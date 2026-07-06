@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.env
+.env
+.env.*
+.venv/
+venv/
+ENV/
+env/
+*.sqlite3
+*.db
+
+# Django
+/staticfiles/
+/media/
+*.log
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+coverage/
+.npm/
+.pnpm-store/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Project-specific
+crm/db.sqlite3
+crm/.venv/
+crm-frontend/.next/
+crm-frontend/node_modules/
