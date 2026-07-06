@@ -136,9 +136,16 @@ class CustomerAccountViewSet(viewsets.ModelViewSet):
             self.request.user,
         )
 
-        return CustomerAccount.objects.select_related("customer").filter(
+        queryset = CustomerAccount.objects.select_related("customer").filter(
             customer_id__in=allowed_customers.values_list("id", flat=True)
         ).order_by("-id")
+
+        account_number = self.request.query_params.get("account_number")
+
+        if account_number:
+            queryset = queryset.filter(account_number=account_number)
+
+        return queryset
 
 
 class CustomerEmployeeAssignmentViewSet(viewsets.ModelViewSet):
