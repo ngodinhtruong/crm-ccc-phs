@@ -18,7 +18,7 @@ import {
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-
+import { DashboardSidebar } from "@/components/layout/DashboardSidebar";
 
 import { authService } from "@/services/auth.service";
 import {
@@ -34,6 +34,7 @@ import { MainNavigationDrawer } from "@/components/layout/MainNavigationDrawer";
 import { DashboardTopbar } from "@/components/layout/DashboardTopbar";
 const tabs = ["Ticket", "Call Center", "Hoạt động", "Ghi chú"];
 
+
 export default function HomePage() {
   const router = useRouter();
 
@@ -41,6 +42,7 @@ export default function HomePage() {
   const [dashboard, setDashboard] = useState<HomeDashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [settingsSidebarOpen, setSettingsSidebarOpen] = useState(false);
 
 
   const [menuOpen, setMenuOpen] = useState(false);
@@ -53,7 +55,6 @@ export default function HomePage() {
     const loadData = async () => {
       try {
         const dashboardData = await dashboardService.getHome();
-        setDashboard(dashboardData);
         setDashboard(dashboardData);
       } catch (err: any) {
         console.error("HOME DASHBOARD ERROR:", err);
@@ -73,19 +74,28 @@ export default function HomePage() {
     loadData();
   }, [router]);
 
-  
+
 
   return (
     <main className="min-h-screen bg-[#eef2f5] text-slate-800">
       <MainNavigationDrawer open={menuOpen} onClose={() => setMenuOpen(false)} />
       {/* Topbar */}
       <DashboardTopbar onMenuClick={() => setMenuOpen(true)} />
+      <DashboardSidebar
+        open={settingsSidebarOpen}
+        onClose={() => setSettingsSidebarOpen(false)}
+      />
 
       {/* Left icon rail */}
-      <aside className="fixed left-0 top-10 z-30 h-[calc(100vh-40px)] w-10 bg-[#263747]">
-        <div className="flex h-10 items-center justify-center bg-[#1d2c39] text-white">
-          ⚙
-        </div>
+      <aside className="fixed left-0 top-14 z-30 h-[calc(100vh-56px)] w-10 bg-[#263747]">
+        <button
+          type="button"
+          onClick={() => setSettingsSidebarOpen(true)}
+          className="flex h-10 w-full items-center justify-center bg-[#1d2c39] text-white hover:bg-orange-500"
+          title="Mở cài đặt"
+        >
+          <Settings size={22} />
+        </button>
       </aside>
 
       {/* Content */}
