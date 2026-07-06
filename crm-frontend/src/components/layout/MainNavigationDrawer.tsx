@@ -377,7 +377,7 @@ export function MainNavigationDrawer({
         }`}
       >
         {/* Main drawer */}
-        <div className="h-screen w-[315px] border-r border-white/10 bg-[#263747]">
+        <div className="h-screen w-[200px] border-r border-white/10 bg-[#263747]">
           <div className="flex h-[56px] items-center justify-between border-b border-white/10 px-4">
             <button
               type="button"
@@ -402,13 +402,13 @@ export function MainNavigationDrawer({
                     key={item.title}
                     type="button"
                     onMouseEnter={() => setActivePanel(item.panel!)}
-                    className={`flex h-[58px] w-full items-center gap-4 px-5 text-left transition hover:bg-white/10 ${
+                    className={`flex h-[40px] w-full items-center gap-4 px-5 text-left transition hover:bg-white/10 ${
                       isActive ? "bg-white/10 text-white" : "text-white/80"
                     }`}
                   >
                     <Icon size={27} className="shrink-0 text-white/70" />
 
-                    <span className="flex-1 text-[20px] font-semibold tracking-wide">
+                    <span className="flex-1 text-[10px] font-semibold tracking-wide">
                       {item.title}
                     </span>
 
@@ -423,11 +423,11 @@ export function MainNavigationDrawer({
                   href={item.href}
                   onMouseEnter={() => setActivePanel(null)}
                   onClick={handleClose}
-                  className="flex h-[58px] items-center gap-4 px-5 text-white/80 transition hover:bg-white/10 hover:text-white"
+                  className="flex h-[40px] items-center gap-4 px-5 text-white/80 transition hover:bg-white/10 hover:text-white"
                 >
                   <Icon size={27} className="shrink-0 text-white/70" />
 
-                  <span className="flex-1 text-[20px] font-semibold tracking-wide">
+                  <span className="flex-1 text-[10px] font-semibold tracking-wide">
                     {item.title}
                   </span>
                 </Link>
@@ -442,7 +442,7 @@ export function MainNavigationDrawer({
             if (activePanel) setActivePanel(activePanel);
           }}
           className={`h-screen overflow-y-auto bg-[#263747] transition-all duration-300 ${
-            activePanel ? "w-[760px] opacity-100" : "w-0 opacity-0"
+            activePanel ? "w-[350px] opacity-100" : "w-0 opacity-0"
           }`}
         >
           <div className="min-w-[760px] px-8 py-7">
@@ -452,7 +452,7 @@ export function MainNavigationDrawer({
                   <div className="flex items-center gap-3">
                     <Menu size={24} className="text-white/60" />
 
-                    <h2 className="text-[24px] font-semibold text-[#b9d8e8]">
+                    <h2 className="text-[10px] font-semibold text-[#b9d8e8]">
                       {panelTitleMap[activePanel]}
                     </h2>
                   </div>
@@ -475,7 +475,7 @@ export function MainNavigationDrawer({
                 >
                   {activeGroups.map((group) => (
                     <section key={group.title} className="min-w-0">
-                      <h3 className="mb-5 text-[22px] font-medium text-[#b9d8e8]">
+                      <h3 className="mb-5 text-[10px] font-medium text-[#b9d8e8]">
                         {group.title}
                       </h3>
 
@@ -495,7 +495,7 @@ export function MainNavigationDrawer({
                                 className="shrink-0 text-white/55 group-hover:text-white"
                               />
 
-                              <span className="truncate text-[17px] font-semibold leading-none">
+                              <span className="truncate text-[10px] font-semibold leading-none">
                                 {item.title}
                               </span>
                             </Link>
