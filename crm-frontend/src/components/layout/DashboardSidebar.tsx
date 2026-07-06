@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   Boxes,
   ChevronDown,
@@ -21,6 +21,9 @@ import {
 type DashboardSidebarProps = {
   open: boolean;
   onClose: () => void;
+  defaultExpandedGroupKey?: string | null;
+  defaultActiveChildKey?: string | null;
+  showCloseButton?: boolean;
 };
 
 type SidebarChildItem = {
@@ -123,7 +126,10 @@ const menuGroups: SidebarGroup[] = [
   },
 ];
 
-function buildPlaceholderChildren(title: string, key: string): SidebarChildItem[] {
+function buildPlaceholderChildren(
+  title: string,
+  key: string
+): SidebarChildItem[] {
   return Array.from({ length: PLACEHOLDER_CHILD_COUNT }, (_, index) => ({
     key: `${key}-placeholder-${index + 1}`,
     title: `${title} ${index + 1}`,
@@ -134,53 +140,58 @@ function buildPlaceholderChildren(title: string, key: string): SidebarChildItem[
 export function DashboardSidebar({
   open,
   onClose,
+  defaultExpandedGroupKey = null,
+  defaultActiveChildKey = null,
+  showCloseButton = true,
 }: DashboardSidebarProps) {
-    const [expandedGroupKey, setExpandedGroupKey] = useState<string | null>(null);
-    const [activeChildKey, setActiveChildKey] = useState<string | null>(null);
-    const [search, setSearch] = useState("");
+  const [expandedGroupKey, setExpandedGroupKey] = useState<string | null>(
+    defaultExpandedGroupKey
+  );
+  const [activeChildKey, setActiveChildKey] = useState<string | null>(
+    defaultActiveChildKey
+  );
+  const [search, setSearch] = useState("");
 
-  const normalizedGroups = useMemo(() => {
-    return menuGroups.map((group) => ({
-      ...group,
-      resolvedChildren:
-        group.children && group.children.length > 0
-          ? group.children
-          : buildPlaceholderChildren(group.title, group.key),
-    }));
-  }, []);
+  const normalizedGroups = menuGroups.map((group) => ({
+    ...group,
+    resolvedChildren:
+      group.children && group.children.length > 0
+        ? group.children
+        : buildPlaceholderChildren(group.title, group.key),
+  }));
 
-  const visibleGroups = useMemo(() => {
-    const keyword = search.trim().toLowerCase();
+  const keyword = search.trim().toLowerCase();
 
-    if (!keyword) {
-      return normalizedGroups;
-    }
+  const visibleGroups = keyword
+    ? normalizedGroups
+        .map((group) => {
+          const groupMatches = group.title.toLowerCase().includes(keyword);
 
-    return normalizedGroups
-      .map((group) => {
-        const groupMatches = group.title.toLowerCase().includes(keyword);
+          const matchedChildren = group.resolvedChildren.filter((child) =>
+            child.title.toLowerCase().includes(keyword)
+          );
 
-        const matchedChildren = group.resolvedChildren.filter((child) =>
-          child.title.toLowerCase().includes(keyword)
-        );
+          if (groupMatches) {
+            return group;
+          }
 
-        if (groupMatches) {
-          return group;
-        }
+          if (matchedChildren.length > 0) {
+            return {
+              ...group,
+              resolvedChildren: matchedChildren,
+            };
+          }
 
-        if (matchedChildren.length > 0) {
-          return {
-            ...group,
-            resolvedChildren: matchedChildren,
-          };
-        }
-
-        return null;
-      })
-      .filter(Boolean) as Array<
-      SidebarGroup & { resolvedChildren: SidebarChildItem[] }
-    >;
-  }, [normalizedGroups, search]);
+          return null;
+        })
+        .filter(
+          (
+            group
+          ): group is SidebarGroup & {
+            resolvedChildren: SidebarChildItem[];
+          } => group !== null
+        )
+    : normalizedGroups;
 
   const handleToggleGroup = (groupKey: string) => {
     setExpandedGroupKey((prev) => (prev === groupKey ? null : groupKey));
@@ -197,11 +208,22 @@ export function DashboardSidebar({
         <button
           type="button"
           onClick={onClose}
-          className="mt-2 flex h-8 w-8 items-center justify-center rounded hover:bg-white/10"
-          title="Đóng"
+          className="flex h-10 w-full items-center justify-center bg-orange-500 hover:bg-orange-600"
+          title="Cài đặt"
         >
-          <X size={18} />
+          <Settings size={22} />
         </button>
+
+        {showCloseButton && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="mt-2 flex h-8 w-8 items-center justify-center rounded hover:bg-white/10"
+            title="Đóng"
+          >
+            <X size={18} />
+          </button>
+        )}
       </div>
 
       {/* Main sidebar */}
@@ -209,7 +231,7 @@ export function DashboardSidebar({
         <div className="border-b border-white/10 px-3 py-3">
           <input
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(event) => setSearch(event.target.value)}
             placeholder="Tìm kiếm cài đặt"
             className="h-10 w-full rounded-md bg-white px-3 text-sm text-slate-700 outline-none placeholder:text-slate-400"
           />
@@ -248,12 +270,15 @@ export function DashboardSidebar({
                         <Link
                           key={child.key}
                           href={child.href || "#"}
-                          onClick={(e) => {
+                          onClick={(event) => {
                             setActiveChildKey(child.key);
 
                             if (isPlaceholder) {
-                              e.preventDefault();
+                              event.preventDefault();
+                              return;
                             }
+
+                            onClose();
                           }}
                           className={`flex min-h-10 items-center rounded px-3 text-[14px] font-semibold transition ${
                             isActive

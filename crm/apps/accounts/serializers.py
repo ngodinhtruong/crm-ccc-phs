@@ -14,7 +14,14 @@ class UserSerializer(serializers.ModelSerializer):
         required=False,
         allow_blank=True,
     )
+
     employee_name = serializers.SerializerMethodField()
+    employee_code = serializers.SerializerMethodField()
+    branch_name = serializers.SerializerMethodField()
+    department = serializers.SerializerMethodField()
+    position = serializers.SerializerMethodField()
+    role_names = serializers.SerializerMethodField()
+    role_codes = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -26,6 +33,12 @@ class UserSerializer(serializers.ModelSerializer):
             "last_name",
             "employee",
             "employee_name",
+            "employee_code",
+            "branch_name",
+            "department",
+            "position",
+            "role_names",
+            "role_codes",
             "status",
             "is_active",
             "is_staff",
@@ -35,7 +48,35 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = ["is_superuser"]
 
     def get_employee_name(self, obj):
-        return obj.employee.full_name if obj.employee else None
+        return obj.employee.full_name if obj.employee else ""
+
+    def get_employee_code(self, obj):
+        return obj.employee.employee_code if obj.employee else ""
+
+    def get_branch_name(self, obj):
+        if obj.employee and obj.employee.branch:
+            return obj.employee.branch.branch_name
+        return ""
+
+    def get_department(self, obj):
+        return obj.employee.department if obj.employee else ""
+
+    def get_position(self, obj):
+        return obj.employee.position if obj.employee else ""
+
+    def get_role_names(self, obj):
+        return list(
+            UserRole.objects.filter(user=obj)
+            .select_related("role")
+            .values_list("role__role_name", flat=True)
+        )
+
+    def get_role_codes(self, obj):
+        return list(
+            UserRole.objects.filter(user=obj)
+            .select_related("role")
+            .values_list("role__role_code", flat=True)
+        )
 
     def create(self, validated_data):
         password = validated_data.pop("password", None)

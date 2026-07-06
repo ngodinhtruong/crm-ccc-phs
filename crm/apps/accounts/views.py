@@ -6,7 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from django.contrib.auth import get_user_model
-
+from django.db.models import Q
 from apps.accounts.models import Permission, Role, RolePermission, UserBranchAccess, UserRole
 from apps.accounts.serializers import (
     PermissionSerializer,
@@ -29,7 +29,46 @@ User = get_user_model()
 class UserViewSet(viewsets.ModelViewSet):
     permission_classes = [IsSystemManager]
     serializer_class = UserSerializer
-    queryset = User.objects.select_related("employee").all().order_by("id")
+
+    def get_queryset(self):
+        queryset = User.objects.select_related(
+            "employee",
+            "employee__branch",
+        ).all().order_by("id")
+
+        active = self.request.query_params.get("active")
+        status_value = self.request.query_params.get("status")
+        q = self.request.query_params.get("q")
+        branch = self.request.query_params.get("branch")
+        department = self.request.query_params.get("department")
+
+        if active == "true":
+            queryset = queryset.filter(is_active=True)
+
+        if active == "false":
+            queryset = queryset.filter(is_active=False)
+
+        if status_value:
+            queryset = queryset.filter(status=status_value)
+
+        if branch:
+            queryset = queryset.filter(employee__branch_id=branch)
+
+        if department:
+            queryset = queryset.filter(employee__department__icontains=department)
+
+        if q:
+            queryset = queryset.filter(
+                Q(username__icontains=q)
+                | Q(email__icontains=q)
+                | Q(first_name__icontains=q)
+                | Q(last_name__icontains=q)
+                | Q(employee__full_name__icontains=q)
+                | Q(employee__employee_code__icontains=q)
+                | Q(employee__department__icontains=q)
+            )
+
+        return queryset
 
     @action(detail=True, methods=["post"], url_path="set-roles")
     @transaction.atomic

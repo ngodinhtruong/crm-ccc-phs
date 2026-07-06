@@ -134,6 +134,7 @@ STATIC_URL = 'static/'
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
+    "http://192.168.200.36:3000"
 ]
 
 AUTH_USER_MODEL = "accounts.User"
