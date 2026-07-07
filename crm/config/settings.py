@@ -50,7 +50,8 @@ INSTALLED_APPS = [
     "apps.sla",
     "apps.notifications",
     "apps.common",
-    "apps.calls"
+    "apps.calls",
+    "apps.chatbots",
 ]
 
 MIDDLEWARE = [

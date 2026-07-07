@@ -32,6 +32,7 @@ import {
     Users,
     UsersRound,
     X,
+    BotMessageSquare,
 } from "lucide-react";
 
 type MainNavigationDrawerProps = {
@@ -119,7 +120,7 @@ const panelGroups: Record<PanelKey, PanelGroup[]> = {
                 },
                 {
                     title: "Công ty",
-                    href: "/customers/companies",
+                    href: "/companies",
                     icon: Building2,
                 },
             ],
@@ -167,6 +168,11 @@ const panelGroups: Record<PanelKey, PanelGroup[]> = {
                     title: "Ticket",
                     href: "/tickets",
                     icon: FileCheck2,
+                },
+                {
+                    title:"Chatbots",
+                    href: "/chatbots",
+                    icon: BotMessageSquare,
                 },
                 {
                     title: "Kho kiến thức",

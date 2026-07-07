@@ -17,20 +17,109 @@ class CustomerType(models.Model):
 
 
 class Company(TimeStampedModel):
-    company_code = models.CharField(max_length=50, unique=True, null=True, blank=True)
+    company_code = models.CharField(
+        max_length=50,
+        unique=True,
+        null=True,
+        blank=True,
+    )
+
     company_name = models.CharField(max_length=255)
-    tax_code = models.CharField(max_length=50, null=True, blank=True)
+
     phone = models.CharField(max_length=50, null=True, blank=True)
     email = models.EmailField(max_length=255, null=True, blank=True)
+    website = models.URLField(max_length=255, null=True, blank=True)
+    fax = models.CharField(max_length=50, null=True, blank=True)
+
+    tax_code = models.CharField(max_length=50, null=True, blank=True)
+
+    account_number = models.CharField(
+        max_length=10,
+        unique=True,
+        null=True,
+        blank=True,
+    )
+    opened_at = models.DateField(null=True, blank=True)
+
+    primary_contact = models.ForeignKey(
+        "customers.Customer",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="primary_contact_companies",
+    )
+
+    source = models.ForeignKey(
+        "customers.CustomerSource",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="companies",
+    )
+
+    rating = models.ForeignKey(
+        "customers.CustomerRating",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="companies",
+    )
+
+    membership_tier = models.ForeignKey(
+        "customers.MembershipTier",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="companies",
+    )
+
+    assigned_employee = models.ForeignKey(
+        "branches.Employee",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assigned_companies",
+    )
+
     address = models.TextField(null=True, blank=True)
+    country = models.CharField(max_length=100, null=True, blank=True)
+    province = models.CharField(max_length=100, null=True, blank=True)
+    district = models.CharField(max_length=100, null=True, blank=True)
+    ward = models.CharField(max_length=100, null=True, blank=True)
+
+    description = models.TextField(null=True, blank=True)
+
     status = models.CharField(max_length=20, default="ACTIVE")
+
+    created_by_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_companies",
+    )
+
+    updated_by_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="updated_companies",
+    )
 
     class Meta:
         db_table = "companies"
+        indexes = [
+            models.Index(fields=["company_name"]),
+            models.Index(fields=["phone"]),
+            models.Index(fields=["email"]),
+            models.Index(fields=["tax_code"]),
+            models.Index(fields=["account_number"]),
+            models.Index(fields=["status"]),
+        ]
 
     def __str__(self):
         return self.company_name
-
 
 class CustomerSource(models.Model):
     source_code = models.CharField(max_length=50, unique=True)
@@ -175,7 +264,7 @@ class CustomerAccount(TimeStampedModel):
         related_name="accounts",
     )
 
-    account_number = models.CharField(max_length=100)
+    account_number = models.CharField(max_length=10, unique=True)
     opened_at = models.DateField(null=True, blank=True)
     account_status = models.CharField(max_length=50, null=True, blank=True)
 
@@ -183,11 +272,9 @@ class CustomerAccount(TimeStampedModel):
 
     class Meta:
         db_table = "customer_accounts"
-        constraints = [
-            models.UniqueConstraint(
-                fields=["customer", "account_number"],
-                name="uq_customer_account_number",
-            )
+        indexes = [
+            models.Index(fields=["account_number"]),
+            models.Index(fields=["account_status"]),
         ]
 
     def __str__(self):

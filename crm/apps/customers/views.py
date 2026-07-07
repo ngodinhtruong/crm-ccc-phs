@@ -1,5 +1,6 @@
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import action
 
 from apps.customers.models import (
     Company,
@@ -21,7 +22,6 @@ from apps.customers.serializers import (
     CustomerTypeSerializer,
     MembershipTierSerializer,
 )
-
 from django.db.models import Q
 
 from apps.accounts.api_permissions import HasActionPermission, MasterDataPermission
@@ -34,9 +34,95 @@ class CustomerTypeViewSet(viewsets.ModelViewSet):
 
 
 class CompanyViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [HasActionPermission]
     serializer_class = CompanySerializer
-    queryset = Company.objects.all().order_by("id")
+
+    permission_action_map = {
+        "create": "CUSTOMER_CREATE",
+        "update": "CUSTOMER_AMEND",
+        "partial_update": "CUSTOMER_AMEND",
+        "destroy": "CUSTOMER_AMEND",
+    }
+
+    def get_queryset(self):
+        queryset = Company.objects.select_related(
+            "primary_contact",
+            "source",
+            "rating",
+            "membership_tier",
+            "assigned_employee",
+        ).all().order_by("-id")
+
+        keyword = self.request.query_params.get("q")
+        status_value = self.request.query_params.get("status")
+        source_id = self.request.query_params.get("source")
+        rating_id = self.request.query_params.get("rating")
+        membership_tier_id = self.request.query_params.get("membership_tier")
+
+        if keyword:
+            queryset = queryset.filter(
+                Q(company_code__icontains=keyword)
+                | Q(company_name__icontains=keyword)
+                | Q(phone__icontains=keyword)
+                | Q(email__icontains=keyword)
+                | Q(tax_code__icontains=keyword)
+                | Q(account_number__icontains=keyword)
+            )
+
+        if status_value:
+            queryset = queryset.filter(status=status_value)
+
+        if source_id:
+            queryset = queryset.filter(source_id=source_id)
+
+        if rating_id:
+            queryset = queryset.filter(rating_id=rating_id)
+
+        if membership_tier_id:
+            queryset = queryset.filter(membership_tier_id=membership_tier_id)
+
+        return queryset
+
+    def perform_create(self, serializer):
+        serializer.save(
+            created_by_user=self.request.user,
+            updated_by_user=self.request.user,
+        )
+
+    def perform_update(self, serializer):
+        serializer.save(updated_by_user=self.request.user)
+
+    @action(detail=True, methods=["get"], url_path="contacts")
+    def contacts(self, request, pk=None):
+        company = self.get_object()
+
+        queryset = Customer.objects.select_related(
+            "customer_type",
+            "branch",
+            "company",
+        ).filter(company=company)
+
+        queryset = filter_customers_by_user(queryset, request.user)
+
+        queryset = queryset.filter(
+            Q(customer_type__type_code__icontains="CONTACT")
+            | Q(customer_type__type_code__icontains="LIEN_HE")
+            | Q(customer_type__type_name__icontains="Người liên hệ")
+            | Q(customer_type__type_name__icontains="liên hệ")
+        )
+
+        keyword = request.query_params.get("q")
+
+        if keyword:
+            queryset = queryset.filter(
+                Q(full_name__icontains=keyword)
+                | Q(phone__icontains=keyword)
+                | Q(email__icontains=keyword)
+                | Q(customer_code__icontains=keyword)
+            )
+
+        serializer = CustomerSerializer(queryset.order_by("full_name"), many=True)
+        return Response(serializer.data)
 
 
 class CustomerSourceViewSet(viewsets.ModelViewSet):

@@ -1,3 +1,5 @@
+import re
+
 from rest_framework import serializers
 
 from apps.customers.models import (
@@ -19,9 +21,106 @@ class CustomerTypeSerializer(serializers.ModelSerializer):
 
 
 class CompanySerializer(serializers.ModelSerializer):
+    primary_contact_name = serializers.SerializerMethodField()
+    source_name = serializers.SerializerMethodField()
+    rating_name = serializers.SerializerMethodField()
+    membership_tier_name = serializers.SerializerMethodField()
+    assigned_employee_name = serializers.SerializerMethodField()
+    opened_at_display = serializers.SerializerMethodField()
+    status_label = serializers.SerializerMethodField()
+
     class Meta:
         model = Company
         fields = "__all__"
+
+    def get_primary_contact_name(self, obj):
+        primary_contact = getattr(obj, "primary_contact", None)
+        return primary_contact.full_name if primary_contact else ""
+
+    def get_source_name(self, obj):
+        source = getattr(obj, "source", None)
+        return source.source_name if source else ""
+
+    def get_rating_name(self, obj):
+        rating = getattr(obj, "rating", None)
+        return rating.rating_name if rating else ""
+
+    def get_membership_tier_name(self, obj):
+        membership_tier = getattr(obj, "membership_tier", None)
+        return membership_tier.tier_name if membership_tier else ""
+
+    def get_assigned_employee_name(self, obj):
+        assigned_employee = getattr(obj, "assigned_employee", None)
+        return assigned_employee.full_name if assigned_employee else ""
+
+    def get_opened_at_display(self, obj):
+        opened_at = getattr(obj, "opened_at", None)
+
+        if not opened_at:
+            return ""
+
+        return opened_at.strftime("%d-%m-%Y")
+
+    def get_status_label(self, obj):
+        status = getattr(obj, "status", "")
+
+        if status == "ACTIVE":
+            return "Đang hoạt động"
+
+        if status == "INACTIVE":
+            return "Ngừng hoạt động"
+
+        return status or ""
+
+    def validate_account_number(self, value):
+        if not value:
+            return value
+
+        if not re.fullmatch(r"[A-Za-z0-9]{10}", value):
+            raise serializers.ValidationError(
+                "Số tài khoản phải gồm đúng 10 ký tự, chỉ bao gồm chữ và số."
+            )
+
+        queryset = Company.objects.filter(account_number=value)
+
+        if self.instance:
+            queryset = queryset.exclude(id=self.instance.id)
+
+        if queryset.exists():
+            raise serializers.ValidationError("Số tài khoản công ty này đã tồn tại.")
+
+        return value
+
+    def validate(self, attrs):
+        primary_contact = attrs.get(
+            "primary_contact",
+            getattr(self.instance, "primary_contact", None),
+        )
+
+        if primary_contact:
+            # Khi thêm mới công ty thì công ty chưa có id,
+            # nên chưa thể kiểm tra người liên hệ có thuộc công ty đó chưa.
+            if not self.instance:
+                raise serializers.ValidationError(
+                    {
+                        "primary_contact": (
+                            "Cần tạo công ty trước, sau đó mới chọn Người liên hệ chính "
+                            "thuộc công ty này."
+                        )
+                    }
+                )
+
+            if primary_contact.company_id != self.instance.id:
+                raise serializers.ValidationError(
+                    {
+                        "primary_contact": (
+                            "Người liên hệ chính phải là khách hàng/người liên hệ "
+                            "thuộc đúng công ty này."
+                        )
+                    }
+                )
+
+        return attrs
 
 
 class CustomerSourceSerializer(serializers.ModelSerializer):
@@ -44,6 +143,7 @@ class MembershipTierSerializer(serializers.ModelSerializer):
 
 class CustomerSerializer(serializers.ModelSerializer):
     branch_name = serializers.SerializerMethodField()
+    customer_type_name = serializers.SerializerMethodField()
     company_name = serializers.SerializerMethodField()
     source_name = serializers.SerializerMethodField()
     rating_name = serializers.SerializerMethodField()
@@ -62,6 +162,9 @@ class CustomerSerializer(serializers.ModelSerializer):
 
     def get_branch_name(self, obj):
         return obj.branch.branch_name if obj.branch else ""
+
+    def get_customer_type_name(self, obj):
+        return obj.customer_type.type_name if obj.customer_type else ""
 
     def get_company_name(self, obj):
         return obj.company.company_name if obj.company else ""
@@ -94,7 +197,11 @@ class CustomerSerializer(serializers.ModelSerializer):
         value = None
 
         if account:
-            value = getattr(account, "opened_at", None) or getattr(account, "created_at", None)
+            value = getattr(account, "opened_at", None) or getattr(
+                account,
+                "created_at",
+                None,
+            )
 
         if not value:
             value = getattr(obj, "created_at", None)
@@ -193,7 +300,17 @@ class CustomerAccountSerializer(serializers.ModelSerializer):
 
         return value
 
+
 class CustomerEmployeeAssignmentSerializer(serializers.ModelSerializer):
+    customer_name = serializers.SerializerMethodField()
+    employee_name = serializers.SerializerMethodField()
+
     class Meta:
         model = CustomerEmployeeAssignment
         fields = "__all__"
+
+    def get_customer_name(self, obj):
+        return obj.customer.full_name if obj.customer else ""
+
+    def get_employee_name(self, obj):
+        return obj.employee.full_name if obj.employee else ""
