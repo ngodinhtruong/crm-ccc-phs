@@ -6,8 +6,9 @@ from apps.common.models import TimeStampedModel
 
 
 class SlaPolicy(TimeStampedModel):
-    sla_code = models.CharField(max_length=50, unique=True)
+    # sla_code = models.CharField(max_length=50, unique=True)
     sla_name = models.CharField(max_length=255)
+    description = models.TextField(null=True, blank=True)
 
     support_category = models.ForeignKey(
         "tickets.TicketSupportCategory",
@@ -87,6 +88,13 @@ class SlaPolicy(TimeStampedModel):
         null=True,
         blank=True,
         related_name="created_sla_policies",
+    )
+    assigned_to_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assigned_sla_policies",
     )
 
     activated_by_user = models.ForeignKey(

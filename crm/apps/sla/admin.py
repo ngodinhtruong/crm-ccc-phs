@@ -18,8 +18,8 @@ from .models import (
 
 @admin.register(SlaPolicy)
 class SlaPolicyAdmin(admin.ModelAdmin):
-    list_display = ("id", "sla_code", "sla_name", "status", "version", "is_active", "effective_from", "effective_to")
-    search_fields = ("sla_code", "sla_name")
+    list_display = ("id", "sla_name", "status", "version", "is_active", "effective_from", "effective_to")
+    search_fields = ("sla_name",)
     list_filter = ("status", "is_active", "support_category", "classification", "priority", "processing_unit")
 
 

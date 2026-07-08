@@ -32,7 +32,12 @@ class SlaPolicyViewSet(viewsets.ModelViewSet):
     }
 
     def perform_create(self, serializer):
-        serializer.save(created_by_user=self.request.user)
+        assigned_to_user = serializer.validated_data.get("assigned_to_user")
+
+        serializer.save(
+            created_by_user=self.request.user,
+            assigned_to_user=assigned_to_user or self.request.user,
+        )
 
 
 class SlaPolicyTaskViewSet(viewsets.ModelViewSet):
