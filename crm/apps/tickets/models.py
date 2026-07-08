@@ -278,6 +278,17 @@ class Ticket(TimeStampedModel):
 
     class Meta:
         db_table = "tickets"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["source", "source_ref_id"],
+                condition=(
+                    Q(source__isnull=False)
+                    & Q(source_ref_id__isnull=False)
+                    & ~Q(source_ref_id="")
+                ),
+                name="uq_ticket_source_source_ref_id",
+            )
+        ]
         indexes = [
             models.Index(fields=["ticket_code"]),
             models.Index(fields=["customer"]),

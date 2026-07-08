@@ -97,6 +97,7 @@ class ChatbotSessionSummary(TimeStampedModel):
     dashboard_category = models.CharField(max_length=255, null=True, blank=True)
 
     state = models.CharField(max_length=50, null=True, blank=True)
+
     outcome_type = models.CharField(
         max_length=50,
         choices=OUTCOME_CHOICES,
@@ -138,26 +139,18 @@ class ChatbotSessionSummary(TimeStampedModel):
         return self.session_id
 
 
-class ChatbotFAQ(TimeStampedModel):
-    external_id = models.CharField(max_length=100, unique=True, null=True, blank=True)
-    faq_code = models.CharField(max_length=50, unique=True, null=True, blank=True)
+    class ChatbotSyncCursor(TimeStampedModel):
+        source_name = models.CharField(max_length=100, unique=True)
 
-    category = models.CharField(max_length=255, null=True, blank=True)
-    question = models.TextField()
-    answer = models.TextField()
+        last_synced_at = models.DateTimeField(null=True, blank=True)
+        last_success_at = models.DateTimeField(null=True, blank=True)
 
-    hit_count = models.IntegerField(default=0)
-    is_active = models.BooleanField(default=True)
+        last_row_count = models.IntegerField(default=0)
+        status = models.CharField(max_length=50, default="SUCCESS")
+        error_message = models.TextField(null=True, blank=True)
 
-    raw_payload = models.JSONField(null=True, blank=True)
+        class Meta:
+            db_table = "chatbot_sync_cursors"
 
-    class Meta:
-        db_table = "chatbot_faqs"
-        indexes = [
-            models.Index(fields=["category"]),
-            models.Index(fields=["hit_count"]),
-            models.Index(fields=["is_active"]),
-        ]
-
-    def __str__(self):
-        return self.question[:100]
+        def __str__(self):
+            return self.source_name

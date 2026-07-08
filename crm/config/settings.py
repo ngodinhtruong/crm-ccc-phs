@@ -10,11 +10,18 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
+load_dotenv(BASE_DIR / ".env")
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
@@ -41,6 +48,7 @@ INSTALLED_APPS = [
     # Third-party apps
     "rest_framework",
     "corsheaders",
+    "django_celery_beat",
 
     # Local apps
     "apps.accounts",
@@ -149,3 +157,31 @@ REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
 }
+
+
+#supabase
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+
+SUPABASE_XPRO_CHAT_TABLE = os.getenv("SUPABASE_XPRO_CHAT_TABLE", "xpro_chat")
+SUPABASE_CSKH_STATE_TABLE = os.getenv("SUPABASE_CSKH_STATE_TABLE", "cskh_state")
+SUPABASE_CSKH_REQUESTS_TABLE = os.getenv("SUPABASE_CSKH_REQUESTS_TABLE", "cskh_requests")
+
+
+#selery
+CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://127.0.0.1:6379/0")
+CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://127.0.0.1:6379/1")
+CELERY_TIMEZONE = "Asia/Ho_Chi_Minh"
+CELERY_ENABLE_UTC = False
+CELERY_TASK_TIME_LIMIT = 60 * 10
+CELERY_TASK_SOFT_TIME_LIMIT = 60 * 8
+CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": os.getenv("REDIS_CACHE_URL", "redis://127.0.0.1:6379/2"),
+    }
+}
+CHATBOT_SYNC_INTERVAL_SECONDS = int(os.getenv("CHATBOT_SYNC_INTERVAL_SECONDS", 60))
+CHATBOT_SYNC_LOOKBACK_MINUTES = int(os.getenv("CHATBOT_SYNC_LOOKBACK_MINUTES", 30))

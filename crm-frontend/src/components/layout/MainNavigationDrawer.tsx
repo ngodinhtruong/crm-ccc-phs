@@ -171,7 +171,7 @@ const panelGroups: Record<PanelKey, PanelGroup[]> = {
                 },
                 {
                     title:"Chatbots",
-                    href: "/chatbots",
+                    href: "/chatbots/dashboard",
                     icon: BotMessageSquare,
                 },
                 {
