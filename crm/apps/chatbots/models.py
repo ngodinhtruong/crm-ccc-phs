@@ -1,9 +1,8 @@
 from django.db import models
-
 from apps.common.models import TimeStampedModel
 
-
 class ChatbotChatLog(TimeStampedModel):
+    # external_id dùng để lưu cột id (bigint) từ Supabase kéo về
     external_id = models.CharField(max_length=100, unique=True)
     session_id = models.CharField(max_length=100, db_index=True)
     user_id = models.CharField(max_length=100, null=True, blank=True)
@@ -13,6 +12,7 @@ class ChatbotChatLog(TimeStampedModel):
     answer = models.TextField(null=True, blank=True)
     category = models.CharField(max_length=100, null=True, blank=True)
 
+    # external_created_at dùng để lưu cột created_at từ Supabase
     external_created_at = models.DateTimeField(null=True, blank=True)
     raw_payload = models.JSONField(null=True, blank=True)
 
@@ -24,19 +24,21 @@ class ChatbotChatLog(TimeStampedModel):
             models.Index(fields=["external_created_at"]),
         ]
 
+    def __str__(self):
+        return f"Log: {self.session_id}"
+
 
 class ChatbotState(TimeStampedModel):
+    # external_id dùng để lưu cột id (bigint) từ Supabase
     external_id = models.CharField(max_length=100, unique=True)
     session_id = models.CharField(max_length=100, db_index=True)
-    user_id = models.CharField(max_length=100, null=True, blank=True)
+    user_id = models.CharField(max_length=100, null=True, blank=True) # Trong DB của bạn cột này là NO NULL
     channel = models.CharField(max_length=50, null=True, blank=True)
 
-    # closed / waiting_info / collected
-    state = models.CharField(max_length=50, null=True, blank=True)
     step = models.CharField(max_length=100, null=True, blank=True)
-    answer = models.TextField(null=True, blank=True)
-    category = models.CharField(max_length=100, null=True, blank=True)
+    reason = models.TextField(null=True, blank=True)
 
+    # external_created_at dùng để lưu cột updated_at từ Supabase
     external_created_at = models.DateTimeField(null=True, blank=True)
     raw_payload = models.JSONField(null=True, blank=True)
 
@@ -44,12 +46,16 @@ class ChatbotState(TimeStampedModel):
         db_table = "chatbot_states"
         indexes = [
             models.Index(fields=["session_id"]),
-            models.Index(fields=["state"]),
+            models.Index(fields=["step"]),
             models.Index(fields=["external_created_at"]),
         ]
 
+    def __str__(self):
+        return f"State: {self.session_id}"
+
 
 class ChatbotCskhRequest(TimeStampedModel):
+    # external_id dùng để lưu cột id (bigint) từ Supabase
     external_id = models.CharField(max_length=100, unique=True)
     session_id = models.CharField(max_length=100, db_index=True)
     user_id = models.CharField(max_length=100, null=True, blank=True)
@@ -60,6 +66,7 @@ class ChatbotCskhRequest(TimeStampedModel):
     reason = models.TextField(null=True, blank=True)
     status = models.CharField(max_length=50, null=True, blank=True)
 
+    # external_created_at dùng để lưu cột created_at từ Supabase
     external_created_at = models.DateTimeField(null=True, blank=True)
     raw_payload = models.JSONField(null=True, blank=True)
 
@@ -70,6 +77,9 @@ class ChatbotCskhRequest(TimeStampedModel):
             models.Index(fields=["status"]),
             models.Index(fields=["external_created_at"]),
         ]
+
+    def __str__(self):
+        return f"Request: {self.session_id}"
 
 
 class ChatbotSessionSummary(TimeStampedModel):
@@ -95,8 +105,6 @@ class ChatbotSessionSummary(TimeStampedModel):
 
     main_category = models.CharField(max_length=100, null=True, blank=True)
     dashboard_category = models.CharField(max_length=255, null=True, blank=True)
-
-    state = models.CharField(max_length=50, null=True, blank=True)
 
     outcome_type = models.CharField(
         max_length=50,
@@ -139,18 +147,18 @@ class ChatbotSessionSummary(TimeStampedModel):
         return self.session_id
 
 
-    class ChatbotSyncCursor(TimeStampedModel):
-        source_name = models.CharField(max_length=100, unique=True)
+class ChatbotSyncCursor(TimeStampedModel):
+    source_name = models.CharField(max_length=100, unique=True)
 
-        last_synced_at = models.DateTimeField(null=True, blank=True)
-        last_success_at = models.DateTimeField(null=True, blank=True)
+    last_synced_at = models.DateTimeField(null=True, blank=True)
+    last_success_at = models.DateTimeField(null=True, blank=True)
 
-        last_row_count = models.IntegerField(default=0)
-        status = models.CharField(max_length=50, default="SUCCESS")
-        error_message = models.TextField(null=True, blank=True)
+    last_row_count = models.IntegerField(default=0)
+    status = models.CharField(max_length=50, default="SUCCESS")
+    error_message = models.TextField(null=True, blank=True)
 
-        class Meta:
-            db_table = "chatbot_sync_cursors"
+    class Meta:
+        db_table = "chatbot_sync_cursors"
 
-        def __str__(self):
-            return self.source_name
+    def __str__(self):
+        return self.source_name
