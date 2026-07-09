@@ -129,49 +129,33 @@ class ChatbotDashboardOverviewAPIView(ChatbotDashboardFilterMixin, APIView):
             ChatbotSessionSummary.objects.select_related("ticket").all()
         )
 
-        total = queryset.count()
+        total_sessions = queryset.count()
+        total_messages = ChatbotChatLog.objects.all().count()
 
-        ccc = queryset.filter(
-            outcome_type=ChatbotSessionSummary.OUTCOME_CCC
-        ).count()
-
-        spam = queryset.filter(
-            outcome_type__in=[
-                ChatbotSessionSummary.OUTCOME_SPAM,
-                ChatbotSessionSummary.OUTCOME_TIMEOUT,
-            ]
-        ).count()
-
-        # Rule mới:
-        # Chatbot tự xử lý = tổng phiên - phiên chuyển CCC - phiên rác/timeout
-        bot_done = max(total - ccc - spam, 0)
-
-        waiting_info = queryset.filter(
-            outcome_type=ChatbotSessionSummary.OUTCOME_WAITING_INFO
-        ).count()
-
-        collected = queryset.filter(
-            outcome_type=ChatbotSessionSummary.OUTCOME_COLLECTED
-        ).count()
+        ccc = queryset.filter(outcome_type=ChatbotSessionSummary.OUTCOME_CCC).count()
+        spam = queryset.filter(outcome_type=ChatbotSessionSummary.OUTCOME_SPAM).count()
+        bot_done = queryset.filter(outcome_type=ChatbotSessionSummary.OUTCOME_BOT_DONE).count()
+        waiting_info = queryset.filter(outcome_type=ChatbotSessionSummary.OUTCOME_WAITING_INFO).count()
+        collected = queryset.filter(outcome_type=ChatbotSessionSummary.OUTCOME_COLLECTED).count()
 
         process_classification = [
             {
                 "name": "Chatbot tự xử lý",
                 "code": "BOT_DONE",
                 "value": bot_done,
-                "rate": self.rate(bot_done, total),
+                "rate": self.rate(bot_done, total_sessions),
             },
             {
                 "name": "Chuyển CCC",
                 "code": "CCC",
                 "value": ccc,
-                "rate": self.rate(ccc, total),
+                "rate": self.rate(ccc, total_sessions),
             },
             {
-                "name": "Câu hỏi rác / Timeout",
-                "code": "SPAM_TIMEOUT",
+                "name": "Câu hỏi rác",
+                "code": "SPAM",
                 "value": spam,
-                "rate": self.rate(spam, total),
+                "rate": self.rate(spam, total_sessions),
             },
         ]
 
@@ -217,23 +201,24 @@ class ChatbotDashboardOverviewAPIView(ChatbotDashboardFilterMixin, APIView):
                 },
                 "summary": {
                     "total_received": {
-                        "value": total,
+                        "value": total_messages,
+                        "session_count": total_sessions,
                         "label": "Tổng tiếp nhận",
                     },
                     "bot_done": {
                         "value": bot_done,
-                        "rate": self.rate(bot_done, total),
+                        "rate": self.rate(bot_done, total_sessions),
                         "label": "Chatbot tự xử lý",
                     },
                     "ccc": {
                         "value": ccc,
-                        "rate": self.rate(ccc, total),
+                        "rate": self.rate(ccc, total_sessions),
                         "label": "Chuyển sang CCC xử lý",
                     },
                     "spam": {
                         "value": spam,
-                        "rate": self.rate(spam, total),
-                        "label": "Câu hỏi rác / Timeout",
+                        "rate": self.rate(spam, total_sessions),
+                        "label": "Câu hỏi rác",
                     },
                     "waiting_info": {
                         "value": waiting_info,
