@@ -31,28 +31,11 @@ def normalize_state(value):
 
 
 def map_dashboard_category(category, reason=""):
-    category = normalize_category(category)
-    reason_text = str(reason or "").lower()
-
-    if "giao dịch" in reason_text or "lệnh" in reason_text or "mua bán" in reason_text:
-        return "Hỗ trợ Giao dịch"
-
-    if "tài khoản" in reason_text or "đăng nhập" in reason_text or "xác thực" in reason_text:
-        return "Quản lý Tài khoản PHS"
-
-    if "app" in reason_text or "mobile" in reason_text or "ứng dụng" in reason_text:
-        return "Ứng dụng PHS"
-
-    if category == "CUSTOMER_CARE":
-        return "Dịch vụ CSKH"
-
-    if category == "FAQ":
-        return "FAQ"
-
-    if category == "RESEARCH":
-        return "Tra cứu / Tư vấn"
-
-    return "Khác"
+    """
+    Tạm thời để trống việc phân loại chủ đề Dashboard.
+    Sau này có rule mới thì viết logic vào đây.
+    """
+    return ""  
 
 
 def build_full_conversation(logs):

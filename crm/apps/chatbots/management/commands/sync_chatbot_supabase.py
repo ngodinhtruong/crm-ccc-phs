@@ -136,6 +136,32 @@ class Command(BaseCommand):
 
         self.stdout.write(f"Synced chat logs: {len(rows)}")
 
+    # def sync_states(self, client, table_name):
+    #     rows = self.fetch_all(client, table_name)
+
+    #     for row in rows:
+    #         external_id = str(get_value(row, "id", "external_id"))
+    #         session_id = str(get_value(row, "session_id", "sessionID", "sessionId") or "")
+
+    #         if not external_id or not session_id:
+    #             continue
+
+    #         ChatbotState.objects.update_or_create(
+    #             external_id=external_id,
+    #             defaults={
+    #                 "session_id": session_id,
+    #                 "user_id": get_value(row, "user_id", "user_ID", "userId"),
+    #                 "channel": get_value(row, "channel"),
+    #                 "state": get_value(row, "state", "status"),
+    #                 "step": get_value(row, "step"),
+    #                 "answer": get_value(row, "answer"),
+    #                 "category": get_value(row, "category", "categories", "catogeries"),
+    #                 "external_created_at": parse_dt(get_value(row, "create_at", "created_at")),
+    #                 "raw_payload": row,
+    #             },
+    #         )
+
+    #     self.stdout.write(f"Synced states: {len(rows)}")
     def sync_states(self, client, table_name):
         rows = self.fetch_all(client, table_name)
 
@@ -152,11 +178,10 @@ class Command(BaseCommand):
                     "session_id": session_id,
                     "user_id": get_value(row, "user_id", "user_ID", "userId"),
                     "channel": get_value(row, "channel"),
-                    "state": get_value(row, "state", "status"),
                     "step": get_value(row, "step"),
-                    "answer": get_value(row, "answer"),
-                    "category": get_value(row, "category", "categories", "catogeries"),
-                    "external_created_at": parse_dt(get_value(row, "create_at", "created_at")),
+                    "reason": get_value(row, "reason"), # Đã thêm cột reason
+                    # Lấy updated_at theo đúng schema Supabase
+                    "external_created_at": parse_dt(get_value(row, "updated_at", "updatedAt")),
                     "raw_payload": row,
                 },
             )
