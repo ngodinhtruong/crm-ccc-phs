@@ -8,6 +8,7 @@ from apps.chatbots.models import (
     ChatbotChatLog,
     ChatbotCskhRequest,
     ChatbotState,
+    ChatbotSyncCursor,
 )
 from apps.chatbots.services import (
     create_crm_tickets_from_chatbot,
@@ -64,12 +65,17 @@ class Command(BaseCommand):
         state_table = getattr(settings, "SUPABASE_CSKH_STATE_TABLE", "cskh_state")
         request_table = getattr(settings, "SUPABASE_CSKH_REQUESTS_TABLE", "cskh_requests")
 
-        self.sync_chat_logs(client, chat_table)
-        self.sync_states(client, state_table)
-        self.sync_requests(client, request_table)
+        affected_chat = self.sync_chat_logs(client, chat_table)
+        affected_state = self.sync_states(client, state_table)
+        affected_request = self.sync_requests(client, request_table)
 
-        self.stdout.write("Rebuilding chatbot session summaries...")
-        rebuild_chatbot_session_summaries()
+        affected_sessions = affected_chat | affected_state | affected_request
+
+        if affected_sessions:
+            self.stdout.write(f"Rebuilding chatbot session summaries for {len(affected_sessions)} sessions...")
+            rebuild_chatbot_session_summaries(affected_session_ids=affected_sessions)
+        else:
+            self.stdout.write("No new sessions to rebuild.")
 
         if options["create_tickets"]:
             branch_code = options["branch_code"]
@@ -87,18 +93,17 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS("Sync chatbot data completed."))
 
-    def fetch_all(self, client, table_name):
+    def fetch_incremental(self, client, table_name, since_date=None, time_column="created_at"):
         result = []
         start = 0
         batch_size = 1000
 
         while True:
-            response = (
-                client.table(table_name)
-                .select("*")
-                .range(start, start + batch_size - 1)
-                .execute()
-            )
+            query = client.table(table_name).select("*")
+            if since_date:
+                query = query.gte(time_column, since_date.isoformat())
+                
+            response = query.range(start, start + batch_size - 1).execute()
 
             rows = response.data or []
             result.extend(rows)
@@ -110,12 +115,31 @@ class Command(BaseCommand):
 
         return result
 
+    def get_and_update_cursor(self, source_name, client, table_name, time_columns):
+        cursor, _ = ChatbotSyncCursor.objects.get_or_create(source_name=source_name)
+        last_synced_at = cursor.last_synced_at
+
+        # We need to know which time column to filter on in Supabase
+        # Default to created_at if multiple are possible, as Supabase usually prefers one.
+        # But we pass it to fetch_incremental.
+        # Since Supabase python client requires knowing the exact column name, 
+        # we assume time_columns[0] is the primary one used in DB schema.
+        time_column_db = time_columns[0]
+        
+        rows = self.fetch_incremental(client, table_name, since_date=last_synced_at, time_column=time_column_db)
+        
+        return rows, cursor
+
     def sync_chat_logs(self, client, table_name):
-        rows = self.fetch_all(client, table_name)
+        # In Supabase, the column is usually created_at
+        rows, cursor = self.get_and_update_cursor("xpro_chat_logs", client, table_name, ["created_at"])
+        affected_sessions = set()
+        max_dt = cursor.last_synced_at
 
         for row in rows:
             external_id = str(get_value(row, "id", "external_id"))
             session_id = str(get_value(row, "session_id", "sessionID", "sessionId") or "")
+            dt = parse_dt(get_value(row, "create_at", "created_at"))
 
             if not external_id or not session_id:
                 continue
@@ -129,12 +153,20 @@ class Command(BaseCommand):
                     "question": get_value(row, "question"),
                     "answer": get_value(row, "answer"),
                     "category": get_value(row, "category", "categories", "catogeries"),
-                    "external_created_at": parse_dt(get_value(row, "create_at", "created_at")),
+                    "external_created_at": dt,
                     "raw_payload": row,
                 },
             )
+            affected_sessions.add(session_id)
+            if dt and (not max_dt or dt > max_dt):
+                max_dt = dt
+
+        cursor.last_synced_at = max_dt
+        cursor.last_row_count = len(rows)
+        cursor.save()
 
         self.stdout.write(f"Synced chat logs: {len(rows)}")
+        return affected_sessions
 
     # def sync_states(self, client, table_name):
     #     rows = self.fetch_all(client, table_name)
@@ -163,11 +195,14 @@ class Command(BaseCommand):
 
     #     self.stdout.write(f"Synced states: {len(rows)}")
     def sync_states(self, client, table_name):
-        rows = self.fetch_all(client, table_name)
+        rows, cursor = self.get_and_update_cursor("cskh_state", client, table_name, ["updated_at"])
+        affected_sessions = set()
+        max_dt = cursor.last_synced_at
 
         for row in rows:
             external_id = str(get_value(row, "id", "external_id"))
             session_id = str(get_value(row, "session_id", "sessionID", "sessionId") or "")
+            dt = parse_dt(get_value(row, "updated_at", "updatedAt"))
 
             if not external_id or not session_id:
                 continue
@@ -181,19 +216,30 @@ class Command(BaseCommand):
                     "step": get_value(row, "step"),
                     "reason": get_value(row, "reason"), # Đã thêm cột reason
                     # Lấy updated_at theo đúng schema Supabase
-                    "external_created_at": parse_dt(get_value(row, "updated_at", "updatedAt")),
+                    "external_created_at": dt,
                     "raw_payload": row,
                 },
             )
+            affected_sessions.add(session_id)
+            if dt and (not max_dt or dt > max_dt):
+                max_dt = dt
+
+        cursor.last_synced_at = max_dt
+        cursor.last_row_count = len(rows)
+        cursor.save()
 
         self.stdout.write(f"Synced states: {len(rows)}")
+        return affected_sessions
 
     def sync_requests(self, client, table_name):
-        rows = self.fetch_all(client, table_name)
+        rows, cursor = self.get_and_update_cursor("cskh_requests", client, table_name, ["created_at"])
+        affected_sessions = set()
+        max_dt = cursor.last_synced_at
 
         for row in rows:
             external_id = str(get_value(row, "id", "external_id"))
             session_id = str(get_value(row, "session_id", "sessionID", "sessionId") or "")
+            dt = parse_dt(get_value(row, "create_at", "created_at"))
 
             if not external_id or not session_id:
                 continue
@@ -208,11 +254,19 @@ class Command(BaseCommand):
                     "contact_type": get_value(row, "contact_type"),
                     "reason": get_value(row, "reason"),
                     "status": get_value(row, "status"),
-                    "external_created_at": parse_dt(get_value(row, "create_at", "created_at")),
+                    "external_created_at": dt,
                     "raw_payload": row,
                 },
             )
+            affected_sessions.add(session_id)
+            if dt and (not max_dt or dt > max_dt):
+                max_dt = dt
+
+        cursor.last_synced_at = max_dt
+        cursor.last_row_count = len(rows)
+        cursor.save()
 
         self.stdout.write(f"Synced CSKH requests: {len(rows)}")
+        return affected_sessions
 
     

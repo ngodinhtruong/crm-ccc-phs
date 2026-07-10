@@ -81,30 +81,39 @@ def detect_outcome(session_id, main_category, latest_state, cskh_request):
     return ChatbotSessionSummary.OUTCOME_WAITING_INFO
 
 
-def rebuild_chatbot_session_summaries():
-    session_ids = set(ChatbotChatLog.objects.values_list("session_id", flat=True))
-    session_ids.update(ChatbotState.objects.values_list("session_id", flat=True))
-    session_ids.update(ChatbotCskhRequest.objects.values_list("session_id", flat=True))
+from collections import defaultdict
 
+def rebuild_chatbot_session_summaries(affected_session_ids=None):
+    # 1. Determine which session IDs to process
+    if affected_session_ids is not None:
+        session_ids = set(affected_session_ids)
+    else:
+        # Full rebuild: collect all session IDs
+        session_ids = set(ChatbotChatLog.objects.values_list("session_id", flat=True))
+        session_ids.update(ChatbotState.objects.values_list("session_id", flat=True))
+        session_ids.update(ChatbotCskhRequest.objects.values_list("session_id", flat=True))
+
+    if not session_ids:
+        return
+
+    # 2. In-memory grouping (Fetch all related data for these sessions in 3 queries)
+    logs_by_session = defaultdict(list)
+    for log in ChatbotChatLog.objects.filter(session_id__in=session_ids).order_by("external_created_at", "id"):
+        logs_by_session[log.session_id].append(log)
+
+    latest_state_by_session = {}
+    for state in ChatbotState.objects.filter(session_id__in=session_ids).order_by("external_created_at", "id"):
+        latest_state_by_session[state.session_id] = state
+
+    latest_request_by_session = {}
+    for req in ChatbotCskhRequest.objects.filter(session_id__in=session_ids).order_by("external_created_at", "id"):
+        latest_request_by_session[req.session_id] = req
+
+    # 3. Process and save
     for session_id in session_ids:
-        logs = list(
-            ChatbotChatLog.objects.filter(session_id=session_id).order_by(
-                "external_created_at",
-                "id",
-            )
-        )
-
-        latest_state = (
-            ChatbotState.objects.filter(session_id=session_id)
-            .order_by("-external_created_at", "-id")
-            .first()
-        )
-
-        cskh_request = (
-            ChatbotCskhRequest.objects.filter(session_id=session_id)
-            .order_by("-external_created_at", "-id")
-            .first()
-        )
+        logs = logs_by_session.get(session_id, [])
+        latest_state = latest_state_by_session.get(session_id)
+        cskh_request = latest_request_by_session.get(session_id)
 
         first_log = logs[0] if logs else None
         last_log = logs[-1] if logs else None
