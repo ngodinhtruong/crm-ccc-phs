@@ -202,7 +202,7 @@ class SaRecordWriteSerializer(serializers.ModelSerializer):
         ]
 
     def validate_account_no(self, value):
-        value = value.strip()
+        value = str(value or "").strip()
 
         if not value:
             raise serializers.ValidationError("Số tài khoản không được để trống.")
@@ -214,3 +214,37 @@ class SaRecordWriteSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Lần follow phải lớn hơn hoặc bằng 1.")
 
         return value
+    
+    def validate(self, attrs):
+        request = self.context.get("request")
+
+        account_no = attrs.get("account_no")
+        call_date = attrs.get("call_date")
+        follow_no = attrs.get("follow_no") or 1
+
+        pic_user = attrs.get("pic_user")
+
+        if not pic_user and request and request.user and request.user.is_authenticated:
+            pic_user = request.user
+
+        if account_no and call_date and pic_user:
+            queryset = SaRecord.objects.filter(
+                account_no=account_no,
+                pic_user=pic_user,
+                call_date=call_date,
+                follow_no=follow_no,
+            )
+
+            if self.instance:
+                queryset = queryset.exclude(id=self.instance.id)
+
+            if queryset.exists():
+                raise serializers.ValidationError(
+                    {
+                        "non_field_errors": [
+                            "SA Record đã tồn tại cho số tài khoản, PIC, ngày gọi và lần follow này."
+                        ]
+                    }
+                )
+
+        return attrs

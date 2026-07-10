@@ -7,12 +7,13 @@ import { useSaRecords } from "@/hooks/useSaRecords";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
 import { SaRecordItem } from "@/types/sale-admin.type";
 import {
-  ColumnBooleanFilter,
-  ColumnDateRangeFilter,
-  ColumnNumberRangeFilter,
-  ColumnSelectFilter,
-  ColumnTextFilter,
-  TableState,
+    ColumnBooleanFilter,
+    ColumnDateRangeFilter,
+    ColumnNumberRangeFilter,
+    ColumnSelectFilter,
+    ColumnTextFilter,
+    TablePagination,
+    TableState,
 } from "@/components/common";
 
 function formatMoney(value?: string | number | null) {
@@ -110,10 +111,17 @@ export function SaRecordListPage() {
                         </h1>
                     </div>
 
-                    <div className="flex items-center gap-3 text-xs text-slate-600">
-                        <span>
-                            Tổng: <span className="font-semibold">{records.count}</span>
-                        </span>
+                    <div className="flex items-center gap-3">
+                        <TablePagination
+                            fromRecord={records.fromRecord}
+                            toRecord={records.toRecord}
+                            count={records.count}
+                            page={records.page}
+                            totalPages={records.totalPages}
+                            loading={records.loading}
+                            onPrevious={records.previousPage}
+                            onNext={records.nextPage}
+                        />
 
                         <button
                             type="button"

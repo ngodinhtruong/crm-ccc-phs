@@ -14,6 +14,8 @@ import {
     TicketSupportCategoryOption,
 } from "@/types/ticket.type";
 
+import { useTablePagination } from "@/hooks/useTablePagination";
+
 function getErrorMessage(err: unknown, fallback: string) {
     const error = err as {
         response?: {
@@ -37,12 +39,7 @@ export function useTickets() {
     const [items, setItems] = useState<TicketListItem[]>([]);
     const [count, setCount] = useState(0);
 
-    const PAGE_SIZE = 20;
-    const [page, setPage] = useState(1);
-
-    const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
-    const fromRecord = count === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
-    const toRecord = Math.min(page * PAGE_SIZE, count);
+    const pagination =  useTablePagination(count);
 
     const [supportCategories, setSupportCategories] = useState<
         TicketSupportCategoryOption[]
@@ -97,7 +94,7 @@ export function useTickets() {
 
     const buildParams = (
         customParams?: Partial<TicketListParams>,
-        pageValue = page
+        pageValue = pagination.page
     ): TicketListParams => ({
         ...debouncedTextFilters,
 
@@ -135,7 +132,7 @@ export function useTickets() {
 
     const loadTickets = async (
         params?: TicketListParams,
-        pageValue = page
+        pageValue = pagination.page
     ) => {
         try {
             setLoading(true);
@@ -154,23 +151,23 @@ export function useTickets() {
         }
     };
     const goToPage = (nextPage: number) => {
-        const safePage = Math.min(Math.max(nextPage, 1), totalPages);
+        const safePage = Math.min(Math.max(nextPage, 1), pagination.totalPages);
 
-        setPage(safePage);
+        pagination.setPage(safePage);
         void loadTickets(buildParams({ page: String(safePage) }, safePage), safePage);
     };
 
     const previousPage = () => {
-        if (page <= 1) return;
-        goToPage(page - 1);
+        if (pagination.page <= 1) return;
+        goToPage(pagination.page - 1);
     };
 
     const nextPage = () => {
-        if (page >= totalPages) return;
-        goToPage(page + 1);
+        if (pagination.page >= pagination.totalPages) return;
+        goToPage(pagination.page + 1);
     };
     const search = () => {
-        setPage(1);
+        pagination.resetPage();
 
         void loadTickets(
             {
@@ -240,8 +237,8 @@ export function useTickets() {
             return;
         }
 
-        setPage(1);
-        void loadTickets(buildParams({ page: "1" }, 1), 1);
+        pagination.resetPage();
+        void loadTickets(buildParams({ page: "1" }, pagination.page), pagination.page);
 
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [
@@ -274,9 +271,14 @@ export function useTickets() {
         items,
         count,
 
-        fromRecord: items.length === 0 ? 0 : 1,
-        toRecord: items.length,
-
+        page: pagination.page,
+        pageSize: pagination.pageSize,
+        totalPages: pagination.totalPages,
+        fromRecord: pagination.fromRecord,
+        toRecord: pagination.toRecord,
+        previousPage,
+        nextPage,
+        goToPage,
         supportCategories,
         classifications,
         filteredClassifications,

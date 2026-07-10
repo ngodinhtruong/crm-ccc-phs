@@ -11,7 +11,7 @@ import {
   SaRecordItem,
   SaRecordListParams,
 } from "@/types/sale-admin.type";
-
+import { useTablePagination } from "@/hooks/useTablePagination";
 function getErrorMessage(err: unknown, fallback: string) {
   const error = err as {
     response?: {
@@ -32,12 +32,8 @@ function getErrorMessage(err: unknown, fallback: string) {
 export function useSaRecords() {
   const [items, setItems] = useState<SaRecordItem[]>([]);
   const [count, setCount] = useState(0);
-  const PAGE_SIZE = 20;
-  const [page, setPage] = useState(1);
-
-  const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
-  const fromRecord = count === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
-  const toRecord = Math.min(page * PAGE_SIZE, count);
+  
+  const pagination = useTablePagination(count);
 
   const [callResults, setCallResults] = useState<SaCallResult[]>([]);
   const [icpGroups, setIcpGroups] = useState<SaIcpGroup[]>([]);
@@ -113,7 +109,7 @@ export function useSaRecords() {
 
   const buildParams = (
     customParams?: Partial<SaRecordListParams>,
-    pageValue = page
+    pageValue = pagination.page
   ): SaRecordListParams => ({
     ...debouncedTextFilters,
 
@@ -160,7 +156,7 @@ export function useSaRecords() {
 
   const loadRecords = async (
     params?: SaRecordListParams,
-    pageValue = page
+    pageValue = pagination.page
   ) => {
     try {
       setLoading(true);
@@ -180,24 +176,24 @@ export function useSaRecords() {
   };
 
   const goToPage = (nextPage: number) => {
-    const safePage = Math.min(Math.max(nextPage, 1), totalPages);
+    const safePage = Math.min(Math.max(nextPage, 1), pagination.totalPages);
 
-    setPage(safePage);
+    pagination.setPage(safePage);
     void loadRecords(buildParams({ page: String(safePage) }, safePage), safePage);
   };
 
   const previousPage = () => {
-    if (page <= 1) return;
-    goToPage(page - 1);
+    if (pagination.page <= 1) return;
+    goToPage(pagination.page - 1);
   };
 
   const nextPage = () => {
-    if (page >= totalPages) return;
-    goToPage(page + 1);
+    if (pagination.page >= pagination.totalPages) return;
+    goToPage(pagination.page + 1);
   };
 
   const search = () => {
-    setPage(1);
+    pagination.resetPage();
 
     void loadRecords(
       {
@@ -264,7 +260,7 @@ export function useSaRecords() {
     setCallDateFrom("");
     setCallDateTo("");
 
-    setPage(1);
+    pagination.resetPage();
     
     void loadRecords({
       record_code: "",
@@ -327,11 +323,11 @@ export function useSaRecords() {
     items,
     count,
 
-    page,
-    pageSize: PAGE_SIZE,
-    totalPages,
-    fromRecord,
-    toRecord,
+    page: pagination.page,
+    pageSize: pagination.pageSize,
+    totalPages: pagination.totalPages,
+    fromRecord: pagination.fromRecord,
+    toRecord: pagination.toRecord,
     previousPage,
     nextPage,
     goToPage,

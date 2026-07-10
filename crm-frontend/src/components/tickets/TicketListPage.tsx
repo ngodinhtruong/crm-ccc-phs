@@ -3,11 +3,11 @@
 import { Plus } from "lucide-react";
 
 import {
-  ColumnDateRangeFilter,
-  ColumnSelectFilter,
-  ColumnTextFilter,
-  TablePagination,
-  TableState,
+    ColumnDateRangeFilter,
+    ColumnSelectFilter,
+    ColumnTextFilter,
+    TablePagination,
+    TableState,
 } from "@/components/common";
 import { useTickets } from "@/hooks/useTickets";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
@@ -88,11 +88,17 @@ export function TicketListPage() {
                         </p>
                     </div>
 
-                    <div className="flex items-center gap-3 text-xs text-slate-700">
-                        <span>
-                            {tickets.fromRecord} đến {tickets.toRecord} của{" "}
-                            <span className="font-semibold">{tickets.count}</span>
-                        </span>
+                    <div className="flex items-center gap-3">
+                        <TablePagination
+                            fromRecord={tickets.fromRecord}
+                            toRecord={tickets.toRecord}
+                            count={tickets.count}
+                            page={tickets.page}
+                            totalPages={tickets.totalPages}
+                            loading={tickets.loading}
+                            onPrevious={tickets.previousPage}
+                            onNext={tickets.nextPage}
+                        />
 
                         <button
                             type="button"

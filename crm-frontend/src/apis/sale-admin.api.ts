@@ -8,6 +8,7 @@ import {
   SaInterestLevel,
   SaRecordItem,
   SaRecordListParams,
+  SaRecordCreatePayload,
 } from "@/types/sale-admin.type";
 
 const SA_RECORD_ENDPOINT = "/api/sale-admin/records/";
@@ -41,6 +42,8 @@ export const saleAdminApi = {
       }
     );
 
+
+
     return normalizePaginated(response.data);
   },
 
@@ -66,6 +69,16 @@ export const saleAdminApi = {
     );
 
     return getListData<SaIcpGroup>(response.data);
+  },
+  createSaRecord: async (
+    payload: SaRecordCreatePayload
+  ): Promise<SaRecordItem> => {
+    const response = await api.post<SaRecordItem>(
+      SA_RECORD_ENDPOINT,
+      payload
+    );
+
+    return response.data;
   },
 };
 

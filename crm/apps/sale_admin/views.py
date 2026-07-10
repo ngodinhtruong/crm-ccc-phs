@@ -1,9 +1,8 @@
-from django.db import transaction
 from django.db.models import Q
 from rest_framework import status, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-
+from django.db import IntegrityError, transaction
 from apps.sale_admin.models import (
     SaCallResult,
     SaInterestLevel,
@@ -290,14 +289,24 @@ class SaRecordViewSet(viewsets.ModelViewSet):
         )
         branch = self.resolve_branch(serializer)
 
-        record = serializer.save(
-            record_code=generate_sa_record_code(),
-            pic_user=pic_user,
-            pic_employee=pic_employee,
-            branch=branch,
-            created_by_user=request.user,
-            updated_by_user=request.user,
-        )
+        try:
+            record = serializer.save(
+                record_code=generate_sa_record_code(),
+                pic_user=pic_user,
+                pic_employee=pic_employee,
+                branch=branch,
+                created_by_user=request.user,
+                updated_by_user=request.user,
+            )
+        except IntegrityError:
+            return Response(
+                {
+                    "non_field_errors": [
+                        "SA Record bị trùng dữ liệu. Vui lòng kiểm tra lại số tài khoản, PIC, ngày gọi và lần follow."
+                    ]
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+    )
 
         new_data = serialize_sa_record(record)
 

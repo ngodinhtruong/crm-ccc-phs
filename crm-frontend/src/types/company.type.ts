@@ -155,7 +155,6 @@ export type CompanyListParams = {
   status?: string;
 };
 
-
 export type CompanyCreateFormState = {
   companyName: string;
   phone: string;
