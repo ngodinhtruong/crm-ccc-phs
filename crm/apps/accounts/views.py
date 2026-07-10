@@ -1,6 +1,7 @@
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import status, viewsets
+from rest_framework import permissions
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -23,8 +24,8 @@ from apps.accounts.serializers import (
 from apps.branches.models import Branch
 from apps.accounts.api_permissions import IsSystemManager
 from rest_framework.views import APIView
-# from apps.accounts.services import PermissionService
-# from crm.apps.accounts import serializers
+
+from apps.accounts.services import PermissionService
 User = get_user_model()
 
 
@@ -379,6 +380,11 @@ class MeAPIView(APIView):
             id__in=permission_ids,
             is_active=True,
         ).distinct()
+                
+        role_codes = [role.role_code for role in roles]
+        permission_codes = [permission.permission_code for permission in permissions]
+        scope_type = PermissionService.get_highest_scope(user)
+        branch_ids = list(PermissionService.get_user_branch_ids(user))
 
         accessible_groups = self.get_accessible_groups(user, roles)
         default_group = self.get_default_group(accessible_groups)
@@ -433,5 +439,11 @@ class MeAPIView(APIView):
                 "accessible_groups": accessible_groups,
                 "default_group": default_group,
                 "is_global_admin": is_global_admin,
+
+
+                "role_codes": role_codes,
+                "permission_codes": permission_codes,
+                "scope_type": scope_type,
+                "branch_ids": branch_ids,
             }
         )

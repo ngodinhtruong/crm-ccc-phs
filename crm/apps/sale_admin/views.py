@@ -24,6 +24,9 @@ from apps.sale_admin.services import (
     generate_sa_record_code,
     serialize_sa_record,
 )
+from apps.accounts.scopes import filter_sa_records_by_user
+from apps.sale_admin.permissions import SaRecordPermission, SaRecordAuditLogPermission 
+
 
 
 class SaCallResultViewSet(viewsets.ReadOnlyModelViewSet):
@@ -45,7 +48,7 @@ class SaIcpGroupViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class SaRecordViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsSaleAdminUser]
+    permission_classes = [SaRecordPermission]
 
     def get_serializer_class(self):
         if self.action in ["list", "retrieve"]:
@@ -86,20 +89,8 @@ class SaRecordViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = self.get_base_queryset()
+        queryset = filter_sa_records_by_user(queryset, self.request.user)
 
-        user = self.request.user
-
-        if not is_sale_admin_manager(user):
-            branch_ids = self.get_user_branch_ids()
-
-            if branch_ids:
-                queryset = queryset.filter(
-                    Q(branch_id__in=branch_ids) | Q(pic_user=user)
-                )
-            else:
-                queryset = queryset.filter(pic_user=user)
-
-                q = self.request.query_params.get("q")
 
         q = self.request.query_params.get("q")
         record_code = self.request.query_params.get("record_code")
@@ -382,14 +373,24 @@ class SaRecordViewSet(viewsets.ModelViewSet):
 
 
 class SaRecordAuditLogViewSet(viewsets.ReadOnlyModelViewSet):
-    permission_classes = [IsSaleAdminUser]
+    permission_classes = [SaRecordAuditLogPermission]
     serializer_class = SaRecordAuditLogSerializer
 
     def get_queryset(self):
         queryset = SaRecordAuditLog.objects.select_related(
             "sa_record",
             "changed_by_user",
+            "sa_record__branch",
+            "sa_record__pic_user",
+            "sa_record__pic_employee",
         ).all()
+
+        accessible_records = filter_sa_records_by_user(
+            SaRecord.objects.all(),
+            self.request.user,
+        ).values_list("id", flat=True)
+
+        queryset = queryset.filter(sa_record_id__in=accessible_records)
 
         sa_record = self.request.query_params.get("sa_record")
 

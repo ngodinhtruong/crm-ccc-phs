@@ -144,3 +144,40 @@ def filter_branches_by_user(queryset, user):
 
     branch_ids = get_accessible_branch_ids(user)
     return queryset.filter(id__in=branch_ids).distinct()
+
+
+def filter_sa_records_by_user(queryset, user):
+    if not user or not user.is_authenticated:
+        return queryset.none()
+
+    if user.is_superuser:
+        return queryset
+
+    from apps.common.constants import PermissionCode
+
+    if not PermissionService.has_permission(user, PermissionCode.SA_RECORD_VIEW):
+        return queryset.none()
+
+    scope = get_user_scope(user)
+    employee = get_user_employee(user)
+
+    if scope == "ALL":
+        return queryset
+
+    if scope in ["BRANCH", "MULTI_BRANCH"]:
+        branch_ids = get_accessible_branch_ids(user)
+
+        if not branch_ids:
+            return queryset.none()
+
+        return queryset.filter(branch_id__in=branch_ids).distinct()
+
+    if scope == "OWN":
+        q = Q(pic_user=user)
+
+        if employee:
+            q |= Q(pic_employee=employee)
+
+        return queryset.filter(q).distinct()
+
+    return queryset.none()
