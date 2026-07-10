@@ -1,15 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import {
-  ChevronLeft,
-  ChevronRight,
-  Download,
-  Plus,
-  Upload,
-} from "lucide-react";
+import { Download, Plus, Upload } from "lucide-react";
 
 import { CompanyTable } from "@/components/companies/CompanyTable";
+import { TablePagination } from "@/components/common";
 import { useCompanies } from "@/hooks/useCompanies";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
 
@@ -70,11 +65,17 @@ export function CompanyListPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2 text-xs text-slate-700">
-            <span>
-              {companies.fromRecord} đến {companies.toRecord} của{" "}
-              <span className="font-semibold">{companies.count}</span>
-            </span>
+          <div className="flex items-center gap-3">
+            <TablePagination
+              fromRecord={companies.fromRecord}
+              toRecord={companies.toRecord}
+              count={companies.count}
+              page={companies.page}
+              totalPages={companies.totalPages}
+              loading={companies.loading}
+              onPrevious={companies.previousPage}
+              onNext={companies.nextPage}
+            />
 
             <button
               type="button"
@@ -82,27 +83,6 @@ export function CompanyListPage() {
               className="h-8 rounded border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50"
             >
               Xóa lọc
-            </button>
-
-            <button
-              type="button"
-              className="flex h-8 w-8 items-center justify-center rounded border bg-white text-slate-400 hover:bg-slate-50"
-            >
-              <ChevronLeft size={16} />
-            </button>
-
-            <button
-              type="button"
-              className="flex h-8 w-8 items-center justify-center rounded border bg-white text-slate-500 hover:bg-slate-50"
-            >
-              ...
-            </button>
-
-            <button
-              type="button"
-              className="flex h-8 w-8 items-center justify-center rounded border bg-white text-slate-400 hover:bg-slate-50"
-            >
-              <ChevronRight size={16} />
             </button>
           </div>
         </div>

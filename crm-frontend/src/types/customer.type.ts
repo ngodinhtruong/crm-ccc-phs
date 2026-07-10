@@ -75,10 +75,40 @@ export type PaginatedResponse<T> = {
 };
 
 export type CustomerListParams = {
-    q?: string;
-    branch?: string;
-    phone?: string;
-    status?: string;
+  page?: string;
+
+  q?: string;
+
+  customer_code?: string;
+  external_customer_id?: string;
+  full_name?: string;
+  phone?: string;
+  email?: string;
+  identity_number?: string;
+
+  account_number?: string;
+  opened_account_from?: string;
+  opened_account_to?: string;
+
+  branch?: string;
+  customer_type?: string;
+  company_name?: string;
+
+  source?: string;
+  rating?: string;
+  membership_tier?: string;
+
+  assigned_employee_name?: string;
+  vip_type?: string;
+
+  description?: string;
+  status?: string;
+
+  date_of_birth_from?: string;
+  date_of_birth_to?: string;
+
+  created_from?: string;
+  created_to?: string;
 };
 
 export type SelectOption = {

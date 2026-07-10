@@ -32,6 +32,12 @@ function getErrorMessage(err: unknown, fallback: string) {
 export function useSaRecords() {
   const [items, setItems] = useState<SaRecordItem[]>([]);
   const [count, setCount] = useState(0);
+  const PAGE_SIZE = 20;
+  const [page, setPage] = useState(1);
+
+  const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
+  const fromRecord = count === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const toRecord = Math.min(page * PAGE_SIZE, count);
 
   const [callResults, setCallResults] = useState<SaCallResult[]>([]);
   const [icpGroups, setIcpGroups] = useState<SaIcpGroup[]>([]);
@@ -106,9 +112,12 @@ export function useSaRecords() {
   const debouncedTextFilters = useDebounce(textFilters, 500);
 
   const buildParams = (
-    customParams?: Partial<SaRecordListParams>
+    customParams?: Partial<SaRecordListParams>,
+    pageValue = page
   ): SaRecordListParams => ({
     ...debouncedTextFilters,
+
+    page: String(pageValue),
 
     call_result: callResult,
     interest_level: interestLevel,
@@ -149,12 +158,17 @@ export function useSaRecords() {
     }
   };
 
-  const loadRecords = async (params?: SaRecordListParams) => {
+  const loadRecords = async (
+    params?: SaRecordListParams,
+    pageValue = page
+  ) => {
     try {
       setLoading(true);
       setError("");
 
-      const data = await saleAdminService.getSaRecords(params || buildParams());
+      const data = await saleAdminService.getSaRecords(
+        params || buildParams({}, pageValue)
+      );
 
       setItems(data.results || []);
       setCount(data.count || 0);
@@ -165,36 +179,60 @@ export function useSaRecords() {
     }
   };
 
+  const goToPage = (nextPage: number) => {
+    const safePage = Math.min(Math.max(nextPage, 1), totalPages);
+
+    setPage(safePage);
+    void loadRecords(buildParams({ page: String(safePage) }, safePage), safePage);
+  };
+
+  const previousPage = () => {
+    if (page <= 1) return;
+    goToPage(page - 1);
+  };
+
+  const nextPage = () => {
+    if (page >= totalPages) return;
+    goToPage(page + 1);
+  };
+
   const search = () => {
-    void loadRecords({
-      record_code: recordCode,
-      account_no: accountNo,
-      customer_name: customerName,
-      branch_name: branchName,
-      account_status: accountStatus,
-      vip_classification: vipClassification,
-      pic,
-      follow_no: followNo,
+    setPage(1);
 
-      call_result: callResult,
-      interest_level: interestLevel,
-      icp_group: icpGroup,
+    void loadRecords(
+      {
+        page: "1",
 
-      introduced_product: introducedProduct,
-      reactivation,
-      support_info: supportInfo,
-      handover_to_broker: handoverToBroker,
+        record_code: recordCode,
+        account_no: accountNo,
+        customer_name: customerName,
+        branch_name: branchName,
+        account_status: accountStatus,
+        vip_classification: vipClassification,
+        pic,
+        follow_no: followNo,
 
-      transaction_value_min: transactionValueMin,
-      transaction_value_max: transactionValueMax,
-      transaction_fee_min: transactionFeeMin,
-      transaction_fee_max: transactionFeeMax,
+        call_result: callResult,
+        interest_level: interestLevel,
+        icp_group: icpGroup,
 
-      note,
+        introduced_product: introducedProduct,
+        reactivation,
+        support_info: supportInfo,
+        handover_to_broker: handoverToBroker,
 
-      call_date_from: callDateFrom,
-      call_date_to: callDateTo,
-    });
+        transaction_value_min: transactionValueMin,
+        transaction_value_max: transactionValueMax,
+        transaction_fee_min: transactionFeeMin,
+        transaction_fee_max: transactionFeeMax,
+
+        note,
+
+        call_date_from: callDateFrom,
+        call_date_to: callDateTo,
+      },
+      1
+    );
   };
 
   const clearFilter = () => {
@@ -226,6 +264,8 @@ export function useSaRecords() {
     setCallDateFrom("");
     setCallDateTo("");
 
+    setPage(1);
+    
     void loadRecords({
       record_code: "",
       account_no: "",
@@ -257,6 +297,9 @@ export function useSaRecords() {
     });
   };
 
+  
+  
+
   useEffect(() => {
     void loadMasterData();
 
@@ -264,7 +307,7 @@ export function useSaRecords() {
   }, []);
 
   useEffect(() => {
-    void loadRecords();
+    void loadRecords(buildParams({ page: "1" }, 1), 1);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -283,6 +326,15 @@ export function useSaRecords() {
   return {
     items,
     count,
+
+    page,
+    pageSize: PAGE_SIZE,
+    totalPages,
+    fromRecord,
+    toRecord,
+    previousPage,
+    nextPage,
+    goToPage,
 
     callResults,
     icpGroups,

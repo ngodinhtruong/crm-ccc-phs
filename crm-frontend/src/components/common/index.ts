@@ -6,4 +6,6 @@ export { TableState } from "./TableState";
 export { TableToolbar } from "./TableToolbar";
 export { UserAssigneeCombobox } from "./UserAssigneeCombobox";
 
+
+export * from "./TablePagination";
 export * from "./table-filters";

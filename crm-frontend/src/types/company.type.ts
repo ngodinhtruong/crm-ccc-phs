@@ -118,6 +118,8 @@ export type PaginatedResponse<T> = {
 };
 
 export type CompanyListParams = {
+  page?: string;
+
   q?: string;
 
   company_code?: string;

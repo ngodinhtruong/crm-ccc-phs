@@ -1,5 +1,11 @@
 import { Edit, Lock, MoreVertical } from "lucide-react";
 
+import {
+  ColumnSelectFilter,
+  ColumnTextFilter,
+  TableState,
+} from "@/components/common";
+import type { useUsers } from "@/hooks/useUsers";
 import { UserListItem } from "@/types/user.type";
 
 function getNameParts(user: UserListItem) {
@@ -32,21 +38,27 @@ function UserActiveBadge({ active }: { active: boolean }) {
   );
 }
 
+function getBranchName(branch: ReturnType<typeof useUsers>["branches"][number]) {
+  return branch.branch_name || branch.name || `Chi nhánh ${branch.id}`;
+}
+
+function getRoleLabel(role: ReturnType<typeof useUsers>["roles"][number]) {
+  return `${role.role_name} (${role.group_code})`;
+}
+
 export function UserTable({
-  users,
-  loading,
-  error,
+  userState,
 }: {
-  users: UserListItem[];
-  loading: boolean;
-  error: string;
+  userState: ReturnType<typeof useUsers>;
 }) {
+  const users = userState.users;
+
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[1300px] border-collapse text-left text-xs">
+      <table className="w-full min-w-[1450px] border-collapse text-left text-xs">
         <thead>
           <tr className="h-10 border-b bg-white text-slate-700">
-            <th className="sticky left-0 z-10 w-[110px] bg-white px-3 font-semibold">
+            <th className="sticky left-0 z-20 w-[110px] bg-white px-3 font-semibold">
               Thao tác
             </th>
             <th className="w-[160px] px-3 font-semibold">Chi nhánh</th>
@@ -55,39 +67,128 @@ export function UserTable({
             <th className="w-[140px] px-3 font-semibold">Tên</th>
             <th className="w-[160px] px-3 font-semibold">Tên truy cập</th>
             <th className="w-[240px] px-3 font-semibold">Vai trò</th>
+            <th className="w-[140px] px-3 font-semibold">Phân hệ</th>
             <th className="w-[130px] px-3 font-semibold">Đang online</th>
             <th className="w-[220px] px-3 font-semibold">Email</th>
             <th className="w-[150px] px-3 font-semibold">Trạng thái</th>
           </tr>
+
+          <tr className="border-b bg-[#f8fafc] align-top">
+            <th className="sticky left-0 z-20 bg-[#f8fafc] px-2 py-2" />
+
+            <th className="px-2 py-2">
+              <ColumnSelectFilter
+                value={userState.branch}
+                onChange={userState.setBranch}
+                options={userState.branches.map((item) => ({
+                  label: getBranchName(item),
+                  value: String(item.id),
+                }))}
+              />
+            </th>
+
+            <th className="px-2 py-2">
+              <ColumnTextFilter
+                value={userState.department}
+                onChange={userState.setDepartment}
+                placeholder="Phòng ban"
+              />
+            </th>
+
+            <th className="px-2 py-2">
+              <ColumnTextFilter
+                value={userState.fullName}
+                onChange={userState.setFullName}
+                placeholder="Họ tên"
+              />
+            </th>
+
+            <th className="px-2 py-2" />
+
+            <th className="px-2 py-2">
+              <ColumnTextFilter
+                value={userState.username}
+                onChange={userState.setUsername}
+                placeholder="Username"
+              />
+            </th>
+
+            <th className="px-2 py-2">
+              <ColumnSelectFilter
+                value={userState.role}
+                onChange={userState.setRole}
+                options={userState.roles.map((item) => ({
+                  label: getRoleLabel(item),
+                  value: String(item.id),
+                }))}
+              />
+            </th>
+
+            <th className="px-2 py-2">
+              <ColumnSelectFilter
+                value={userState.groupCode}
+                onChange={userState.setGroupCode}
+                options={[
+                  {
+                    label: "Global",
+                    value: "GLOBAL",
+                  },
+                  {
+                    label: "CCC",
+                    value: "CCC",
+                  },
+                  {
+                    label: "Sale Admin",
+                    value: "SALE_ADMIN",
+                  },
+                ]}
+              />
+            </th>
+
+            <th className="px-2 py-2">
+              <ColumnSelectFilter
+                value={userState.online}
+                onChange={userState.setOnline}
+                options={[
+                  {
+                    label: "Có",
+                    value: "yes",
+                  },
+                  {
+                    label: "Không",
+                    value: "no",
+                  },
+                ]}
+              />
+            </th>
+
+            <th className="px-2 py-2">
+              <ColumnTextFilter
+                value={userState.email}
+                onChange={userState.setEmail}
+                placeholder="Email"
+              />
+            </th>
+
+            <th className="px-2 py-2" />
+          </tr>
         </thead>
 
         <tbody>
-          {loading && (
-            <tr>
-              <td colSpan={10} className="h-28 text-center text-slate-500">
-                Đang tải dữ liệu...
-              </td>
-            </tr>
-          )}
+          <TableState
+            loading={userState.loading}
+            error={userState.error}
+            empty={
+              !userState.loading &&
+              !userState.error &&
+              users.length === 0
+            }
+            colSpan={11}
+            emptyText="Không có dữ liệu người dùng."
+          />
 
-          {error && (
-            <tr>
-              <td colSpan={10} className="h-28 px-4 text-center text-red-600">
-                {error}
-              </td>
-            </tr>
-          )}
-
-          {!loading && !error && users.length === 0 && (
-            <tr>
-              <td colSpan={10} className="h-28 text-center text-slate-500">
-                Không có dữ liệu người dùng.
-              </td>
-            </tr>
-          )}
-
-          {!loading &&
-            !error &&
+          {!userState.loading &&
+            !userState.error &&
             users.map((user, index) => {
               const { middleName, firstName } = getNameParts(user);
               const rowBg = index % 2 === 0 ? "bg-white" : "bg-[#f8fafc]";
@@ -126,6 +227,7 @@ export function UserTable({
                   </td>
 
                   <td className="px-3">{user.branch_name || "Hội sở"}</td>
+
                   <td className="px-3">{user.department || "-"}</td>
 
                   <td className="px-3">
@@ -145,6 +247,12 @@ export function UserTable({
                   <td className="px-3">
                     <span className="line-clamp-2 text-sky-600">
                       {user.role_names?.join(", ") || "-"}
+                    </span>
+                  </td>
+
+                  <td className="px-3">
+                    <span className="line-clamp-2">
+                      {user.role_group_codes?.join(", ") || "-"}
                     </span>
                   </td>
 

@@ -40,6 +40,13 @@ export function useCustomers() {
   const [customers, setCustomers] = useState<CustomerListItem[]>([]);
   const [count, setCount] = useState(0);
 
+  const PAGE_SIZE = 20;
+  const [page, setPage] = useState(1);
+
+  const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
+  const fromRecord = count === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const toRecord = Math.min(page * PAGE_SIZE, count);
+
   const [branches, setBranches] = useState<BranchOption[]>([]);
   const [customerTypes, setCustomerTypes] = useState<CustomerTypeOption[]>([]);
   const [sources, setSources] = useState<CustomerSourceOption[]>([]);
@@ -76,9 +83,6 @@ export function useCustomers() {
   const [error, setError] = useState("");
   const [masterError, setMasterError] = useState("");
 
-  const fromRecord = count === 0 ? 0 : 1;
-  const toRecord = Math.min(20, count);
-
   const textFilters = useMemo<CustomerListParams>(
     () => ({
       full_name: fullName,
@@ -103,9 +107,12 @@ export function useCustomers() {
   const debouncedTextFilters = useDebounce(textFilters, 500);
 
   const buildParams = (
-    customParams?: Partial<CustomerListParams>
+    customParams?: Partial<CustomerListParams>,
+    pageValue = page
   ): CustomerListParams => ({
     ...debouncedTextFilters,
+
+    page: String(pageValue),
 
     opened_account_from: openedAccountFrom,
     opened_account_to: openedAccountTo,
@@ -123,12 +130,17 @@ export function useCustomers() {
     ...customParams,
   });
 
-  const loadCustomers = async (params?: CustomerListParams) => {
+  const loadCustomers = async (
+    params?: CustomerListParams,
+    pageValue = page
+  ) => {
     try {
       setLoading(true);
       setError("");
 
-      const data = await customerService.getCustomers(params || buildParams());
+      const data = await customerService.getCustomers(
+        params || buildParams({}, pageValue)
+      );
 
       setCustomers(data.results || []);
       setCount(data.count || 0);
@@ -137,6 +149,31 @@ export function useCustomers() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const goToPage = (nextPage: number) => {
+    const safePage = Math.min(Math.max(nextPage, 1), totalPages);
+
+    setPage(safePage);
+    void loadCustomers(
+      buildParams(
+        {
+          page: String(safePage),
+        },
+        safePage
+      ),
+      safePage
+    );
+  };
+
+  const previousPage = () => {
+    if (page <= 1) return;
+    goToPage(page - 1);
+  };
+
+  const nextPage = () => {
+    if (page >= totalPages) return;
+    goToPage(page + 1);
   };
 
   const loadMasterData = async () => {
@@ -173,29 +210,36 @@ export function useCustomers() {
   };
 
   const search = () => {
-    void loadCustomers({
-      opened_account_from: openedAccountFrom,
-      opened_account_to: openedAccountTo,
+    setPage(1);
 
-      full_name: fullName,
-      phone,
-      account_number: accountNumber,
-      company_name: companyName,
-      email,
+    void loadCustomers(
+      {
+        page: "1",
 
-      membership_tier: membershipTier,
-      assigned_employee_name: assignedEmployeeName,
-      source,
+        opened_account_from: openedAccountFrom,
+        opened_account_to: openedAccountTo,
 
-      date_of_birth_from: dateOfBirthFrom,
-      date_of_birth_to: dateOfBirthTo,
+        full_name: fullName,
+        phone,
+        account_number: accountNumber,
+        company_name: companyName,
+        email,
 
-      description,
-      status,
-      branch,
-      customer_type: customerType,
-      rating,
-    });
+        membership_tier: membershipTier,
+        assigned_employee_name: assignedEmployeeName,
+        source,
+
+        date_of_birth_from: dateOfBirthFrom,
+        date_of_birth_to: dateOfBirthTo,
+
+        description,
+        status,
+        branch,
+        customer_type: customerType,
+        rating,
+      },
+      1
+    );
   };
 
   const clearFilter = () => {
@@ -222,29 +266,36 @@ export function useCustomers() {
     setCustomerType("");
     setRating("");
 
-    void loadCustomers({
-      opened_account_from: "",
-      opened_account_to: "",
+    setPage(1);
 
-      full_name: "",
-      phone: "",
-      account_number: "",
-      company_name: "",
-      email: "",
+    void loadCustomers(
+      {
+        page: "1",
 
-      membership_tier: "",
-      assigned_employee_name: "",
-      source: "",
+        opened_account_from: "",
+        opened_account_to: "",
 
-      date_of_birth_from: "",
-      date_of_birth_to: "",
+        full_name: "",
+        phone: "",
+        account_number: "",
+        company_name: "",
+        email: "",
 
-      description: "",
-      status: "",
-      branch: "",
-      customer_type: "",
-      rating: "",
-    });
+        membership_tier: "",
+        assigned_employee_name: "",
+        source: "",
+
+        date_of_birth_from: "",
+        date_of_birth_to: "",
+
+        description: "",
+        status: "",
+        branch: "",
+        customer_type: "",
+        rating: "",
+      },
+      1
+    );
   };
 
   useEffect(() => {
@@ -263,7 +314,8 @@ export function useCustomers() {
       return;
     }
 
-    void loadCustomers();
+    setPage(1);
+    void loadCustomers(buildParams({ page: "1" }, 1), 1);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -286,8 +338,15 @@ export function useCustomers() {
   return {
     customers,
     count,
+
+    page,
+    pageSize: PAGE_SIZE,
+    totalPages,
     fromRecord,
     toRecord,
+    previousPage,
+    nextPage,
+    goToPage,
 
     branches,
     customerTypes,

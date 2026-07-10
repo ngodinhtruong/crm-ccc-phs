@@ -3,10 +3,11 @@
 import { Plus } from "lucide-react";
 
 import {
-    ColumnDateRangeFilter,
-    ColumnSelectFilter,
-    ColumnTextFilter,
-    TableState,
+  ColumnDateRangeFilter,
+  ColumnSelectFilter,
+  ColumnTextFilter,
+  TablePagination,
+  TableState,
 } from "@/components/common";
 import { useTickets } from "@/hooks/useTickets";
 import { DashboardLayout } from "@/layouts/DashboardLayout";

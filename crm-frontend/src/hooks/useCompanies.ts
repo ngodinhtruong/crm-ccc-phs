@@ -38,6 +38,13 @@ export function useCompanies() {
   const [companies, setCompanies] = useState<CompanyListItem[]>([]);
   const [count, setCount] = useState(0);
 
+  const PAGE_SIZE = 20;
+  const [page, setPage] = useState(1);
+
+  const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
+  const fromRecord = count === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const toRecord = Math.min(page * PAGE_SIZE, count);
+
   const [sources, setSources] = useState<CompanySourceOption[]>([]);
   const [ratings, setRatings] = useState<CompanyRatingOption[]>([]);
   const [membershipTiers, setMembershipTiers] = useState<
@@ -71,9 +78,6 @@ export function useCompanies() {
   const [error, setError] = useState("");
   const [masterError, setMasterError] = useState("");
 
-  const fromRecord = count === 0 ? 0 : 1;
-  const toRecord = Math.min(20, count);
-
   const textFilters = useMemo<CompanyListParams>(
     () => ({
       company_name: companyName,
@@ -100,25 +104,36 @@ export function useCompanies() {
   const debouncedTextFilters = useDebounce(textFilters, 500);
 
   const buildParams = (
-    customParams?: Partial<CompanyListParams>
+    customParams?: Partial<CompanyListParams>,
+    pageValue = page
   ): CompanyListParams => ({
     ...debouncedTextFilters,
+
+    page: String(pageValue),
+
     opened_at_from: openedAtFrom,
     opened_at_to: openedAtTo,
+
     source,
     rating,
     membership_tier: membershipTier,
     assigned_employee: assignedEmployee,
     status,
+
     ...customParams,
   });
 
-  const loadCompanies = async (params?: CompanyListParams) => {
+  const loadCompanies = async (
+    params?: CompanyListParams,
+    pageValue = page
+  ) => {
     try {
       setLoading(true);
       setError("");
 
-      const data = await companyService.getCompanies(params || buildParams());
+      const data = await companyService.getCompanies(
+        params || buildParams({}, pageValue)
+      );
 
       setCompanies(data.results || []);
       setCount(data.count || 0);
@@ -127,6 +142,31 @@ export function useCompanies() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const goToPage = (nextPage: number) => {
+    const safePage = Math.min(Math.max(nextPage, 1), totalPages);
+
+    setPage(safePage);
+    void loadCompanies(
+      buildParams(
+        {
+          page: String(safePage),
+        },
+        safePage
+      ),
+      safePage
+    );
+  };
+
+  const previousPage = () => {
+    if (page <= 1) return;
+    goToPage(page - 1);
+  };
+
+  const nextPage = () => {
+    if (page >= totalPages) return;
+    goToPage(page + 1);
   };
 
   const loadMasterData = async () => {
@@ -154,23 +194,30 @@ export function useCompanies() {
   };
 
   const search = () => {
-    void loadCompanies({
-      company_name: companyName,
-      phone,
-      account_number: accountNumber,
-      opened_at_from: openedAtFrom,
-      opened_at_to: openedAtTo,
-      tax_code: taxCode,
-      email,
-      website,
-      primary_contact_name: primaryContactName,
-      source,
-      rating,
-      membership_tier: membershipTier,
-      assigned_employee: assignedEmployee,
-      status,
-      address,
-    });
+    setPage(1);
+
+    void loadCompanies(
+      {
+        page: "1",
+
+        company_name: companyName,
+        phone,
+        account_number: accountNumber,
+        opened_at_from: openedAtFrom,
+        opened_at_to: openedAtTo,
+        tax_code: taxCode,
+        email,
+        website,
+        primary_contact_name: primaryContactName,
+        source,
+        rating,
+        membership_tier: membershipTier,
+        assigned_employee: assignedEmployee,
+        status,
+        address,
+      },
+      1
+    );
   };
 
   const clearFilter = () => {
@@ -190,23 +237,30 @@ export function useCompanies() {
     setStatus("");
     setAddress("");
 
-    void loadCompanies({
-      company_name: "",
-      phone: "",
-      account_number: "",
-      opened_at_from: "",
-      opened_at_to: "",
-      tax_code: "",
-      email: "",
-      website: "",
-      primary_contact_name: "",
-      source: "",
-      rating: "",
-      membership_tier: "",
-      assigned_employee: "",
-      status: "",
-      address: "",
-    });
+    setPage(1);
+
+    void loadCompanies(
+      {
+        page: "1",
+
+        company_name: "",
+        phone: "",
+        account_number: "",
+        opened_at_from: "",
+        opened_at_to: "",
+        tax_code: "",
+        email: "",
+        website: "",
+        primary_contact_name: "",
+        source: "",
+        rating: "",
+        membership_tier: "",
+        assigned_employee: "",
+        status: "",
+        address: "",
+      },
+      1
+    );
   };
 
   const goToDetail = (id: number | string) => {
@@ -229,7 +283,8 @@ export function useCompanies() {
       return;
     }
 
-    void loadCompanies();
+    setPage(1);
+    void loadCompanies(buildParams({ page: "1" }, 1), 1);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -246,8 +301,15 @@ export function useCompanies() {
   return {
     companies,
     count,
+
+    page,
+    pageSize: PAGE_SIZE,
+    totalPages,
     fromRecord,
     toRecord,
+    previousPage,
+    nextPage,
+    goToPage,
 
     sources,
     ratings,
