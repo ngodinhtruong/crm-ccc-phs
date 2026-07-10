@@ -3,6 +3,37 @@ export type SelectOption = {
   [key: string]: unknown;
 };
 
+export type CompanySourceOption = {
+  id: number;
+  source_code: string;
+  source_name: string;
+  is_active: boolean;
+};
+
+export type CompanyRatingOption = {
+  id: number;
+  rating_code: string;
+  rating_name: string;
+  score?: number | null;
+  is_active: boolean;
+};
+
+export type CompanyMembershipTierOption = {
+  id: number;
+  tier_code: string;
+  tier_name: string;
+  description?: string | null;
+  is_active: boolean;
+};
+
+export type CompanyEmployeeOption = {
+  id: number;
+  employee_code?: string | null;
+  full_name?: string | null;
+  employee_name?: string | null;
+  name?: string | null;
+};
+
 export type CompanyListItem = {
   id: number;
   company_code?: string | null;
@@ -88,10 +119,38 @@ export type PaginatedResponse<T> = {
 
 export type CompanyListParams = {
   q?: string;
-  status?: string;
+
+  company_code?: string;
+  company_name?: string;
+
+  phone?: string;
+  email?: string;
+  website?: string;
+  fax?: string;
+
+  tax_code?: string;
+  account_number?: string;
+
+  opened_at_from?: string;
+  opened_at_to?: string;
+
+  primary_contact?: string;
+  primary_contact_name?: string;
+
   source?: string;
+  source_name?: string;
+
   rating?: string;
+  rating_name?: string;
+
   membership_tier?: string;
+  membership_tier_name?: string;
+
+  assigned_employee?: string;
+  assigned_employee_name?: string;
+
+  address?: string;
+  status?: string;
 };
 
 

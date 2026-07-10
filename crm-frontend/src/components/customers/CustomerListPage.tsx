@@ -9,7 +9,6 @@ import {
   Upload,
 } from "lucide-react";
 
-import { CustomerFilter } from "@/components/customers/CustomerFilter";
 import { CustomerTable } from "@/components/customers/CustomerTable";
 import { useCustomers } from "@/hooks/useCustomers";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
@@ -65,6 +64,7 @@ export function CustomerListPage() {
             <h1 className="text-sm font-semibold text-slate-800">
               Danh sách khách hàng
             </h1>
+
             <p className="mt-0.5 text-xs text-slate-500">
               Quản lý thông tin khách hàng, tài khoản, chi nhánh và trạng thái.
             </p>
@@ -73,8 +73,16 @@ export function CustomerListPage() {
           <div className="flex items-center gap-2 text-xs text-slate-700">
             <span>
               {customers.fromRecord} đến {customers.toRecord} của{" "}
-              {customers.count}
+              <span className="font-semibold">{customers.count}</span>
             </span>
+
+            <button
+              type="button"
+              onClick={customers.clearFilter}
+              className="h-8 rounded border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+            >
+              Xóa lọc
+            </button>
 
             <button
               type="button"
@@ -99,26 +107,13 @@ export function CustomerListPage() {
           </div>
         </div>
 
-        <CustomerFilter
-          q={customers.q}
-          phone={customers.phone}
-          branch={customers.branch}
-          status={customers.status}
-          branches={customers.branches}
-          loadingBranches={customers.loadingBranches}
-          onQChange={customers.setQ}
-          onPhoneChange={customers.setPhone}
-          onBranchChange={customers.setBranch}
-          onStatusChange={customers.setStatus}
-          onSearch={customers.search}
-          onClear={customers.clearFilter}
-        />
+        {customers.masterError && (
+          <div className="border-b border-red-200 bg-red-50 px-4 py-2 text-xs text-red-600">
+            {customers.masterError}
+          </div>
+        )}
 
-        <CustomerTable
-          customers={customers.customers}
-          loading={customers.loading}
-          error={customers.error}
-        />
+        <CustomerTable customerState={customers} />
       </div>
     </DashboardLayout>
   );

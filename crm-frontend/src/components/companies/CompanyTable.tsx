@@ -2,38 +2,47 @@ import Link from "next/link";
 import { Eye, MoreVertical } from "lucide-react";
 
 import { CompanyStatusBadge } from "@/components/companies/CompanyBadges";
+import {
+  ColumnDateRangeFilter,
+  ColumnSelectFilter,
+  ColumnTextFilter,
+  TableState,
+} from "@/components/common";
 import { CompanyListItem } from "@/types/company.type";
+import type { useCompanies } from "@/hooks/useCompanies";
 
 function buildAddress(company: CompanyListItem) {
   return (
-    [
-      company.address,
-      company.district,
-      company.province,
-      company.country,
-    ]
+    [company.address, company.district, company.province, company.country]
       .filter(Boolean)
       .join(", ") || "-"
   );
 }
 
+function getEmployeeName(
+  employee: ReturnType<typeof useCompanies>["employees"][number]
+) {
+  return (
+    employee.full_name ||
+    employee.employee_name ||
+    employee.name ||
+    `Nhân viên ${employee.id}`
+  );
+}
+
 export function CompanyTable({
-  companies,
-  loading,
-  error,
-  onView,
+  companyState,
 }: {
-  companies: CompanyListItem[];
-  loading: boolean;
-  error: string;
-  onView: (id: number | string) => void;
+  companyState: ReturnType<typeof useCompanies>;
 }) {
+  const companies = companyState.companies;
+
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[1550px] border-collapse text-left text-xs">
+      <table className="w-full min-w-[1700px] border-collapse text-left text-xs">
         <thead>
           <tr className="h-10 border-b bg-white text-slate-700">
-            <th className="sticky left-0 z-10 w-[90px] bg-white px-3 font-semibold">
+            <th className="sticky left-0 z-20 w-[90px] bg-white px-3 font-semibold">
               Thao tác
             </th>
             <th className="w-[220px] px-3 font-semibold">Tên công ty</th>
@@ -53,35 +62,161 @@ export function CompanyTable({
             <th className="w-[140px] px-3 font-semibold">Tình trạng</th>
             <th className="w-[220px] px-3 font-semibold">Địa chỉ</th>
           </tr>
+
+          <tr className="border-b bg-[#f8fafc] align-top">
+            <th className="sticky left-0 z-20 bg-[#f8fafc] px-2 py-2" />
+
+            <th className="px-2 py-2">
+              <ColumnTextFilter
+                value={companyState.companyName}
+                onChange={companyState.setCompanyName}
+                placeholder="Tên công ty"
+              />
+            </th>
+
+            <th className="px-2 py-2">
+              <ColumnTextFilter
+                value={companyState.phone}
+                onChange={companyState.setPhone}
+                placeholder="SĐT"
+              />
+            </th>
+
+            <th className="px-2 py-2">
+              <ColumnTextFilter
+                value={companyState.accountNumber}
+                onChange={companyState.setAccountNumber}
+                placeholder="Số TK"
+              />
+            </th>
+
+            <th className="px-2 py-2">
+              <ColumnDateRangeFilter
+                fromValue={companyState.openedAtFrom}
+                toValue={companyState.openedAtTo}
+                onFromChange={companyState.setOpenedAtFrom}
+                onToChange={companyState.setOpenedAtTo}
+              />
+            </th>
+
+            <th className="px-2 py-2">
+              <ColumnTextFilter
+                value={companyState.taxCode}
+                onChange={companyState.setTaxCode}
+                placeholder="MST"
+              />
+            </th>
+
+            <th className="px-2 py-2">
+              <ColumnTextFilter
+                value={companyState.email}
+                onChange={companyState.setEmail}
+                placeholder="Email"
+              />
+            </th>
+
+            <th className="px-2 py-2">
+              <ColumnTextFilter
+                value={companyState.website}
+                onChange={companyState.setWebsite}
+                placeholder="Website"
+              />
+            </th>
+
+            <th className="px-2 py-2">
+              <ColumnTextFilter
+                value={companyState.primaryContactName}
+                onChange={companyState.setPrimaryContactName}
+                placeholder="Liên hệ"
+              />
+            </th>
+
+            <th className="px-2 py-2">
+              <ColumnSelectFilter
+                value={companyState.source}
+                onChange={companyState.setSource}
+                options={companyState.sources.map((item) => ({
+                  label: item.source_name,
+                  value: String(item.id),
+                }))}
+              />
+            </th>
+
+            <th className="px-2 py-2">
+              <ColumnSelectFilter
+                value={companyState.rating}
+                onChange={companyState.setRating}
+                options={companyState.ratings.map((item) => ({
+                  label: item.rating_name,
+                  value: String(item.id),
+                }))}
+              />
+            </th>
+
+            <th className="px-2 py-2">
+              <ColumnSelectFilter
+                value={companyState.membershipTier}
+                onChange={companyState.setMembershipTier}
+                options={companyState.membershipTiers.map((item) => ({
+                  label: item.tier_name,
+                  value: String(item.id),
+                }))}
+              />
+            </th>
+
+            <th className="px-2 py-2">
+              <ColumnSelectFilter
+                value={companyState.assignedEmployee}
+                onChange={companyState.setAssignedEmployee}
+                options={companyState.employees.map((item) => ({
+                  label: getEmployeeName(item),
+                  value: String(item.id),
+                }))}
+              />
+            </th>
+
+            <th className="px-2 py-2">
+              <ColumnSelectFilter
+                value={companyState.status}
+                onChange={companyState.setStatus}
+                options={[
+                  {
+                    label: "Đang hoạt động",
+                    value: "ACTIVE",
+                  },
+                  {
+                    label: "Ngừng hoạt động",
+                    value: "INACTIVE",
+                  },
+                ]}
+              />
+            </th>
+
+            <th className="px-2 py-2">
+              <ColumnTextFilter
+                value={companyState.address}
+                onChange={companyState.setAddress}
+                placeholder="Địa chỉ"
+              />
+            </th>
+          </tr>
         </thead>
 
         <tbody>
-          {loading && (
-            <tr>
-              <td colSpan={15} className="h-28 text-center text-slate-500">
-                Đang tải dữ liệu...
-              </td>
-            </tr>
-          )}
+          <TableState
+            loading={companyState.loading}
+            error={companyState.error}
+            empty={
+              !companyState.loading &&
+              !companyState.error &&
+              companies.length === 0
+            }
+            colSpan={15}
+            emptyText="Không có dữ liệu công ty."
+          />
 
-          {error && (
-            <tr>
-              <td colSpan={15} className="h-28 px-4 text-center text-red-600">
-                {error}
-              </td>
-            </tr>
-          )}
-
-          {!loading && !error && companies.length === 0 && (
-            <tr>
-              <td colSpan={15} className="h-28 text-center text-slate-500">
-                Không có dữ liệu công ty.
-              </td>
-            </tr>
-          )}
-
-          {!loading &&
-            !error &&
+          {!companyState.loading &&
+            !companyState.error &&
             companies.map((company, index) => {
               const rowBg = index % 2 === 0 ? "bg-white" : "bg-[#f8fafc]";
 
@@ -95,7 +230,7 @@ export function CompanyTable({
                       <button
                         type="button"
                         title="Xem"
-                        onClick={() => onView(company.id)}
+                        onClick={() => companyState.goToDetail(company.id)}
                         className="hover:text-sky-600"
                       >
                         <Eye size={15} />
@@ -151,6 +286,7 @@ export function CompanyTable({
                   </td>
 
                   <td className="px-3">{company.source_name || "-"}</td>
+
                   <td className="px-3">{company.rating_name || "-"}</td>
 
                   <td className="px-3">

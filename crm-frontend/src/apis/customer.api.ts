@@ -6,6 +6,10 @@ import {
   CreateCustomerPayload,
   CustomerListItem,
   CustomerListParams,
+  CustomerRatingOption,
+  CustomerSourceOption,
+  CustomerTypeOption,
+  MembershipTierOption,
   PaginatedResponse,
   SelectOption,
 } from "@/types/customer.type";
@@ -54,9 +58,12 @@ export const customerApi = {
     return Number(data.count || 0) > 0;
   },
 
-  getCustomerTypes: async (): Promise<SelectOption[]> => {
-    const response = await api.get("/api/customers/customer-types/");
-    return getListData<SelectOption>(response.data);
+  getCustomerTypes: async (): Promise<CustomerTypeOption[]> => {
+    const response = await api.get<
+      CustomerTypeOption[] | PaginatedResponse<CustomerTypeOption>
+    >("/api/customers/customer-types/");
+
+    return getListData<CustomerTypeOption>(response.data);
   },
 
   getCompanies: async (): Promise<SelectOption[]> => {
@@ -64,19 +71,27 @@ export const customerApi = {
     return getListData<SelectOption>(response.data);
   },
 
-  getSources: async (): Promise<SelectOption[]> => {
-    const response = await api.get("/api/customers/customer-sources/");
-    return getListData<SelectOption>(response.data);
+  getSources: async (): Promise<CustomerSourceOption[]> => {
+    const response = await api.get<
+      CustomerSourceOption[] | PaginatedResponse<CustomerSourceOption>
+    >("/api/customers/customer-sources/");
+
+    return getListData<CustomerSourceOption>(response.data);
+  },
+  getRatings: async (): Promise<CustomerRatingOption[]> => {
+    const response = await api.get<
+      CustomerRatingOption[] | PaginatedResponse<CustomerRatingOption>
+    >("/api/customers/customer-ratings/");
+
+    return getListData<CustomerRatingOption>(response.data);
   },
 
-  getRatings: async (): Promise<SelectOption[]> => {
-    const response = await api.get("/api/customers/customer-ratings/");
-    return getListData<SelectOption>(response.data);
-  },
+  getMembershipTiers: async (): Promise<MembershipTierOption[]> => {
+    const response = await api.get<
+      MembershipTierOption[] | PaginatedResponse<MembershipTierOption>
+    >("/api/customers/membership-tiers/");
 
-  getMembershipTiers: async (): Promise<SelectOption[]> => {
-    const response = await api.get("/api/customers/membership-tiers/");
-    return getListData<SelectOption>(response.data);
+    return getListData<MembershipTierOption>(response.data);
   },
 };
 

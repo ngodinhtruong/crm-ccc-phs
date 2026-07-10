@@ -179,7 +179,7 @@ class TicketViewSet(
                 | Q(customer__phone__icontains=q)
                 | Q(customer__email__icontains=q)
                 | Q(company__company_name__icontains=q)
-                | Q(customer_account__account_no__icontains=q)
+                | Q(customer_account__account_number__icontains=q)
                 | Q(owner_user__username__icontains=q)
                 | Q(owner_user__email__icontains=q)
                 | Q(assigned_employee__full_name__icontains=q)
@@ -204,7 +204,7 @@ class TicketViewSet(
             queryset = queryset.filter(customer__phone__icontains=customer_phone)
 
         if customer_account_no:
-            queryset = queryset.filter(customer_account__account_no__icontains=customer_account_no)
+            queryset = queryset.filter(customer_account__account_number__icontains=customer_account_no)
 
         if company_name:
             queryset = queryset.filter(company__company_name__icontains=company_name)

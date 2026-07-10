@@ -9,7 +9,6 @@ import {
   Upload,
 } from "lucide-react";
 
-import { CompanyFilter } from "@/components/companies/CompanyFilter";
 import { CompanyTable } from "@/components/companies/CompanyTable";
 import { useCompanies } from "@/hooks/useCompanies";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
@@ -74,8 +73,16 @@ export function CompanyListPage() {
           <div className="flex items-center gap-2 text-xs text-slate-700">
             <span>
               {companies.fromRecord} đến {companies.toRecord} của{" "}
-              {companies.count}
+              <span className="font-semibold">{companies.count}</span>
             </span>
+
+            <button
+              type="button"
+              onClick={companies.clearFilter}
+              className="h-8 rounded border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+            >
+              Xóa lọc
+            </button>
 
             <button
               type="button"
@@ -100,21 +107,13 @@ export function CompanyListPage() {
           </div>
         </div>
 
-        <CompanyFilter
-          q={companies.q}
-          status={companies.status}
-          onQChange={companies.setQ}
-          onStatusChange={companies.setStatus}
-          onSearch={companies.search}
-          onClear={companies.clearFilter}
-        />
+        {companies.masterError && (
+          <div className="border-b border-red-200 bg-red-50 px-4 py-2 text-xs text-red-600">
+            {companies.masterError}
+          </div>
+        )}
 
-        <CompanyTable
-          companies={companies.companies}
-          loading={companies.loading}
-          error={companies.error}
-          onView={companies.goToDetail}
-        />
+        <CompanyTable companyState={companies} />
       </div>
     </DashboardLayout>
   );
