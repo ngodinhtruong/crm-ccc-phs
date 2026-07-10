@@ -29,21 +29,19 @@ class TicketViewSet(
 
     def get_queryset(self):
         queryset = Ticket.objects.select_related(
-            "customer",
-            "company",
-            "customer_account",
-            "handling_branch",
-            "assigned_unit",
-            "assigned_employee",
-            "support_category",
-            "classification",
-            "current_status",
-            "priority",
-            "source",
-            "sla_policy",
-            "created_by_user",
-            "updated_by_user",
-        ).all().order_by("-created_at")
+        "support_category",
+        "classification",
+        "current_status",
+        "priority",
+        "source",
+        "company",
+        "customer",
+        "customer_account",
+        "handling_branch",
+        "assigned_unit",
+        "assigned_employee",
+        "owner_user",
+    ).all().order_by("-id")
 
         queryset = filter_tickets_by_user(queryset, self.request.user)
 
