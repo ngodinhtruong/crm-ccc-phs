@@ -70,6 +70,7 @@ export type ChatbotOverviewResponse = {
   summary: {
     total_received: {
       value: number;
+      session_count?: number;
       label: string;
     };
 

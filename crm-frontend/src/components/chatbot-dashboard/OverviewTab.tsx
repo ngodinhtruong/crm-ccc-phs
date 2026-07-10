@@ -33,8 +33,20 @@ export function OverviewTab({
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-4">
         <KpiCard
           title="Tổng tiếp nhận"
-          value={overview.summary.total_received.value}
-          subtitle="Tổng phiên chatbot trong kỳ"
+          value={
+            <div className="flex items-baseline gap-2">
+              <span>
+                {overview.summary.total_received.value}
+                <span className="ml-1 text-sm font-normal text-slate-500">lượt</span>
+              </span>
+              <span className="text-slate-300">/</span>
+              <span className="text-xl font-bold">
+                {overview.summary.total_received.session_count ?? "-"}
+                <span className="ml-1 text-xs font-normal text-slate-500">phiên</span>
+              </span>
+            </div>
+          }
+          subtitle="Tổng lượt chat & phiên trong kỳ"
           icon={<Bot size={22} />}
           iconClassName="bg-sky-100 text-sky-600"
           onClick={() =>
@@ -172,7 +184,7 @@ function KpiCard({
   onClick,
 }: {
   title: string;
-  value: number;
+  value: number | React.ReactNode;
   subtitle: string;
   icon: React.ReactNode;
   iconClassName: string;

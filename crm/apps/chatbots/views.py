@@ -130,7 +130,7 @@ class ChatbotDashboardOverviewAPIView(ChatbotDashboardFilterMixin, APIView):
         )
 
         total_sessions = queryset.count()
-        total_messages = ChatbotChatLog.objects.all().count()
+        total_messages = self.filter_logs(ChatbotChatLog.objects.all()).count()
 
         ccc = queryset.filter(outcome_type=ChatbotSessionSummary.OUTCOME_CCC).count()
         spam = queryset.filter(outcome_type=ChatbotSessionSummary.OUTCOME_SPAM).count()

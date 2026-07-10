@@ -53,7 +53,7 @@ def build_full_conversation(logs):
 
 def detect_outcome(session_id, main_category, latest_state, cskh_request):
     category = normalize_category(main_category)
-    state = normalize_state(latest_state.state if latest_state else "")
+    state = normalize_state(latest_state.step if latest_state else "")
 
     if cskh_request:
         return ChatbotSessionSummary.OUTCOME_CCC
@@ -72,7 +72,7 @@ def detect_outcome(session_id, main_category, latest_state, cskh_request):
     if state == "collected":
         return ChatbotSessionSummary.OUTCOME_COLLECTED
 
-    if state == "closed" and category in BOT_DONE_CATEGORIES:
+    if category in BOT_DONE_CATEGORIES:
         return ChatbotSessionSummary.OUTCOME_BOT_DONE
 
     if state == "closed":
@@ -110,12 +110,8 @@ def rebuild_chatbot_session_summaries():
         last_log = logs[-1] if logs else None
 
         main_category = ""
-        if cskh_request and cskh_request.reason:
-            main_category = latest_state.category if latest_state else ""
-        elif last_log:
+        if last_log:
             main_category = last_log.category or ""
-        elif latest_state:
-            main_category = latest_state.category or ""
 
         outcome_type = detect_outcome(
             session_id=session_id,
@@ -163,7 +159,6 @@ def rebuild_chatbot_session_summaries():
                     main_category,
                     cskh_request.reason if cskh_request else "",
                 ),
-                "state": latest_state.state if latest_state else "",
                 "outcome_type": outcome_type,
                 "has_cskh_request": bool(cskh_request),
                 "contact_info": cskh_request.contact_info if cskh_request else "",
