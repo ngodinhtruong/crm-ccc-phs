@@ -1,0 +1,110 @@
+export type CustomerListItem = {
+  id: number;
+  customer_code?: string | null;
+  full_name: string;
+  phone?: string | null;
+  email?: string | null;
+  status?: string | null;
+
+  branch?: number | null;
+  branch_name?: string | null;
+
+  company?: number | null;
+  company_name?: string | null;
+
+  source?: number | null;
+  source_name?: string | null;
+
+  rating?: number | null;
+  rating_name?: string | null;
+
+  membership_tier?: number | null;
+  membership_tier_name?: string | null;
+
+  account_number?: string | null;
+  opened_account_date?: string | null;
+  assigned_employee_name?: string | null;
+  vip_type?: string | null;
+  status_label?: string | null;
+  birth_date_display?: string | null;
+  description_display?: string | null;
+};
+
+export type PaginatedResponse<T> = {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
+};
+
+export type CustomerListParams = {
+  q?: string;
+  branch?: string;
+  phone?: string;
+  status?: string;
+};
+
+export type SelectOption = {
+  id: number;
+  [key: string]: unknown;
+};
+
+export type BranchOption = {
+  id: number;
+  branch_code?: string;
+  branch_name?: string;
+  name?: string;
+};
+
+export type CreateCustomerPayload = {
+  full_name: string;
+  phone: string;
+  email?: string;
+  identity_number?: string;
+  birth_date?: string;
+  gender?: string;
+  customer_type?: number | null;
+  branch?: number | null;
+  company?: number | null;
+  source?: number | null;
+  rating?: number | null;
+  membership_tier?: number | null;
+  address?: string;
+  status?: string;
+};
+
+export type CreateCustomerAccountPayload = {
+  customer: number;
+  account_number: string;
+  account_status: string;
+  source_system?: string;
+};
+
+export type CustomerCreateFormState = {
+  genderPrefix: string;
+  fullName: string;
+  identityNumber: string;
+  birthDate: string;
+  gender: string;
+  phone: string;
+  email: string;
+
+  customerType: string;
+  accountNumber: string;
+  branch: string;
+  openedDate: string;
+  referrer: string;
+  company: string;
+
+  address: string;
+  province: string;
+  country: string;
+  district: string;
+
+  description: string;
+
+  assignedTo: string;
+  source: string;
+  rating: string;
+  membershipTier: string;
+};

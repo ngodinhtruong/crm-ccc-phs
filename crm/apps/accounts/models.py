@@ -26,17 +26,35 @@ class User(AbstractUser):
 
 
 class Role(TimeStampedModel):
+    GROUP_GLOBAL = "GLOBAL"
+    GROUP_CCC = "CCC"
+    GROUP_SALE_ADMIN = "SALE_ADMIN"
+
+    GROUP_CHOICES = [
+        (GROUP_GLOBAL, "Global"),
+        (GROUP_CCC, "CCC"),
+        (GROUP_SALE_ADMIN, "Sale Admin"),
+    ]
+
     role_code = models.CharField(max_length=50, unique=True)
     role_name = models.CharField(max_length=255)
 
     # OWN / BRANCH / MULTI_BRANCH / ALL
     scope_type = models.CharField(max_length=50)
 
+    # GLOBAL / CCC / SALE_ADMIN
+    group_code = models.CharField(
+        max_length=50,
+        choices=GROUP_CHOICES,
+        default=GROUP_CCC,
+        db_index=True,
+    )
+
     class Meta:
         db_table = "roles"
 
     def __str__(self):
-        return self.role_name
+        return f"{self.role_name} ({self.group_code})"
 
 
 class UserRole(models.Model):

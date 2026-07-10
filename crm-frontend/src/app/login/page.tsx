@@ -27,7 +27,7 @@ export default function LoginPage() {
         password,
       });
 
-      router.push("/");
+      router.push("/workspace");
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
         if (err.response?.status === 401) {

@@ -11,6 +11,74 @@ from apps.tickets.models import (
     TicketSource,
     TicketStatus,
 )
+class TicketSupportCategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TicketSupportCategory
+        fields = [
+            "id",
+            "category_code",
+            "category_name",
+            "parent",
+            "is_active",
+            "sort_order",
+        ]
+
+
+class TicketClassificationSerializer(serializers.ModelSerializer):
+    support_category_name = serializers.CharField(
+        source="support_category.category_name",
+        read_only=True,
+    )
+
+    class Meta:
+        model = TicketClassification
+        fields = [
+            "id",
+            "classification_code",
+            "classification_name",
+            "support_category",
+            "support_category_name",
+            "is_active",
+            "sort_order",
+        ]
+
+
+class TicketStatusSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TicketStatus
+        fields = [
+            "id",
+            "status_code",
+            "status_name",
+            "sort_order",
+            "is_final",
+            "is_active",
+        ]
+
+
+class TicketPrioritySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TicketPriority
+        fields = [
+            "id",
+            "priority_code",
+            "priority_name",
+            "level_order",
+            "default_sla_minutes",
+            "is_active",
+        ]
+
+
+class TicketSourceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TicketSource
+        fields = [
+            "id",
+            "source_code",
+            "source_name",
+            "is_active",
+        ]
+
 User = get_user_model()
 class TicketReadSerializer(serializers.ModelSerializer):
     support_category_name = serializers.SerializerMethodField()
@@ -228,6 +296,16 @@ class TicketCreateSerializer(serializers.Serializer):
         allow_blank=True,
         allow_null=True,
     )
+    handling_solution = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        )
+    final_response = serializers.CharField(
+            required=False,
+            allow_blank=True,
+            allow_null=True,
+        )
 
 
 class TicketAssignSerializer(serializers.Serializer):
@@ -337,6 +415,27 @@ class TicketAmendSerializer(serializers.Serializer):
         allow_null=True,
     )
     request_content = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+
+    owner_user = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(),
+        required=False,
+        allow_null=True,
+    )
+    current_status = serializers.PrimaryKeyRelatedField(
+        queryset=TicketStatus.objects.all(),
+        required=False,
+        allow_null=True,
+    )
+    handling_solution = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    final_response = serializers.CharField(
         required=False,
         allow_blank=True,
         allow_null=True,

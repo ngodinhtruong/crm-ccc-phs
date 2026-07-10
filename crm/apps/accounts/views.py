@@ -1,5 +1,6 @@
 from django.db import transaction
 from django.utils import timezone
+from httpx import request
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -9,6 +10,7 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q
 from apps.accounts.models import Permission, Role, RolePermission, UserBranchAccess, UserRole
 from apps.accounts.serializers import (
+    CurrentUserSerializer,
     PermissionSerializer,
     RolePermissionSerializer,
     RoleSerializer,
@@ -22,7 +24,8 @@ from apps.accounts.serializers import (
 from apps.branches.models import Branch
 from apps.accounts.api_permissions import IsSystemManager
 from rest_framework.views import APIView
-from apps.accounts.services import PermissionService
+# from apps.accounts.services import PermissionService
+# from crm.apps.accounts import serializers
 User = get_user_model()
 
 
@@ -188,11 +191,59 @@ class UserBranchAccessViewSet(viewsets.ModelViewSet):
 class MeAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
+    def get_accessible_groups(self, user, roles):
+        role_codes = {role.role_code for role in roles}
+        group_codes = {role.group_code for role in roles if getattr(role, "group_code", None)}
+
+        if user.is_superuser or "SYSTEM_ADMIN" in role_codes or "GLOBAL" in group_codes:
+            return ["CCC", "SALE_ADMIN"]
+
+        result = []
+
+        if "CCC" in group_codes:
+            result.append("CCC")
+
+        if "SALE_ADMIN" in group_codes:
+            result.append("SALE_ADMIN")
+
+        return result
+
+    def get_default_group(self, accessible_groups):
+        if "CCC" in accessible_groups:
+            return "CCC"
+
+        if "SALE_ADMIN" in accessible_groups:
+            return "SALE_ADMIN"
+
+        return None
+
+    def get_is_global_admin(self, user, roles):
+        role_codes = {role.role_code for role in roles}
+        group_codes = {role.group_code for role in roles if getattr(role, "group_code", None)}
+
+        return user.is_superuser or "SYSTEM_ADMIN" in role_codes or "GLOBAL" in group_codes
+
     def get(self, request):
-        user = request.user
+        user = (
+            User.objects.select_related(
+                "employee",
+                "employee__branch",
+            )
+            .prefetch_related(
+                "user_roles__role",
+                "user_roles__role__role_permissions__permission",
+            )
+            .get(id=request.user.id)
+        )
+
         employee = getattr(user, "employee", None)
 
-        roles = PermissionService.get_user_roles(user)
+        roles = [
+            user_role.role
+            for user_role in user.user_roles.all()
+            if user_role.role
+        ]
+
         role_ids = [role.id for role in roles]
 
         permission_ids = RolePermission.objects.filter(
@@ -203,6 +254,10 @@ class MeAPIView(APIView):
             id__in=permission_ids,
             is_active=True,
         ).distinct()
+
+        accessible_groups = self.get_accessible_groups(user, roles)
+        default_group = self.get_default_group(accessible_groups)
+        is_global_admin = self.get_is_global_admin(user, roles)
 
         return Response(
             {
@@ -236,6 +291,7 @@ class MeAPIView(APIView):
                         "role_code": role.role_code,
                         "role_name": role.role_name,
                         "scope_type": role.scope_type,
+                        "group_code": role.group_code,
                     }
                     for role in roles
                 ],
@@ -249,5 +305,8 @@ class MeAPIView(APIView):
                     }
                     for permission in permissions
                 ],
+                "accessible_groups": accessible_groups,
+                "default_group": default_group,
+                "is_global_admin": is_global_admin,
             }
         )
