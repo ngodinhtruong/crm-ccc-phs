@@ -17,6 +17,7 @@ class Branch(TimeStampedModel):
 
 class Employee(TimeStampedModel):
     employee_code = models.CharField(max_length=50, unique=True)
+    
     full_name = models.CharField(max_length=255)
     email = models.EmailField(max_length=255, null=True, blank=True)
     phone = models.CharField(max_length=50, null=True, blank=True)

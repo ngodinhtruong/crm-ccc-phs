@@ -16,6 +16,8 @@ import {
 } from "@/types/sla.type";
 import { UserListItem } from "@/types/user.type";
 
+
+
 const initialForm: SlaCreateFormState = {
     policyName: "",
     ticketCategory: "",
@@ -255,7 +257,6 @@ export function useSlaCreate() {
 
         ticketCategories,
         processingUnits,
-        users,
 
         loadingDropdowns,
         saving,

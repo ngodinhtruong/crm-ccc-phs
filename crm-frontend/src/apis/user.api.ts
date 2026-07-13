@@ -3,6 +3,7 @@ import { cleanParams } from "@/utils/api-param.util";
 import { getListData } from "@/utils/response.util";
 import {
   PaginatedResponse,
+  UserCreateWithAccessPayload,
   UserListItem,
   UserListParams,
   UserRoleOption,
@@ -48,6 +49,15 @@ export const userApi = {
     });
 
     return getListData<UserRoleOption>(response.data);
+  },
+  createWithAccess: async ( payload: UserCreateWithAccessPayload ): Promise<UserListItem> => 
+    {
+    const response = await api.post<UserListItem>(
+      "/api/accounts/users/create-with-access/",
+      payload
+    );
+
+    return response.data;
   },
 };
 

@@ -2,6 +2,7 @@
 
 import { Download, Plus, Wrench } from "lucide-react";
 
+import { useRouter } from "next/navigation";
 import { TablePagination } from "@/components/common";
 import { UserTable } from "@/components/users/UserTable";
 import { useUsers } from "@/hooks/useUsers";
@@ -9,7 +10,7 @@ import { DashboardLayout } from "@/layouts/DashboardLayout";
 
 export function UserListPage() {
   const users = useUsers();
-
+  const router = useRouter();
   return (
     <DashboardLayout
       breadcrumbs={[
@@ -31,10 +32,11 @@ export function UserListPage() {
         <div className="flex items-center gap-2">
           <button
             type="button"
+            onClick={() => router.push("/accounts/users/create")}
             className="flex h-8 items-center gap-1 rounded bg-[#0097cf] px-3 text-xs font-semibold text-white hover:bg-[#0089bd]"
           >
             <Plus size={15} />
-            Thêm Người dùng thường
+            Thêm người dùng
           </button>
 
           <button
@@ -101,11 +103,10 @@ export function UserListPage() {
             <button
               type="button"
               onClick={() => users.changeTab("active")}
-              className={`h-8 px-5 ${
-                users.activeTab === "active"
+              className={`h-8 px-5 ${users.activeTab === "active"
                   ? "bg-[#0097cf] text-white"
                   : "bg-white text-[#0097cf] hover:bg-sky-50"
-              }`}
+                }`}
             >
               Người dùng đang hoạt động
             </button>
@@ -113,11 +114,10 @@ export function UserListPage() {
             <button
               type="button"
               onClick={() => users.changeTab("inactive")}
-              className={`h-8 border-l border-sky-300 px-5 ${
-                users.activeTab === "inactive"
+              className={`h-8 border-l border-sky-300 px-5 ${users.activeTab === "inactive"
                   ? "bg-[#0097cf] text-white"
                   : "bg-white text-[#0097cf] hover:bg-sky-50"
-              }`}
+                }`}
             >
               Người dùng ngừng hoạt động
             </button>

@@ -4,6 +4,12 @@ import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { useSaRecords } from "@/hooks/useSaRecords";
+
+import {
+  PermissionCode,
+  useCurrentUserPermissions,
+} from "@/hooks/useCurrentUserPermissions";
+
 import { DashboardLayout } from "@/layouts/DashboardLayout";
 import { SaRecordItem } from "@/types/sale-admin.type";
 import {
@@ -77,6 +83,9 @@ function IcpBadge({ item }: { item: SaRecordItem }) {
 export function SaRecordListPage() {
     const router = useRouter();
     const records = useSaRecords();
+    const authz = useCurrentUserPermissions();
+
+    const canCreate = authz.hasPermission(PermissionCode.SA_RECORD_CREATE);
 
     return (
         <DashboardLayout
@@ -93,16 +102,18 @@ export function SaRecordListPage() {
                 },
             ]}
             rightAction={
-                <button
-                    type="button"
-                    onClick={() => router.push("/sale-admin/records/create")}
-                    className="flex h-8 items-center gap-1 rounded bg-[#0097cf] px-3 text-xs font-semibold text-white hover:bg-[#0089bd]"
-                >
-                    <Plus size={15} />
-                    Thêm SA Record
-                </button>
+                canCreate ? (
+                    <button
+                        type="button"
+                        onClick={() => router.push("/sale-admin/records/create")}
+                        className="flex h-8 items-center gap-1 rounded bg-[#0097cf] px-3 text-xs font-semibold text-white hover:bg-[#0089bd]"
+                    >
+                        <Plus size={15} />
+                        Thêm SA Record
+                    </button>
+                ) : null
             }
-        >
+                    >
             <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
                 <div className="flex h-12 items-center justify-between border-b bg-white px-4">
                     <div>

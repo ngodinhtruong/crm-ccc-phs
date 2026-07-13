@@ -79,3 +79,62 @@ export type UserBranchOption = {
   branch_name?: string | null;
   name?: string | null;
 };
+
+export type UserEmployeeOption = {
+  id: number;
+  employee_code?: string | null;
+  full_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  department?: string | null;
+  position?: string | null;
+  status?: string | null;
+  branch?: {
+    id: number;
+    branch_code?: string | null;
+    branch_name?: string | null;
+  } | null;
+  branch_id?: number | null;
+  branch_name?: string | null;
+};
+export type UserCreateWithAccessPayload = {
+  username: string;
+  email: string;
+
+  password?: string;
+
+  employee?: number | null;
+  employee_data?: UserCreateEmployeeData | null;
+
+  status: string;
+  is_active: boolean;
+
+  role_ids: number[];
+  branch_ids: number[];
+};
+export type UserCreateFormState = {
+  username: string;
+  email: string;
+
+  employeeId: string;
+  employeeCode: string;
+  employeeFullName: string;
+  employeeBranchId: string;
+  employeeDepartment: string;
+  employeePosition: string;
+
+  status: string;
+  isActive: boolean;
+
+  groupCode: string;
+  roleId: string;
+  branchIds: string[];
+};
+
+export type UserCreateEmployeeData = {
+  employee_code: string;
+  full_name: string;
+  branch: number | null;
+  department?: string;
+  position?: string;
+};

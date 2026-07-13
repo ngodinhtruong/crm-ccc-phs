@@ -128,3 +128,74 @@ export type SaRecordListParams = {
     call_date_from?: string;
     call_date_to?: string;
 };
+
+export type SaRecordCreatePayload = {
+  account_no: string;
+
+  customer_name_snapshot?: string;
+  branch_name_snapshot?: string;
+  pic_name_snapshot?: string;
+  account_status?: string;
+  vip_classification?: string;
+
+  customer_account?: number | null;
+  customer?: number | null;
+  company?: number | null;
+  branch?: number | null;
+
+  pic_user?: number | null;
+  pic_employee?: number | null;
+
+  call_date: string;
+  follow_no: number;
+
+  call_result: number;
+  interest_level?: number | null;
+  icp_group?: number | null;
+
+  reactivation?: boolean;
+  introduced_product?: boolean;
+  support_info?: boolean;
+  referred_rm?: boolean;
+
+  handover_to_broker?: boolean;
+  broker_user?: number | null;
+  broker_employee?: number | null;
+  broker_handover_note?: string;
+
+  transaction_fee_snapshot?: string;
+  transaction_value_snapshot?: string;
+
+  note?: string;
+  source_system?: string;
+  data_status?: string;
+};
+
+export type SaRecordCreateFormState = {
+  accountNo: string;
+  customerNameSnapshot: string;
+  branchNameSnapshot: string;
+  picNameSnapshot: string;
+  accountStatus: string;
+  vipClassification: string;
+
+  callDate: string;
+  followNo: string;
+
+  callResult: string;
+  interestLevel: string;
+  icpGroup: string;
+
+  introducedProduct: boolean;
+  reactivation: boolean;
+  supportInfo: boolean;
+  referredRm: boolean;
+
+  handoverToBroker: boolean;
+  brokerHandoverNote: string;
+
+  transactionValueSnapshot: string;
+  transactionFeeSnapshot: string;
+
+  note: string;
+};

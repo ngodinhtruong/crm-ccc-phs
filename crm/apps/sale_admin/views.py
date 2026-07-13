@@ -10,7 +10,6 @@ from apps.sale_admin.models import (
     SaRecord,
     SaRecordAuditLog,
 )
-from apps.sale_admin.permissions import IsSaleAdminUser, is_sale_admin_manager
 from apps.sale_admin.serializers import (
     SaCallResultSerializer,
     SaInterestLevelSerializer,
@@ -25,7 +24,7 @@ from apps.sale_admin.services import (
     serialize_sa_record,
 )
 from apps.accounts.scopes import filter_sa_records_by_user
-from apps.sale_admin.permissions import SaRecordPermission, SaRecordAuditLogPermission 
+from apps.sale_admin.permissions import SaRecordAuditLogPermission, SaRecordPermission
 
 
 
@@ -49,7 +48,7 @@ class SaIcpGroupViewSet(viewsets.ReadOnlyModelViewSet):
 
 class SaRecordViewSet(viewsets.ModelViewSet):
     permission_classes = [SaRecordPermission]
-
+    
     def get_serializer_class(self):
         if self.action in ["list", "retrieve"]:
             return SaRecordReadSerializer
