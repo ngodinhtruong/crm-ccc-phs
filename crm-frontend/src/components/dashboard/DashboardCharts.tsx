@@ -2,6 +2,7 @@
 
 import { ChartItem } from "@/services/dashboard.service";
 
+
 type BarChartCardProps = {
   title: string;
   items: ChartItem[];
@@ -27,12 +28,12 @@ export function BarChartCard({ title, items, footer }: BarChartCardProps) {
           </div>
         ) : (
           <div className="flex h-full items-end gap-4 overflow-hidden">
-            {items.map((item) => {
+            {items.map((item, index) => {
               const height = Math.max((item.count / max) * 110, 6);
 
               return (
                 <div
-                  key={item.label}
+                  key={`${item.label}-${index}`}
                   className="flex min-w-[44px] flex-1 flex-col items-center justify-end"
                 >
                   <div className="mb-1 text-[10px] font-semibold text-slate-700">

@@ -60,6 +60,8 @@ INSTALLED_APPS = [
     "apps.common",
     "apps.calls",
     "apps.chatbots",
+    # "apps.dashboard",
+    "apps.sale_admin",
 ]
 
 MIDDLEWARE = [

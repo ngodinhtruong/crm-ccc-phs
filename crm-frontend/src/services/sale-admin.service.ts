@@ -1,0 +1,1 @@
+export { saleAdminApi, saleAdminService } from "@/apis/sale-admin.api";

@@ -1,4 +1,5 @@
 from rest_framework import viewsets
+from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
 
@@ -51,37 +52,144 @@ class CompanyViewSet(viewsets.ModelViewSet):
             "rating",
             "membership_tier",
             "assigned_employee",
-        ).all().order_by("-id")
+        ).all()
 
-        keyword = self.request.query_params.get("q")
-        status_value = self.request.query_params.get("status")
-        source_id = self.request.query_params.get("source")
-        rating_id = self.request.query_params.get("rating")
-        membership_tier_id = self.request.query_params.get("membership_tier")
+        params = self.request.query_params
 
-        if keyword:
+        q = params.get("q")
+
+        company_code = params.get("company_code")
+        company_name = params.get("company_name")
+        phone = params.get("phone")
+        email = params.get("email")
+        website = params.get("website")
+        fax = params.get("fax")
+        tax_code = params.get("tax_code")
+        account_number = params.get("account_number")
+
+        opened_at_from = params.get("opened_at_from")
+        opened_at_to = params.get("opened_at_to")
+
+        primary_contact = params.get("primary_contact")
+        primary_contact_name = params.get("primary_contact_name")
+
+        source = params.get("source")
+        source_name = params.get("source_name")
+
+        rating = params.get("rating")
+        rating_name = params.get("rating_name")
+
+        membership_tier = params.get("membership_tier")
+        membership_tier_name = params.get("membership_tier_name")
+
+        assigned_employee = params.get("assigned_employee")
+        assigned_employee_name = params.get("assigned_employee_name")
+
+        address = params.get("address")
+        status_value = params.get("status")
+
+        if q:
             queryset = queryset.filter(
-                Q(company_code__icontains=keyword)
-                | Q(company_name__icontains=keyword)
-                | Q(phone__icontains=keyword)
-                | Q(email__icontains=keyword)
-                | Q(tax_code__icontains=keyword)
-                | Q(account_number__icontains=keyword)
+                Q(company_code__icontains=q)
+                | Q(company_name__icontains=q)
+                | Q(phone__icontains=q)
+                | Q(email__icontains=q)
+                | Q(website__icontains=q)
+                | Q(fax__icontains=q)
+                | Q(tax_code__icontains=q)
+                | Q(account_number__icontains=q)
+                | Q(primary_contact__full_name__icontains=q)
+                | Q(source__source_name__icontains=q)
+                | Q(rating__rating_name__icontains=q)
+                | Q(membership_tier__tier_name__icontains=q)
+                | Q(assigned_employee__full_name__icontains=q)
+                | Q(address__icontains=q)
+                | Q(country__icontains=q)
+                | Q(province__icontains=q)
+                | Q(district__icontains=q)
+                | Q(ward__icontains=q)
+                | Q(description__icontains=q)
+            )
+
+        if company_code:
+            queryset = queryset.filter(company_code__icontains=company_code)
+
+        if company_name:
+            queryset = queryset.filter(company_name__icontains=company_name)
+
+        if phone:
+            queryset = queryset.filter(phone__icontains=phone)
+
+        if email:
+            queryset = queryset.filter(email__icontains=email)
+
+        if website:
+            queryset = queryset.filter(website__icontains=website)
+
+        if fax:
+            queryset = queryset.filter(fax__icontains=fax)
+
+        if tax_code:
+            queryset = queryset.filter(tax_code__icontains=tax_code)
+
+        if account_number:
+            queryset = queryset.filter(account_number__icontains=account_number)
+
+        if opened_at_from:
+            queryset = queryset.filter(opened_at__gte=opened_at_from)
+
+        if opened_at_to:
+            queryset = queryset.filter(opened_at__lte=opened_at_to)
+
+        if primary_contact:
+            queryset = queryset.filter(primary_contact_id=primary_contact)
+
+        if primary_contact_name:
+            queryset = queryset.filter(
+                primary_contact__full_name__icontains=primary_contact_name
+            )
+
+        if source:
+            queryset = queryset.filter(source_id=source)
+
+        if source_name:
+            queryset = queryset.filter(source__source_name__icontains=source_name)
+
+        if rating:
+            queryset = queryset.filter(rating_id=rating)
+
+        if rating_name:
+            queryset = queryset.filter(rating__rating_name__icontains=rating_name)
+
+        if membership_tier:
+            queryset = queryset.filter(membership_tier_id=membership_tier)
+
+        if membership_tier_name:
+            queryset = queryset.filter(
+                membership_tier__tier_name__icontains=membership_tier_name
+            )
+
+        if assigned_employee:
+            queryset = queryset.filter(assigned_employee_id=assigned_employee)
+
+        if assigned_employee_name:
+            queryset = queryset.filter(
+                assigned_employee__full_name__icontains=assigned_employee_name
+            )
+
+        if address:
+            queryset = queryset.filter(
+                Q(address__icontains=address)
+                | Q(country__icontains=address)
+                | Q(province__icontains=address)
+                | Q(district__icontains=address)
+                | Q(ward__icontains=address)
             )
 
         if status_value:
             queryset = queryset.filter(status=status_value)
 
-        if source_id:
-            queryset = queryset.filter(source_id=source_id)
-
-        if rating_id:
-            queryset = queryset.filter(rating_id=rating_id)
-
-        if membership_tier_id:
-            queryset = queryset.filter(membership_tier_id=membership_tier_id)
-
-        return queryset
+        return queryset.order_by("-id")
 
     def perform_create(self, serializer):
         serializer.save(
@@ -146,7 +254,7 @@ class MembershipTierViewSet(viewsets.ModelViewSet):
 class CustomerViewSet(viewsets.ModelViewSet):
     permission_classes = [HasActionPermission]
     serializer_class = CustomerSerializer
-
+    
     permission_action_map = {
         "create": "CUSTOMER_CREATE",
         "update": "CUSTOMER_AMEND",
@@ -155,6 +263,8 @@ class CustomerViewSet(viewsets.ModelViewSet):
     }
 
     def get_queryset(self):
+        
+
         queryset = Customer.objects.select_related(
             "branch",
             "customer_type",
@@ -162,38 +272,181 @@ class CustomerViewSet(viewsets.ModelViewSet):
             "source",
             "rating",
             "membership_tier",
-        ).all().order_by("-id")
+        ).prefetch_related(
+            "accounts",
+            "employee_assignments__employee",
+        ).all()
 
         queryset = filter_customers_by_user(queryset, self.request.user)
 
-        keyword = self.request.query_params.get("q")
-        branch_id = self.request.query_params.get("branch")
-        customer_type_id = self.request.query_params.get("customer_type")
-        phone = self.request.query_params.get("phone")
-        status_value = self.request.query_params.get("status")
+        params = self.request.query_params
 
-        if keyword:
+        q = params.get("q")
+
+
+        opened_account_from = params.get("opened_account_from")
+        opened_account_to = params.get("opened_account_to")
+        description = params.get("description")
+        
+        customer_code = params.get("customer_code")
+        external_customer_id = params.get("external_customer_id")
+        full_name = params.get("full_name")
+        phone = params.get("phone")
+        email = params.get("email")
+        identity_number = params.get("identity_number")
+
+        branch = params.get("branch")
+        branch_name = params.get("branch_name")
+
+        customer_type = params.get("customer_type")
+        customer_type_name = params.get("customer_type_name")
+
+        company = params.get("company")
+        company_name = params.get("company_name")
+
+        source = params.get("source")
+        source_name = params.get("source_name")
+
+        rating = params.get("rating")
+        rating_name = params.get("rating_name")
+
+        membership_tier = params.get("membership_tier")
+        membership_tier_name = params.get("membership_tier_name")
+
+        account_number = params.get("account_number")
+        assigned_employee_name = params.get("assigned_employee_name")
+        vip_type = params.get("vip_type")
+
+        status_value = params.get("status")
+
+        date_of_birth_from = params.get("date_of_birth_from")
+        date_of_birth_to = params.get("date_of_birth_to")
+
+        created_from = params.get("created_from")
+        created_to = params.get("created_to")
+
+        if q:
             queryset = queryset.filter(
-                Q(customer_code__icontains=keyword)
-                | Q(full_name__icontains=keyword)
-                | Q(phone__icontains=keyword)
-                | Q(email__icontains=keyword)
-                | Q(identity_number__icontains=keyword)
+                Q(customer_code__icontains=q)
+                | Q(external_customer_id__icontains=q)
+                | Q(full_name__icontains=q)
+                | Q(phone__icontains=q)
+                | Q(email__icontains=q)
+                | Q(identity_number__icontains=q)
+                | Q(description__icontains=q)
+                | Q(address__icontains=q)
+                | Q(branch__branch_name__icontains=q)
+                | Q(customer_type__type_name__icontains=q)
+                | Q(company__company_name__icontains=q)
+                | Q(source__source_name__icontains=q)
+                | Q(rating__rating_name__icontains=q)
+                | Q(membership_tier__tier_name__icontains=q)
+                | Q(accounts__account_number__icontains=q)
+                | Q(employee_assignments__employee__full_name__icontains=q)
             )
 
-        if branch_id:
-            queryset = queryset.filter(branch_id=branch_id)
+        if customer_code:
+            queryset = queryset.filter(customer_code__icontains=customer_code)
 
-        if customer_type_id:
-            queryset = queryset.filter(customer_type_id=customer_type_id)
+        if external_customer_id:
+            queryset = queryset.filter(
+                external_customer_id__icontains=external_customer_id
+            )
+
+        if full_name:
+            queryset = queryset.filter(full_name__icontains=full_name)
 
         if phone:
             queryset = queryset.filter(phone__icontains=phone)
 
+        if email:
+            queryset = queryset.filter(email__icontains=email)
+
+        if identity_number:
+            queryset = queryset.filter(identity_number__icontains=identity_number)
+
+        if branch:
+            queryset = queryset.filter(branch_id=branch)
+
+        if branch_name:
+            queryset = queryset.filter(branch__branch_name__icontains=branch_name)
+
+        if customer_type:
+            queryset = queryset.filter(customer_type_id=customer_type)
+
+        if customer_type_name:
+            queryset = queryset.filter(customer_type__type_name__icontains=customer_type_name)
+
+        if company:
+            queryset = queryset.filter(company_id=company)
+
+        if company_name:
+            queryset = queryset.filter(company__company_name__icontains=company_name)
+
+        if source:
+            queryset = queryset.filter(source_id=source)
+
+        if source_name:
+            queryset = queryset.filter(source__source_name__icontains=source_name)
+
+        if rating:
+            queryset = queryset.filter(rating_id=rating)
+
+        if rating_name:
+            queryset = queryset.filter(rating__rating_name__icontains=rating_name)
+
+        if membership_tier:
+            queryset = queryset.filter(membership_tier_id=membership_tier)
+
+        if membership_tier_name:
+            queryset = queryset.filter(
+                membership_tier__tier_name__icontains=membership_tier_name
+            )
+
+        if account_number:
+            queryset = queryset.filter(accounts__account_number__icontains=account_number)
+
+
+        if opened_account_from:
+            queryset = queryset.filter(accounts__opened_at__gte=opened_account_from)
+
+        if opened_account_to:
+            queryset = queryset.filter(accounts__opened_at__lte=opened_account_to)
+
+        if description:
+            queryset = queryset.filter(
+                Q(description__icontains=description)
+                | Q(address__icontains=description)
+            )
+            
+        if assigned_employee_name:
+            queryset = queryset.filter(
+                employee_assignments__is_current=True,
+                employee_assignments__employee__full_name__icontains=assigned_employee_name,
+            )
+
+        if vip_type:
+            queryset = queryset.filter(
+                Q(membership_tier__tier_name__icontains=vip_type)
+                | Q(rating__rating_name__icontains=vip_type)
+            )
+
         if status_value:
             queryset = queryset.filter(status=status_value)
 
-        return queryset
+        if date_of_birth_from:
+            queryset = queryset.filter(date_of_birth__gte=date_of_birth_from)
+
+        if date_of_birth_to:
+            queryset = queryset.filter(date_of_birth__lte=date_of_birth_to)
+
+        if created_from:
+            queryset = queryset.filter(created_at__date__gte=created_from)
+
+        if created_to:
+            queryset = queryset.filter(created_at__date__lte=created_to)
+
+        return queryset.distinct().order_by("-id")
 
     def perform_create(self, serializer):
         serializer.save(

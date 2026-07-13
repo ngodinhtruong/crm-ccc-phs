@@ -339,3 +339,110 @@ class PermissionService:
             return False
 
         return PermissionService.can_view_call_history(user, call_log)
+    
+    @staticmethod
+    def is_sa_record_pic(user, record):
+        if user is None or record is None:
+            return False
+
+        if record.pic_user_id == user.id:
+            return True
+
+        employee = getattr(user, "employee", None)
+
+        if employee and record.pic_employee_id == employee.id:
+            return True
+
+        return False
+
+    @staticmethod
+    def can_access_sa_record_by_scope(user, record):
+        if user is None or not user.is_authenticated or record is None:
+            return False
+
+        if user.is_superuser:
+            return True
+
+        scope = PermissionService.get_highest_scope(user)
+
+        if scope == ScopeType.ALL:
+            return True
+
+        if scope == ScopeType.MULTI_BRANCH:
+            return record.branch_id in PermissionService.get_user_branch_ids(user)
+
+        if scope == ScopeType.BRANCH:
+            return record.branch_id in PermissionService.get_user_branch_ids(user)
+
+        if scope == ScopeType.OWN:
+            return PermissionService.is_sa_record_pic(user, record)
+
+        return False
+
+    @staticmethod
+    def can_view_sa_record(user, record=None):
+        if not PermissionService.has_permission(user, PermissionCode.SA_RECORD_VIEW):
+            return False
+
+        if record is None:
+            return True
+
+        return PermissionService.can_access_sa_record_by_scope(user, record)
+
+    @staticmethod
+    def can_create_sa_record(user):
+        return PermissionService.has_permission(user, PermissionCode.SA_RECORD_CREATE)
+
+    @staticmethod
+    def can_update_sa_record(user, record):
+        if not PermissionService.has_permission(user, PermissionCode.SA_RECORD_UPDATE):
+            return False
+
+        if record is None:
+            return False
+
+        return PermissionService.can_access_sa_record_by_scope(user, record)
+
+    @staticmethod
+    def can_delete_sa_record(user, record):
+        if not PermissionService.has_permission(user, PermissionCode.SA_RECORD_DELETE):
+            return False
+
+        if record is None:
+            return False
+
+        return PermissionService.can_access_sa_record_by_scope(user, record)
+
+    @staticmethod
+    def can_import_sa_record(user):
+        return PermissionService.has_permission(user, PermissionCode.SA_RECORD_IMPORT)
+
+    @staticmethod
+    def can_view_sa_record_audit(user, record=None):
+        if not PermissionService.has_permission(user, PermissionCode.SA_RECORD_AUDIT_VIEW):
+            return False
+
+        if record is None:
+            return True
+
+        return PermissionService.can_access_sa_record_by_scope(user, record)
+
+    @staticmethod
+    def can_view_sa_dashboard(user):
+        return PermissionService.has_permission(user, PermissionCode.SA_DASHBOARD_VIEW)
+
+    @staticmethod
+    def can_view_sa_kpi_self(user):
+        return PermissionService.has_permission(user, PermissionCode.SA_KPI_VIEW_SELF)
+
+    @staticmethod
+    def can_view_sa_kpi_branch(user):
+        return PermissionService.has_permission(user, PermissionCode.SA_KPI_VIEW_BRANCH)
+
+    @staticmethod
+    def can_config_sa_kpi(user):
+        return PermissionService.has_permission(user, PermissionCode.SA_KPI_CONFIG)
+
+    @staticmethod
+    def can_view_customer_360(user):
+        return PermissionService.has_permission(user, PermissionCode.CUSTOMER_360_VIEW)
