@@ -59,7 +59,19 @@ export function OverviewTab({
 
         <KpiCard
           title="Chatbot tự xử lý"
-          value={overview.summary.bot_done.value}
+          value={
+            <div className="flex items-baseline gap-1">
+              <span>{overview.summary.bot_done.value}</span>
+              <span className="text-sm font-normal text-muted-foreground">lượt</span>
+              {overview.summary.bot_done.session_count !== undefined && (
+                <>
+                  <span className="text-sm font-normal text-muted-foreground">/</span>
+                  <span>{overview.summary.bot_done.session_count}</span>
+                  <span className="text-sm font-normal text-muted-foreground">phiên</span>
+                </>
+              )}
+            </div>
+          }
           subtitle={`${overview.summary.bot_done.rate || 0}% so với tổng tiếp nhận`}
           icon={<UserRoundCheck size={22} />}
           iconClassName="bg-emerald-100 text-emerald-600"
@@ -73,7 +85,19 @@ export function OverviewTab({
 
         <KpiCard
           title="Chuyển CCC xử lý"
-          value={overview.summary.ccc.value}
+          value={
+            <div className="flex items-baseline gap-1">
+              <span>{overview.summary.ccc.value}</span>
+              <span className="text-sm font-normal text-muted-foreground">lượt</span>
+              {overview.summary.ccc.session_count !== undefined && (
+                <>
+                  <span className="text-sm font-normal text-muted-foreground">/</span>
+                  <span>{overview.summary.ccc.session_count}</span>
+                  <span className="text-sm font-normal text-muted-foreground">phiên</span>
+                </>
+              )}
+            </div>
+          }
           subtitle={`${overview.summary.ccc.rate || 0}% so với tổng tiếp nhận`}
           icon={<Ticket size={22} />}
           iconClassName="bg-amber-100 text-amber-600"
@@ -87,7 +111,19 @@ export function OverviewTab({
 
         <KpiCard
           title="Câu hỏi rác / Timeout"
-          value={overview.summary.spam.value}
+          value={
+            <div className="flex items-baseline gap-1">
+              <span>{overview.summary.spam.value}</span>
+              <span className="text-sm font-normal text-muted-foreground">lượt</span>
+              {overview.summary.spam.session_count !== undefined && (
+                <>
+                  <span className="text-sm font-normal text-muted-foreground">/</span>
+                  <span>{overview.summary.spam.session_count}</span>
+                  <span className="text-sm font-normal text-muted-foreground">phiên</span>
+                </>
+              )}
+            </div>
+          }
           subtitle={`${overview.summary.spam.rate || 0}% so với tổng tiếp nhận`}
           icon={<MessageSquareWarning size={22} />}
           iconClassName="bg-rose-100 text-rose-600"

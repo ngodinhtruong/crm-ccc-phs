@@ -10,6 +10,7 @@ class ChatbotChatLog(TimeStampedModel):
 
     question = models.TextField(null=True, blank=True)
     answer = models.TextField(null=True, blank=True)
+    questionType = models.CharField(max_length=100, null=True, blank=True)
     category = models.CharField(max_length=100, null=True, blank=True)
 
     # external_created_at dùng để lưu cột created_at từ Supabase
@@ -20,7 +21,7 @@ class ChatbotChatLog(TimeStampedModel):
         db_table = "chatbot_chat_logs"
         indexes = [
             models.Index(fields=["session_id"]),
-            models.Index(fields=["category"]),
+            models.Index(fields=["questionType"]),
             models.Index(fields=["external_created_at"]),
         ]
 
@@ -111,6 +112,11 @@ class ChatbotSessionSummary(TimeStampedModel):
         choices=OUTCOME_CHOICES,
         db_index=True,
     )
+
+    msg_count_total = models.IntegerField(default=0)
+    msg_count_bot_done = models.IntegerField(default=0)
+    msg_count_ccc = models.IntegerField(default=0)
+    msg_count_spam = models.IntegerField(default=0)
 
     has_cskh_request = models.BooleanField(default=False)
 

@@ -1,4 +1,4 @@
-from django.db.models import Count, Max, Q
+from django.db.models import Count, Max, Q, Sum
 from django.utils.dateparse import parse_date
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
@@ -132,9 +132,18 @@ class ChatbotDashboardOverviewAPIView(ChatbotDashboardFilterMixin, APIView):
         total_sessions = queryset.count()
         total_messages = self.filter_logs(ChatbotChatLog.objects.all()).count()
 
-        ccc = queryset.filter(outcome_type=ChatbotSessionSummary.OUTCOME_CCC).count()
-        spam = queryset.filter(outcome_type=ChatbotSessionSummary.OUTCOME_SPAM).count()
-        bot_done = queryset.filter(outcome_type=ChatbotSessionSummary.OUTCOME_BOT_DONE).count()
+        aggs = queryset.aggregate(
+            bot_done_msg=Sum("msg_count_bot_done"),
+            ccc_msg=Sum("msg_count_ccc"),
+            spam_msg=Sum("msg_count_spam")
+        )
+        bot_done_msg = aggs["bot_done_msg"] or 0
+        ccc_msg = aggs["ccc_msg"] or 0
+        spam_msg = aggs["spam_msg"] or 0
+
+        bot_done_sessions = queryset.filter(outcome_type=ChatbotSessionSummary.OUTCOME_BOT_DONE).count()
+        ccc_sessions = queryset.filter(outcome_type=ChatbotSessionSummary.OUTCOME_CCC).count()
+        spam_sessions = queryset.filter(outcome_type=ChatbotSessionSummary.OUTCOME_SPAM).count()
         waiting_info = queryset.filter(outcome_type=ChatbotSessionSummary.OUTCOME_WAITING_INFO).count()
         collected = queryset.filter(outcome_type=ChatbotSessionSummary.OUTCOME_COLLECTED).count()
 
@@ -142,20 +151,23 @@ class ChatbotDashboardOverviewAPIView(ChatbotDashboardFilterMixin, APIView):
             {
                 "name": "Chatbot tự xử lý",
                 "code": "BOT_DONE",
-                "value": bot_done,
-                "rate": self.rate(bot_done, total_sessions),
+                "value": bot_done_msg,
+                "session_count": bot_done_sessions,
+                "rate": self.rate(bot_done_msg, total_messages),
             },
             {
                 "name": "Chuyển CCC",
                 "code": "CCC",
-                "value": ccc,
-                "rate": self.rate(ccc, total_sessions),
+                "value": ccc_msg,
+                "session_count": ccc_sessions,
+                "rate": self.rate(ccc_msg, total_messages),
             },
             {
                 "name": "Câu hỏi rác",
                 "code": "SPAM",
-                "value": spam,
-                "rate": self.rate(spam, total_sessions),
+                "value": spam_msg,
+                "session_count": spam_sessions,
+                "rate": self.rate(spam_msg, total_messages),
             },
         ]
 
@@ -206,18 +218,21 @@ class ChatbotDashboardOverviewAPIView(ChatbotDashboardFilterMixin, APIView):
                         "label": "Tổng tiếp nhận",
                     },
                     "bot_done": {
-                        "value": bot_done,
-                        "rate": self.rate(bot_done, total_sessions),
+                        "value": bot_done_msg,
+                        "session_count": bot_done_sessions,
+                        "rate": self.rate(bot_done_msg, total_messages),
                         "label": "Chatbot tự xử lý",
                     },
                     "ccc": {
-                        "value": ccc,
-                        "rate": self.rate(ccc, total_sessions),
+                        "value": ccc_msg,
+                        "session_count": ccc_sessions,
+                        "rate": self.rate(ccc_msg, total_messages),
                         "label": "Chuyển sang CCC xử lý",
                     },
                     "spam": {
-                        "value": spam,
-                        "rate": self.rate(spam, total_sessions),
+                        "value": spam_msg,
+                        "session_count": spam_sessions,
+                        "rate": self.rate(spam_msg, total_messages),
                         "label": "Câu hỏi rác",
                     },
                     "waiting_info": {

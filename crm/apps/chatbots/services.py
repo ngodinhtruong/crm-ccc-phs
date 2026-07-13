@@ -119,15 +119,38 @@ def rebuild_chatbot_session_summaries(affected_session_ids=None):
         last_log = logs[-1] if logs else None
 
         main_category = ""
+        topic_category = ""
         if last_log:
-            main_category = last_log.category or ""
+            main_category = last_log.questionType or ""
+            topic_category = last_log.category or ""
 
-        outcome_type = detect_outcome(
-            session_id=session_id,
-            main_category=main_category,
-            latest_state=latest_state,
-            cskh_request=cskh_request,
-        )
+        msg_count_total = len(logs)
+        msg_count_bot_done = 0
+        msg_count_ccc = 0
+        msg_count_spam = 0
+
+        if cskh_request:
+            msg_count_ccc = msg_count_total
+            outcome_type = ChatbotSessionSummary.OUTCOME_CCC
+        else:
+            for log in logs:
+                cat = normalize_category(log.questionType)
+                if cat in SPAM_CATEGORIES:
+                    msg_count_spam += 1
+                else:
+                    msg_count_bot_done += 1
+
+            if msg_count_bot_done > 0:
+                outcome_type = ChatbotSessionSummary.OUTCOME_BOT_DONE
+            elif msg_count_spam > 0:
+                outcome_type = ChatbotSessionSummary.OUTCOME_SPAM
+            else:
+                outcome_type = detect_outcome(
+                    session_id=session_id,
+                    main_category=main_category,
+                    latest_state=latest_state,
+                    cskh_request=cskh_request,
+                )
 
         started_at = None
         ended_at = None
@@ -164,7 +187,7 @@ def rebuild_chatbot_session_summaries(affected_session_ids=None):
                     else ""
                 ),
                 "main_category": normalize_category(main_category),
-                "dashboard_category": map_dashboard_category(
+                "dashboard_category": topic_category or map_dashboard_category(
                     main_category,
                     cskh_request.reason if cskh_request else "",
                 ),
@@ -178,6 +201,10 @@ def rebuild_chatbot_session_summaries(affected_session_ids=None):
                 "full_conversation": build_full_conversation(logs),
                 "started_at": started_at,
                 "ended_at": ended_at,
+                "msg_count_total": msg_count_total,
+                "msg_count_bot_done": msg_count_bot_done,
+                "msg_count_ccc": msg_count_ccc,
+                "msg_count_spam": msg_count_spam,
             },
         )
 

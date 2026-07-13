@@ -152,6 +152,7 @@ class Command(BaseCommand):
                     "channel": get_value(row, "channel"),
                     "question": get_value(row, "question"),
                     "answer": get_value(row, "answer"),
+                    "questionType": get_value(row, "questionType"),
                     "category": get_value(row, "category", "categories", "catogeries"),
                     "external_created_at": dt,
                     "raw_payload": row,

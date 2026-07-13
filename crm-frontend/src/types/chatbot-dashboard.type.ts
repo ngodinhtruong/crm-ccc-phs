@@ -76,18 +76,21 @@ export type ChatbotOverviewResponse = {
 
     bot_done: {
       value: number;
+      session_count?: number;
       rate: number;
       label: string;
     };
 
     ccc: {
       value: number;
+      session_count?: number;
       rate: number;
       label: string;
     };
 
     spam: {
       value: number;
+      session_count?: number;
       rate: number;
       label: string;
     };
