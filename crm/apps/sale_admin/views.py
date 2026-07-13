@@ -26,7 +26,8 @@ from apps.sale_admin.services import (
 from apps.accounts.scopes import filter_sa_records_by_user
 from apps.sale_admin.permissions import SaRecordAuditLogPermission, SaRecordPermission
 
-
+from datetime import date, datetime
+from decimal import Decimal
 
 class SaCallResultViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated]
@@ -48,7 +49,46 @@ class SaIcpGroupViewSet(viewsets.ReadOnlyModelViewSet):
 
 class SaRecordViewSet(viewsets.ModelViewSet):
     permission_classes = [SaRecordPermission]
-    
+
+
+    def normalize_compare_value(self, value):
+        if hasattr(value, "pk"):
+            return value.pk
+
+        if isinstance(value, Decimal):
+            return value
+
+        if isinstance(value, (date, datetime)):
+            return value
+
+        if isinstance(value, str):
+            return value.strip()
+
+        return value
+
+    def has_validated_changes(self, instance, validated_data):
+        ignored_fields = {
+            "pic_user",
+            "pic_employee",
+            "branch",
+        }
+
+        for field, new_value in validated_data.items():
+            if field in ignored_fields:
+                continue
+
+            if not hasattr(instance, field):
+                continue
+
+            old_value = getattr(instance, field)
+
+            old_compare = self.normalize_compare_value(old_value)
+            new_compare = self.normalize_compare_value(new_value)
+
+            if old_compare != new_compare:
+                return True
+
+        return False
     def get_serializer_class(self):
         if self.action in ["list", "retrieve"]:
             return SaRecordReadSerializer
@@ -272,12 +312,16 @@ class SaRecordViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        pic_user = serializer.validated_data.get("pic_user") or request.user
-        pic_employee = (
-            serializer.validated_data.get("pic_employee")
-            or self.resolve_pic_employee(pic_user)
-        )
-        branch = self.resolve_branch(serializer)
+
+        pic_user = request.user
+        pic_employee = self.resolve_pic_employee(pic_user)
+
+        employee = getattr(request.user, "employee", None)
+
+        if employee and getattr(employee, "branch_id", None):
+            branch = employee.branch
+        else:
+            branch = self.resolve_branch(serializer)
 
         try:
             record = serializer.save(
@@ -306,6 +350,7 @@ class SaRecordViewSet(viewsets.ModelViewSet):
             changed_by_user=request.user,
             old_data=None,
             new_data=new_data,
+            note=record.note or None,
         )
 
         read_serializer = SaRecordReadSerializer(record)
@@ -326,17 +371,20 @@ class SaRecordViewSet(viewsets.ModelViewSet):
         )
         serializer.is_valid(raise_exception=True)
 
-        pic_user = serializer.validated_data.get("pic_user", instance.pic_user)
-        pic_employee = serializer.validated_data.get("pic_employee", instance.pic_employee)
-
-        if pic_user and not pic_employee:
-            pic_employee = self.resolve_pic_employee(pic_user)
-
-        branch = serializer.validated_data.get("branch", instance.branch)
+        if not self.has_validated_changes(instance, serializer.validated_data):
+            read_serializer = SaRecordReadSerializer(instance)
+            return Response(
+                {
+                    "detail": "Không có thay đổi nào để cập nhật.",
+                    "record": read_serializer.data,
+                },
+                status=status.HTTP_200_OK,
+            )
 
         record = serializer.save(
-            pic_employee=pic_employee,
-            branch=branch,
+            pic_user=instance.pic_user,
+            pic_employee=instance.pic_employee,
+            branch=instance.branch,
             updated_by_user=request.user,
         )
 
@@ -348,11 +396,18 @@ class SaRecordViewSet(viewsets.ModelViewSet):
             changed_by_user=request.user,
             old_data=old_data,
             new_data=new_data,
+            note=record.note or None,
         )
 
         read_serializer = SaRecordReadSerializer(record)
 
-        return Response(read_serializer.data)
+        return Response(
+            {
+                "detail": "Cập nhật SA Record thành công.",
+                "record": read_serializer.data,
+            },
+            status=status.HTTP_200_OK,
+        )
 
     @transaction.atomic
     def destroy(self, request, *args, **kwargs):

@@ -119,6 +119,7 @@ const initialForm: SaRecordCreateFormState = {
     transactionFeeSnapshot: "0",
 
     note: "",
+    editReason: "",
 };
 
 

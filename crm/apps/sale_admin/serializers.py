@@ -28,18 +28,18 @@ class SaIcpGroupSerializer(serializers.ModelSerializer):
 
 
 class SaRecordAuditLogSerializer(serializers.ModelSerializer):
-    changed_by_user_name = serializers.SerializerMethodField()
+    # changed_by_user_name = serializers.SerializerMethodField()
 
     class Meta:
         model = SaRecordAuditLog
         fields = "__all__"
 
-    def get_changed_by_user_name(self, obj):
-        if not obj.changed_by_user:
-            return None
+    # def get_changed_by_user_name(self, obj):
+    #     if not obj.changed_by_user:
+    #         return None
 
-        full_name = obj.changed_by_user.get_full_name()
-        return full_name or obj.changed_by_user.username or obj.changed_by_user.email
+    #     full_name = obj.changed_by_user.get_full_name()
+    #     return full_name or obj.changed_by_user.username or obj.changed_by_user.email
 
 
 class SaRecordReadSerializer(serializers.ModelSerializer):
@@ -153,7 +153,8 @@ class SaRecordReadSerializer(serializers.ModelSerializer):
 
 class SaRecordWriteSerializer(serializers.ModelSerializer):
 
-   
+    
+
     class Meta:
         model = SaRecord
         fields = [

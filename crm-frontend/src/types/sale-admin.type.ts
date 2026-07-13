@@ -129,73 +129,118 @@ export type SaRecordListParams = {
     call_date_to?: string;
 };
 
+export type SaRecordFormMode = "create" | "edit";
+
+export type SaRecordFormController = {
+  form: SaRecordCreateFormState;
+
+  setField: <K extends keyof SaRecordCreateFormState>(
+    key: K,
+    value: SaRecordCreateFormState[K]
+  ) => void;
+
+  callResults: SaCallResult[];
+  interestLevels: SaInterestLevel[];
+  icpGroups: SaIcpGroup[];
+
+  loadingMaster: boolean;
+  submitting: boolean;
+
+  error: string;
+  masterError: string;
+
+  submit: () => Promise<void>;
+  cancel: () => void;
+};
+
 export type SaRecordCreatePayload = {
-  account_no: string;
+    account_no: string;
+    customer_name_snapshot?: string;
+    branch_name_snapshot?: string;
+    pic_name_snapshot?: string;
+    account_status?: string;
+    vip_classification?: string;
 
-  customer_name_snapshot?: string;
-  branch_name_snapshot?: string;
-  pic_name_snapshot?: string;
-  account_status?: string;
-  vip_classification?: string;
+    customer_account?: number | null;
+    customer?: number | null;
+    company?: number | null;
+    branch?: number | null;
 
-  customer_account?: number | null;
-  customer?: number | null;
-  company?: number | null;
-  branch?: number | null;
+    pic_user?: number | null;
+    pic_employee?: number | null;
 
-  pic_user?: number | null;
-  pic_employee?: number | null;
+    call_date: string;
+    follow_no: number;
 
-  call_date: string;
-  follow_no: number;
+    call_result: number;
+    interest_level?: number | null;
+    icp_group?: number | null;
 
-  call_result: number;
-  interest_level?: number | null;
-  icp_group?: number | null;
+    reactivation?: boolean;
+    introduced_product?: boolean;
+    support_info?: boolean;
+    referred_rm?: boolean;
 
-  reactivation?: boolean;
-  introduced_product?: boolean;
-  support_info?: boolean;
-  referred_rm?: boolean;
+    handover_to_broker?: boolean;
+    broker_user?: number | null;
+    broker_employee?: number | null;
+    broker_handover_note?: string;
 
-  handover_to_broker?: boolean;
-  broker_user?: number | null;
-  broker_employee?: number | null;
-  broker_handover_note?: string;
+    transaction_fee_snapshot?: string;
+    transaction_value_snapshot?: string;
 
-  transaction_fee_snapshot?: string;
-  transaction_value_snapshot?: string;
+    note?: string;
+    source_system?: string;
+    data_status?: string;
 
-  note?: string;
-  source_system?: string;
-  data_status?: string;
 };
 
 export type SaRecordCreateFormState = {
-  accountNo: string;
-  customerNameSnapshot: string;
-  branchNameSnapshot: string;
-  picNameSnapshot: string;
-  accountStatus: string;
-  vipClassification: string;
+    accountNo: string;
+    customerNameSnapshot: string;
+    branchNameSnapshot: string;
+    picNameSnapshot: string;
+    accountStatus: string;
+    vipClassification: string;
 
-  callDate: string;
-  followNo: string;
+    callDate: string;
+    followNo: string;
 
-  callResult: string;
-  interestLevel: string;
-  icpGroup: string;
+    callResult: string;
+    interestLevel: string;
+    icpGroup: string;
 
-  introducedProduct: boolean;
-  reactivation: boolean;
-  supportInfo: boolean;
-  referredRm: boolean;
+    introducedProduct: boolean;
+    reactivation: boolean;
+    supportInfo: boolean;
+    referredRm: boolean;
 
-  handoverToBroker: boolean;
-  brokerHandoverNote: string;
+    handoverToBroker: boolean;
+    brokerHandoverNote: string;
 
-  transactionValueSnapshot: string;
-  transactionFeeSnapshot: string;
+    transactionValueSnapshot: string;
+    transactionFeeSnapshot: string;
 
-  note: string;
+    note: string;
 };
+
+export type SaRecordAuditLogItem = {
+    id: number;
+    sa_record: number;
+
+    action_type: "CREATE" | "UPDATE" | "DELETE" | string;
+
+    old_data?: Record<string, unknown> | null;
+    new_data?: Record<string, unknown> | null;
+    changed_fields?: string[] | null;
+
+    changed_by_user?: number | null;
+    // changed_by_user_name?: string | null;
+
+    changed_at?: string | null;
+    created_at?: string | null;
+
+    note?: string | null;
+};
+
+export type SaRecordUpdatePayload = Partial<SaRecordCreatePayload>;

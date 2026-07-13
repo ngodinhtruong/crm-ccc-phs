@@ -35,4 +35,7 @@ urlpatterns = [
 
     #sale-admin
     path("api/sale-admin/", include("apps.sale_admin.urls")),
+
+    #kpi
+    path("api/kpis/", include("apps.kpis.urls")),
 ]

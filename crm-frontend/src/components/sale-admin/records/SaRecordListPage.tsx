@@ -1,13 +1,12 @@
 "use client";
 
-import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { useSaRecords } from "@/hooks/useSaRecords";
-
+import { Edit, Eye, Plus } from "lucide-react";
 import {
-  PermissionCode,
-  useCurrentUserPermissions,
+    PermissionCode,
+    useCurrentUserPermissions,
 } from "@/hooks/useCurrentUserPermissions";
 
 import { DashboardLayout } from "@/layouts/DashboardLayout";
@@ -86,6 +85,7 @@ export function SaRecordListPage() {
     const authz = useCurrentUserPermissions();
 
     const canCreate = authz.hasPermission(PermissionCode.SA_RECORD_CREATE);
+    const canUpdate = authz.hasPermission(PermissionCode.SA_RECORD_UPDATE);
 
     return (
         <DashboardLayout
@@ -113,7 +113,7 @@ export function SaRecordListPage() {
                     </button>
                 ) : null
             }
-                    >
+        >
             <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
                 <div className="flex h-12 items-center justify-between border-b bg-white px-4">
                     <div>
@@ -150,6 +150,7 @@ export function SaRecordListPage() {
                     <table className="w-full min-w-[1900px] border-collapse text-left text-xs">
                         <thead>
                             <tr className="h-10 border-b bg-white text-slate-700">
+                                <th className="w-[130px] px-3 font-semibold">Thao tác</th>
                                 <th className="w-[150px] px-3 font-semibold">Mã record</th>
                                 <th className="w-[140px] px-3 font-semibold">Số TK lưu ký</th>
                                 <th className="w-[180px] px-3 font-semibold">Tên KH</th>
@@ -172,6 +173,8 @@ export function SaRecordListPage() {
                             </tr>
 
                             <tr className="border-b bg-[#f8fafc] align-top">
+                                <th className="px-2 py-2" />
+
                                 <th className="px-2 py-2">
                                     <ColumnTextFilter
                                         value={records.recordCode}
@@ -336,11 +339,12 @@ export function SaRecordListPage() {
                         </thead>
 
                         <tbody>
+
                             <TableState
                                 loading={records.loading}
                                 error={records.error}
                                 empty={!records.loading && !records.error && records.items.length === 0}
-                                colSpan={19}
+                                colSpan={20}
                                 emptyText="Không có dữ liệu SA Record."
                             />
                             {!records.loading &&
@@ -353,8 +357,37 @@ export function SaRecordListPage() {
                                             key={item.id}
                                             className={`h-14 border-b border-slate-100 ${rowBg} hover:bg-sky-50`}
                                         >
+                                            <td className="px-3">
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => router.push(`/sale-admin/records/${item.id}`)}
+                                                        className="inline-flex h-7 items-center gap-1 rounded border border-slate-300 bg-white px-2 text-[11px] font-semibold text-slate-600 hover:bg-slate-50"
+                                                    >
+                                                        <Eye size={13} />
+                                                        Xem
+                                                    </button>
+
+                                                    {canUpdate && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => router.push(`/sale-admin/records/${item.id}/edit`)}
+                                                            className="inline-flex h-7 items-center gap-1 rounded border border-sky-200 bg-sky-50 px-2 text-[11px] font-semibold text-sky-700 hover:bg-sky-100"
+                                                        >
+                                                            <Edit size={13} />
+                                                            Sửa
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </td>
                                             <td className="px-3 font-semibold text-sky-600">
-                                                {item.record_code}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => router.push(`/sale-admin/records/${item.id}`)}
+                                                    className="hover:underline"
+                                                >
+                                                    {item.record_code}
+                                                </button>
                                             </td>
                                             <td className="px-3 font-semibold">{item.account_no}</td>
                                             <td className="px-3">

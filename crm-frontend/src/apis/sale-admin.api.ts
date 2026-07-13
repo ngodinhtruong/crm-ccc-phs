@@ -9,9 +9,12 @@ import {
   SaRecordItem,
   SaRecordListParams,
   SaRecordCreatePayload,
+  SaRecordAuditLogItem,
+  SaRecordUpdatePayload,
 } from "@/types/sale-admin.type";
 
 const SA_RECORD_ENDPOINT = "/api/sale-admin/records/";
+const SA_RECORD_AUDIT_LOG_ENDPOINT = "/api/sale-admin/record-audit-logs/";
 const SA_CALL_RESULT_ENDPOINT = "/api/sale-admin/call-results/";
 const SA_INTEREST_LEVEL_ENDPOINT = "/api/sale-admin/interest-levels/";
 const SA_ICP_GROUP_ENDPOINT = "/api/sale-admin/icp-groups/";
@@ -79,6 +82,39 @@ export const saleAdminApi = {
     );
 
     return response.data;
+  },
+  getSaRecord: async (id: number | string): Promise<SaRecordItem> => {
+    const response = await api.get<SaRecordItem>(
+      `${SA_RECORD_ENDPOINT}${id}/`
+    );
+
+    return response.data;
+  },
+
+  updateSaRecord: async (
+    id: number | string,
+    payload: SaRecordUpdatePayload
+  ): Promise<SaRecordItem> => {
+    const response = await api.patch<SaRecordItem>(
+      `${SA_RECORD_ENDPOINT}${id}/`,
+      payload
+    );
+
+    return response.data;
+  },
+
+  getSaRecordAuditLogs: async (
+    saRecordId: number | string
+  ): Promise<SaRecordAuditLogItem[]> => {
+    const response = await api.get<
+      SaRecordAuditLogItem[] | PaginatedResponse<SaRecordAuditLogItem>
+    >(SA_RECORD_AUDIT_LOG_ENDPOINT, {
+      params: {
+        sa_record: saRecordId,
+      },
+    });
+
+    return getListData<SaRecordAuditLogItem>(response.data);
   },
 };
 
