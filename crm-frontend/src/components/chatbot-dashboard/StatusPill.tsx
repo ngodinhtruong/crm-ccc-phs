@@ -1,3 +1,8 @@
+import {
+  DEFAULT_OUTCOME_STYLE,
+  OUTCOME_STYLES,
+} from "@/constants/chatbot-dashboard.constant";
+
 export function StatusPill({
   value,
   label,
@@ -5,35 +10,13 @@ export function StatusPill({
   value?: string | null;
   label?: string | null;
 }) {
-  const display = label || value || "-";
-
-  if (value === "CCC") {
-    return (
-      <span className="rounded-full bg-amber-100 px-2 py-1 font-semibold text-amber-700">
-        {display}
-      </span>
-    );
-  }
-
-  if (value === "BOT_DONE") {
-    return (
-      <span className="rounded-full bg-emerald-100 px-2 py-1 font-semibold text-emerald-700">
-        {display}
-      </span>
-    );
-  }
-
-  if (value === "SPAM" || value === "TIMEOUT") {
-    return (
-      <span className="rounded-full bg-rose-100 px-2 py-1 font-semibold text-rose-700">
-        {display}
-      </span>
-    );
-  }
+  const style = OUTCOME_STYLES[value || ""] || DEFAULT_OUTCOME_STYLE;
 
   return (
-    <span className="rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-600">
-      {display}
+    <span
+      className={`rounded-full px-2 py-1 font-semibold whitespace-nowrap ${style.pill}`}
+    >
+      {label || value || "-"}
     </span>
   );
 }

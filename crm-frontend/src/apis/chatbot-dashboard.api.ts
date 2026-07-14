@@ -4,6 +4,7 @@ import {
   ChatbotDashboardFilters,
   ChatbotFaqItem,
   ChatbotOverviewResponse,
+  ChatbotSessionDetail,
   ChatbotTicketItem,
   FaqListParams,
   PaginatedResponse,
@@ -45,6 +46,14 @@ export const chatbotDashboardApi = {
       {
         params: cleanParams(params),
       }
+    );
+
+    return response.data;
+  },
+
+  getSessionDetail: async (sessionId: string): Promise<ChatbotSessionDetail> => {
+    const response = await api.get<ChatbotSessionDetail>(
+      `/api/chatbots/dashboard/sessions/${encodeURIComponent(sessionId)}/`
     );
 
     return response.data;

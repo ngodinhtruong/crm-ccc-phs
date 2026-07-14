@@ -4,6 +4,7 @@ from apps.chatbots.views import (
     ChatbotDashboardFAQAPIView,
     ChatbotDashboardOverviewAPIView,
     ChatbotDashboardTicketsAPIView,
+    ChatbotSessionDetailAPIView,
 )
 
 urlpatterns = [
@@ -21,5 +22,10 @@ urlpatterns = [
         "dashboard/faqs/",
         ChatbotDashboardFAQAPIView.as_view(),
         name="chatbot-dashboard-faqs",
+    ),
+    path(
+        "dashboard/sessions/<str:session_id>/",
+        ChatbotSessionDetailAPIView.as_view(),
+        name="chatbot-session-detail",
     ),
 ]

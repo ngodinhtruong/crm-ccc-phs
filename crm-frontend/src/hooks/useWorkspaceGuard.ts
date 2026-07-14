@@ -20,6 +20,7 @@ export function useWorkspaceGuard() {
   const [activeWorkspace, setActiveWorkspaceState] =
     useState<WorkspaceCode | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!authService.isAuthenticated()) {
@@ -30,6 +31,7 @@ export function useWorkspaceGuard() {
     const load = async () => {
       try {
         setLoading(true);
+        setError("");
 
         const me = await accountService.getMe();
         setCurrentUser(me);
@@ -71,6 +73,23 @@ export function useWorkspaceGuard() {
           router.push(getDefaultPathByWorkspace("SALE_ADMIN"));
           return;
         }
+      } catch (err) {
+        // Không có catch thì activeWorkspace mãi là null và màn hình kẹt ở
+        // "Đang kiểm tra phân hệ..." mà không báo lỗi gì.
+        const status = (err as { response?: { status?: number } })?.response
+          ?.status;
+
+        if (status === 401) {
+          authService.logout();
+          router.push("/login");
+          return;
+        }
+
+        setError(
+          status
+            ? `Không tải được thông tin tài khoản (HTTP ${status}).`
+            : "Không kết nối được máy chủ. Kiểm tra backend đã chạy chưa."
+        );
       } finally {
         setLoading(false);
       }
@@ -83,5 +102,6 @@ export function useWorkspaceGuard() {
     currentUser,
     activeWorkspace,
     loading,
+    error,
   };
 }

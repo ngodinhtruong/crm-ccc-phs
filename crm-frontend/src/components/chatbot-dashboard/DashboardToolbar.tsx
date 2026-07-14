@@ -3,12 +3,11 @@
 import { useState } from "react";
 import { Bot, CalendarRange, Filter, X } from "lucide-react";
 
+import type { QuickPreset } from "@/hooks/useChatbotDashboard";
 import {
   ActiveTab,
   ChatbotDashboardFilters,
 } from "@/types/chatbot-dashboard.type";
-
-type QuickPreset = "TODAY" | "THIS_WEEK" | "THIS_MONTH";
 
 export function DashboardToolbar({
   filters,

@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+from apps.chatbots.constants import UNCATEGORIZED_LABEL
 from apps.chatbots.models import (
     ChatbotChatLog,
     ChatbotCskhRequest,
@@ -12,6 +13,7 @@ class ChatbotSessionSummarySerializer(serializers.ModelSerializer):
     ticket_code = serializers.SerializerMethodField()
     ticket_status = serializers.SerializerMethodField()
     outcome_label = serializers.SerializerMethodField()
+    category_label = serializers.SerializerMethodField()
     linked_status = serializers.SerializerMethodField()
 
     class Meta:
@@ -28,22 +30,13 @@ class ChatbotSessionSummarySerializer(serializers.ModelSerializer):
         return ""
 
     def get_outcome_label(self, obj):
-        labels = {
-            "BOT_DONE": "Đã đóng — Chatbot",
-            "CCC": "Đang xử lý — CCC",
-            "SPAM": "Câu hỏi rác",
-            "TIMEOUT": "Timeout",
-            "WAITING_INFO": "Đang chờ thông tin",
-            "COLLECTED": "Đã thu thập thông tin",
-        }
+        return obj.get_outcome_type_display()
 
-        return labels.get(obj.outcome_type, obj.outcome_type)
+    def get_category_label(self, obj):
+        return obj.dashboard_category or UNCATEGORIZED_LABEL
 
     def get_linked_status(self, obj):
-        if obj.ticket and obj.ticket.customer_account:
-            return "LINKED"
-
-        if obj.ticket and obj.ticket.customer:
+        if obj.ticket and (obj.ticket.customer_account or obj.ticket.customer):
             return "LINKED"
 
         return "UNLINKED"
@@ -52,7 +45,17 @@ class ChatbotSessionSummarySerializer(serializers.ModelSerializer):
 class ChatbotChatLogSerializer(serializers.ModelSerializer):
     class Meta:
         model = ChatbotChatLog
-        fields = "__all__"
+        fields = [
+            "id",
+            "session_id",
+            "user_id",
+            "channel",
+            "question",
+            "answer",
+            "questionType",
+            "category",
+            "external_created_at",
+        ]
 
 
 class ChatbotStateSerializer(serializers.ModelSerializer):
@@ -68,8 +71,9 @@ class ChatbotCskhRequestSerializer(serializers.ModelSerializer):
 
 
 class ChatbotFAQReportSerializer(serializers.Serializer):
-    question = serializers.CharField()
-    answer = serializers.CharField(allow_blank=True)
-    category = serializers.CharField(allow_blank=True)
+    """Một dòng xếp hạng FAQ: chủ đề + số lượt hỏi + số phiên."""
+
+    category = serializers.CharField()
     hit_count = serializers.IntegerField()
+    session_count = serializers.IntegerField()
     latest_at = serializers.DateTimeField(allow_null=True)

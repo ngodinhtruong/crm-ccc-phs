@@ -11,60 +11,82 @@ import {
   ChatbotFaqItem,
   ChatbotOverviewResponse,
   ChatbotTicketItem,
+  OutcomeCode,
   TicketListParams,
   TicketOpenOptions,
 } from "@/types/chatbot-dashboard.type";
-import {
-  formatDateInput,
-  getStartOfWeek,
-} from "@/utils/date.util";
+import { formatDateInput, getStartOfWeek } from "@/utils/date.util";
 import { normalizeFilters } from "@/utils/chatbot-filter.util";
 
-type QuickPreset = "TODAY" | "THIS_WEEK" | "THIS_MONTH";
+export type QuickPreset = "TODAY" | "THIS_WEEK" | "THIS_MONTH";
 
-const currentYear = new Date().getFullYear();
+const PAGE_SIZE = 50;
+const DEFAULT_PANEL_TITLE = "Tất cả phiên chatbot";
 
 function getErrorMessage(err: unknown, fallback: string) {
   const error = err as {
-    response?: {
-      status?: number;
-      data?: unknown;
-    };
+    response?: { status?: number; data?: unknown };
     message?: string;
   };
 
   const status = error?.response?.status;
+
   const detail = error?.response?.data
     ? JSON.stringify(error.response.data)
     : error?.message;
 
-  return `${fallback}. Status: ${status} - ${detail}`;
+  if (!status && !detail) {
+    return fallback;
+  }
+
+  return `${fallback} (${status ?? "?"}: ${detail ?? ""})`;
 }
+
+/** Khoảng ngày của preset. Dùng start_date/end_date để tránh đá nhau với year/month. */
+function getPresetFilters(preset: QuickPreset): ChatbotDashboardFilters {
+  const now = new Date();
+
+  const start =
+    preset === "TODAY"
+      ? now
+      : preset === "THIS_WEEK"
+      ? getStartOfWeek(now)
+      : new Date(now.getFullYear(), now.getMonth(), 1);
+
+  return {
+    start_date: formatDateInput(start),
+    end_date: formatDateInput(now),
+  };
+}
+
+const EMPTY_FILTERS: ChatbotDashboardFilters = {
+  year: "",
+  month: "",
+  start_date: "",
+  end_date: "",
+  start_hour: "",
+  end_hour: "",
+};
 
 export function useChatbotDashboard() {
   const router = useRouter();
 
   const [activeTab, setActiveTab] = useState<ActiveTab>("overview");
 
+  // Mặc định xem tháng hiện tại
   const [filters, setFilters] = useState<ChatbotDashboardFilters>({
-    year: String(currentYear),
-    month: "",
-    start_date: "",
-    end_date: "",
-    start_hour: "",
-    end_hour: "",
+    ...EMPTY_FILTERS,
+    ...getPresetFilters("THIS_MONTH"),
   });
 
   const [overview, setOverview] = useState<ChatbotOverviewResponse | null>(null);
 
   const [tickets, setTickets] = useState<ChatbotTicketItem[]>([]);
   const [ticketCount, setTicketCount] = useState(0);
-  const [ticketStatus, setTicketStatus] = useState("ALL");
+  const [ticketStatus, setTicketStatus] = useState<OutcomeCode>("ALL");
   const [ticketKeyword, setTicketKeyword] = useState("");
   const [ticketCategory, setTicketCategory] = useState("");
-  const [ticketPanelTitle, setTicketPanelTitle] = useState(
-    "Tất cả phiên chatbot"
-  );
+  const [ticketPanelTitle, setTicketPanelTitle] = useState(DEFAULT_PANEL_TITLE);
 
   const [selectedSession, setSelectedSession] =
     useState<ChatbotTicketItem | null>(null);
@@ -76,44 +98,40 @@ export function useChatbotDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const normalizedFilters = useMemo(() => {
-    return normalizeFilters(filters);
-  }, [filters]);
+  const normalizedFilters = useMemo(
+    () => normalizeFilters(filters),
+    [filters]
+  );
 
   const updateFilter = (key: keyof ChatbotDashboardFilters, value: string) => {
-    setFilters((prev) => ({
-      ...prev,
-      [key]: value,
-    }));
+    setFilters((prev) => ({ ...prev, [key]: value }));
   };
 
-  const loadOverview = async (activeFilters = normalizedFilters) => {
-    const data = await chatbotDashboardService.getOverview(activeFilters);
-    setOverview(data);
+  const loadOverview = async (activeFilters: ChatbotDashboardFilters) => {
+    setOverview(await chatbotDashboardService.getOverview(activeFilters));
   };
 
   const loadTickets = async (
-    activeFilters = normalizedFilters,
-    overrideParams: Partial<TicketListParams> = {}
+    activeFilters: ChatbotDashboardFilters,
+    overrides: Partial<TicketListParams> = {}
   ) => {
     const data = await chatbotDashboardService.getTickets({
       ...activeFilters,
-      status: overrideParams.status ?? ticketStatus,
-      q: overrideParams.q ?? ticketKeyword,
-      dashboard_category:
-        overrideParams.dashboard_category ?? ticketCategory,
-      page_size: overrideParams.page_size ?? 50,
+      status: overrides.status ?? ticketStatus,
+      q: overrides.q ?? ticketKeyword,
+      dashboard_category: overrides.dashboard_category ?? ticketCategory,
+      page_size: PAGE_SIZE,
     });
 
     setTickets(data.results || []);
     setTicketCount(data.count || 0);
   };
 
-  const loadFaqs = async (activeFilters = normalizedFilters) => {
+  const loadFaqs = async (activeFilters: ChatbotDashboardFilters) => {
     const data = await chatbotDashboardService.getFaqs({
       ...activeFilters,
       q: faqKeyword,
-      page_size: 50,
+      page_size: PAGE_SIZE,
     });
 
     setFaqs(data.results || []);
@@ -124,34 +142,25 @@ export function useChatbotDashboard() {
     overrideFilters?: ChatbotDashboardFilters,
     tabOverride?: ActiveTab
   ) => {
+    const tab = tabOverride || activeTab;
+
+    const activeFilters = overrideFilters
+      ? normalizeFilters(overrideFilters)
+      : normalizedFilters;
+
     try {
       setLoading(true);
       setError("");
 
-      const tab = tabOverride || activeTab;
-
-      const activeFilters = overrideFilters
-        ? normalizeFilters(overrideFilters)
-        : normalizedFilters;
-
       if (tab === "overview") {
         await loadOverview(activeFilters);
-      }
-
-      if (tab === "tickets") {
+      } else if (tab === "tickets") {
         await loadTickets(activeFilters);
-      }
-
-      if (tab === "faqs") {
+      } else if (tab === "faqs") {
         await loadFaqs(activeFilters);
       }
     } catch (err) {
-      setError(
-        getErrorMessage(
-          err,
-          "Không tải được dữ liệu dashboard chatbot"
-        )
-      );
+      setError(getErrorMessage(err, "Không tải được dữ liệu dashboard chatbot"));
     } finally {
       setLoading(false);
     }
@@ -163,130 +172,64 @@ export function useChatbotDashboard() {
   };
 
   const applyQuickPreset = (preset: QuickPreset) => {
-    const now = new Date();
-
-    let nextFilters: ChatbotDashboardFilters = {
-      year: String(now.getFullYear()),
-      month: "",
-      start_date: "",
-      end_date: formatDateInput(now),
-      start_hour: "",
-      end_hour: "",
-    };
-
-    if (preset === "TODAY") {
-      nextFilters = {
-        ...nextFilters,
-        month: String(now.getMonth() + 1),
-        start_date: formatDateInput(now),
-        end_date: formatDateInput(now),
-      };
-    }
-
-    if (preset === "THIS_WEEK") {
-      const start = getStartOfWeek(now);
-
-      nextFilters = {
-        ...nextFilters,
-        month: String(now.getMonth() + 1),
-        start_date: formatDateInput(start),
-        end_date: formatDateInput(now),
-      };
-    }
-
-    if (preset === "THIS_MONTH") {
-      const start = new Date(now.getFullYear(), now.getMonth(), 1);
-
-      nextFilters = {
-        ...nextFilters,
-        month: String(now.getMonth() + 1),
-        start_date: formatDateInput(start),
-        end_date: formatDateInput(now),
-      };
-    }
+    const nextFilters = { ...EMPTY_FILTERS, ...getPresetFilters(preset) };
 
     setFilters(nextFilters);
     void loadData(nextFilters);
   };
 
   const clearFilters = () => {
-    const nextFilters: ChatbotDashboardFilters = {
-      year: "",
-      month: "",
-      start_date: "",
-      end_date: "",
-      start_hour: "",
-      end_hour: "",
-    };
-
-    setFilters(nextFilters);
-    void loadData(nextFilters);
+    setFilters(EMPTY_FILTERS);
+    void loadData(EMPTY_FILTERS);
   };
 
+  /** Bấm vào một ô KPI / một cột biểu đồ -> mở danh sách phiên tương ứng. */
   const openTicketsFromOverview = async (options: TicketOpenOptions) => {
+    const status = options.status || "ALL";
+    const category = options.dashboard_category || "";
+
+    setTicketStatus(status);
+    setTicketKeyword("");
+    setTicketCategory(category);
+    setTicketPanelTitle(options.title);
+    setActiveTab("tickets");
+
     try {
       setLoading(true);
       setError("");
-
-      const status = options.status || "ALL";
-      const category = options.dashboard_category || "";
-
-      setTicketStatus(status);
-      setTicketKeyword("");
-      setTicketCategory(category);
-      setTicketPanelTitle(options.title);
-      setActiveTab("tickets");
 
       await loadTickets(normalizedFilters, {
         status,
         q: "",
         dashboard_category: category,
-        page_size: 50,
       });
     } catch (err) {
-      setError(
-        getErrorMessage(err, "Không tải được danh sách phiên chat")
-      );
+      setError(getErrorMessage(err, "Không tải được danh sách phiên chat"));
     } finally {
       setLoading(false);
     }
   };
 
   const clearTicketFilters = async () => {
+    setTicketStatus("ALL");
+    setTicketKeyword("");
+    setTicketCategory("");
+    setTicketPanelTitle(DEFAULT_PANEL_TITLE);
+
     try {
       setLoading(true);
       setError("");
-
-      setTicketCategory("");
-      setTicketPanelTitle("Tất cả phiên chatbot");
-      setTicketStatus("ALL");
-      setTicketKeyword("");
 
       await loadTickets(normalizedFilters, {
         status: "ALL",
         q: "",
         dashboard_category: "",
-        page_size: 50,
       });
     } catch (err) {
-      setError(
-        getErrorMessage(err, "Không tải được danh sách phiên chat")
-      );
+      setError(getErrorMessage(err, "Không tải được danh sách phiên chat"));
     } finally {
       setLoading(false);
     }
-  };
-
-  const refresh = () => {
-    void loadData();
-  };
-
-  const searchTickets = () => {
-    void loadData(undefined, "tickets");
-  };
-
-  const searchFaqs = () => {
-    void loadData(undefined, "faqs");
   };
 
   useEffect(() => {
@@ -333,8 +276,8 @@ export function useChatbotDashboard() {
     loading,
     error,
 
-    refresh,
-    searchTickets,
-    searchFaqs,
+    refresh: () => void loadData(),
+    searchTickets: () => void loadData(undefined, "tickets"),
+    searchFaqs: () => void loadData(undefined, "faqs"),
   };
 }

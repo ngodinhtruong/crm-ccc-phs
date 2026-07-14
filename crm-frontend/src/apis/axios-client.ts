@@ -4,8 +4,14 @@ import axios, {
   InternalAxiosRequestConfig,
 } from "axios";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+/**
+ * Để rỗng: trình duyệt gọi đường dẫn tương đối (/api/...) tới chính origin
+ * đang mở, rồi Next.js chuyển tiếp sang Django (xem next.config.ts).
+ *
+ * Nhờ vậy mở trang bằng localhost, 127.0.0.1 hay IP LAN đều chạy và không dính
+ * CORS. Hardcode 127.0.0.1 sẽ gây Network Error khi truy cập từ máy khác.
+ */
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 type RetryableAxiosRequestConfig = InternalAxiosRequestConfig & {
   _retry?: boolean;
@@ -58,13 +64,17 @@ api.interceptors.response.use(
 
       if (!refreshToken) {
         clearAuthAndRedirect();
-        return Promise.reject(error);
+        return new Promise(() => {});
       }
 
       try {
-        const response = await axios.post(`${API_BASE_URL}/api/token/refresh/`, {
-          refresh: refreshToken,
-        });
+        // Dùng axios trần (không qua instance `api`) để tránh interceptor này
+        // gọi lại chính nó khi refresh cũng trả 401.
+        const response = await axios.post(
+          `${API_BASE_URL}/api/token/refresh/`,
+          { refresh: refreshToken },
+          { headers: { "Content-Type": "application/json" } }
+        );
 
         const newAccessToken = response.data.access;
 
@@ -74,8 +84,11 @@ api.interceptors.response.use(
 
         return api(originalRequest);
       } catch {
+        // Refresh token cũng hỏng -> phiên hết hạn thật. Xoá token và về trang
+        // đăng nhập. Trả về promise treo để component không kịp render lỗi
+        // "unknown" trong lúc trình duyệt đang chuyển trang.
         clearAuthAndRedirect();
-        return Promise.reject(error);
+        return new Promise(() => {});
       }
     }
 

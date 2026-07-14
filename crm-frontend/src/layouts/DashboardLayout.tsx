@@ -35,12 +35,37 @@ export function DashboardLayout({
         defaultSettingsSidebarOpen
     );
 
-    const { activeWorkspace, loading } = useWorkspaceGuard();
+    const { activeWorkspace, loading, error } = useWorkspaceGuard();
 
-    if (loading || !activeWorkspace) {
+    if (loading) {
         return (
             <div className="flex min-h-screen items-center justify-center bg-slate-50 text-sm text-slate-500">
                 Đang kiểm tra phân hệ...
+            </div>
+        );
+    }
+
+    if (error || !activeWorkspace) {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
+                <div className="max-w-md rounded-xl border border-red-200 bg-white p-6 text-center shadow-sm">
+                    <h1 className="text-base font-bold text-slate-800">
+                        Không vào được phân hệ
+                    </h1>
+
+                    <p className="mt-2 text-sm text-slate-600">
+                        {error ||
+                            "Tài khoản của bạn chưa được gán phân hệ nào. Liên hệ quản trị viên để được cấp quyền."}
+                    </p>
+
+                    <button
+                        type="button"
+                        onClick={() => window.location.reload()}
+                        className="mt-4 h-9 rounded-lg bg-[#0097cf] px-4 text-xs font-semibold text-white transition hover:bg-[#0089bd]"
+                    >
+                        Thử lại
+                    </button>
+                </div>
             </div>
         );
     }
