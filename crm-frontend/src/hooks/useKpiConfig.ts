@@ -18,8 +18,11 @@ import {
   KpiPeriodGateConfigItem,
   KpiPeriodItem,
   KpiPeriodMetricItem,
+  KpiProfileItem,
   KpiRewardTierConfigItem,
   KpiRewardTierPayload,
+  KpiSectionItem,
+  KpiSectionPayload,
   KpiWeightValidation,
 } from "@/types/kpi.type";
 
@@ -34,7 +37,6 @@ function formatApiErrorData(data: unknown): string {
 
   if (typeof data === "object") {
     const obj = data as Record<string, unknown>;
-
     const messages: string[] = [];
 
     if (typeof obj.detail === "string") {
@@ -88,9 +90,9 @@ function getErrorMessage(err: unknown, fallback: string) {
     return `${fallback}. ${apiMessage}`;
   }
 
-  return `${fallback}. Status: ${
-    error?.response?.status || "unknown"
-  } - ${error?.message || "Không rõ lỗi"}`;
+  return `${fallback}. Status: ${error?.response?.status || "unknown"} - ${
+    error?.message || "Không rõ lỗi"
+  }`;
 }
 
 function normalizeDecimal(value?: string | number | null) {
@@ -110,6 +112,32 @@ function getInitialPeriodId(periods: KpiPeriodItem[]) {
   return String(active?.id || draft?.id || periods[0]?.id || "");
 }
 
+function getInitialProfileId(profiles: KpiProfileItem[]) {
+  const active = profiles.find((item) => item.is_active);
+  return String(active?.id || profiles[0]?.id || "");
+}
+
+function getSafeMeasurementFormula(value?: string | null) {
+  return value?.trim() || "Chưa cấu hình công thức tính";
+}
+
+function belongsToProfile(
+  item: { profile?: number | null; profile_code?: string | null },
+  profile: KpiProfileItem | null
+) {
+  if (!profile) return true;
+
+  if (item.profile) {
+    return item.profile === profile.id;
+  }
+
+  if (item.profile_code) {
+    return item.profile_code === profile.profile_code;
+  }
+
+  return true;
+}
+
 export function useKpiConfig() {
   const authz = useCurrentUserPermissions();
 
@@ -124,18 +152,23 @@ export function useKpiConfig() {
   const [periods, setPeriods] = useState<KpiPeriodItem[]>([]);
   const [selectedPeriodId, setSelectedPeriodId] = useState("");
 
-  const [periodDetail, setPeriodDetail] = useState<KpiPeriodDetail | null>(
-    null
+  const [periodDetail, setPeriodDetail] = useState<KpiPeriodDetail | null>(null);
+
+  const [profileRows, setProfileRows] = useState<KpiProfileItem[]>([]);
+  const [selectedProfileId, setSelectedProfileId] = useState("");
+
+  const [sectionRowsAll, setSectionRowsAll] = useState<KpiSectionItem[]>([]);
+  const [groupRowsAll, setGroupRowsAll] = useState<KpiGroupItem[]>([]);
+  const [metricRowsAll, setMetricRowsAll] = useState<KpiPeriodMetricItem[]>([]);
+  const [gateRowsAll, setGateRowsAll] = useState<KpiPeriodGateConfigItem[]>([]);
+  const [rewardRowsAll, setRewardRowsAll] = useState<KpiRewardTierConfigItem[]>(
+    []
   );
 
-  const [groupRows, setGroupRows] = useState<KpiGroupItem[]>([]);
-  const [metricRows, setMetricRows] = useState<KpiPeriodMetricItem[]>([]);
-  const [gateRows, setGateRows] = useState<KpiPeriodGateConfigItem[]>([]);
-  const [rewardRows, setRewardRows] = useState<KpiRewardTierConfigItem[]>([]);
-
-  const [metricDefinitions, setMetricDefinitions] = useState<
-    KpiMetricDefinitionItem[]
-  >([]);
+  /**
+   * Backend mới không còn KPI master. State này giữ rỗng để các component cũ chưa refactor không bị vỡ.
+   */
+  const [metricDefinitions] = useState<KpiMetricDefinitionItem[]>([]);
   const [gateDefinitions, setGateDefinitions] = useState<
     KpiGateDefinitionItem[]
   >([]);
@@ -154,47 +187,105 @@ export function useKpiConfig() {
     return periods.find((item) => String(item.id) === selectedPeriodId) || null;
   }, [periods, selectedPeriodId]);
 
-  const syncDetailToRows = (detail: KpiPeriodDetail) => {
-    setPeriodDetail(detail);
-    setGroupRows(detail.groups || []);
-    setMetricRows(detail.metrics || []);
-    setGateRows(detail.gate_configs || []);
-    setRewardRows(detail.reward_tiers || []);
-  };
+  const selectedProfile = useMemo(() => {
+    return (
+      profileRows.find((item) => String(item.id) === selectedProfileId) || null
+    );
+  }, [profileRows, selectedProfileId]);
 
-  const loadPeriods = useCallback(async () => {
-    const data = await kpiService.getPeriods();
+  const sectionRows = useMemo(() => {
+    return sectionRowsAll
+      .filter((item) => belongsToProfile(item, selectedProfile))
+      .sort((a, b) => a.sort_order - b.sort_order || a.id - b.id);
+  }, [sectionRowsAll, selectedProfile]);
 
-    setPeriods(data);
+  const groupRows = useMemo(() => {
+    return groupRowsAll
+      .filter((item) => belongsToProfile(item, selectedProfile))
+      .sort((a, b) => {
+        const sectionA = sectionRowsAll.find((section) => section.id === a.section);
+        const sectionB = sectionRowsAll.find((section) => section.id === b.section);
 
-    if (!selectedPeriodId && data.length > 0) {
-      setSelectedPeriodId(getInitialPeriodId(data));
-    }
-  }, [selectedPeriodId]);
+        return (
+          (sectionA?.sort_order || 0) - (sectionB?.sort_order || 0) ||
+          a.sort_order - b.sort_order ||
+          a.id - b.id
+        );
+      });
+  }, [groupRowsAll, sectionRowsAll, selectedProfile]);
 
-  const loadDefinitions = useCallback(async () => {
-    const [metricDefinitionData, gateDefinitionData] = await Promise.all([
-      kpiService.getMetricDefinitions({ is_active: "true" }),
-      kpiService.getGateDefinitions({ is_active: "true" }),
-    ]);
+  const metricRows = useMemo(() => {
+    return metricRowsAll
+      .filter((item) => belongsToProfile(item, selectedProfile))
+      .sort((a, b) => {
+        const groupA = groupRowsAll.find((group) => group.id === a.group);
+        const groupB = groupRowsAll.find((group) => group.id === b.group);
+        const sectionA = sectionRowsAll.find(
+          (section) => section.id === groupA?.section
+        );
+        const sectionB = sectionRowsAll.find(
+          (section) => section.id === groupB?.section
+        );
 
-    setMetricDefinitions(metricDefinitionData);
-    setGateDefinitions(gateDefinitionData);
-  }, []);
+        return (
+          (sectionA?.sort_order || 0) - (sectionB?.sort_order || 0) ||
+          (groupA?.sort_order || 0) - (groupB?.sort_order || 0) ||
+          a.metric_code.localeCompare(b.metric_code) ||
+          a.id - b.id
+        );
+      });
+  }, [metricRowsAll, groupRowsAll, sectionRowsAll, selectedProfile]);
 
-  const loadPeriodDetail = useCallback(async (periodId: string) => {
-    if (!periodId) return;
+  const gateRows = useMemo(() => {
+    return gateRowsAll
+      .filter((item) => belongsToProfile(item, selectedProfile))
+      .sort((a, b) => a.gate_code.localeCompare(b.gate_code) || a.id - b.id);
+  }, [gateRowsAll, selectedProfile]);
 
-    try {
-      setLoadingDetail(true);
-      setError("");
+  const rewardRows = useMemo(() => {
+    return rewardRowsAll
+      .filter((item) => belongsToProfile(item, selectedProfile))
+      .sort((a, b) => a.sort_order - b.sort_order || a.id - b.id);
+  }, [rewardRowsAll, selectedProfile]);
 
-      const detail = await kpiService.getPeriodDetail(periodId);
+  const syncDetailToRows = useCallback(
+    (detail: KpiPeriodDetail, preferredProfileId?: string) => {
+      const profiles = detail.profiles || [];
+      const nextProfileId =
+        preferredProfileId && profiles.some((item) => String(item.id) === preferredProfileId)
+          ? preferredProfileId
+          : selectedProfileId &&
+            profiles.some((item) => String(item.id) === selectedProfileId)
+          ? selectedProfileId
+          : getInitialProfileId(profiles);
 
-      syncDetailToRows(detail);
+      setPeriodDetail(detail);
+      setProfileRows(profiles);
+      setSelectedProfileId(nextProfileId);
+      setSectionRowsAll(detail.sections || []);
+      setGroupRowsAll(detail.groups || []);
+      setMetricRowsAll(detail.metrics || []);
+      setGateRowsAll(detail.gate_configs || []);
+      setRewardRowsAll(detail.reward_tiers || []);
+
+      return nextProfileId;
+    },
+    [selectedProfileId]
+  );
+
+  const loadWeightValidation = useCallback(
+    async (periodId: string, profileId?: string) => {
+      if (!periodId) return;
+
+      const profile =
+        profileRows.find((item) => String(item.id) === profileId) ||
+        profileRows.find((item) => String(item.id) === selectedProfileId);
 
       try {
-        const validation = await kpiService.validateWeights(periodId);
+        const validation = await kpiService.validateWeights(periodId, {
+          profile: profile?.id,
+          profile_code: profile?.profile_code,
+        });
         setWeightValidation(validation);
       } catch (err) {
         const validationError = err as {
@@ -213,18 +304,78 @@ export function useKpiConfig() {
           ],
         });
       }
-    } catch (err) {
-      setError(getErrorMessage(err, "Không tải được cấu hình KPI"));
-    } finally {
-      setLoadingDetail(false);
+    },
+    [profileRows, selectedProfileId]
+  );
+
+  const loadPeriods = useCallback(async () => {
+    const data = await kpiService.getPeriods();
+
+    setPeriods(data);
+
+    if (!selectedPeriodId && data.length > 0) {
+      setSelectedPeriodId(getInitialPeriodId(data));
     }
+  }, [selectedPeriodId]);
+
+  const loadDefinitions = useCallback(async () => {
+    const gateDefinitionData = await kpiService.getGateDefinitions({
+      is_active: "true",
+    });
+
+    setGateDefinitions(gateDefinitionData);
   }, []);
+
+  const loadPeriodDetail = useCallback(
+    async (periodId: string, preferredProfileId?: string) => {
+      if (!periodId) return;
+
+      try {
+        setLoadingDetail(true);
+        setError("");
+
+        const detail = await kpiService.getPeriodDetail(periodId);
+        const nextProfileId = syncDetailToRows(detail, preferredProfileId);
+
+        const nextProfile = (detail.profiles || []).find(
+          (item) => String(item.id) === nextProfileId
+        );
+
+        try {
+          const validation = await kpiService.validateWeights(periodId, {
+            profile: nextProfile?.id,
+            profile_code: nextProfile?.profile_code,
+          });
+          setWeightValidation(validation);
+        } catch (err) {
+          const validationError = err as {
+            response?: {
+              data?: {
+                valid?: boolean;
+                errors?: string[];
+              };
+            };
+          };
+
+          setWeightValidation({
+            valid: false,
+            errors: validationError.response?.data?.errors || [
+              "Cấu hình trọng số chưa hợp lệ.",
+            ],
+          });
+        }
+      } catch (err) {
+        setError(getErrorMessage(err, "Không tải được cấu hình KPI"));
+      } finally {
+        setLoadingDetail(false);
+      }
+    },
+    [syncDetailToRows]
+  );
 
   const reloadAll = useCallback(async () => {
     try {
       setLoading(true);
-    //   setError("");
-
       await Promise.all([loadPeriods(), loadDefinitions()]);
     } catch (err) {
       setError(getErrorMessage(err, "Không tải được dữ liệu KPI"));
@@ -249,9 +400,30 @@ export function useKpiConfig() {
     }
   }, [selectedPeriodId, loadPeriodDetail]);
 
+  useEffect(() => {
+    if (selectedPeriodId && selectedProfileId && profileRows.length > 0) {
+      void loadWeightValidation(selectedPeriodId, selectedProfileId);
+    }
+  }, [selectedPeriodId, selectedProfileId, profileRows.length, loadWeightValidation]);
+
   const clearMessages = () => {
     setError("");
     setNotice("");
+  };
+
+  const changeSelectedProfileId = (profileId: string) => {
+    setSelectedProfileId(profileId);
+    clearMessages();
+  };
+
+  const setSectionField = <K extends keyof KpiSectionItem>(
+    id: number,
+    key: K,
+    value: KpiSectionItem[K]
+  ) => {
+    setSectionRowsAll((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, [key]: value } : item))
+    );
   };
 
   const setGroupField = <K extends keyof KpiGroupItem>(
@@ -259,7 +431,7 @@ export function useKpiConfig() {
     key: K,
     value: KpiGroupItem[K]
   ) => {
-    setGroupRows((prev) =>
+    setGroupRowsAll((prev) =>
       prev.map((item) => (item.id === id ? { ...item, [key]: value } : item))
     );
   };
@@ -269,7 +441,7 @@ export function useKpiConfig() {
     key: K,
     value: KpiPeriodMetricItem[K]
   ) => {
-    setMetricRows((prev) =>
+    setMetricRowsAll((prev) =>
       prev.map((item) => (item.id === id ? { ...item, [key]: value } : item))
     );
   };
@@ -279,7 +451,7 @@ export function useKpiConfig() {
     key: K,
     value: KpiPeriodGateConfigItem[K]
   ) => {
-    setGateRows((prev) =>
+    setGateRowsAll((prev) =>
       prev.map((item) => (item.id === id ? { ...item, [key]: value } : item))
     );
   };
@@ -289,8 +461,46 @@ export function useKpiConfig() {
     key: K,
     value: KpiRewardTierConfigItem[K]
   ) => {
-    setRewardRows((prev) =>
+    setRewardRowsAll((prev) =>
       prev.map((item) => (item.id === id ? { ...item, [key]: value } : item))
+    );
+  };
+
+  const markSectionInactive = (sectionId: number) => {
+    const section = sectionRows.find((item) => item.id === sectionId);
+
+    if (!section) return;
+
+    const groupIds = groupRows
+      .filter((item) => item.section === sectionId)
+      .map((item) => item.id);
+
+    setSectionRowsAll((prev) =>
+      prev.map((item) =>
+        item.id === sectionId
+          ? { ...item, is_active: false, weight_percent: "0.00" }
+          : item
+      )
+    );
+
+    setGroupRowsAll((prev) =>
+      prev.map((item) =>
+        item.section === sectionId
+          ? { ...item, is_active: false, weight_percent: "0.00" }
+          : item
+      )
+    );
+
+    setMetricRowsAll((prev) =>
+      prev.map((item) =>
+        groupIds.includes(item.group)
+          ? { ...item, is_active: false, weight_percent: "0.00" }
+          : item
+      )
+    );
+
+    setNotice(
+      `Đã tắt tạm phần ${section.section_code}. Hãy chỉnh lại trọng số và bấm "Lưu trọng số".`
     );
   };
 
@@ -299,7 +509,7 @@ export function useKpiConfig() {
 
     if (!group) return;
 
-    setGroupRows((prev) =>
+    setGroupRowsAll((prev) =>
       prev.map((item) =>
         item.id === groupId
           ? { ...item, is_active: false, weight_percent: "0.00" }
@@ -307,7 +517,7 @@ export function useKpiConfig() {
       )
     );
 
-    setMetricRows((prev) =>
+    setMetricRowsAll((prev) =>
       prev.map((item) =>
         item.group === groupId
           ? { ...item, is_active: false, weight_percent: "0.00" }
@@ -321,7 +531,7 @@ export function useKpiConfig() {
   };
 
   const markMetricInactive = (metricId: number) => {
-    setMetricRows((prev) =>
+    setMetricRowsAll((prev) =>
       prev.map((item) =>
         item.id === metricId
           ? { ...item, is_active: false, weight_percent: "0.00" }
@@ -335,13 +545,20 @@ export function useKpiConfig() {
   };
 
   const saveWeights = async () => {
-    if (!periodDetail) return;
+    if (!periodDetail || !selectedProfile) return;
 
     try {
       setSaving(true);
       clearMessages();
 
       const response = await kpiService.saveWeightConfig(periodDetail.id, {
+        profile: selectedProfile.id,
+        profile_code: selectedProfile.profile_code,
+        sections: sectionRows.map((item) => ({
+          id: item.id,
+          weight_percent: normalizeDecimal(item.weight_percent),
+          is_active: item.is_active,
+        })),
         groups: groupRows.map((item) => ({
           id: item.id,
           weight_percent: normalizeDecimal(item.weight_percent),
@@ -356,10 +573,53 @@ export function useKpiConfig() {
 
       setNotice(response.detail);
       setWeightValidation(response.weight_validation);
-      syncDetailToRows(response.period);
+      syncDetailToRows(response.period, String(selectedProfile.id));
       await loadPeriods();
     } catch (err) {
       setError(getErrorMessage(err, "Không lưu được trọng số KPI"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveProfile = async (item: KpiProfileItem) => {
+    try {
+      setSaving(true);
+      clearMessages();
+
+      const response = await kpiService.updateProfile(item.id, {
+        profile_name: item.profile_name,
+        target_role_code: item.target_role_code,
+        total_weight: item.total_weight,
+        sort_order: item.sort_order,
+        is_active: item.is_active,
+      });
+
+      setNotice(response.detail);
+      await loadPeriodDetail(String(item.period), String(item.id));
+    } catch (err) {
+      setError(getErrorMessage(err, "Không cập nhật được bộ KPI"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveSection = async (item: KpiSectionItem) => {
+    try {
+      setSaving(true);
+      clearMessages();
+
+      const response = await kpiService.updateSection(item.id, {
+        section_name: item.section_name,
+        weight_percent: item.weight_percent,
+        sort_order: item.sort_order,
+        is_active: item.is_active,
+      });
+
+      setNotice(response.detail);
+      await loadPeriodDetail(String(item.period), String(item.profile));
+    } catch (err) {
+      setError(getErrorMessage(err, "Không cập nhật được phần KPI"));
     } finally {
       setSaving(false);
     }
@@ -371,13 +631,15 @@ export function useKpiConfig() {
       clearMessages();
 
       const response = await kpiService.updateGroup(item.id, {
+        section: item.section,
         group_name: item.group_name,
         group_type: item.group_type,
         sort_order: item.sort_order,
+        is_active: item.is_active,
       });
 
       setNotice(response.detail);
-      await loadPeriodDetail(String(item.period));
+      await loadPeriodDetail(String(item.period), String(item.profile));
     } catch (err) {
       setError(getErrorMessage(err, "Không cập nhật được nhóm KPI"));
     } finally {
@@ -391,16 +653,23 @@ export function useKpiConfig() {
       clearMessages();
 
       const response = await kpiService.updateMetric(item.id, {
+        period: item.period,
+        profile: item.profile,
+        group: item.group,
+        metric_code: item.metric_code,
         metric_name: item.metric_name,
+        weight_percent: item.weight_percent,
+        work_description: item.work_description || "",
+        measurement_formula: getSafeMeasurementFormula(item.measurement_formula),
+        target_text: item.target_text || "",
         target_value: item.target_value || null,
-        min_value: item.min_value || null,
-        max_value: item.max_value || null,
-        description: item.description || "",
-        sort_order: item.sort_order,
+        target_unit: item.target_unit || null,
+        frequency: item.frequency || "",
+        is_active: item.is_active,
       });
 
       setNotice(response.detail);
-      await loadPeriodDetail(String(item.period));
+      await loadPeriodDetail(String(item.period), String(item.profile));
     } catch (err) {
       setError(getErrorMessage(err, "Không cập nhật được KPI"));
     } finally {
@@ -422,7 +691,7 @@ export function useKpiConfig() {
       });
 
       setNotice(response.detail);
-      await loadPeriodDetail(String(item.period));
+      await loadPeriodDetail(String(item.period), item.profile ? String(item.profile) : undefined);
     } catch (err) {
       setError(getErrorMessage(err, "Không cập nhật được gate KPI"));
     } finally {
@@ -443,12 +712,13 @@ export function useKpiConfig() {
         min_total_score: item.min_total_score || null,
         require_all_gates_passed: item.require_all_gates_passed,
         reward_type: item.reward_type || null,
+        reward_config: item.reward_config || null,
         sort_order: item.sort_order,
         is_active: item.is_active,
       });
 
       setNotice(response.detail);
-      await loadPeriodDetail(String(item.period));
+      await loadPeriodDetail(String(item.period), item.profile ? String(item.profile) : undefined);
     } catch (err) {
       setError(getErrorMessage(err, "Không cập nhật được bậc thưởng KPI"));
     } finally {
@@ -456,8 +726,8 @@ export function useKpiConfig() {
     }
   };
 
-  const addGroup = async (
-    payload: Omit<KpiGroupPayload, "period" | "weight_percent" | "is_active">
+  const addProfile = async (
+    payload: Omit<KpiProfileItem, "id" | "period" | "created_at" | "updated_at" | "period_code">
   ) => {
     if (!periodDetail) return;
 
@@ -465,9 +735,73 @@ export function useKpiConfig() {
       setSaving(true);
       clearMessages();
 
-      const response = await kpiService.createGroup({
+      const response = await kpiService.createProfile({
+        period: periodDetail.id,
+        profile_code: payload.profile_code,
+        profile_name: payload.profile_name,
+        target_role_code: payload.target_role_code,
+        total_weight: payload.total_weight || "100.00",
+        sort_order: payload.sort_order,
+        is_active: payload.is_active,
+      });
+
+      setNotice(response.detail);
+      await loadPeriodDetail(String(periodDetail.id), String(response.item.id));
+    } catch (err) {
+      setError(getErrorMessage(err, "Không thêm được bộ KPI"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const addSection = async (
+    payload: Omit<KpiSectionPayload, "period" | "profile" | "weight_percent" | "is_active">
+  ) => {
+    if (!periodDetail || !selectedProfile) return;
+
+    try {
+      setSaving(true);
+      clearMessages();
+
+      const response = await kpiService.createSection({
         ...payload,
         period: periodDetail.id,
+        profile: selectedProfile.id,
+        weight_percent: "0.00",
+        is_active: false,
+      });
+
+      setNotice(
+        `${response.detail} Phần mới đang tắt và trọng số 0%, hãy bật bằng màn hình trọng số.`
+      );
+
+      await loadPeriodDetail(String(periodDetail.id), String(selectedProfile.id));
+    } catch (err) {
+      setError(getErrorMessage(err, "Không thêm được phần KPI"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const addGroup = async (
+    payload: Omit<
+      KpiGroupPayload,
+      "period" | "profile" | "weight_percent" | "is_active"
+    >
+  ) => {
+    if (!periodDetail || !selectedProfile) return;
+
+    const fallbackSection = sectionRows.find((item) => item.is_active) || sectionRows[0];
+
+    try {
+      setSaving(true);
+      clearMessages();
+
+      const response = await kpiService.createGroup({
+        ...payload,
+        section: payload.section || fallbackSection?.id,
+        period: periodDetail.id,
+        profile: selectedProfile.id,
         weight_percent: "0.00",
         is_active: false,
       });
@@ -476,7 +810,7 @@ export function useKpiConfig() {
         `${response.detail} Nhóm mới đang tắt và trọng số 0%, hãy bật bằng màn hình trọng số.`
       );
 
-      await loadPeriodDetail(String(periodDetail.id));
+      await loadPeriodDetail(String(periodDetail.id), String(selectedProfile.id));
     } catch (err) {
       setError(getErrorMessage(err, "Không thêm được nhóm KPI"));
     } finally {
@@ -487,10 +821,10 @@ export function useKpiConfig() {
   const addMetric = async (
     payload: Omit<
       KpiMetricPayload,
-      "period" | "weight_percent" | "is_active"
+      "period" | "profile" | "weight_percent" | "is_active"
     >
   ) => {
-    if (!periodDetail) return;
+    if (!periodDetail || !selectedProfile) return;
 
     try {
       setSaving(true);
@@ -499,7 +833,9 @@ export function useKpiConfig() {
       const response = await kpiService.createMetric({
         ...payload,
         period: periodDetail.id,
+        profile: selectedProfile.id,
         weight_percent: "0.00",
+        measurement_formula: getSafeMeasurementFormula(payload.measurement_formula),
         is_active: false,
       });
 
@@ -507,7 +843,7 @@ export function useKpiConfig() {
         `${response.detail} KPI mới đang tắt và trọng số 0%, hãy bật bằng màn hình trọng số.`
       );
 
-      await loadPeriodDetail(String(periodDetail.id));
+      await loadPeriodDetail(String(periodDetail.id), String(selectedProfile.id));
     } catch (err) {
       setError(getErrorMessage(err, "Không thêm được KPI"));
     } finally {
@@ -515,10 +851,8 @@ export function useKpiConfig() {
     }
   };
 
-  const addGate = async (
-    payload: Omit<KpiGateConfigPayload, "period">
-  ) => {
-    if (!periodDetail) return;
+  const addGate = async (payload: Omit<KpiGateConfigPayload, "period">) => {
+    if (!periodDetail || !selectedProfile) return;
 
     try {
       setSaving(true);
@@ -527,10 +861,11 @@ export function useKpiConfig() {
       const response = await kpiService.createGateConfig({
         ...payload,
         period: periodDetail.id,
+        profile: selectedProfile.id,
       });
 
       setNotice(response.detail);
-      await loadPeriodDetail(String(periodDetail.id));
+      await loadPeriodDetail(String(periodDetail.id), String(selectedProfile.id));
     } catch (err) {
       setError(getErrorMessage(err, "Không thêm được gate KPI"));
     } finally {
@@ -538,10 +873,8 @@ export function useKpiConfig() {
     }
   };
 
-  const addReward = async (
-    payload: Omit<KpiRewardTierPayload, "period">
-  ) => {
-    if (!periodDetail) return;
+  const addReward = async (payload: Omit<KpiRewardTierPayload, "period">) => {
+    if (!periodDetail || !selectedProfile) return;
 
     try {
       setSaving(true);
@@ -550,12 +883,61 @@ export function useKpiConfig() {
       const response = await kpiService.createRewardTier({
         ...payload,
         period: periodDetail.id,
+        profile: selectedProfile.id,
       });
 
       setNotice(response.detail);
-      await loadPeriodDetail(String(periodDetail.id));
+      await loadPeriodDetail(String(periodDetail.id), String(selectedProfile.id));
     } catch (err) {
       setError(getErrorMessage(err, "Không thêm được bậc thưởng KPI"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteSection = async (item: KpiSectionItem) => {
+    try {
+      setSaving(true);
+      clearMessages();
+
+      const response = await kpiService.deleteSection(item.id);
+
+      setNotice(response.detail);
+      await loadPeriodDetail(String(item.period), String(item.profile));
+    } catch (err) {
+      setError(getErrorMessage(err, "Không xóa được phần KPI"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteGroup = async (item: KpiGroupItem) => {
+    try {
+      setSaving(true);
+      clearMessages();
+
+      const response = await kpiService.deleteGroup(item.id);
+
+      setNotice(response.detail);
+      await loadPeriodDetail(String(item.period), String(item.profile));
+    } catch (err) {
+      setError(getErrorMessage(err, "Không xóa được nhóm KPI"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteMetric = async (item: KpiPeriodMetricItem) => {
+    try {
+      setSaving(true);
+      clearMessages();
+
+      const response = await kpiService.deleteMetric(item.id);
+
+      setNotice(response.detail);
+      await loadPeriodDetail(String(item.period), String(item.profile));
+    } catch (err) {
+      setError(getErrorMessage(err, "Không xóa được KPI"));
     } finally {
       setSaving(false);
     }
@@ -569,7 +951,7 @@ export function useKpiConfig() {
       const response = await kpiService.deleteGateConfig(item.id);
 
       setNotice(response.detail);
-      await loadPeriodDetail(String(item.period));
+      await loadPeriodDetail(String(item.period), item.profile ? String(item.profile) : undefined);
     } catch (err) {
       setError(getErrorMessage(err, "Không xóa được gate KPI"));
     } finally {
@@ -585,7 +967,7 @@ export function useKpiConfig() {
       const response = await kpiService.deleteRewardTier(item.id);
 
       setNotice(response.detail);
-      await loadPeriodDetail(String(item.period));
+      await loadPeriodDetail(String(item.period), item.profile ? String(item.profile) : undefined);
     } catch (err) {
       setError(getErrorMessage(err, "Không xóa được bậc thưởng KPI"));
     } finally {
@@ -620,6 +1002,71 @@ export function useKpiConfig() {
     }
   };
 
+  const updatePeriod = async (
+    periodId: number | string,
+    payload: {
+      period_name?: string;
+      status?: string;
+      start_date?: string;
+      end_date?: string;
+    }
+  ) => {
+    try {
+      setSaving(true);
+      clearMessages();
+
+      const response = await kpiService.updatePeriod(periodId, payload);
+
+      setNotice(response.detail);
+      await loadPeriods();
+      await loadPeriodDetail(String(periodId), selectedProfileId);
+    } catch (err) {
+      setError(getErrorMessage(err, "Không cập nhật được kỳ KPI"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deletePeriod = async (periodId: number | string) => {
+    if (!window.confirm("Bạn chắc chắn muốn xóa kỳ KPI này?")) return;
+
+    try {
+      setSaving(true);
+      clearMessages();
+
+      const response = await kpiService.deletePeriod(periodId);
+
+      setNotice(response.detail);
+      setSelectedPeriodId("");
+      setPeriodDetail(null);
+      setProfileRows([]);
+      setSelectedProfileId("");
+      setSectionRowsAll([]);
+      setGroupRowsAll([]);
+      setMetricRowsAll([]);
+      setGateRowsAll([]);
+      setRewardRowsAll([]);
+
+      await loadPeriods();
+    } catch (err) {
+      setError(getErrorMessage(err, "Không xóa được kỳ KPI"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteSectionDraft = (sectionId: number) => {
+    markSectionInactive(sectionId);
+  };
+
+  const deleteGroupDraft = (groupId: number) => {
+    markGroupInactive(groupId);
+  };
+
+  const deleteMetricDraft = (metricId: number) => {
+    markMetricInactive(metricId);
+  };
+
   return {
     authz,
 
@@ -636,6 +1083,12 @@ export function useKpiConfig() {
 
     periodDetail,
 
+    profileRows,
+    selectedProfileId,
+    selectedProfile,
+    setSelectedProfileId: changeSelectedProfileId,
+
+    sectionRows,
     groupRows,
     metricRows,
     gateRows,
@@ -653,34 +1106,49 @@ export function useKpiConfig() {
     error,
     notice,
 
+    setSectionField,
     setGroupField,
     setMetricField,
     setGateField,
     setRewardField,
 
+    markSectionInactive,
     markGroupInactive,
     markMetricInactive,
 
     saveWeights,
+    saveProfile,
+    saveSection,
     saveGroup,
     saveMetric,
     saveGate,
     saveReward,
 
+    addProfile,
+    addSection,
     addGroup,
     addMetric,
     addGate,
     addReward,
 
+    deleteSection,
+    deleteGroup,
+    deleteMetric,
     deleteGate,
     deleteReward,
 
     createMonthlyPeriod,
+    updatePeriod,
+    deletePeriod,
+
+    deleteSectionDraft,
+    deleteGroupDraft,
+    deleteMetricDraft,
 
     reloadAll,
     reloadPeriodDetail: () => {
       if (selectedPeriodId) {
-        void loadPeriodDetail(selectedPeriodId);
+        void loadPeriodDetail(selectedPeriodId, selectedProfileId);
       }
     },
   };

@@ -8,33 +8,57 @@ import {
   KpiGateDefinitionPayload,
   KpiGroupItem,
   KpiGroupPayload,
-  KpiMetricDefinitionItem,
-  KpiMetricDefinitionPayload,
   KpiMetricPayload,
   KpiPeriodDetail,
   KpiPeriodGateConfigItem,
   KpiPeriodItem,
   KpiPeriodMetricItem,
+  KpiPeriodPayload,
+  KpiProfileItem,
+  KpiProfilePayload,
   KpiRewardTierConfigItem,
   KpiRewardTierPayload,
   KpiSaveWeightConfigPayload,
   KpiSaveWeightConfigResponse,
+  KpiSectionItem,
+  KpiSectionPayload,
+  KpiValidateWeightPayload,
   KpiWeightValidation,
   PaginatedResponse,
 } from "@/types/kpi.type";
 
 const KPI_PERIOD_ENDPOINT = "/api/kpis/periods/";
+const KPI_PROFILE_ENDPOINT = "/api/kpis/profiles/";
+const KPI_SECTION_ENDPOINT = "/api/kpis/sections/";
 const KPI_GROUP_ENDPOINT = "/api/kpis/groups/";
 const KPI_METRIC_ENDPOINT = "/api/kpis/metrics/";
 const KPI_GATE_CONFIG_ENDPOINT = "/api/kpis/gate-configs/";
 const KPI_REWARD_TIER_ENDPOINT = "/api/kpis/reward-tiers/";
-const KPI_METRIC_DEFINITION_ENDPOINT = "/api/kpis/metric-definitions/";
 const KPI_GATE_DEFINITION_ENDPOINT = "/api/kpis/gate-definitions/";
 
 function getListData<T>(data: T[] | PaginatedResponse<T>): T[] {
   if (Array.isArray(data)) return data;
 
   return data.results;
+}
+
+function normalizeMetricPayload(payload: Partial<KpiMetricPayload>) {
+  return {
+    period: payload.period,
+    profile: payload.profile,
+    group: payload.group,
+    metric_code: payload.metric_code,
+    metric_name: payload.metric_name,
+    weight_percent: payload.weight_percent,
+    work_description: payload.work_description ?? "",
+    measurement_formula:
+      payload.measurement_formula?.trim() || "Chưa cấu hình công thức tính",
+    target_text: payload.target_text ?? "",
+    target_value: payload.target_value ?? null,
+    target_unit: payload.target_unit ?? null,
+    frequency: payload.frequency ?? "",
+    is_active: payload.is_active,
+  };
 }
 
 export const kpiApi = {
@@ -64,9 +88,35 @@ export const kpiApi = {
     return response.data;
   },
 
-  validateWeights: async (periodId: number | string): Promise<KpiWeightValidation> => {
+  updatePeriod: async (
+    id: number | string,
+    payload: KpiPeriodPayload
+  ): Promise<KpiConfigMutationResponse<KpiPeriodItem>> => {
+    const response = await api.patch<KpiConfigMutationResponse<KpiPeriodItem>>(
+      `${KPI_PERIOD_ENDPOINT}${id}/`,
+      payload
+    );
+
+    return response.data;
+  },
+
+  deletePeriod: async (
+    id: number | string
+  ): Promise<{ detail: string; changed: boolean }> => {
+    const response = await api.delete<{ detail: string; changed: boolean }>(
+      `${KPI_PERIOD_ENDPOINT}${id}/`
+    );
+
+    return response.data;
+  },
+
+  validateWeights: async (
+    periodId: number | string,
+    payload: KpiValidateWeightPayload = {}
+  ): Promise<KpiWeightValidation> => {
     const response = await api.post<KpiWeightValidation & { detail?: string }>(
-      `${KPI_PERIOD_ENDPOINT}${periodId}/validate-weights/`
+      `${KPI_PERIOD_ENDPOINT}${periodId}/validate-weights/`,
+      payload
     );
 
     return {
@@ -82,6 +132,94 @@ export const kpiApi = {
     const response = await api.post<KpiSaveWeightConfigResponse>(
       `${KPI_PERIOD_ENDPOINT}${periodId}/save-weight-config/`,
       payload
+    );
+
+    return response.data;
+  },
+
+  getProfiles: async (
+    params: Record<string, string> = {}
+  ): Promise<KpiProfileItem[]> => {
+    const response = await api.get<KpiProfileItem[] | PaginatedResponse<KpiProfileItem>>(
+      KPI_PROFILE_ENDPOINT,
+      { params }
+    );
+
+    return getListData(response.data);
+  },
+
+  createProfile: async (
+    payload: KpiProfilePayload
+  ): Promise<KpiConfigMutationResponse<KpiProfileItem>> => {
+    const response = await api.post<KpiConfigMutationResponse<KpiProfileItem>>(
+      KPI_PROFILE_ENDPOINT,
+      payload
+    );
+
+    return response.data;
+  },
+
+  updateProfile: async (
+    id: number | string,
+    payload: Partial<KpiProfilePayload>
+  ): Promise<KpiConfigMutationResponse<KpiProfileItem>> => {
+    const response = await api.patch<KpiConfigMutationResponse<KpiProfileItem>>(
+      `${KPI_PROFILE_ENDPOINT}${id}/`,
+      payload
+    );
+
+    return response.data;
+  },
+
+  deleteProfile: async (
+    id: number | string
+  ): Promise<KpiConfigMutationResponse<KpiProfileItem>> => {
+    const response = await api.delete<KpiConfigMutationResponse<KpiProfileItem>>(
+      `${KPI_PROFILE_ENDPOINT}${id}/`
+    );
+
+    return response.data;
+  },
+
+  getSections: async (
+    params: Record<string, string> = {}
+  ): Promise<KpiSectionItem[]> => {
+    const response = await api.get<KpiSectionItem[] | PaginatedResponse<KpiSectionItem>>(
+      KPI_SECTION_ENDPOINT,
+      { params }
+    );
+
+    return getListData(response.data);
+  },
+
+  createSection: async (
+    payload: KpiSectionPayload
+  ): Promise<KpiConfigMutationResponse<KpiSectionItem>> => {
+    const response = await api.post<KpiConfigMutationResponse<KpiSectionItem>>(
+      KPI_SECTION_ENDPOINT,
+      payload
+    );
+
+    return response.data;
+  },
+
+  updateSection: async (
+    id: number | string,
+    payload: Partial<KpiSectionPayload>
+  ): Promise<KpiConfigMutationResponse<KpiSectionItem>> => {
+    const response = await api.patch<KpiConfigMutationResponse<KpiSectionItem>>(
+      `${KPI_SECTION_ENDPOINT}${id}/`,
+      payload
+    );
+
+    return response.data;
+  },
+
+  deleteSection: async (
+    id: number | string
+  ): Promise<KpiConfigMutationResponse<KpiSectionItem>> => {
+    const response = await api.delete<KpiConfigMutationResponse<KpiSectionItem>>(
+      `${KPI_SECTION_ENDPOINT}${id}/`
     );
 
     return response.data;
@@ -144,7 +282,7 @@ export const kpiApi = {
   ): Promise<KpiConfigMutationResponse<KpiPeriodMetricItem>> => {
     const response = await api.post<KpiConfigMutationResponse<KpiPeriodMetricItem>>(
       KPI_METRIC_ENDPOINT,
-      payload
+      normalizeMetricPayload(payload)
     );
 
     return response.data;
@@ -156,7 +294,7 @@ export const kpiApi = {
   ): Promise<KpiConfigMutationResponse<KpiPeriodMetricItem>> => {
     const response = await api.patch<KpiConfigMutationResponse<KpiPeriodMetricItem>>(
       `${KPI_METRIC_ENDPOINT}${id}/`,
-      payload
+      normalizeMetricPayload(payload)
     );
 
     return response.data;
@@ -258,47 +396,6 @@ export const kpiApi = {
     return response.data;
   },
 
-  getMetricDefinitions: async (
-    params: Record<string, string> = {}
-  ): Promise<KpiMetricDefinitionItem[]> => {
-    const response = await api.get<
-      KpiMetricDefinitionItem[] | PaginatedResponse<KpiMetricDefinitionItem>
-    >(KPI_METRIC_DEFINITION_ENDPOINT, { params });
-
-    return getListData(response.data);
-  },
-
-  createMetricDefinition: async (
-    payload: KpiMetricDefinitionPayload
-  ): Promise<KpiMetricDefinitionItem> => {
-    const response = await api.post<KpiMetricDefinitionItem>(
-      KPI_METRIC_DEFINITION_ENDPOINT,
-      payload
-    );
-
-    return response.data;
-  },
-
-  updateMetricDefinition: async (
-    id: number | string,
-    payload: Partial<KpiMetricDefinitionPayload>
-  ): Promise<KpiMetricDefinitionItem> => {
-    const response = await api.patch<KpiMetricDefinitionItem>(
-      `${KPI_METRIC_DEFINITION_ENDPOINT}${id}/`,
-      payload
-    );
-
-    return response.data;
-  },
-
-  deleteMetricDefinition: async (id: number | string): Promise<KpiMetricDefinitionItem> => {
-    const response = await api.delete<KpiMetricDefinitionItem>(
-      `${KPI_METRIC_DEFINITION_ENDPOINT}${id}/`
-    );
-
-    return response.data;
-  },
-
   getGateDefinitions: async (
     params: Record<string, string> = {}
   ): Promise<KpiGateDefinitionItem[]> => {
@@ -338,5 +435,13 @@ export const kpiApi = {
     );
 
     return response.data;
+  },
+
+  /**
+   * Deprecated compatibility method.
+   * Backend mới không còn KPI master, nên luôn trả mảng rỗng.
+   */
+  getMetricDefinitions: async (): Promise<[]> => {
+    return [];
   },
 };

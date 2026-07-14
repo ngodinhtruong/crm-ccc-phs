@@ -12,6 +12,10 @@ import {
   setActiveWorkspace,
   WorkspaceCode,
 } from "@/utils/workspace.util";
+import {
+  getDefaultPathForWorkspaceByUser,
+  isSaleAdminKpiHomeUser,
+} from "@/utils/default-home.util";
 
 function getRoleCodes(user: CurrentUser) {
   const fromRoleCodes = user.role_codes || [];
@@ -58,6 +62,10 @@ function getFallbackPath(user: CurrentUser) {
 
   if (isGlobalAdmin(user)) {
     return "/accounts/users";
+  }
+
+  if (isSaleAdminKpiHomeUser(user)) {
+    return "/sale-admin/kpi";
   }
 
   if (groups.includes("SALE_ADMIN")) {
@@ -215,7 +223,7 @@ export function useWorkspaceGuard() {
         setActiveWorkspaceState(workspace);
         setActiveWorkspace(workspace);
 
-        router.push(getDefaultPathByWorkspace(workspace));
+        router.push(getDefaultPathForWorkspaceByUser(workspace, me));
       } finally {
         setLoading(false);
       }

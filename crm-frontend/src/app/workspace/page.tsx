@@ -11,6 +11,10 @@ import {
   setActiveWorkspace,
   WorkspaceCode,
 } from "@/utils/workspace.util";
+import {
+  getDefaultHomePath,
+  getDefaultPathForWorkspaceByUser,
+} from "@/utils/default-home.util";
 
 export default function WorkspacePage() {
   const router = useRouter();
@@ -21,7 +25,7 @@ export default function WorkspacePage() {
 
   const chooseWorkspace = (workspace: WorkspaceCode) => {
     setActiveWorkspace(workspace);
-    router.push(getDefaultPathByWorkspace(workspace));
+    router.push(getDefaultPathForWorkspaceByUser(workspace, me));
   };
 
   useEffect(() => {
@@ -38,6 +42,13 @@ export default function WorkspacePage() {
         const data = await accountService.getMe();
         setMe(data);
 
+        const defaultHomePath = getDefaultHomePath(data);
+
+        if (defaultHomePath !== "/workspace") {
+          router.replace(defaultHomePath);
+          return;
+        }
+
         const groups = data.accessible_groups || [];
 
         if (groups.length === 1) {
@@ -45,7 +56,7 @@ export default function WorkspacePage() {
 
           if (onlyGroup === "CCC" || onlyGroup === "SALE_ADMIN") {
             setActiveWorkspace(onlyGroup);
-            router.push(getDefaultPathByWorkspace(onlyGroup));
+            router.replace(getDefaultPathForWorkspaceByUser(onlyGroup, data));
           }
         }
       } catch (err) {
@@ -62,9 +73,7 @@ export default function WorkspacePage() {
           ? JSON.stringify(error.response.data)
           : error?.message;
 
-        setError(
-          `Không tải được thông tin phân hệ. Status: ${status} - ${detail}`
-        );
+        setError(`Không tải được thông tin phân hệ. Status: ${status} - ${detail}`);
       } finally {
         setLoading(false);
       }
@@ -78,9 +87,7 @@ export default function WorkspacePage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#eef2f5] p-6">
       <div className="w-full max-w-3xl rounded-md border bg-white p-6 shadow-sm">
-        <h1 className="text-xl font-semibold text-slate-800">
-          Chọn phân hệ làm việc
-        </h1>
+        <h1 className="text-xl font-semibold text-slate-800">Chọn phân hệ làm việc</h1>
 
         <p className="mt-2 text-sm text-slate-500">
           Tài khoản của bạn có quyền truy cập nhiều phân hệ. Vui lòng chọn phân hệ muốn làm việc.
@@ -126,9 +133,7 @@ export default function WorkspacePage() {
                 onClick={() => chooseWorkspace("SALE_ADMIN")}
                 className="rounded-md border border-slate-200 bg-white p-5 text-left hover:border-emerald-400 hover:bg-emerald-50"
               >
-                <div className="text-lg font-semibold text-slate-800">
-                  Sale Admin
-                </div>
+                <div className="text-lg font-semibold text-slate-800">Sale Admin</div>
 
                 <p className="mt-2 text-sm text-slate-500">
                   SA Records, Dashboard Sale Admin, KPI và import Excel.

@@ -1,19 +1,23 @@
+from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
+from apps.sale_admin.admin_dashboard_views import SaleAdminDashboardView
 from apps.sale_admin.views import (
     SaCallResultViewSet,
-    SaInterestLevelViewSet,
     SaIcpGroupViewSet,
-    SaRecordViewSet,
+    SaInterestLevelViewSet,
     SaRecordAuditLogViewSet,
+    SaRecordViewSet,
 )
 
 router = DefaultRouter()
+router.register("records", SaRecordViewSet, basename="sa-records")
+router.register("record-audit-logs", SaRecordAuditLogViewSet, basename="sa-record-audit-logs")
+router.register("call-results", SaCallResultViewSet, basename="sa-call-results")
+router.register("interest-levels", SaInterestLevelViewSet, basename="sa-interest-levels")
+router.register("icp-groups", SaIcpGroupViewSet, basename="sa-icp-groups")
 
-router.register(r"call-results", SaCallResultViewSet, basename="sa-call-results")
-router.register(r"interest-levels", SaInterestLevelViewSet, basename="sa-interest-levels")
-router.register(r"icp-groups", SaIcpGroupViewSet, basename="sa-icp-groups")
-router.register(r"records", SaRecordViewSet, basename="sa-records")
-router.register(r"record-audit-logs", SaRecordAuditLogViewSet, basename="sa-record-audit-logs")
-
-urlpatterns = router.urls
+urlpatterns = [
+    path("dashboard/", SaleAdminDashboardView.as_view(), name="sale-admin-dashboard"),
+    path("", include(router.urls)),
+]

@@ -95,25 +95,126 @@ class KpiPeriod(TimeStampedModel):
 
     def validate_weight_configuration(self):
         errors = []
+        profiles = self.profiles.filter(is_active=True)
 
-        groups = self.groups.filter(is_active=True)
-        metrics = self.metrics.filter(is_active=True, group__is_active = True)
+        profile_total = (
+            profiles.aggregate(total=Sum("total_weight"))["total"] or Decimal("0")
+        ).quantize(Decimal("0.01"))
 
-        group_total = groups.aggregate(total=Sum("weight_percent"))["total"] or Decimal("0")
-        metric_total = metrics.aggregate(total=Sum("weight_percent"))["total"] or Decimal("0")
+        if not profiles.exists():
+            errors.append("Kỳ KPI chưa có bộ KPI nào.")
 
-        group_total = group_total.quantize(Decimal("0.01"))
-        metric_total = metric_total.quantize(Decimal("0.01"))
+        for profile in profiles:
+            try:
+                profile.validate_weight_configuration()
+            except ValidationError as exc:
+                if hasattr(exc, "messages"):
+                    errors.extend(exc.messages)
+                else:
+                    errors.append(str(exc))
+
+        # Mỗi profile tự có total_weight = 100%. Không cộng SA + SA_SUP với nhau.
+        if profile_total <= Decimal("0.00"):
+            errors.append("Tổng trọng số các bộ KPI không hợp lệ.")
+
+        if errors:
+            raise ValidationError(errors)
+
+        return True
+
+
+class KpiProfile(TimeStampedModel):
+    PROFILE_SA = "SA"
+    PROFILE_SA_SUP = "SA_SUP"
+
+    PROFILE_CHOICES = [
+        (PROFILE_SA, "KPI dành cho SA"),
+        (PROFILE_SA_SUP, "KPI dành cho SA_SUP"),
+    ]
+
+    TARGET_ROLE_SA = "SA_STAFF"
+    TARGET_ROLE_SA_SUP = "SA_SUPERVISOR"
+
+    TARGET_ROLE_CHOICES = [
+        (TARGET_ROLE_SA, "Nhân viên SA"),
+        (TARGET_ROLE_SA_SUP, "Nhân viên SA_SUP"),
+    ]
+
+    period = models.ForeignKey(
+        KpiPeriod,
+        on_delete=models.CASCADE,
+        related_name="profiles",
+    )
+    profile_code = models.CharField(max_length=50, choices=PROFILE_CHOICES)
+    profile_name = models.CharField(max_length=255)
+    target_role_code = models.CharField(max_length=50, choices=TARGET_ROLE_CHOICES)
+    total_weight = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("100.00"))
+    sort_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "kpi_profiles"
+        ordering = ["sort_order", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["period", "profile_code"],
+                name="uq_kpi_profile_period_code",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.period.period_code} - {self.profile_code}"
+
+    def validate_weight_configuration(self):
+        errors = []
+
+        sections = self.sections.filter(is_active=True)
+        groups = self.groups.filter(is_active=True, section__is_active=True)
+        metrics = self.metrics.filter(
+            is_active=True,
+            group__is_active=True,
+            group__section__is_active=True,
+        )
+
+        section_total = (
+            sections.aggregate(total=Sum("weight_percent"))["total"] or Decimal("0")
+        ).quantize(Decimal("0.01"))
+        group_total = (
+            groups.aggregate(total=Sum("weight_percent"))["total"] or Decimal("0")
+        ).quantize(Decimal("0.01"))
+        metric_total = (
+            metrics.aggregate(total=Sum("weight_percent"))["total"] or Decimal("0")
+        ).quantize(Decimal("0.01"))
+
+        if section_total != self.total_weight:
+            errors.append(
+                f"[{self.profile_code}] Tổng trọng số phần KPI hiện là {section_total}%, "
+                f"phải bằng {self.total_weight}%."
+            )
 
         if group_total != self.total_weight:
             errors.append(
-                f"Tổng trọng số nhóm KPI hiện là {group_total}%, phải bằng {self.total_weight}%."
+                f"[{self.profile_code}] Tổng trọng số nhóm KPI hiện là {group_total}%, "
+                f"phải bằng {self.total_weight}%."
             )
 
         if metric_total != self.total_weight:
             errors.append(
-                f"Tổng trọng số chỉ tiêu KPI hiện là {metric_total}%, phải bằng {self.total_weight}%."
+                f"[{self.profile_code}] Tổng trọng số KPI chi tiết hiện là {metric_total}%, "
+                f"phải bằng {self.total_weight}%."
             )
+
+        for section in sections:
+            child_total = (
+                groups.filter(section=section).aggregate(total=Sum("weight_percent"))["total"]
+                or Decimal("0")
+            ).quantize(Decimal("0.01"))
+
+            if child_total != section.weight_percent:
+                errors.append(
+                    f"[{self.profile_code}] Tổng trọng số nhóm trong phần {section.section_code} "
+                    f"là {child_total}%, phải bằng {section.weight_percent}%."
+                )
 
         for group in groups:
             child_total = (
@@ -123,14 +224,45 @@ class KpiPeriod(TimeStampedModel):
 
             if child_total != group.weight_percent:
                 errors.append(
-                    f"Tổng trọng số chỉ tiêu trong nhóm {group.group_code} là {child_total}%, "
-                    f"phải bằng {group.weight_percent}%."
+                    f"[{self.profile_code}] Tổng trọng số KPI trong nhóm {group.group_code} "
+                    f"là {child_total}%, phải bằng {group.weight_percent}%."
                 )
 
         if errors:
             raise ValidationError(errors)
 
         return True
+
+
+class KpiSection(TimeStampedModel):
+    period = models.ForeignKey(
+        KpiPeriod,
+        on_delete=models.CASCADE,
+        related_name="sections",
+    )
+    profile = models.ForeignKey(
+        KpiProfile,
+        on_delete=models.CASCADE,
+        related_name="sections",
+    )
+    section_code = models.CharField(max_length=50)
+    section_name = models.CharField(max_length=255)
+    weight_percent = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0.00"))
+    sort_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "kpi_sections"
+        ordering = ["profile__sort_order", "sort_order", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["period", "profile", "section_code"],
+                name="uq_kpi_section_period_profile_code",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.profile.profile_code} - {self.section_code} - {self.section_name}"
 
 
 class KpiGroup(TimeStampedModel):
@@ -149,167 +281,139 @@ class KpiGroup(TimeStampedModel):
         on_delete=models.CASCADE,
         related_name="groups",
     )
-
+    profile = models.ForeignKey(
+        KpiProfile,
+        on_delete=models.CASCADE,
+        related_name="groups",
+        null=True,
+        blank=True,
+    )
+    section = models.ForeignKey(
+        KpiSection,
+        on_delete=models.CASCADE,
+        related_name="groups",
+        null=True,
+        blank=True,
+    )
     group_code = models.CharField(max_length=50)
     group_name = models.CharField(max_length=255)
     group_type = models.CharField(max_length=50, choices=GROUP_TYPE_CHOICES)
-
-    weight_percent = models.DecimalField(max_digits=5, decimal_places=2)
-
+    weight_percent = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0.00"))
     sort_order = models.PositiveIntegerField(default=0)
     is_active = models.BooleanField(default=True)
 
     class Meta:
         db_table = "kpi_groups"
-        ordering = ["sort_order", "id"]
+        ordering = ["profile__sort_order", "section__sort_order", "sort_order", "id"]
         constraints = [
             models.UniqueConstraint(
-                fields=["period", "group_code"],
-                name="uq_kpi_group_period_code",
+                fields=["period", "profile", "group_code"],
+                name="uq_kpi_group_period_profile_code",
             )
         ]
 
     def __str__(self):
-        return f"{self.group_code} - {self.group_name}"
-
-
-class KpiMetricDefinition(TimeStampedModel):
-    INPUT_MANUAL = "MANUAL"
-    INPUT_AUTO = "AUTO"
-
-    INPUT_TYPE_CHOICES = [
-        (INPUT_MANUAL, "Nhập tay"),
-        (INPUT_AUTO, "Tự động"),
-    ]
-
-    
-
-    UNIT_COUNT = "COUNT"
-    UNIT_PERCENT = "PERCENT"
-    UNIT_MONEY = "MONEY"
-    UNIT_SCORE = "SCORE"
-    UNIT_VALUE = "VALUE"
-
-    UNIT_CHOICES = [
-        (UNIT_COUNT, "Số lượng"),
-        (UNIT_PERCENT, "Phần trăm"),
-        (UNIT_MONEY, "Tiền"),
-        (UNIT_SCORE, "Điểm"),
-        (UNIT_VALUE, "Giá trị"),
-    ]
-
-    metric_code = models.CharField(max_length=50, unique=True)
-    metric_name = models.CharField(max_length=255)
-
-    description = models.TextField(null=True, blank=True)
-
-    input_type = models.CharField(max_length=20, choices=INPUT_TYPE_CHOICES)
-    formula_key = models.CharField(max_length=100, null=True, blank=True)
-
-    
-
-    unit = models.CharField(max_length=50, choices=UNIT_CHOICES, default=UNIT_SCORE)
-
-    min_score = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0.00"))
-    max_score = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("100.00"))
-
-    is_active = models.BooleanField(default=True)
-
-    class Meta:
-        db_table = "kpi_metric_definitions"
-        ordering = ["metric_code"]
-
-    def __str__(self):
-        return f"{self.metric_code} - {self.metric_name}"
+        return f"{self.profile.profile_code if self.profile else ''} - {self.group_code} - {self.group_name}"
 
 
 class KpiPeriodMetric(TimeStampedModel):
-    KPI_TYPE_ADMIN = "ADMIN"
-    KPI_TYPE_SALE_CSKH = "SALE_CSKH"
+    FREQUENCY_DAILY = "DAILY"
+    FREQUENCY_WEEKLY = "WEEKLY"
+    FREQUENCY_MONTHLY = "MONTHLY"
+    FREQUENCY_QUARTERLY = "QUARTERLY"
+    FREQUENCY_HALF_YEARLY = "HALF_YEARLY"
+    FREQUENCY_YEARLY = "YEARLY"
+    FREQUENCY_ON_EVENT = "ON_EVENT"
 
-    KPI_TYPE_CHOICES = [
-        (KPI_TYPE_ADMIN, "Admin"),
-        (KPI_TYPE_SALE_CSKH, "Sale/CSKH"),
+    FREQUENCY_CHOICES = [
+        (FREQUENCY_DAILY, "Ngày"),
+        (FREQUENCY_WEEKLY, "Tuần"),
+        (FREQUENCY_MONTHLY, "Tháng"),
+        (FREQUENCY_QUARTERLY, "Quý / 3 tháng"),
+        (FREQUENCY_HALF_YEARLY, "6 tháng"),
+        (FREQUENCY_YEARLY, "Năm"),
+        (FREQUENCY_ON_EVENT, "Khi phát sinh"),
     ]
 
-    kpi_type = models.CharField(
-        max_length=50,
-        choices=KPI_TYPE_CHOICES,
-        default=KPI_TYPE_ADMIN,
-        db_index=True,
-    )
+    UNIT_COUNT = "COUNT"
+    UNIT_PERCENT = "PERCENT"
+    UNIT_VND = "VND"
 
-    work_description = models.TextField(null=True, blank=True)
-    measurement_formula = models.TextField(null=True, blank=True)
-    target_text = models.TextField(null=True, blank=True)
-    frequency = models.CharField(max_length=100, null=True, blank=True)
+    TARGET_UNIT_CHOICES = [
+        (UNIT_COUNT, "Số lượng"),
+        (UNIT_PERCENT, "%"),
+        (UNIT_VND, "VND"),
+    ]
+
     period = models.ForeignKey(
         KpiPeriod,
         on_delete=models.CASCADE,
         related_name="metrics",
     )
+    profile = models.ForeignKey(
+        KpiProfile,
+        on_delete=models.CASCADE,
+        related_name="metrics",
+        null=True,
+        blank=True,
+    )
     group = models.ForeignKey(
         KpiGroup,
-        on_delete=models.PROTECT,
+        on_delete=models.CASCADE,
         related_name="metrics",
-    )
-    metric_definition = models.ForeignKey(
-        KpiMetricDefinition,
-        on_delete=models.PROTECT,
-        related_name="period_metrics",
     )
 
     metric_code = models.CharField(max_length=50)
     metric_name = models.CharField(max_length=255)
-
-    input_type = models.CharField(max_length=20, choices=KpiMetricDefinition.INPUT_TYPE_CHOICES)
-    formula_key = models.CharField(max_length=100, null=True, blank=True)
-
-    weight_percent = models.DecimalField(max_digits=5, decimal_places=2)
-
+    weight_percent = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0.00"))
+    work_description = models.TextField(null=True, blank=True)
+    measurement_formula = models.TextField()
+    target_text = models.TextField(null=True, blank=True)
     target_value = models.DecimalField(max_digits=20, decimal_places=4, null=True, blank=True)
-    min_value = models.DecimalField(max_digits=20, decimal_places=4, null=True, blank=True)
-    max_value = models.DecimalField(max_digits=20, decimal_places=4, null=True, blank=True)
-
-    
-
-    formula_config = models.JSONField(null=True, blank=True)
-    description = models.TextField(null=True, blank=True)
-
-    sort_order = models.PositiveIntegerField(default=0)
+    target_unit = models.CharField(
+        max_length=20,
+        choices=TARGET_UNIT_CHOICES,
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+    frequency = models.CharField(
+        max_length=20,
+        choices=FREQUENCY_CHOICES,
+        default=FREQUENCY_MONTHLY,
+        db_index=True,
+    )
     is_active = models.BooleanField(default=True)
 
     class Meta:
         db_table = "kpi_period_metrics"
-        ordering = ["group__sort_order", "sort_order", "id"]
+        ordering = ["profile__sort_order", "group__section__sort_order", "group__sort_order", "metric_code", "id"]
         constraints = [
             models.UniqueConstraint(
-                fields=["period", "metric_code"],
-                name="uq_kpi_period_metric_code",
+                fields=["period", "profile", "metric_code"],
+                name="uq_kpi_period_profile_metric_code",
             )
         ]
 
     def __str__(self):
         return f"{self.metric_code} - {self.metric_name}"
 
+    def clean(self):
+        if not self.measurement_formula or not self.measurement_formula.strip():
+            raise ValidationError("Mỗi KPI bắt buộc phải có công thức tính / đo lường CRM.")
+
 
 class KpiUserTarget(TimeStampedModel):
-    period = models.ForeignKey(
-        KpiPeriod,
+    period = models.ForeignKey(KpiPeriod, on_delete=models.CASCADE, related_name="user_targets")
+    profile = models.ForeignKey(
+        KpiProfile,
         on_delete=models.CASCADE,
         related_name="user_targets",
+        null=True,
+        blank=True,
     )
-    metric = models.ForeignKey(
-        KpiPeriodMetric,
-        on_delete=models.CASCADE,
-        related_name="user_targets",
-    )
-
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="kpi_targets",
-    )
+    metric = models.ForeignKey(KpiPeriodMetric, on_delete=models.CASCADE, related_name="user_targets")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="kpi_targets")
     employee = models.ForeignKey(
         "branches.Employee",
         on_delete=models.SET_NULL,
@@ -324,9 +428,9 @@ class KpiUserTarget(TimeStampedModel):
         blank=True,
         related_name="kpi_targets",
     )
-
-    target_value = models.DecimalField(max_digits=20, decimal_places=4)
-
+    target_value = models.DecimalField(max_digits=20, decimal_places=4, null=True, blank=True)
+    target_text = models.TextField(null=True, blank=True)
+    target_unit = models.CharField(max_length=50, null=True, blank=True)
     assigned_by_user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -335,20 +439,27 @@ class KpiUserTarget(TimeStampedModel):
         related_name="assigned_kpi_targets",
     )
     assigned_at = models.DateTimeField(null=True, blank=True)
-
     note = models.TextField(null=True, blank=True)
 
     class Meta:
         db_table = "kpi_user_targets"
         constraints = [
             models.UniqueConstraint(
-                fields=["period", "metric", "user"],
-                name="uq_kpi_user_target",
+                fields=["period", "profile", "metric", "user"],
+                name="uq_kpi_user_target_profile",
             )
         ]
 
 
 class KpiUserMetricResult(TimeStampedModel):
+    SOURCE_MANUAL = "MANUAL"
+    SOURCE_AUTO = "AUTO"
+
+    SOURCE_TYPE_CHOICES = [
+        (SOURCE_MANUAL, "Nhập tay"),
+        (SOURCE_AUTO, "Tự động"),
+    ]
+
     STATUS_GOOD = "GOOD"
     STATUS_WARNING = "WARNING"
     STATUS_BAD = "BAD"
@@ -363,27 +474,17 @@ class KpiUserMetricResult(TimeStampedModel):
         (STATUS_FAILED, "Không đạt"),
     ]
 
-    period = models.ForeignKey(
-        KpiPeriod,
+    period = models.ForeignKey(KpiPeriod, on_delete=models.CASCADE, related_name="user_metric_results")
+    profile = models.ForeignKey(
+        KpiProfile,
         on_delete=models.CASCADE,
         related_name="user_metric_results",
+        null=True,
+        blank=True,
     )
-    group = models.ForeignKey(
-        KpiGroup,
-        on_delete=models.PROTECT,
-        related_name="user_metric_results",
-    )
-    metric = models.ForeignKey(
-        KpiPeriodMetric,
-        on_delete=models.CASCADE,
-        related_name="user_metric_results",
-    )
-
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="kpi_metric_results",
-    )
+    group = models.ForeignKey(KpiGroup, on_delete=models.PROTECT, related_name="user_metric_results")
+    metric = models.ForeignKey(KpiPeriodMetric, on_delete=models.CASCADE, related_name="user_metric_results")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="kpi_metric_results")
     employee = models.ForeignKey(
         "branches.Employee",
         on_delete=models.SET_NULL,
@@ -398,26 +499,19 @@ class KpiUserMetricResult(TimeStampedModel):
         blank=True,
         related_name="kpi_metric_results",
     )
-
-    source_type = models.CharField(max_length=20, choices=KpiMetricDefinition.INPUT_TYPE_CHOICES)
-
+    source_type = models.CharField(max_length=20, choices=SOURCE_TYPE_CHOICES, default=SOURCE_MANUAL)
     actual_value = models.DecimalField(max_digits=20, decimal_places=4, null=True, blank=True)
     target_value = models.DecimalField(max_digits=20, decimal_places=4, null=True, blank=True)
-
+    window_start_date = models.DateField(null=True, blank=True, db_index=True)
+    window_end_date = models.DateField(null=True, blank=True, db_index=True)
+    denominator_value = models.DecimalField(max_digits=20, decimal_places=4, null=True, blank=True)
+    contributing_record_count = models.PositiveIntegerField(default=0)
     score = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0.00"))
     weight_percent = models.DecimalField(max_digits=5, decimal_places=2)
     weighted_score = models.DecimalField(max_digits=8, decimal_places=4, default=Decimal("0.0000"))
-
-    result_status = models.CharField(
-        max_length=20,
-        choices=STATUS_CHOICES,
-        null=True,
-        blank=True,
-    )
-
+    result_status = models.CharField(max_length=20, choices=STATUS_CHOICES, null=True, blank=True)
     calculated_payload = models.JSONField(null=True, blank=True)
     evidence_data = models.JSONField(null=True, blank=True)
-
     scored_by_user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -426,23 +520,21 @@ class KpiUserMetricResult(TimeStampedModel):
         related_name="scored_kpi_results",
     )
     scored_at = models.DateTimeField(null=True, blank=True)
-
     calculated_at = models.DateTimeField(null=True, blank=True)
-
     note = models.TextField(null=True, blank=True)
 
     class Meta:
         db_table = "kpi_user_metric_results"
         constraints = [
             models.UniqueConstraint(
-                fields=["period", "metric", "user"],
-                name="uq_kpi_user_metric_result",
+                fields=["period", "profile", "metric", "user"],
+                name="uq_kpi_user_metric_result_profile",
             )
         ]
         indexes = [
-            models.Index(fields=["period", "user"]),
+            models.Index(fields=["period", "profile", "user"]),
             models.Index(fields=["period", "branch"]),
-            models.Index(fields=["period", "metric"]),
+            models.Index(fields=["period", "profile", "metric"]),
         ]
 
     def save(self, *args, **kwargs):
@@ -467,13 +559,10 @@ class KpiGateDefinition(TimeStampedModel):
 
     gate_code = models.CharField(max_length=50, unique=True)
     gate_name = models.CharField(max_length=255)
-
     description = models.TextField(null=True, blank=True)
     formula_key = models.CharField(max_length=100)
-
     default_threshold = models.DecimalField(max_digits=20, decimal_places=4, null=True, blank=True)
     operator = models.CharField(max_length=20, choices=OPERATOR_CHOICES)
-
     is_active = models.BooleanField(default=True)
 
     class Meta:
@@ -485,56 +574,45 @@ class KpiGateDefinition(TimeStampedModel):
 
 
 class KpiPeriodGateConfig(TimeStampedModel):
-    period = models.ForeignKey(
-        KpiPeriod,
+    period = models.ForeignKey(KpiPeriod, on_delete=models.CASCADE, related_name="gate_configs")
+    profile = models.ForeignKey(
+        KpiProfile,
         on_delete=models.CASCADE,
         related_name="gate_configs",
+        null=True,
+        blank=True,
     )
-    gate_definition = models.ForeignKey(
-        KpiGateDefinition,
-        on_delete=models.PROTECT,
-        related_name="period_configs",
-    )
-
+    gate_definition = models.ForeignKey(KpiGateDefinition, on_delete=models.PROTECT, related_name="period_configs")
     gate_code = models.CharField(max_length=50)
     gate_name = models.CharField(max_length=255)
-
     formula_key = models.CharField(max_length=100)
     operator = models.CharField(max_length=20, choices=KpiGateDefinition.OPERATOR_CHOICES)
     threshold_value = models.DecimalField(max_digits=20, decimal_places=4)
-
     is_required = models.BooleanField(default=True)
     is_active = models.BooleanField(default=True)
-
     formula_config = models.JSONField(null=True, blank=True)
 
     class Meta:
         db_table = "kpi_period_gate_configs"
         constraints = [
             models.UniqueConstraint(
-                fields=["period", "gate_code"],
-                name="uq_kpi_period_gate_code",
+                fields=["period", "profile", "gate_code"],
+                name="uq_kpi_period_profile_gate_code",
             )
         ]
 
 
 class KpiUserGateResult(TimeStampedModel):
-    period = models.ForeignKey(
-        KpiPeriod,
+    period = models.ForeignKey(KpiPeriod, on_delete=models.CASCADE, related_name="user_gate_results")
+    profile = models.ForeignKey(
+        KpiProfile,
         on_delete=models.CASCADE,
         related_name="user_gate_results",
+        null=True,
+        blank=True,
     )
-    gate_config = models.ForeignKey(
-        KpiPeriodGateConfig,
-        on_delete=models.CASCADE,
-        related_name="user_gate_results",
-    )
-
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="kpi_gate_results",
-    )
+    gate_config = models.ForeignKey(KpiPeriodGateConfig, on_delete=models.CASCADE, related_name="user_gate_results")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="kpi_gate_results")
     employee = models.ForeignKey(
         "branches.Employee",
         on_delete=models.SET_NULL,
@@ -549,29 +627,25 @@ class KpiUserGateResult(TimeStampedModel):
         blank=True,
         related_name="kpi_gate_results",
     )
-
     actual_value = models.DecimalField(max_digits=20, decimal_places=4, null=True, blank=True)
     threshold_value = models.DecimalField(max_digits=20, decimal_places=4, null=True, blank=True)
     operator = models.CharField(max_length=20, choices=KpiGateDefinition.OPERATOR_CHOICES)
-
     is_passed = models.BooleanField(default=False)
     result_label = models.CharField(max_length=100, null=True, blank=True)
-
     calculated_payload = models.JSONField(null=True, blank=True)
     evidence_data = models.JSONField(null=True, blank=True)
-
     calculated_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = "kpi_user_gate_results"
         constraints = [
             models.UniqueConstraint(
-                fields=["period", "gate_config", "user"],
-                name="uq_kpi_user_gate_result",
+                fields=["period", "profile", "gate_config", "user"],
+                name="uq_kpi_user_gate_result_profile",
             )
         ]
         indexes = [
-            models.Index(fields=["period", "user"]),
+            models.Index(fields=["period", "profile", "user"]),
             models.Index(fields=["period", "branch"]),
         ]
 
@@ -586,52 +660,47 @@ class KpiRewardTierConfig(TimeStampedModel):
     REWARD_RECOGNITION = "RECOGNITION"
     REWARD_IMPROVEMENT_PLAN = "IMPROVEMENT_PLAN"
 
-    period = models.ForeignKey(
-        KpiPeriod,
+    period = models.ForeignKey(KpiPeriod, on_delete=models.CASCADE, related_name="reward_tiers")
+    profile = models.ForeignKey(
+        KpiProfile,
         on_delete=models.CASCADE,
         related_name="reward_tiers",
+        null=True,
+        blank=True,
     )
-
     tier_code = models.CharField(max_length=50)
     tier_name = models.CharField(max_length=255)
-
     description = models.TextField(null=True, blank=True)
-
     rank_metric_code = models.CharField(max_length=50, null=True, blank=True)
     rank_limit = models.PositiveIntegerField(null=True, blank=True)
-
     min_total_score = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     require_all_gates_passed = models.BooleanField(default=True)
-
     reward_type = models.CharField(max_length=50, null=True, blank=True)
     reward_config = models.JSONField(null=True, blank=True)
-
     sort_order = models.PositiveIntegerField(default=0)
     is_active = models.BooleanField(default=True)
 
     class Meta:
         db_table = "kpi_reward_tier_configs"
-        ordering = ["sort_order", "id"]
+        ordering = ["profile__sort_order", "sort_order", "id"]
         constraints = [
             models.UniqueConstraint(
-                fields=["period", "tier_code"],
-                name="uq_kpi_reward_tier_period_code",
+                fields=["period", "profile", "tier_code"],
+                name="uq_kpi_reward_tier_profile_code",
             )
         ]
 
 
 class KpiUserSummary(TimeStampedModel):
-    period = models.ForeignKey(
-        KpiPeriod,
+    period = models.ForeignKey(KpiPeriod, on_delete=models.CASCADE, related_name="user_summaries")
+    profile = models.ForeignKey(
+        KpiProfile,
         on_delete=models.CASCADE,
         related_name="user_summaries",
+        null=True,
+        blank=True,
     )
-
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="kpi_summaries",
-    )
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="kpi_summaries")
     employee = models.ForeignKey(
         "branches.Employee",
         on_delete=models.SET_NULL,
@@ -646,17 +715,13 @@ class KpiUserSummary(TimeStampedModel):
         blank=True,
         related_name="kpi_summaries",
     )
-
     manual_score = models.DecimalField(max_digits=8, decimal_places=4, default=Decimal("0.0000"))
     auto_score = models.DecimalField(max_digits=8, decimal_places=4, default=Decimal("0.0000"))
     total_score = models.DecimalField(max_digits=8, decimal_places=4, default=Decimal("0.0000"))
-
     manual_weight = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     auto_weight = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
-
     all_gates_passed = models.BooleanField(default=False)
     failed_gate_codes = models.JSONField(null=True, blank=True)
-
     reward_tier = models.ForeignKey(
         KpiRewardTierConfig,
         on_delete=models.SET_NULL,
@@ -666,12 +731,10 @@ class KpiUserSummary(TimeStampedModel):
     )
     reward_tier_code = models.CharField(max_length=50, null=True, blank=True)
     reward_tier_name = models.CharField(max_length=255, null=True, blank=True)
-
     rank_overall = models.PositiveIntegerField(null=True, blank=True)
     rank_branch = models.PositiveIntegerField(null=True, blank=True)
     rank_fee = models.PositiveIntegerField(null=True, blank=True)
     rank_reactivated_accounts = models.PositiveIntegerField(null=True, blank=True)
-
     calculated_at = models.DateTimeField(null=True, blank=True)
     locked_at = models.DateTimeField(null=True, blank=True)
     locked_by_user = models.ForeignKey(
@@ -686,19 +749,18 @@ class KpiUserSummary(TimeStampedModel):
         db_table = "kpi_user_summaries"
         constraints = [
             models.UniqueConstraint(
-                fields=["period", "user"],
-                name="uq_kpi_user_summary",
+                fields=["period", "profile", "user"],
+                name="uq_kpi_user_summary_profile",
             )
         ]
         indexes = [
-            models.Index(fields=["period", "branch"]),
-            models.Index(fields=["period", "total_score"]),
+            models.Index(fields=["period", "profile", "branch"]),
+            models.Index(fields=["period", "profile", "total_score"]),
         ]
 
 
 class TransactionLog(TimeStampedModel):
     account_no = models.CharField(max_length=100, db_index=True)
-
     customer_account = models.ForeignKey(
         "customers.CustomerAccount",
         on_delete=models.SET_NULL,
@@ -720,16 +782,12 @@ class TransactionLog(TimeStampedModel):
         blank=True,
         related_name="transaction_logs",
     )
-
     transaction_date = models.DateField(db_index=True)
     matched_at = models.DateTimeField(null=True, blank=True)
-
     transaction_value = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal("0.00"))
     transaction_fee = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal("0.00"))
-
     order_status = models.CharField(max_length=50, db_index=True)
     product_code = models.CharField(max_length=100, null=True, blank=True)
-
     source_system = models.CharField(max_length=100, null=True, blank=True)
     source_transaction_id = models.CharField(max_length=100, null=True, blank=True)
 
@@ -760,16 +818,12 @@ class KpiAuditLog(models.Model):
         blank=True,
         related_name="audit_logs",
     )
-
     object_type = models.CharField(max_length=100)
     object_id = models.BigIntegerField(null=True, blank=True)
-
     action_type = models.CharField(max_length=50)
-
     old_data = models.JSONField(null=True, blank=True)
     new_data = models.JSONField(null=True, blank=True)
     changed_fields = models.JSONField(null=True, blank=True)
-
     changed_by_user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -778,7 +832,6 @@ class KpiAuditLog(models.Model):
         related_name="kpi_audit_logs",
     )
     changed_at = models.DateTimeField(auto_now_add=True)
-
     note = models.TextField(null=True, blank=True)
 
     class Meta:

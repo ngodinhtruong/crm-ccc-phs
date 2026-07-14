@@ -1,10 +1,5 @@
-import { SaleAdminPlaceholderPage } from "@/components/sale-admin/SaleAdminPlaceholderPage";
+import { KpiDashboardPage } from "@/components/kpis/dashboard/KpiDashboardPage";
 
 export default function Page() {
-  return (
-    <SaleAdminPlaceholderPage
-      title="KPI Sale Admin"
-      description="Theo dõi KPI Phần A, Phần B và điều kiện cổng của Sale Admin."
-    />
-  );
+  return <KpiDashboardPage />;
 }

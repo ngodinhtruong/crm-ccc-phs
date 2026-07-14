@@ -3,74 +3,81 @@ from decimal import Decimal
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
-from rest_framework.exceptions import ValidationError as DRFValidationError
-
-
-# from django.core.exceptions import ValidationError
-from django.db.models import Count
+from django.contrib.auth import get_user_model
+from django.db.models import Count, Q
 from rest_framework import status, viewsets
-from rest_framework.response import Response
-from django.db.models import Q
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError as DRFValidationError
+from rest_framework.response import Response
+
+from apps.accounts.services import PermissionService
+from apps.kpis.auto_calculation import calculate_auto_kpis_for_user, get_default_kpi_users
 from apps.kpis.models import (
     KpiGateDefinition,
     KpiGroup,
-    KpiMetricDefinition,
     KpiPeriod,
     KpiPeriodGateConfig,
     KpiPeriodMetric,
+    KpiProfile,
     KpiRewardTierConfig,
-    KpiUserMetricResult,
+    KpiSection,
     KpiUserGateResult,
+    KpiUserMetricResult,
     KpiUserSummary,
+    KpiUserTarget,
 )
 from apps.kpis.permissions import (
-    KpiConfigPermission, 
+    KpiAutoCalculatePermission,
+    KpiConfigPermission,
     KpiManualScorePermission,
-    KpiAutoCalculatePermission,)
+    can_assign_target_for_profile,
+    can_manage_kpi_profile,
+    get_dashboard_profile_codes,
+    get_manageable_profile_codes,
+)
 from apps.kpis.serializers import (
     CreateMonthlyKpiPeriodSerializer,
+    KpiAutoCalculateSerializer,
     KpiGateDefinitionSerializer,
     KpiGroupSerializer,
-    KpiMetricDefinitionSerializer,
+    KpiGroupWriteSerializer,
+    KpiManualScoreSerializer,
     KpiPeriodDetailSerializer,
     KpiPeriodGateConfigSerializer,
+    KpiPeriodGateConfigWriteSerializer,
     KpiPeriodListSerializer,
     KpiPeriodMetricSerializer,
+    KpiPeriodMetricWriteSerializer,
+    KpiPeriodWriteSerializer,
+    KpiProfileSerializer,
+    KpiProfileWriteSerializer,
     KpiRewardTierConfigSerializer,
-    KpiManualScoreSerializer,
-    KpiUserMetricResultSerializer,
-    KpiAutoCalculateSerializer,
+    KpiRewardTierConfigWriteSerializer,
+    KpiSectionSerializer,
+    KpiSectionWriteSerializer,
     KpiSummaryCalculateSerializer,
     KpiUserGateResultSerializer,
+    KpiUserMetricResultSerializer,
     KpiUserSummarySerializer,
-    KpiGroupWriteSerializer,
-    KpiPeriodMetricWriteSerializer,
-    KpiPeriodGateConfigWriteSerializer,
-    KpiRewardTierConfigWriteSerializer,
+    KpiUserTargetSerializer,
+    KpiUserTargetWriteSerializer,
     KpiWeightConfigSaveSerializer,
 )
-from apps.kpis.summary_calculation import calculate_kpi_summaries
 from apps.kpis.services import create_kpi_audit_log, serialize_model_basic
-from apps.accounts.services import PermissionService
-from apps.kpis.auto_calculation import (
-    calculate_auto_kpis_for_user,
-    get_default_kpi_users,
-)
+from apps.kpis.summary_calculation import calculate_kpi_summaries
+from apps.kpis.dashboard_contributions import get_metric_contribution_payload
+from apps.kpis.ranking import get_kpi_ranking_payload
+
 
 def normalize_config_compare_value(value):
     if hasattr(value, "pk"):
         return value.pk
-
     if isinstance(value, Decimal):
         return value
-
     if isinstance(value, (date, datetime)):
         return value
-
     if isinstance(value, str):
         return value.strip()
-
     return value
 
 
@@ -80,18 +87,29 @@ def get_validation_error_messages(exc):
 
     if hasattr(exc, "message_dict"):
         messages = []
-
         for field, field_messages in exc.message_dict.items():
             if isinstance(field_messages, list):
-                messages.extend(
-                    [f"{field}: {message}" for message in field_messages]
-                )
+                messages.extend([f"{field}: {message}" for message in field_messages])
             else:
                 messages.append(f"{field}: {field_messages}")
-
         return messages
 
     return [str(exc)]
+
+
+def validate_profile_weights_or_raise(profile):
+    try:
+        profile.validate_weight_configuration()
+    except DjangoValidationError as exc:
+        raise DRFValidationError(
+            {
+                "detail": "Không thể lưu vì tổng trọng số KPI chưa hợp lệ.",
+                "weight_validation": {
+                    "valid": False,
+                    "errors": get_validation_error_messages(exc),
+                },
+            }
+        )
 
 
 def validate_period_weights_or_raise(period):
@@ -109,19 +127,82 @@ def validate_period_weights_or_raise(period):
         )
 
 
-def get_period_weight_validation(period):
+def get_weight_validation(obj):
     try:
-        period.validate_weight_configuration()
-
-        return {
-            "valid": True,
-            "errors": [],
-        }
+        obj.validate_weight_configuration()
+        return {"valid": True, "errors": []}
     except DjangoValidationError as exc:
-        return {
-            "valid": False,
-            "errors": get_validation_error_messages(exc),
-        }
+        return {"valid": False, "errors": get_validation_error_messages(exc)}
+
+
+def get_profile_from_instance(instance):
+    if isinstance(instance, KpiProfile):
+        return instance
+
+    profile = getattr(instance, "profile", None)
+    if profile:
+        return profile
+
+    group = getattr(instance, "group", None)
+    if group:
+        return group.profile
+
+    section = getattr(instance, "section", None)
+    if section:
+        return section.profile
+
+    return None
+
+
+def user_has_permission(user, permission_code):
+    if not user or not user.is_authenticated:
+        return False
+    if user.is_superuser:
+        return True
+    return PermissionService.has_permission(user, permission_code)
+
+
+def get_user_branch_id(user):
+    employee = getattr(user, "employee", None)
+    if not employee:
+        return None
+    branch = getattr(employee, "branch", None)
+    if not branch:
+        return None
+    return branch.id
+
+
+def filter_kpi_results_by_user(queryset, user):
+    if not user or not user.is_authenticated:
+        return queryset.none()
+
+    if user.is_superuser or user_has_permission(user, "KPI_DASHBOARD_VIEW_ALL"):
+        return queryset
+
+    if user_has_permission(user, "KPI_DASHBOARD_VIEW_BRANCH"):
+        branch_id = get_user_branch_id(user)
+        if not branch_id:
+            return queryset.filter(user=user)
+        return queryset.filter(Q(branch_id=branch_id) | Q(user=user))
+
+    return queryset.filter(user=user)
+
+
+def can_score_target_user(scored_by_user, target_user):
+    if not scored_by_user or not scored_by_user.is_authenticated:
+        return False
+
+    if scored_by_user.is_superuser or user_has_permission(scored_by_user, "KPI_DASHBOARD_VIEW_ALL"):
+        return True
+
+    if user_has_permission(scored_by_user, "KPI_DASHBOARD_VIEW_BRANCH"):
+        scorer_branch_id = get_user_branch_id(scored_by_user)
+        target_branch_id = get_user_branch_id(target_user)
+        if not scorer_branch_id or not target_branch_id:
+            return False
+        return scorer_branch_id == target_branch_id
+
+    return False
 
 
 class KpiPeriodConfigCrudMixin:
@@ -129,51 +210,81 @@ class KpiPeriodConfigCrudMixin:
     write_serializer_class = None
     config_object_type = "KpiConfig"
     validate_weights_on_save = False
-    deactivate_children_on_destroy = False
 
     def get_serializer_class(self):
         if self.action in ["create", "update", "partial_update", "destroy"]:
             return self.write_serializer_class or self.serializer_class
-
         return self.read_serializer_class or self.serializer_class
 
     def get_read_serializer(self, instance):
         serializer_class = self.read_serializer_class or self.serializer_class
-
         return serializer_class(instance, context=self.get_serializer_context())
 
     def ensure_period_editable(self, period):
         if period.status in [KpiPeriod.STATUS_LOCKED, KpiPeriod.STATUS_CLOSED]:
-            raise DRFValidationError(
-                {
-                    "detail": "Kỳ KPI đã khóa hoặc đã chốt, không thể chỉnh sửa cấu hình."
-                }
-            )
+            raise DRFValidationError({"detail": "Kỳ KPI đã khóa hoặc đã chốt, không thể chỉnh sửa cấu hình."})
+
+    def ensure_profile_manageable(self, request, profile):
+        if not profile:
+            raise DRFValidationError({"profile": "Thiếu bộ KPI."})
+        if not can_manage_kpi_profile(request.user, profile):
+            raise DRFValidationError({"detail": "Bạn không có quyền chỉnh sửa bộ KPI này."})
 
     def has_validated_changes(self, instance, validated_data):
         for field, new_value in validated_data.items():
             if not hasattr(instance, field):
                 continue
-
             old_value = getattr(instance, field)
-
             if normalize_config_compare_value(old_value) != normalize_config_compare_value(new_value):
                 return True
-
         return False
 
     def get_period_from_serializer(self, serializer):
         period = serializer.validated_data.get("period")
-
         if period:
             return period
-
         instance = getattr(serializer, "instance", None)
-
         if instance and hasattr(instance, "period"):
             return instance.period
+        return None
+
+    def get_profile_from_serializer(self, serializer):
+        profile = serializer.validated_data.get("profile")
+        if profile:
+            return profile
+
+        section = serializer.validated_data.get("section")
+        if section:
+            return section.profile
+
+        group = serializer.validated_data.get("group")
+        if group:
+            return group.profile
+
+        instance = getattr(serializer, "instance", None)
+        if instance:
+            return get_profile_from_instance(instance)
+
+        # KpiProfile create/update stores profile_code but not profile relation.
+        profile_code = serializer.validated_data.get("profile_code")
+        period = serializer.validated_data.get("period")
+        if profile_code and period:
+            return KpiProfile(profile_code=profile_code, period=period)
 
         return None
+
+    def deactivate_related_children(self, instance):
+        if isinstance(instance, KpiProfile):
+            instance.sections.update(is_active=False)
+            instance.groups.update(is_active=False)
+            instance.metrics.update(is_active=False)
+            instance.gate_configs.update(is_active=False)
+            instance.reward_tiers.update(is_active=False)
+        elif isinstance(instance, KpiSection):
+            instance.groups.update(is_active=False)
+            instance.profile.metrics.filter(group__section=instance).update(is_active=False)
+        elif isinstance(instance, KpiGroup):
+            instance.metrics.update(is_active=False)
 
     @transaction.atomic
     def create(self, request, *args, **kwargs):
@@ -181,16 +292,18 @@ class KpiPeriodConfigCrudMixin:
         serializer.is_valid(raise_exception=True)
 
         period = self.get_period_from_serializer(serializer)
-
         if not period:
             raise DRFValidationError({"period": "Thiếu kỳ KPI."})
 
         self.ensure_period_editable(period)
+        profile = self.get_profile_from_serializer(serializer)
+        self.ensure_profile_manageable(request, profile)
 
         instance = serializer.save()
+        profile = get_profile_from_instance(instance) or profile
 
         if self.validate_weights_on_save:
-            validate_period_weights_or_raise(period)
+            validate_profile_weights_or_raise(profile)
 
         create_kpi_audit_log(
             period=period,
@@ -207,7 +320,7 @@ class KpiPeriodConfigCrudMixin:
             {
                 "detail": "Tạo cấu hình KPI thành công.",
                 "changed": True,
-                "weight_validation": get_period_weight_validation(period),
+                "weight_validation": get_weight_validation(profile),
                 "item": self.get_read_serializer(instance).data,
             },
             status=status.HTTP_201_CREATED,
@@ -218,33 +331,34 @@ class KpiPeriodConfigCrudMixin:
         partial = kwargs.pop("partial", False)
         instance = self.get_object()
         period = instance.period
+        profile = get_profile_from_instance(instance)
 
         self.ensure_period_editable(period)
+        self.ensure_profile_manageable(request, profile)
 
-        serializer = self.get_serializer(
-            instance,
-            data=request.data,
-            partial=partial,
-        )
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
+
+        new_profile = self.get_profile_from_serializer(serializer) or profile
+        self.ensure_profile_manageable(request, new_profile)
 
         if not self.has_validated_changes(instance, serializer.validated_data):
             return Response(
                 {
                     "detail": "Không có thay đổi nào để cập nhật.",
                     "changed": False,
-                    "weight_validation": get_period_weight_validation(period),
+                    "weight_validation": get_weight_validation(new_profile),
                     "item": self.get_read_serializer(instance).data,
                 },
                 status=status.HTTP_200_OK,
             )
 
         old_data = serialize_model_basic(instance)
-
         updated_instance = serializer.save()
+        updated_profile = get_profile_from_instance(updated_instance) or new_profile
 
         if self.validate_weights_on_save:
-            validate_period_weights_or_raise(period)
+            validate_profile_weights_or_raise(updated_profile)
 
         create_kpi_audit_log(
             period=period,
@@ -261,7 +375,7 @@ class KpiPeriodConfigCrudMixin:
             {
                 "detail": "Cập nhật cấu hình KPI thành công.",
                 "changed": True,
-                "weight_validation": get_period_weight_validation(period),
+                "weight_validation": get_weight_validation(updated_profile),
                 "item": self.get_read_serializer(updated_instance).data,
             },
             status=status.HTTP_200_OK,
@@ -271,30 +385,29 @@ class KpiPeriodConfigCrudMixin:
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
         period = instance.period
+        profile = get_profile_from_instance(instance)
 
         self.ensure_period_editable(period)
+        self.ensure_profile_manageable(request, profile)
 
         if not getattr(instance, "is_active", True):
             return Response(
                 {
                     "detail": "Cấu hình này đã bị tắt trước đó.",
                     "changed": False,
-                    "weight_validation": get_period_weight_validation(period),
+                    "weight_validation": get_weight_validation(profile),
                     "item": self.get_read_serializer(instance).data,
                 },
                 status=status.HTTP_200_OK,
             )
 
         old_data = serialize_model_basic(instance)
-
         instance.is_active = False
         instance.save(update_fields=["is_active", "updated_at"])
-
-        if self.deactivate_children_on_destroy:
-            instance.metrics.update(is_active=False)
+        self.deactivate_related_children(instance)
 
         if self.validate_weights_on_save:
-            validate_period_weights_or_raise(period)
+            validate_profile_weights_or_raise(profile)
 
         create_kpi_audit_log(
             period=period,
@@ -311,29 +424,27 @@ class KpiPeriodConfigCrudMixin:
             {
                 "detail": "Xóa mềm cấu hình KPI thành công.",
                 "changed": True,
-                "weight_validation": get_period_weight_validation(period),
+                "weight_validation": get_weight_validation(profile),
                 "item": self.get_read_serializer(instance).data,
             },
             status=status.HTTP_200_OK,
         )
 
-class KpiPeriodViewSet(viewsets.ReadOnlyModelViewSet):
+
+class KpiPeriodViewSet(viewsets.ModelViewSet):
     permission_classes = [KpiConfigPermission]
 
     def get_queryset(self):
         queryset = (
             KpiPeriod.objects.annotate(
+                profile_count=Count("profiles", distinct=True),
+                section_count=Count("sections", distinct=True),
                 group_count=Count("groups", distinct=True),
                 metric_count=Count("metrics", distinct=True),
                 gate_count=Count("gate_configs", distinct=True),
                 reward_tier_count=Count("reward_tiers", distinct=True),
             )
-            .prefetch_related(
-                "groups",
-                "metrics",
-                "gate_configs",
-                "reward_tiers",
-            )
+            .prefetch_related("profiles", "sections", "groups", "metrics", "gate_configs", "reward_tiers")
             .all()
         )
 
@@ -345,111 +456,282 @@ class KpiPeriodViewSet(viewsets.ReadOnlyModelViewSet):
 
         if year:
             queryset = queryset.filter(year=year)
-
         if month:
             queryset = queryset.filter(month=month)
-
         if status_value:
             queryset = queryset.filter(status=status_value)
-
         if period_type:
             queryset = queryset.filter(period_type=period_type)
-
         if q:
-            queryset = queryset.filter(period_code__icontains=q) | queryset.filter(
-                period_name__icontains=q
-            )
+            queryset = queryset.filter(Q(period_code__icontains=q) | Q(period_name__icontains=q))
 
         return queryset.order_by("-year", "-month", "-id")
 
     def get_serializer_class(self):
+        if self.action in ["update", "partial_update"]:
+            return KpiPeriodWriteSerializer
         if self.action == "retrieve":
             return KpiPeriodDetailSerializer
-
         return KpiPeriodListSerializer
+
+    @transaction.atomic
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop("partial", False)
+        instance = self.get_object()
+
+        if instance.status in [KpiPeriod.STATUS_LOCKED, KpiPeriod.STATUS_CLOSED]:
+            return Response({"detail": "Kỳ KPI đã khóa hoặc đã chốt, không thể chỉnh sửa."}, status=status.HTTP_400_BAD_REQUEST)
+
+        old_data = serialize_model_basic(instance)
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        period = serializer.save()
+
+        create_kpi_audit_log(
+            period=period,
+            object_type="KpiPeriod",
+            object_id=period.id,
+            action_type="UPDATE",
+            changed_by_user=request.user,
+            old_data=old_data,
+            new_data=serialize_model_basic(period),
+            note="Chỉnh sửa kỳ KPI.",
+        )
+
+        return Response({"detail": "Cập nhật kỳ KPI thành công.", "changed": True, "item": KpiPeriodListSerializer(period).data})
+
+    @transaction.atomic
+    def destroy(self, request, *args, **kwargs):
+        period = self.get_object()
+        if period.status in [KpiPeriod.STATUS_LOCKED, KpiPeriod.STATUS_CLOSED]:
+            return Response({"detail": "Kỳ KPI đã khóa hoặc đã chốt, không thể xóa."}, status=status.HTTP_400_BAD_REQUEST)
+
+        old_data = serialize_model_basic(period)
+        period_code = period.period_code
+        create_kpi_audit_log(
+            period=period,
+            object_type="KpiPeriod",
+            object_id=period.id,
+            action_type="DELETE",
+            changed_by_user=request.user,
+            old_data=old_data,
+            new_data=None,
+            note="Xóa kỳ KPI.",
+        )
+        period.delete()
+        return Response({"detail": f"Đã xóa kỳ KPI {period_code}.", "changed": True})
 
     @action(methods=["post"], detail=False, url_path="create-monthly")
     def create_monthly(self, request):
-        serializer = CreateMonthlyKpiPeriodSerializer(
-            data=request.data,
-            context={"request": request},
-        )
+        serializer = CreateMonthlyKpiPeriodSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
-
         result = serializer.save()
         period = result["period"]
         created = result["created"]
-
         return Response(
             {
-                "detail": (
-                    "Tạo kỳ KPI thành công."
-                    if created
-                    else "Kỳ KPI đã tồn tại."
-                ),
+                "detail": "Tạo kỳ KPI thành công." if created else "Kỳ KPI đã tồn tại.",
                 "created": created,
                 "period": KpiPeriodDetailSerializer(period).data,
             },
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
 
+    def _get_profile_from_request(self, period):
+        profile_id = self.request.data.get("profile") or self.request.query_params.get("profile")
+        profile_code = self.request.data.get("profile_code") or self.request.query_params.get("profile_code")
+        profile = None
+        if profile_id:
+            profile = KpiProfile.objects.filter(period=period, id=profile_id).first()
+        elif profile_code:
+            profile = KpiProfile.objects.filter(period=period, profile_code=profile_code).first()
+        return profile
+
     @action(methods=["post"], detail=True, url_path="validate-weights")
     def validate_weights(self, request, pk=None):
         period = self.get_object()
-
+        profile = self._get_profile_from_request(period)
         try:
-            period.validate_weight_configuration()
+            if profile:
+                profile.validate_weight_configuration()
+            else:
+                period.validate_weight_configuration()
         except DjangoValidationError as exc:
-            return Response(
-                {
-                    "valid": False,
-                    "errors": exc.messages,
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        return Response(
-            {
-                "valid": True,
-                "errors": [],
-                "detail": "Cấu hình trọng số KPI hợp lệ.",
-            }
-        )
+            return Response({"valid": False, "errors": get_validation_error_messages(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"valid": True, "errors": [], "detail": "Cấu hình trọng số KPI hợp lệ."})
 
     @action(methods=["post"], detail=True, url_path="activate")
     def activate(self, request, pk=None):
         period = self.get_object()
-
         if period.status != KpiPeriod.STATUS_DRAFT:
-            return Response(
-                {
-                    "detail": "Chỉ kỳ KPI ở trạng thái DRAFT mới được kích hoạt."
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
+            return Response({"detail": "Chỉ kỳ KPI ở trạng thái DRAFT mới được kích hoạt."}, status=status.HTTP_400_BAD_REQUEST)
         try:
             period.validate_weight_configuration()
         except DjangoValidationError as exc:
             return Response(
-                {
-                    "detail": "Không thể kích hoạt vì cấu hình trọng số chưa hợp lệ.",
-                    "valid": False,
-                    "errors": exc.messages,
-                },
+                {"detail": "Không thể kích hoạt vì cấu hình trọng số chưa hợp lệ.", "valid": False, "errors": get_validation_error_messages(exc)},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
         period.status = KpiPeriod.STATUS_ACTIVE
         period.updated_by_user = request.user
         period.save(update_fields=["status", "updated_by_user", "updated_at"])
+        return Response({"detail": "Kích hoạt kỳ KPI thành công.", "period": KpiPeriodDetailSerializer(period).data})
+
+    @action(methods=["post"], detail=True, url_path="save-weight-config")
+    @transaction.atomic
+    def save_weight_config(self, request, pk=None):
+        period = self.get_object()
+        if period.status in [KpiPeriod.STATUS_LOCKED, KpiPeriod.STATUS_CLOSED]:
+            raise DRFValidationError({"detail": "Kỳ KPI đã khóa hoặc đã chốt, không thể chỉnh sửa cấu hình."})
+
+        serializer = KpiWeightConfigSaveSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        profile = None
+        profile_id = data.get("profile")
+        profile_code = data.get("profile_code")
+        if profile_id:
+            profile = KpiProfile.objects.filter(period=period, id=profile_id).first()
+        elif profile_code:
+            profile = KpiProfile.objects.filter(period=period, profile_code=profile_code).first()
+
+        if not profile:
+            raise DRFValidationError({"profile": "Vui lòng chọn bộ KPI cần lưu trọng số."})
+
+        if not can_manage_kpi_profile(request.user, profile):
+            raise DRFValidationError({"detail": "Bạn không có quyền chỉnh sửa bộ KPI này."})
+
+        changed = False
+        old_data = {
+            "sections": [],
+            "groups": [],
+            "metrics": [],
+        }
+
+        for item in data.get("sections", []):
+            section = KpiSection.objects.get(period=period, profile=profile, id=item["id"])
+            old_data["sections"].append(serialize_model_basic(section))
+            section.weight_percent = item["weight_percent"]
+            if "is_active" in item:
+                section.is_active = item["is_active"]
+            section.save(update_fields=["weight_percent", "is_active", "updated_at"])
+            changed = True
+
+        for item in data.get("groups", []):
+            group = KpiGroup.objects.get(period=period, profile=profile, id=item["id"])
+            old_data["groups"].append(serialize_model_basic(group))
+            group.weight_percent = item["weight_percent"]
+            if "is_active" in item:
+                group.is_active = item["is_active"]
+            group.save(update_fields=["weight_percent", "is_active", "updated_at"])
+            changed = True
+
+        for item in data.get("metrics", []):
+            metric = KpiPeriodMetric.objects.get(period=period, profile=profile, id=item["id"])
+            old_data["metrics"].append(serialize_model_basic(metric))
+            metric.weight_percent = item["weight_percent"]
+            if "is_active" in item:
+                metric.is_active = item["is_active"]
+            metric.save(update_fields=["weight_percent", "is_active", "updated_at"])
+            changed = True
+
+        validate_profile_weights_or_raise(profile)
+
+        create_kpi_audit_log(
+            period=period,
+            object_type="KpiWeightConfig",
+            object_id=profile.id,
+            action_type="UPDATE",
+            changed_by_user=request.user,
+            old_data=old_data,
+            new_data={"profile": serialize_model_basic(profile)},
+            note="Lưu cấu hình trọng số KPI theo bộ KPI.",
+        )
 
         return Response(
             {
-                "detail": "Kích hoạt kỳ KPI thành công.",
+                "detail": "Lưu cấu hình trọng số KPI thành công." if changed else "Không có thay đổi nào để lưu.",
+                "changed": changed,
+                "weight_validation": get_weight_validation(profile),
                 "period": KpiPeriodDetailSerializer(period).data,
             }
         )
+
+
+class KpiProfileViewSet(KpiPeriodConfigCrudMixin, viewsets.ModelViewSet):
+    read_serializer_class = KpiProfileSerializer
+    write_serializer_class = KpiProfileWriteSerializer
+    serializer_class = KpiProfileSerializer
+    permission_classes = [KpiConfigPermission]
+    config_object_type = "KpiProfile"
+    # Profile có thể được tạo trước rồi mới tạo section/group/KPI, nên không validate ngay khi CRUD profile.
+    validate_weights_on_save = False
+
+    def get_queryset(self):
+        queryset = KpiProfile.objects.select_related("period").annotate(
+            section_count=Count("sections", distinct=True),
+            group_count=Count("groups", distinct=True),
+            metric_count=Count("metrics", distinct=True),
+        )
+        period = self.request.query_params.get("period")
+        period_code = self.request.query_params.get("period_code")
+        profile_code = self.request.query_params.get("profile_code")
+        is_active = self.request.query_params.get("is_active")
+
+        if period:
+            queryset = queryset.filter(period_id=period)
+        if period_code:
+            queryset = queryset.filter(period__period_code=period_code)
+        if profile_code:
+            queryset = queryset.filter(profile_code=profile_code)
+        if is_active in ["true", "false"]:
+            queryset = queryset.filter(is_active=is_active == "true")
+
+        # Đọc dashboard khác với quyền cấu hình:
+        # - SA đọc profile SA.
+        # - SUP đọc profile SA_SUP của chính mình và SA khi xem nhân viên chi nhánh.
+        # - SUP chỉ được cấu hình profile SA, nhưng vẫn phải đọc được SA_SUP trên dashboard.
+        dashboard_codes = get_dashboard_profile_codes(self.request.user)
+        manageable_codes = get_manageable_profile_codes(self.request.user)
+        allowed_codes = list(dict.fromkeys([*dashboard_codes, *manageable_codes]))
+
+        if allowed_codes:
+            queryset = queryset.filter(profile_code__in=allowed_codes)
+        else:
+            queryset = queryset.none()
+
+        return queryset.order_by("period_id", "sort_order", "id")
+
+
+class KpiSectionViewSet(KpiPeriodConfigCrudMixin, viewsets.ModelViewSet):
+    read_serializer_class = KpiSectionSerializer
+    write_serializer_class = KpiSectionWriteSerializer
+    serializer_class = KpiSectionSerializer
+    permission_classes = [KpiConfigPermission]
+    config_object_type = "KpiSection"
+    validate_weights_on_save = True
+
+    def get_queryset(self):
+        queryset = KpiSection.objects.select_related("period", "profile").all()
+        period = self.request.query_params.get("period")
+        period_code = self.request.query_params.get("period_code")
+        profile = self.request.query_params.get("profile")
+        profile_code = self.request.query_params.get("profile_code")
+        is_active = self.request.query_params.get("is_active")
+
+        if period:
+            queryset = queryset.filter(period_id=period)
+        if period_code:
+            queryset = queryset.filter(period__period_code=period_code)
+        if profile:
+            queryset = queryset.filter(profile_id=profile)
+        if profile_code:
+            queryset = queryset.filter(profile__profile_code=profile_code)
+        if is_active in ["true", "false"]:
+            queryset = queryset.filter(is_active=is_active == "true")
+
+        return queryset.order_by("period_id", "profile__sort_order", "sort_order", "id")
 
 
 class KpiGroupViewSet(KpiPeriodConfigCrudMixin, viewsets.ModelViewSet):
@@ -459,23 +741,33 @@ class KpiGroupViewSet(KpiPeriodConfigCrudMixin, viewsets.ModelViewSet):
     permission_classes = [KpiConfigPermission]
     config_object_type = "KpiGroup"
     validate_weights_on_save = True
-    deactivate_children_on_destroy = True
 
     def get_queryset(self):
-        queryset = KpiGroup.objects.select_related("period").all()
-
+        queryset = KpiGroup.objects.select_related("period", "profile", "section").all()
         period = self.request.query_params.get("period")
         period_code = self.request.query_params.get("period_code")
+        profile = self.request.query_params.get("profile")
+        profile_code = self.request.query_params.get("profile_code")
+        section_code = self.request.query_params.get("section_code")
+        group_code = self.request.query_params.get("group_code")
+        is_active = self.request.query_params.get("is_active")
 
         if period:
             queryset = queryset.filter(period_id=period)
-
         if period_code:
             queryset = queryset.filter(period__period_code=period_code)
+        if profile:
+            queryset = queryset.filter(profile_id=profile)
+        if profile_code:
+            queryset = queryset.filter(profile__profile_code=profile_code)
+        if section_code:
+            queryset = queryset.filter(section__section_code=section_code)
+        if group_code:
+            queryset = queryset.filter(group_code=group_code)
+        if is_active in ["true", "false"]:
+            queryset = queryset.filter(is_active=is_active == "true")
 
-        return queryset.order_by("period_id", "sort_order", "id")
-
-    
+        return queryset.order_by("period_id", "profile__sort_order", "section__sort_order", "sort_order", "id")
 
 
 class KpiPeriodMetricViewSet(KpiPeriodConfigCrudMixin, viewsets.ModelViewSet):
@@ -487,45 +779,37 @@ class KpiPeriodMetricViewSet(KpiPeriodConfigCrudMixin, viewsets.ModelViewSet):
     validate_weights_on_save = True
 
     def get_queryset(self):
-        queryset = (
-            KpiPeriodMetric.objects.select_related(
-                "period",
-                "group",
-                "metric_definition",
-            )
-            .all()
-        )
-
+        queryset = KpiPeriodMetric.objects.select_related("period", "profile", "group", "group__section").all()
         period = self.request.query_params.get("period")
         period_code = self.request.query_params.get("period_code")
+        profile = self.request.query_params.get("profile")
+        profile_code = self.request.query_params.get("profile_code")
         group_code = self.request.query_params.get("group_code")
-        input_type = self.request.query_params.get("input_type")
+        q = self.request.query_params.get("q")
+        is_active = self.request.query_params.get("is_active")
 
         if period:
             queryset = queryset.filter(period_id=period)
-
         if period_code:
             queryset = queryset.filter(period__period_code=period_code)
-
+        if profile:
+            queryset = queryset.filter(profile_id=profile)
+        if profile_code:
+            queryset = queryset.filter(profile__profile_code=profile_code)
         if group_code:
             queryset = queryset.filter(group__group_code=group_code)
+        if q:
+            queryset = queryset.filter(
+                Q(metric_code__icontains=q)
+                | Q(metric_name__icontains=q)
+                | Q(work_description__icontains=q)
+                | Q(measurement_formula__icontains=q)
+                | Q(target_text__icontains=q)
+            )
+        if is_active in ["true", "false"]:
+            queryset = queryset.filter(is_active=is_active == "true")
 
-        if input_type:
-            queryset = queryset.filter(input_type=input_type)
-
-        return queryset.order_by("period_id", "group__sort_order", "sort_order", "id")
-
-    def create(self, request, *args, **kwargs):
-        return Response(
-            {"detail": "Không tạo chỉ tiêu KPI trực tiếp ở API này. Giai đoạn này chỉ hỗ trợ sửa cấu hình kỳ đã tạo."},
-            status=status.HTTP_405_METHOD_NOT_ALLOWED,
-        )
-
-    def destroy(self, request, *args, **kwargs):
-        return Response(
-            {"detail": "Không xóa chỉ tiêu KPI trực tiếp. Có thể tắt bằng is_active=false."},
-            status=status.HTTP_405_METHOD_NOT_ALLOWED,
-        )
+        return queryset.order_by("period_id", "profile__sort_order", "group__section__sort_order", "group__sort_order", "metric_code", "id")
 
 
 class KpiPeriodGateConfigViewSet(KpiPeriodConfigCrudMixin, viewsets.ModelViewSet):
@@ -536,38 +820,18 @@ class KpiPeriodGateConfigViewSet(KpiPeriodConfigCrudMixin, viewsets.ModelViewSet
     config_object_type = "KpiPeriodGateConfig"
     validate_weights_on_save = False
 
-
     def get_queryset(self):
-        queryset = (
-            KpiPeriodGateConfig.objects.select_related(
-                "period",
-                "gate_definition",
-            )
-            .all()
-        )
-
+        queryset = KpiPeriodGateConfig.objects.select_related("period", "profile", "gate_definition").all()
         period = self.request.query_params.get("period")
         period_code = self.request.query_params.get("period_code")
-
+        profile_code = self.request.query_params.get("profile_code")
         if period:
             queryset = queryset.filter(period_id=period)
-
         if period_code:
             queryset = queryset.filter(period__period_code=period_code)
-
-        return queryset.order_by("period_id", "gate_code")
-
-    def create(self, request, *args, **kwargs):
-        return Response(
-            {"detail": "Không tạo gate trực tiếp ở API này. Hãy dùng cấu hình mặc định theo kỳ."},
-            status=status.HTTP_405_METHOD_NOT_ALLOWED,
-        )
-
-    def destroy(self, request, *args, **kwargs):
-        return Response(
-            {"detail": "Không xóa gate trực tiếp. Có thể tắt bằng is_active=false."},
-            status=status.HTTP_405_METHOD_NOT_ALLOWED,
-        )
+        if profile_code:
+            queryset = queryset.filter(profile__profile_code=profile_code)
+        return queryset.order_by("period_id", "profile__sort_order", "gate_code")
 
 
 class KpiRewardTierConfigViewSet(KpiPeriodConfigCrudMixin, viewsets.ModelViewSet):
@@ -579,49 +843,17 @@ class KpiRewardTierConfigViewSet(KpiPeriodConfigCrudMixin, viewsets.ModelViewSet
     validate_weights_on_save = False
 
     def get_queryset(self):
-        queryset = KpiRewardTierConfig.objects.select_related("period").all()
-
+        queryset = KpiRewardTierConfig.objects.select_related("period", "profile").all()
         period = self.request.query_params.get("period")
         period_code = self.request.query_params.get("period_code")
-
+        profile_code = self.request.query_params.get("profile_code")
         if period:
             queryset = queryset.filter(period_id=period)
-
         if period_code:
             queryset = queryset.filter(period__period_code=period_code)
-
-        return queryset.order_by("period_id", "sort_order", "id")
-
-    def create(self, request, *args, **kwargs):
-        return Response(
-            {"detail": "Không tạo bậc thưởng trực tiếp ở API này. Hãy dùng cấu hình mặc định theo kỳ."},
-            status=status.HTTP_405_METHOD_NOT_ALLOWED,
-        )
-
-    def destroy(self, request, *args, **kwargs):
-        return Response(
-            {"detail": "Không xóa bậc thưởng trực tiếp. Có thể tắt bằng is_active=false."},
-            status=status.HTTP_405_METHOD_NOT_ALLOWED,
-        )
-
-
-class KpiMetricDefinitionViewSet(viewsets.ReadOnlyModelViewSet):
-    serializer_class = KpiMetricDefinitionSerializer
-    permission_classes = [KpiConfigPermission]
-
-    def get_queryset(self):
-        queryset = KpiMetricDefinition.objects.all()
-
-        input_type = self.request.query_params.get("input_type")
-        is_active = self.request.query_params.get("is_active")
-
-        if input_type:
-            queryset = queryset.filter(input_type=input_type)
-
-        if is_active in ["true", "false"]:
-            queryset = queryset.filter(is_active=is_active == "true")
-
-        return queryset.order_by("metric_code")
+        if profile_code:
+            queryset = queryset.filter(profile__profile_code=profile_code)
+        return queryset.order_by("period_id", "profile__sort_order", "sort_order", "id")
 
 
 class KpiGateDefinitionViewSet(viewsets.ReadOnlyModelViewSet):
@@ -630,104 +862,106 @@ class KpiGateDefinitionViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         queryset = KpiGateDefinition.objects.all()
-
         is_active = self.request.query_params.get("is_active")
-
         if is_active in ["true", "false"]:
             queryset = queryset.filter(is_active=is_active == "true")
-
         return queryset.order_by("gate_code")
-    
-def user_has_permission(user, permission_code):
-    if not user or not user.is_authenticated:
-        return False
-
-    if user.is_superuser:
-        return True
-
-    return PermissionService.has_permission(user, permission_code)
 
 
-def get_user_branch_id(user):
-    employee = getattr(user, "employee", None)
+class KpiUserTargetViewSet(KpiPeriodConfigCrudMixin, viewsets.ModelViewSet):
+    read_serializer_class = KpiUserTargetSerializer
+    write_serializer_class = KpiUserTargetWriteSerializer
+    serializer_class = KpiUserTargetSerializer
+    permission_classes = [KpiConfigPermission]
+    config_object_type = "KpiUserTarget"
+    validate_weights_on_save = False
 
-    if not employee:
-        return None
+    def get_queryset(self):
+        queryset = KpiUserTarget.objects.select_related("period", "profile", "metric", "user", "employee", "branch").all()
+        queryset = filter_kpi_results_by_user(queryset, self.request.user)
+        period = self.request.query_params.get("period")
+        profile_code = self.request.query_params.get("profile_code")
+        user = self.request.query_params.get("user")
+        metric = self.request.query_params.get("metric")
+        if period:
+            queryset = queryset.filter(period_id=period)
+        if profile_code:
+            queryset = queryset.filter(profile__profile_code=profile_code)
+        if user:
+            queryset = queryset.filter(user_id=user)
+        if metric:
+            queryset = queryset.filter(metric_id=metric)
+        return queryset.order_by("period_id", "profile__sort_order", "user_id", "metric__metric_code")
 
-    branch = getattr(employee, "branch", None)
+    def ensure_target_user_allowed(self, request, instance_or_serializer):
+        if hasattr(instance_or_serializer, "validated_data"):
+            profile = instance_or_serializer.validated_data.get("profile")
+            metric = instance_or_serializer.validated_data.get("metric")
+            target_user = instance_or_serializer.validated_data.get("user")
+            if not profile and metric:
+                profile = metric.profile
+        else:
+            profile = instance_or_serializer.profile
+            target_user = instance_or_serializer.user
+        if profile and target_user and not can_assign_target_for_profile(request.user, target_user, profile):
+            raise DRFValidationError({"detail": "Bạn không có quyền set chỉ tiêu cho nhân viên thuộc bộ KPI này."})
 
-    if not branch:
-        return None
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.ensure_target_user_allowed(request, serializer)
+        return super().create(request, *args, **kwargs)
 
-    return branch.id
-
-
-def filter_kpi_results_by_user(queryset, user):
-    if not user or not user.is_authenticated:
-        return queryset.none()
-
-    if user.is_superuser or user_has_permission(user, "KPI_DASHBOARD_VIEW_ALL"):
-        return queryset
-
-    if user_has_permission(user, "KPI_DASHBOARD_VIEW_BRANCH"):
-        branch_id = get_user_branch_id(user)
-
-        if not branch_id:
-            return queryset.filter(user=user)
-
-        return queryset.filter(Q(branch_id=branch_id) | Q(user=user))
-
-    return queryset.filter(user=user)
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.ensure_target_user_allowed(request, instance)
+        return super().update(request, *args, **kwargs)
 
 
-def can_score_target_user(scored_by_user, target_user):
-    if not scored_by_user or not scored_by_user.is_authenticated:
-        return False
 
-    if scored_by_user.is_superuser or user_has_permission(
-        scored_by_user,
-        "KPI_DASHBOARD_VIEW_ALL",
-    ):
-        return True
+def get_target_user_or_403(request, user_id):
+    User = get_user_model()
 
-    if user_has_permission(scored_by_user, "KPI_DASHBOARD_VIEW_BRANCH"):
-        scorer_branch_id = get_user_branch_id(scored_by_user)
+    if user_id:
+        target_user = User.objects.filter(pk=user_id).first()
+    else:
+        target_user = request.user
+
+    if not target_user:
+        raise DRFValidationError({"user": "Không tìm thấy nhân viên cần xem KPI."})
+
+    if target_user.pk == request.user.pk:
+        return target_user
+
+    if user_has_permission(request.user, "KPI_DASHBOARD_VIEW_ALL"):
+        return target_user
+
+    if user_has_permission(request.user, "KPI_DASHBOARD_VIEW_BRANCH") or user_has_permission(request.user, "SA_KPI_VIEW_BRANCH"):
+        request_branch_id = get_user_branch_id(request.user)
         target_branch_id = get_user_branch_id(target_user)
 
-        if not scorer_branch_id or not target_branch_id:
-            return False
+        if request_branch_id and target_branch_id and request_branch_id == target_branch_id:
+            return target_user
 
-        return scorer_branch_id == target_branch_id
-
-    return False
+    raise DRFValidationError({"detail": "Bạn không có quyền xem record đóng góp KPI của nhân viên này."})
 
 
 class KpiUserMetricResultViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = KpiUserMetricResultSerializer
+
     def get_permissions(self):
         if self.action == "calculate_auto":
             return [KpiAutoCalculatePermission()]
-
         return [KpiManualScorePermission()]
 
     def get_queryset(self):
-        queryset = (
-            KpiUserMetricResult.objects.select_related(
-                "period",
-                "group",
-                "metric",
-                "user",
-                "employee",
-                "branch",
-                "scored_by_user",
-            )
-            .all()
-        )
-
+        queryset = KpiUserMetricResult.objects.select_related(
+            "period", "profile", "group", "metric", "user", "employee", "branch", "scored_by_user"
+        ).all()
         queryset = filter_kpi_results_by_user(queryset, self.request.user)
-
         period = self.request.query_params.get("period")
         period_code = self.request.query_params.get("period_code")
+        profile_code = self.request.query_params.get("profile_code")
         user = self.request.query_params.get("user")
         branch = self.request.query_params.get("branch")
         source_type = self.request.query_params.get("source_type")
@@ -737,92 +971,109 @@ class KpiUserMetricResultViewSet(viewsets.ReadOnlyModelViewSet):
 
         if period:
             queryset = queryset.filter(period_id=period)
-
         if period_code:
             queryset = queryset.filter(period__period_code=period_code)
-
+        if profile_code:
+            queryset = queryset.filter(profile__profile_code=profile_code)
         if user:
             queryset = queryset.filter(user_id=user)
-
         if branch:
             queryset = queryset.filter(branch_id=branch)
-
         if source_type:
             queryset = queryset.filter(source_type=source_type)
-
         if group_code:
             queryset = queryset.filter(group__group_code=group_code)
-
         if metric:
             queryset = queryset.filter(metric_id=metric)
-
         if metric_code:
             queryset = queryset.filter(metric__metric_code=metric_code)
 
-        return queryset.order_by(
-            "period_id",
-            "user_id",
-            "group__sort_order",
-            "metric__sort_order",
-            "id",
+        return queryset.order_by("period_id", "profile__sort_order", "user_id", "group__sort_order", "metric__metric_code", "id")
+
+    @action(methods=["get"], detail=False, url_path="metric-contributions")
+    def metric_contributions(self, request):
+        period_id = request.query_params.get("period")
+        profile_code = request.query_params.get("profile_code")
+        metric_id = request.query_params.get("metric")
+        metric_code = request.query_params.get("metric_code")
+        user_id = request.query_params.get("user")
+
+        if not period_id:
+            raise DRFValidationError({"period": "Thiếu kỳ KPI."})
+
+        if not profile_code:
+            raise DRFValidationError({"profile_code": "Thiếu bộ KPI."})
+
+        if not metric_id and not metric_code:
+            raise DRFValidationError({"metric": "Thiếu chỉ tiêu KPI."})
+
+        period = KpiPeriod.objects.filter(pk=period_id).first()
+
+        if not period:
+            raise DRFValidationError({"period": "Không tìm thấy kỳ KPI."})
+
+        profile = KpiProfile.objects.filter(
+            period=period,
+            profile_code=profile_code,
+            is_active=True,
+        ).first()
+
+        if not profile:
+            raise DRFValidationError({"profile_code": "Không tìm thấy bộ KPI."})
+
+        metric_queryset = KpiPeriodMetric.objects.filter(
+            period=period,
+            profile=profile,
+            is_active=True,
         )
+
+        if metric_id:
+            metric_queryset = metric_queryset.filter(pk=metric_id)
+        else:
+            metric_queryset = metric_queryset.filter(metric_code=metric_code)
+
+        metric = metric_queryset.select_related("period", "profile", "group").first()
+
+        if not metric:
+            raise DRFValidationError({"metric": "Không tìm thấy chỉ tiêu KPI."})
+
+        target_user = get_target_user_or_403(request, user_id)
+
+        payload = get_metric_contribution_payload(
+            period=period,
+            profile=profile,
+            metric=metric,
+            user=target_user,
+        )
+
+        return Response(payload)
 
     @action(methods=["post"], detail=False, url_path="manual-score")
     def manual_score(self, request):
-        serializer = KpiManualScoreSerializer(
-            data=request.data,
-            context={"request": request},
-        )
+        serializer = KpiManualScoreSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
-
         target_user = serializer.validated_data["user"]
-
         if not can_score_target_user(request.user, target_user):
-            return Response(
-                {
-                    "detail": "Bạn không có quyền chấm điểm KPI cho nhân viên này."
-                },
-                status=status.HTTP_403_FORBIDDEN,
-            )
+            return Response({"detail": "Bạn không có quyền chấm điểm KPI cho nhân viên này."}, status=status.HTTP_403_FORBIDDEN)
 
         period = serializer.validated_data["period"]
+        profile = serializer.validated_data["profile"]
         metric = serializer.validated_data["metric"]
-
-        old_result = KpiUserMetricResult.objects.filter(
-            period=period,
-            metric=metric,
-            user=target_user,
-        ).first()
-
+        old_result = KpiUserMetricResult.objects.filter(period=period, profile=profile, metric=metric, user=target_user).first()
         old_data = serialize_model_basic(old_result) if old_result else None
-
         result, created = serializer.save()
-
-        new_data = serialize_model_basic(result)
-
         create_kpi_audit_log(
             period=period,
             object_type="KpiUserMetricResult",
             object_id=result.id,
-            action_type=(
-                "CREATE" if created else "UPDATE"
-            ),
+            action_type="CREATE" if created else "UPDATE",
             changed_by_user=request.user,
             old_data=old_data,
-            new_data=new_data,
-            note="Nhập điểm KPI Phần A.",
+            new_data=serialize_model_basic(result),
+            note="Nhập điểm KPI.",
         )
-
         return Response(
-            {
-                "detail": (
-                    "Nhập điểm KPI thành công."
-                    if created
-                    else "Cập nhật điểm KPI thành công."
-                ),
-                "created": created,
-                "result": KpiUserMetricResultSerializer(result).data,
-            },
+            {"detail": "Nhập điểm KPI thành công." if created else "Cập nhật điểm KPI thành công.", "created": created, "result": KpiUserMetricResultSerializer(result).data},
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
 
@@ -830,95 +1081,57 @@ class KpiUserMetricResultViewSet(viewsets.ReadOnlyModelViewSet):
     def calculate_auto(self, request):
         serializer = KpiAutoCalculateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-
         period = serializer.validated_data["period"]
+        profile = serializer.validated_data.get("profile")
         target_user = serializer.validated_data.get("user")
         branch = serializer.validated_data.get("branch")
-
-        if target_user:
-            users = [target_user]
-        else:
-            users = list(
-                get_default_kpi_users(
-                    branch_id=branch.id if branch else None
-                )
-            )
-
+        users = [target_user] if target_user else list(get_default_kpi_users(profile=profile, branch_id=branch.id if branch else None))
         calculated_results = []
-
         for user in users:
             user_results = calculate_auto_kpis_for_user(
                 period=period,
+                profile=profile,
                 user=user,
                 calculated_by_user=request.user,
             )
-
             calculated_results.append(
                 {
                     "user_id": user.id,
                     "username": user.username,
                     "email": user.email,
                     "result_count": len(user_results),
-                    "results": [
-                        KpiUserMetricResultSerializer(item["result"]).data
-                        for item in user_results
-                    ],
+                    "results": [KpiUserMetricResultSerializer(item["result"]).data for item in user_results],
                 }
             )
+        return Response({"detail": "Tính KPI tự động thành công.", "period": period.period_code, "profile": profile.profile_code if profile else None, "user_count": len(users), "results": calculated_results})
 
-        return Response(
-            {
-                "detail": "Tính KPI tự động Phần B thành công.",
-                "period": period.period_code,
-                "user_count": len(users),
-                "results": calculated_results,
-            }
-        )
-    
+
 class KpiUserGateResultViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = KpiUserGateResultSerializer
     permission_classes = [KpiManualScorePermission]
 
     def get_queryset(self):
-        queryset = (
-            KpiUserGateResult.objects.select_related(
-                "period",
-                "gate_config",
-                "user",
-                "employee",
-                "branch",
-            )
-            .all()
-        )
-
+        queryset = KpiUserGateResult.objects.select_related("period", "profile", "gate_config", "user", "employee", "branch").all()
         queryset = filter_kpi_results_by_user(queryset, self.request.user)
-
         period = self.request.query_params.get("period")
-        period_code = self.request.query_params.get("period_code")
+        profile_code = self.request.query_params.get("profile_code")
         user = self.request.query_params.get("user")
         branch = self.request.query_params.get("branch")
         gate_code = self.request.query_params.get("gate_code")
         is_passed = self.request.query_params.get("is_passed")
-
         if period:
             queryset = queryset.filter(period_id=period)
-
-        if period_code:
-            queryset = queryset.filter(period__period_code=period_code)
-
+        if profile_code:
+            queryset = queryset.filter(profile__profile_code=profile_code)
         if user:
             queryset = queryset.filter(user_id=user)
-
         if branch:
             queryset = queryset.filter(branch_id=branch)
-
         if gate_code:
             queryset = queryset.filter(gate_config__gate_code=gate_code)
-
         if is_passed in ["true", "false"]:
             queryset = queryset.filter(is_passed=is_passed == "true")
-
-        return queryset.order_by("period_id", "user_id", "gate_config__gate_code")
+        return queryset.order_by("period_id", "profile__sort_order", "user_id", "gate_config__gate_code")
 
 
 class KpiUserSummaryViewSet(viewsets.ReadOnlyModelViewSet):
@@ -927,81 +1140,78 @@ class KpiUserSummaryViewSet(viewsets.ReadOnlyModelViewSet):
     def get_permissions(self):
         if self.action == "calculate":
             return [KpiAutoCalculatePermission()]
-
         return [KpiManualScorePermission()]
 
     def get_queryset(self):
-        queryset = (
-            KpiUserSummary.objects.select_related(
-                "period",
-                "user",
-                "employee",
-                "branch",
-                "reward_tier",
-            )
-            .all()
-        )
-
+        queryset = KpiUserSummary.objects.select_related("period", "profile", "user", "employee", "branch", "reward_tier").all()
         queryset = filter_kpi_results_by_user(queryset, self.request.user)
-
         period = self.request.query_params.get("period")
         period_code = self.request.query_params.get("period_code")
+        profile_code = self.request.query_params.get("profile_code")
         user = self.request.query_params.get("user")
         branch = self.request.query_params.get("branch")
         reward_tier_code = self.request.query_params.get("reward_tier_code")
-        all_gates_passed = self.request.query_params.get("all_gates_passed")
-
         if period:
             queryset = queryset.filter(period_id=period)
-
         if period_code:
             queryset = queryset.filter(period__period_code=period_code)
-
+        if profile_code:
+            queryset = queryset.filter(profile__profile_code=profile_code)
         if user:
             queryset = queryset.filter(user_id=user)
-
         if branch:
             queryset = queryset.filter(branch_id=branch)
-
         if reward_tier_code:
             queryset = queryset.filter(reward_tier_code=reward_tier_code)
+        return queryset.order_by("period_id", "profile__sort_order", "-total_score", "id")
 
-        if all_gates_passed in ["true", "false"]:
-            queryset = queryset.filter(all_gates_passed=all_gates_passed == "true")
+    @action(methods=["get"], detail=False, url_path="ranking")
+    def ranking(self, request):
+        period_id = request.query_params.get("period")
+        period_code = request.query_params.get("period_code")
 
-        return queryset.order_by("period_id", "rank_overall", "-total_score", "id")
+        if not period_id and not period_code:
+            raise DRFValidationError({"period": "Thiếu kỳ KPI."})
+
+        if period_id:
+            period = KpiPeriod.objects.filter(pk=period_id).first()
+        else:
+            period = KpiPeriod.objects.filter(period_code=period_code).first()
+
+        if not period:
+            raise DRFValidationError({"period": "Kỳ KPI không tồn tại."})
+
+        payload = get_kpi_ranking_payload(
+            request_user=request.user,
+            period=period,
+            profile_code=request.query_params.get("profile_code") or KpiProfile.PROFILE_SA,
+            branch_id=request.query_params.get("branch"),
+            q=request.query_params.get("q"),
+            category=request.query_params.get("category"),
+            status=request.query_params.get("status"),
+        )
+
+        return Response(payload)
 
     @action(methods=["post"], detail=False, url_path="calculate")
     def calculate(self, request):
         serializer = KpiSummaryCalculateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-
         period = serializer.validated_data["period"]
+        profile = serializer.validated_data.get("profile")
         target_user = serializer.validated_data.get("user")
         branch = serializer.validated_data.get("branch")
-
-        if target_user:
-            users = [target_user]
-            branch_id = None
-        else:
-            users = None
-            branch_id = branch.id if branch else None
-
-        results = calculate_kpi_summaries(
+        summaries = calculate_kpi_summaries(
             period=period,
-            users=users,
-            branch_id=branch_id,
+            profile=profile,
+            user=target_user,
+            branch=branch,
             calculated_by_user=request.user,
         )
-
-        return Response(
-            {
-                "detail": "Tổng hợp KPI, gate và bậc thưởng thành công.",
-                "period": period.period_code,
-                "result_count": len(results),
-                "results": [
-                    KpiUserSummarySerializer(item["summary"]).data
-                    for item in results
-                ],
-            }
-        )
+        return Response({
+            "detail": "Tổng hợp KPI thành công.",
+            "period": period.period_code,
+            "profile": profile.profile_code if profile else None,
+            "summary_count": len(summaries),
+            "summaries": KpiUserSummarySerializer(summaries, many=True).data,
+        })

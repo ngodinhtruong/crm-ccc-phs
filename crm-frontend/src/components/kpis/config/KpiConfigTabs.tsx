@@ -4,7 +4,7 @@ import { KpiConfigTab } from "@/hooks/useKpiConfig";
 
 const tabs: { key: KpiConfigTab; label: string }[] = [
   { key: "metrics", label: "Chỉ tiêu KPI" },
-  { key: "groups", label: "Nhóm KPI" },
+  { key: "groups", label: "Phần & Nhóm KPI" },
   { key: "gates", label: "Gate Conditions" },
   { key: "rewards", label: "Bậc thưởng" },
 ];
@@ -17,26 +17,29 @@ export function KpiConfigTabs({
   onChange: (tab: KpiConfigTab) => void;
 }) {
   return (
-    <div className="flex flex-wrap gap-2 border-b bg-white px-4 pt-3">
-      {tabs.map((tab) => {
-        const active = activeTab === tab.key;
+    <div className="flex h-12 items-center justify-center border-b bg-white px-4">
+      <div className="inline-flex overflow-hidden rounded border border-sky-300 text-xs font-semibold">
+        {tabs.map((tab, index) => {
+          const active = activeTab === tab.key;
 
-        return (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => onChange(tab.key)}
-            className={[
-              "border-b-2 px-3 pb-3 text-xs font-semibold",
-              active
-                ? "border-orange-500 text-orange-600"
-                : "border-transparent text-slate-500 hover:text-slate-800",
-            ].join(" ")}
-          >
-            {tab.label}
-          </button>
-        );
-      })}
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => onChange(tab.key)}
+              className={[
+                "h-8 px-5",
+                index > 0 ? "border-l border-sky-300" : "",
+                active
+                  ? "bg-[#0097cf] text-white"
+                  : "bg-white text-[#0097cf] hover:bg-sky-50",
+              ].join(" ")}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
