@@ -5,7 +5,9 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 
+import { accountService } from "@/services/account.service";
 import { authService } from "@/services/auth.service";
+import { getDefaultHomePath } from "@/utils/default-home.util";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -27,7 +29,8 @@ export default function LoginPage() {
         password,
       });
 
-      router.push("/workspace");
+      const currentUser = await accountService.getMe();
+      router.replace(getDefaultHomePath(currentUser));
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
         if (err.response?.status === 401) {
@@ -48,7 +51,6 @@ export default function LoginPage() {
   return (
     <main className="min-h-screen bg-white">
       <div className="grid min-h-screen grid-cols-1 lg:grid-cols-2">
-        {/* Khung trái */}
         <section
           className="relative hidden items-center justify-center overflow-hidden p-10 lg:flex"
           style={
@@ -75,9 +77,7 @@ export default function LoginPage() {
               />
             </div>
 
-            <h1 className="text-3xl font-bold tracking-wide">
-              CRM Mini System
-            </h1>
+            <h1 className="text-3xl font-bold tracking-wide">CRM Mini System</h1>
 
             <p className="mt-4 max-w-md text-base leading-7 text-white/85">
               Hệ thống quản lý khách hàng, ticket, SLA và phân quyền nội bộ.
@@ -85,7 +85,6 @@ export default function LoginPage() {
           </div>
         </section>
 
-        {/* Khung phải */}
         <section className="flex items-center justify-center bg-slate-50 px-6 py-12">
           <div className="w-full max-w-md">
             <div className="mb-8 lg:hidden">
@@ -101,9 +100,7 @@ export default function LoginPage() {
 
             <div className="rounded-2xl bg-white p-8 shadow-xl">
               <div className="mb-8">
-                <h2 className="text-2xl font-bold text-slate-900">
-                  Đăng nhập
-                </h2>
+                <h2 className="text-2xl font-bold text-slate-900">Đăng nhập</h2>
                 <p className="mt-2 text-sm text-slate-500">
                   Vui lòng nhập tài khoản để truy cập hệ thống CRM.
                 </p>
@@ -152,8 +149,7 @@ export default function LoginPage() {
                   style={
                     {
                       "--tw-bg-opacity": 1,
-                      backgroundColor:
-                        "rgba(0, 113, 61, var(--tw-bg-opacity))",
+                      backgroundColor: "rgba(0, 113, 61, var(--tw-bg-opacity))",
                     } as React.CSSProperties
                   }
                 >
@@ -161,9 +157,7 @@ export default function LoginPage() {
                 </button>
               </form>
 
-              <p className="mt-6 text-center text-xs text-slate-400">
-                © PHS CRM Mini
-              </p>
+              <p className="mt-6 text-center text-xs text-slate-400">© PHS CRM Mini</p>
             </div>
           </div>
         </section>

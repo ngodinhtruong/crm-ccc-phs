@@ -1,9 +1,14 @@
 "use client";
 
-import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { useSaRecords } from "@/hooks/useSaRecords";
+import { Edit, Eye, Plus } from "lucide-react";
+import {
+    PermissionCode,
+    useCurrentUserPermissions,
+} from "@/hooks/useCurrentUserPermissions";
+
 import { DashboardLayout } from "@/layouts/DashboardLayout";
 import { SaRecordItem } from "@/types/sale-admin.type";
 import {
@@ -77,6 +82,10 @@ function IcpBadge({ item }: { item: SaRecordItem }) {
 export function SaRecordListPage() {
     const router = useRouter();
     const records = useSaRecords();
+    const authz = useCurrentUserPermissions();
+
+    const canCreate = authz.hasPermission(PermissionCode.SA_RECORD_CREATE);
+    const canUpdate = authz.hasPermission(PermissionCode.SA_RECORD_UPDATE);
 
     return (
         <DashboardLayout
@@ -93,14 +102,16 @@ export function SaRecordListPage() {
                 },
             ]}
             rightAction={
-                <button
-                    type="button"
-                    onClick={() => router.push("/sale-admin/records/create")}
-                    className="flex h-8 items-center gap-1 rounded bg-[#0097cf] px-3 text-xs font-semibold text-white hover:bg-[#0089bd]"
-                >
-                    <Plus size={15} />
-                    Thêm SA Record
-                </button>
+                canCreate ? (
+                    <button
+                        type="button"
+                        onClick={() => router.push("/sale-admin/records/create")}
+                        className="flex h-8 items-center gap-1 rounded bg-[#0097cf] px-3 text-xs font-semibold text-white hover:bg-[#0089bd]"
+                    >
+                        <Plus size={15} />
+                        Thêm SA Record
+                    </button>
+                ) : null
             }
         >
             <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
@@ -139,6 +150,7 @@ export function SaRecordListPage() {
                     <table className="w-full min-w-[1900px] border-collapse text-left text-xs">
                         <thead>
                             <tr className="h-10 border-b bg-white text-slate-700">
+                                <th className="w-[130px] px-3 font-semibold">Thao tác</th>
                                 <th className="w-[150px] px-3 font-semibold">Mã record</th>
                                 <th className="w-[140px] px-3 font-semibold">Số TK lưu ký</th>
                                 <th className="w-[180px] px-3 font-semibold">Tên KH</th>
@@ -161,6 +173,8 @@ export function SaRecordListPage() {
                             </tr>
 
                             <tr className="border-b bg-[#f8fafc] align-top">
+                                <th className="px-2 py-2" />
+
                                 <th className="px-2 py-2">
                                     <ColumnTextFilter
                                         value={records.recordCode}
@@ -325,11 +339,12 @@ export function SaRecordListPage() {
                         </thead>
 
                         <tbody>
+
                             <TableState
                                 loading={records.loading}
                                 error={records.error}
                                 empty={!records.loading && !records.error && records.items.length === 0}
-                                colSpan={19}
+                                colSpan={20}
                                 emptyText="Không có dữ liệu SA Record."
                             />
                             {!records.loading &&
@@ -342,8 +357,37 @@ export function SaRecordListPage() {
                                             key={item.id}
                                             className={`h-14 border-b border-slate-100 ${rowBg} hover:bg-sky-50`}
                                         >
+                                            <td className="px-3">
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => router.push(`/sale-admin/records/${item.id}`)}
+                                                        className="inline-flex h-7 items-center gap-1 rounded border border-slate-300 bg-white px-2 text-[11px] font-semibold text-slate-600 hover:bg-slate-50"
+                                                    >
+                                                        <Eye size={13} />
+                                                        Xem
+                                                    </button>
+
+                                                    {canUpdate && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => router.push(`/sale-admin/records/${item.id}/edit`)}
+                                                            className="inline-flex h-7 items-center gap-1 rounded border border-sky-200 bg-sky-50 px-2 text-[11px] font-semibold text-sky-700 hover:bg-sky-100"
+                                                        >
+                                                            <Edit size={13} />
+                                                            Sửa
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </td>
                                             <td className="px-3 font-semibold text-sky-600">
-                                                {item.record_code}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => router.push(`/sale-admin/records/${item.id}`)}
+                                                    className="hover:underline"
+                                                >
+                                                    {item.record_code}
+                                                </button>
                                             </td>
                                             <td className="px-3 font-semibold">{item.account_no}</td>
                                             <td className="px-3">

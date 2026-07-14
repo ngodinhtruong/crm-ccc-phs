@@ -3,8 +3,13 @@ from rest_framework.permissions import BasePermission, SAFE_METHODS
 from apps.accounts.services import PermissionService
 
 
-SYSTEM_MANAGER_ROLES = {"CS_MANAGER", "BOM"}
-
+SYSTEM_MANAGER_ROLES = {
+    "SYSTEM_ADMIN",
+    "CCC_ADMIN",
+    "SA_ADMIN",
+    "CS_MANAGER",
+    "BOM",
+}
 
 def user_has_any_role(user, role_codes):
     if not user or not user.is_authenticated:

@@ -21,7 +21,6 @@ def generate_sa_record_code():
 
     return f"{prefix}{next_number:04d}"
 
-
 def serialize_sa_record(record):
     return {
         "id": record.id,
@@ -39,15 +38,42 @@ def serialize_sa_record(record):
         "company_id": record.company_id,
         "branch_id": record.branch_id,
 
+        "customer_name": record.customer.full_name if record.customer else None,
+        "company_name": record.company.company_name if record.company else None,
+        "branch_name": record.branch.branch_name if record.branch else None,
+
         "pic_user_id": record.pic_user_id,
         "pic_employee_id": record.pic_employee_id,
+        "pic_user_name": (
+            record.pic_user.get_full_name()
+            or record.pic_user.username
+            or record.pic_user.email
+            if record.pic_user
+            else None
+        ),
+        "pic_employee_name": (
+            getattr(record.pic_employee, "full_name", None)
+            if record.pic_employee
+            else None
+        ),
 
         "call_date": record.call_date.isoformat() if record.call_date else None,
         "follow_no": record.follow_no,
 
         "call_result_id": record.call_result_id,
+        "call_result_name": (
+            record.call_result.result_name if record.call_result else None
+        ),
+
         "interest_level_id": record.interest_level_id,
+        "interest_level_name": (
+            record.interest_level.level_name if record.interest_level else None
+        ),
+
         "icp_group_id": record.icp_group_id,
+        "icp_group_code": record.icp_group.icp_code if record.icp_group else None,
+        "icp_group_name": record.icp_group.icp_name if record.icp_group else None,
+        "icp_group_type": record.icp_group.icp_type if record.icp_group else None,
 
         "reactivation": record.reactivation,
         "reactivation_confirmed_at": (
@@ -63,6 +89,18 @@ def serialize_sa_record(record):
         "handover_to_broker": record.handover_to_broker,
         "broker_user_id": record.broker_user_id,
         "broker_employee_id": record.broker_employee_id,
+        "broker_user_name": (
+            record.broker_user.get_full_name()
+            or record.broker_user.username
+            or record.broker_user.email
+            if record.broker_user
+            else None
+        ),
+        "broker_employee_name": (
+            getattr(record.broker_employee, "full_name", None)
+            if record.broker_employee
+            else None
+        ),
         "broker_handover_at": (
             record.broker_handover_at.isoformat()
             if record.broker_handover_at
@@ -105,6 +143,9 @@ def create_sa_record_audit_log(
     note=None,
 ):
     changed_fields = get_changed_fields(old_data or {}, new_data or {})
+
+    if action_type == SaRecordAuditLog.ACTION_UPDATE and not changed_fields:
+        return None
 
     return SaRecordAuditLog.objects.create(
         sa_record=sa_record,

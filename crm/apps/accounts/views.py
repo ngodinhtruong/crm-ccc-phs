@@ -9,6 +9,13 @@ from rest_framework.response import Response
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 from apps.accounts.models import Permission, Role, RolePermission, UserBranchAccess, UserRole
+
+from apps.branches.models import Branch
+from apps.accounts.api_permissions import IsSystemManager
+from rest_framework.views import APIView
+
+from apps.accounts.services import PermissionService
+
 from apps.accounts.serializers import (
     CurrentUserSerializer,
     PermissionSerializer,
@@ -18,14 +25,11 @@ from apps.accounts.serializers import (
     SetUserBranchesSerializer,
     SetUserRolesSerializer,
     UserBranchAccessSerializer,
+    UserCreateWithAccessSerializer,
     UserRoleSerializer,
     UserSerializer,
 )
-from apps.branches.models import Branch
-from apps.accounts.api_permissions import IsSystemManager
-from rest_framework.views import APIView
 
-from apps.accounts.services import PermissionService
 User = get_user_model()
 
 
@@ -166,7 +170,31 @@ class UserViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(is_superuser=False)
 
         return queryset.distinct().order_by("id")
+    
+    @action(detail=False, methods=["post"], url_path="create-with-access")
+    @transaction.atomic
+    def create_with_access(self, request):
+        serializer = UserCreateWithAccessSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
 
+        user = serializer.save()
+
+        user = (
+            User.objects.select_related(
+                "employee",
+                "employee__branch",
+            )
+            .prefetch_related(
+                "user_roles__role",
+                "branch_accesses__branch",
+            )
+            .get(id=user.id)
+        )
+
+        return Response(
+            UserSerializer(user).data,
+            status=status.HTTP_201_CREATED,
+        )
     @action(detail=True, methods=["post"], url_path="set-roles")
     @transaction.atomic
     def set_roles(self, request, pk=None):

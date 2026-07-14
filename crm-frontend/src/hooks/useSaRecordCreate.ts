@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { accountService } from "@/services/account.service";
 
 import { authService } from "@/services/auth.service";
 import { saleAdminService } from "@/services/sale-admin.service";
@@ -118,7 +119,28 @@ const initialForm: SaRecordCreateFormState = {
     transactionFeeSnapshot: "0",
 
     note: "",
+    editReason: "",
 };
+
+
+function getSaPicName(me: any) {
+    return (
+        me.employee_name ||
+        me.employee?.full_name ||
+        [me.last_name, me.first_name].filter(Boolean).join(" ") ||
+        me.username ||
+        ""
+    );
+}
+
+function getSaBranchName(me: any) {
+    return (
+        me.branch_name ||
+        me.employee?.branch_name ||
+        me.employee?.branch?.branch_name ||
+        ""
+    );
+}
 
 export function useSaRecordCreate() {
     const router = useRouter();
@@ -135,6 +157,29 @@ export function useSaRecordCreate() {
     const [error, setError] = useState("");
     const [masterError, setMasterError] = useState("");
 
+
+    const loadSaProfile = async () => {
+        try {
+            const me = await accountService.getMe();
+
+            const picName = getSaPicName(me);
+            const branchName = getSaBranchName(me);
+
+            setForm((prev) => ({
+                ...prev,
+                picNameSnapshot: picName,
+                branchNameSnapshot: branchName,
+            }));
+
+            if (!picName || !branchName) {
+                setError(
+                    "Tài khoản SA chưa được liên kết hồ sơ nhân viên hoặc chi nhánh. Vui lòng kiểm tra User Management."
+                );
+            }
+        } catch {
+            setError("Không tải được hồ sơ người dùng SA.");
+        }
+    };
     const setField = <K extends keyof SaRecordCreateFormState>(
         key: K,
         value: SaRecordCreateFormState[K]
@@ -243,6 +288,13 @@ export function useSaRecordCreate() {
             return;
         }
 
+        if (!form.picNameSnapshot.trim() || !form.branchNameSnapshot.trim()) {
+            setError(
+                "Không thể tạo SA Record vì tài khoản SA chưa có hồ sơ nhân viên hoặc chi nhánh."
+            );
+            return;
+        }
+
         try {
             setSubmitting(true);
             setError("");
@@ -268,6 +320,7 @@ export function useSaRecordCreate() {
         }
 
         void loadMasterData();
+        void loadSaProfile();
 
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [router]);

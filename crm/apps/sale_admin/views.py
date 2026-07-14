@@ -10,7 +10,6 @@ from apps.sale_admin.models import (
     SaRecord,
     SaRecordAuditLog,
 )
-from apps.sale_admin.permissions import IsSaleAdminUser, is_sale_admin_manager
 from apps.sale_admin.serializers import (
     SaCallResultSerializer,
     SaInterestLevelSerializer,
@@ -25,7 +24,8 @@ from apps.sale_admin.services import (
     serialize_sa_record,
 )
 from apps.accounts.scopes import filter_sa_records_by_user
-from apps.sale_admin.permissions import SaRecordPermission, SaRecordAuditLogPermission 
+from apps.sale_admin.permissions import SaRecordAuditLogPermission, SaRecordPermission
+from apps.kpis.realtime import schedule_kpi_recalculation_after_sa_record_change
 
 
 
@@ -49,7 +49,7 @@ class SaIcpGroupViewSet(viewsets.ReadOnlyModelViewSet):
 
 class SaRecordViewSet(viewsets.ModelViewSet):
     permission_classes = [SaRecordPermission]
-
+    
     def get_serializer_class(self):
         if self.action in ["list", "retrieve"]:
             return SaRecordReadSerializer
@@ -309,6 +309,11 @@ class SaRecordViewSet(viewsets.ModelViewSet):
             new_data=new_data,
         )
 
+        schedule_kpi_recalculation_after_sa_record_change(
+            record_id=record.id,
+            changed_by_user_id=request.user.id,
+        )
+
         read_serializer = SaRecordReadSerializer(record)
 
         return Response(read_serializer.data, status=status.HTTP_201_CREATED)
@@ -319,6 +324,8 @@ class SaRecordViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
 
         old_data = serialize_sa_record(instance)
+        previous_pic_user_id = instance.pic_user_id
+        previous_call_date = instance.call_date
 
         serializer = self.get_serializer(
             instance,
@@ -351,6 +358,13 @@ class SaRecordViewSet(viewsets.ModelViewSet):
             new_data=new_data,
         )
 
+        schedule_kpi_recalculation_after_sa_record_change(
+            record_id=record.id,
+            previous_pic_user_id=previous_pic_user_id,
+            previous_call_date=previous_call_date,
+            changed_by_user_id=request.user.id,
+        )
+
         read_serializer = SaRecordReadSerializer(record)
 
         return Response(read_serializer.data)
@@ -360,6 +374,8 @@ class SaRecordViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
 
         old_data = serialize_sa_record(instance)
+        previous_pic_user_id = instance.pic_user_id
+        previous_call_date = instance.call_date
 
         create_sa_record_audit_log(
             sa_record=instance,
@@ -369,7 +385,15 @@ class SaRecordViewSet(viewsets.ModelViewSet):
             new_data=None,
         )
 
-        return super().destroy(request, *args, **kwargs)
+        response = super().destroy(request, *args, **kwargs)
+
+        schedule_kpi_recalculation_after_sa_record_change(
+            previous_pic_user_id=previous_pic_user_id,
+            previous_call_date=previous_call_date,
+            changed_by_user_id=request.user.id,
+        )
+
+        return response
 
 
 class SaRecordAuditLogViewSet(viewsets.ReadOnlyModelViewSet):
