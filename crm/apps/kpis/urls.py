@@ -9,6 +9,8 @@ from apps.kpis.views import (
     KpiPeriodViewSet,
     KpiRewardTierConfigViewSet,
     KpiUserMetricResultViewSet,
+    KpiUserGateResultViewSet,
+    KpiUserSummaryViewSet,
 )
 
 router = DefaultRouter()
@@ -21,4 +23,8 @@ router.register(r"reward-tiers", KpiRewardTierConfigViewSet, basename="kpi-rewar
 router.register(r"metric-definitions", KpiMetricDefinitionViewSet, basename="kpi-metric-definitions")
 router.register(r"gate-definitions", KpiGateDefinitionViewSet, basename="kpi-gate-definitions")
 router.register(r"results", KpiUserMetricResultViewSet, basename="kpi-results")
+
+router.register(r"gate-results", KpiUserGateResultViewSet, basename="kpi-gate-results")
+router.register(r"summaries", KpiUserSummaryViewSet, basename="kpi-summaries")
+
 urlpatterns = router.urls

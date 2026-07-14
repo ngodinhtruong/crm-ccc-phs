@@ -2,7 +2,7 @@ from django.core.management.base import BaseCommand
 
 from apps.accounts.models import Permission, Role, RolePermission
 from apps.kpis.models import KpiGateDefinition, KpiMetricDefinition
-
+from apps.kpis.defaults import DEFAULT_METRIC_DEFINITIONS
 
 KPI_PERMISSIONS = [
     ("KPI_DASHBOARD_VIEW_SELF", "Xem KPI cá nhân", "VIEW_SELF"),
@@ -23,28 +23,8 @@ KPI_PERMISSIONS = [
 ]
 
 
-MANUAL_METRICS = [
-    ("CONTACT_COMPLIANCE", "Tuân thủ liên hệ KH", "Đánh giá số cuộc gọi tối thiểu, chất lượng cuộc gọi, tuân thủ kịch bản."),
-    ("ICP_ACCURACY", "Độ chính xác phân nhóm ICP", "Đánh giá độ đầy đủ và chính xác của phân nhóm ICP."),
-    ("DATA_QUALITY", "Chất lượng nhập liệu", "Đánh giá tính đầy đủ, kịp thời và không trùng lặp dữ liệu."),
-    ("INTERNAL_COLLAB", "Phối hợp nội bộ", "Đánh giá phối hợp với CCC/ticket/escalation."),
-    ("REPORT_PROFILE", "Báo cáo & hồ sơ", "Đánh giá nộp biểu mẫu, báo cáo, tham dự họp."),
-    ("PROFESSIONAL_DEVELOPMENT", "Phát triển chuyên môn", "Đánh giá đào tạo, chứng chỉ, kiến thức sản phẩm."),
-]
 
 
-AUTO_METRICS = [
-    ("TOTAL_CALLS", "Tổng cuộc gọi", "total_calls", "COUNT", "HIGHER_BETTER"),
-    ("REACTIVATED_ACCOUNTS", "TK đã tái kích hoạt", "reactivated_accounts", "COUNT", "HIGHER_BETTER"),
-    ("RETENTION_RATE", "Tỷ lệ duy trì", "retention_rate", "PERCENT", "HIGHER_BETTER"),
-    ("ICP_AB_CUSTOMERS", "Số KH Nhóm A/B", "icp_ab_customers", "COUNT", "HIGHER_BETTER"),
-    ("TOTAL_FEE", "Phí GD phát sinh", "transaction_fee", "MONEY", "HIGHER_BETTER"),
-    ("TOTAL_VALUE", "Giá trị GD phát sinh", "transaction_value", "MONEY", "HIGHER_BETTER"),
-    ("INTRODUCED_PRODUCT_COUNT", "Số lần giới thiệu SP", "introduced_product_count", "COUNT", "HIGHER_BETTER"),
-    ("ON_TIME_FOLLOWUP_RATE", "Tỷ lệ Follow-up đúng hạn", "on_time_followup_rate", "PERCENT", "HIGHER_BETTER"),
-    ("RM_REFERRAL_COUNT", "Số lần giới thiệu/chuyển RM", "rm_referral_count", "COUNT", "HIGHER_BETTER"),
-    ("FAKE_REACTIVATION_RATE", "Tỷ lệ tái kích hoạt ảo", "fake_reactivation_rate", "PERCENT", "LOWER_BETTER"),
-]
 
 
 GATES = [
@@ -229,35 +209,24 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS("Seed KPI permissions done."))
 
     def seed_metric_definitions(self):
-        for code, name, description in MANUAL_METRICS:
+        for item in DEFAULT_METRIC_DEFINITIONS:
             KpiMetricDefinition.objects.update_or_create(
-                metric_code=code,
+                metric_code=item["metric_code"],
                 defaults={
-                    "metric_name": name,
-                    "description": description,
-                    "input_type": KpiMetricDefinition.INPUT_MANUAL,
-                    "formula_key": None,
-                    "score_direction": KpiMetricDefinition.DIRECTION_HIGHER_BETTER,
-                    "unit": KpiMetricDefinition.UNIT_SCORE,
-                    "is_active": True,
+                    "metric_name": item["metric_name"],
+                    "description": item.get("description", ""),
+                    "input_type": item["input_type"],
+                    "formula_key": item.get("formula_key"),
+                    "unit": item.get("unit", "SCORE"),
+                    "is_active": item.get("is_active", True),
                 },
             )
 
-        for code, name, formula_key, unit, direction in AUTO_METRICS:
-            KpiMetricDefinition.objects.update_or_create(
-                metric_code=code,
-                defaults={
-                    "metric_name": name,
-                    "description": name,
-                    "input_type": KpiMetricDefinition.INPUT_AUTO,
-                    "formula_key": formula_key,
-                    "score_direction": direction,
-                    "unit": unit,
-                    "is_active": True,
-                },
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"Seed KPI metric definitions done: {len(DEFAULT_METRIC_DEFINITIONS)}"
             )
-
-        self.stdout.write(self.style.SUCCESS("Seed KPI metric definitions done."))
+        )
 
     def seed_gate_definitions(self):
         for code, name, description, formula_key, operator, threshold in GATES:

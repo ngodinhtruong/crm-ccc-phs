@@ -97,7 +97,7 @@ class KpiPeriod(TimeStampedModel):
         errors = []
 
         groups = self.groups.filter(is_active=True)
-        metrics = self.metrics.filter(is_active=True)
+        metrics = self.metrics.filter(is_active=True, group__is_active = True)
 
         group_total = groups.aggregate(total=Sum("weight_percent"))["total"] or Decimal("0")
         metric_total = metrics.aggregate(total=Sum("weight_percent"))["total"] or Decimal("0")
@@ -182,15 +182,7 @@ class KpiMetricDefinition(TimeStampedModel):
         (INPUT_AUTO, "Tự động"),
     ]
 
-    DIRECTION_HIGHER_BETTER = "HIGHER_BETTER"
-    DIRECTION_LOWER_BETTER = "LOWER_BETTER"
-    DIRECTION_BOOLEAN_PASS_FAIL = "BOOLEAN_PASS_FAIL"
-
-    DIRECTION_CHOICES = [
-        (DIRECTION_HIGHER_BETTER, "Càng cao càng tốt"),
-        (DIRECTION_LOWER_BETTER, "Càng thấp càng tốt"),
-        (DIRECTION_BOOLEAN_PASS_FAIL, "Đạt/Không đạt"),
-    ]
+    
 
     UNIT_COUNT = "COUNT"
     UNIT_PERCENT = "PERCENT"
@@ -214,11 +206,7 @@ class KpiMetricDefinition(TimeStampedModel):
     input_type = models.CharField(max_length=20, choices=INPUT_TYPE_CHOICES)
     formula_key = models.CharField(max_length=100, null=True, blank=True)
 
-    score_direction = models.CharField(
-        max_length=30,
-        choices=DIRECTION_CHOICES,
-        default=DIRECTION_HIGHER_BETTER,
-    )
+    
 
     unit = models.CharField(max_length=50, choices=UNIT_CHOICES, default=UNIT_SCORE)
 
@@ -236,6 +224,25 @@ class KpiMetricDefinition(TimeStampedModel):
 
 
 class KpiPeriodMetric(TimeStampedModel):
+    KPI_TYPE_ADMIN = "ADMIN"
+    KPI_TYPE_SALE_CSKH = "SALE_CSKH"
+
+    KPI_TYPE_CHOICES = [
+        (KPI_TYPE_ADMIN, "Admin"),
+        (KPI_TYPE_SALE_CSKH, "Sale/CSKH"),
+    ]
+
+    kpi_type = models.CharField(
+        max_length=50,
+        choices=KPI_TYPE_CHOICES,
+        default=KPI_TYPE_ADMIN,
+        db_index=True,
+    )
+
+    work_description = models.TextField(null=True, blank=True)
+    measurement_formula = models.TextField(null=True, blank=True)
+    target_text = models.TextField(null=True, blank=True)
+    frequency = models.CharField(max_length=100, null=True, blank=True)
     period = models.ForeignKey(
         KpiPeriod,
         on_delete=models.CASCADE,
@@ -264,11 +271,7 @@ class KpiPeriodMetric(TimeStampedModel):
     min_value = models.DecimalField(max_digits=20, decimal_places=4, null=True, blank=True)
     max_value = models.DecimalField(max_digits=20, decimal_places=4, null=True, blank=True)
 
-    score_direction = models.CharField(
-        max_length=30,
-        choices=KpiMetricDefinition.DIRECTION_CHOICES,
-        default=KpiMetricDefinition.DIRECTION_HIGHER_BETTER,
-    )
+    
 
     formula_config = models.JSONField(null=True, blank=True)
     description = models.TextField(null=True, blank=True)

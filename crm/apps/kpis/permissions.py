@@ -19,6 +19,7 @@ class KpiConfigPermission(BasePermission):
         "create_monthly",
         "activate",
         "validate_weights",
+        "save_weight_config"
     }
 
     def has_permission(self, request, view):

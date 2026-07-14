@@ -8,6 +8,8 @@ from apps.kpis.models import (
     KpiPeriodGateConfig,
     KpiPeriodMetric,
     KpiRewardTierConfig,
+    KpiUserGateResult,
+    KpiUserSummary,
 )
 from apps.kpis.services import create_monthly_kpi_period
 
@@ -53,15 +55,11 @@ class KpiPeriodMetricSerializer(serializers.ModelSerializer):
     period_code = serializers.CharField(source="period.period_code", read_only=True)
     group_code = serializers.CharField(source="group.group_code", read_only=True)
     group_name = serializers.CharField(source="group.group_name", read_only=True)
-    branch = serializers.PrimaryKeyRelatedField(
-            queryset=Branch.objects.all(),
-            required=False,
-            allow_null=True,
-        )
     definition_code = serializers.CharField(
         source="metric_definition.metric_code",
         read_only=True,
     )
+    unit = serializers.CharField(source="metric_definition.unit", read_only=True)
 
     class Meta:
         model = KpiPeriodMetric
@@ -76,13 +74,18 @@ class KpiPeriodMetricSerializer(serializers.ModelSerializer):
             "definition_code",
             "metric_code",
             "metric_name",
+            "kpi_type",
             "input_type",
             "formula_key",
+            "unit",
+            "work_description",
+            "measurement_formula",
+            "target_text",
+            "frequency",
             "weight_percent",
             "target_value",
             "min_value",
             "max_value",
-            "score_direction",
             "formula_config",
             "description",
             "sort_order",
@@ -91,15 +94,11 @@ class KpiPeriodMetricSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = [
-            "period",
             "period_code",
-            "group",
             "group_code",
             "group_name",
-            "metric_definition",
             "definition_code",
-            "metric_code",
-            "input_type",
+            "unit",
             "formula_key",
         ]
 
@@ -474,3 +473,270 @@ class KpiAutoCalculateSerializer(serializers.Serializer):
             )
 
         return attrs
+    
+class KpiUserGateResultSerializer(serializers.ModelSerializer):
+    period_code = serializers.CharField(source="period.period_code", read_only=True)
+    gate_code = serializers.CharField(source="gate_config.gate_code", read_only=True)
+    gate_name = serializers.CharField(source="gate_config.gate_name", read_only=True)
+
+    user_username = serializers.CharField(source="user.username", read_only=True)
+    user_email = serializers.CharField(source="user.email", read_only=True)
+
+    employee_name = serializers.CharField(source="employee.full_name", read_only=True)
+    branch_name = serializers.CharField(source="branch.branch_name", read_only=True)
+
+    class Meta:
+        model = KpiUserGateResult
+        fields = [
+            "id",
+            "period",
+            "period_code",
+            "gate_config",
+            "gate_code",
+            "gate_name",
+            "user",
+            "user_username",
+            "user_email",
+            "employee",
+            "employee_name",
+            "branch",
+            "branch_name",
+            "actual_value",
+            "threshold_value",
+            "operator",
+            "is_passed",
+            "result_label",
+            "calculated_payload",
+            "evidence_data",
+            "calculated_at",
+            "created_at",
+            "updated_at",
+        ]
+
+
+class KpiUserSummarySerializer(serializers.ModelSerializer):
+    period_code = serializers.CharField(source="period.period_code", read_only=True)
+
+    user_username = serializers.CharField(source="user.username", read_only=True)
+    user_email = serializers.CharField(source="user.email", read_only=True)
+
+    employee_name = serializers.CharField(source="employee.full_name", read_only=True)
+    branch_name = serializers.CharField(source="branch.branch_name", read_only=True)
+
+    class Meta:
+        model = KpiUserSummary
+        fields = [
+            "id",
+            "period",
+            "period_code",
+            "user",
+            "user_username",
+            "user_email",
+            "employee",
+            "employee_name",
+            "branch",
+            "branch_name",
+            "manual_score",
+            "auto_score",
+            "total_score",
+            "manual_weight",
+            "auto_weight",
+            "all_gates_passed",
+            "failed_gate_codes",
+            "reward_tier",
+            "reward_tier_code",
+            "reward_tier_name",
+            "rank_overall",
+            "rank_branch",
+            "rank_fee",
+            "rank_reactivated_accounts",
+            "calculated_at",
+            "locked_at",
+            "locked_by_user",
+            "created_at",
+            "updated_at",
+        ]
+
+
+class KpiSummaryCalculateSerializer(serializers.Serializer):
+    period = serializers.PrimaryKeyRelatedField(
+        queryset=KpiPeriod.objects.all(),
+        required=False,
+        allow_null=True,
+    )
+    period_code = serializers.CharField(required=False, allow_blank=True)
+
+    user = serializers.PrimaryKeyRelatedField(
+        queryset=get_user_model().objects.all(),
+        required=False,
+        allow_null=True,
+    )
+
+    branch = serializers.PrimaryKeyRelatedField(
+        queryset=Branch.objects.all(),
+        required=False,
+        allow_null=True,
+    )
+
+    def validate(self, attrs):
+        period = attrs.get("period")
+        period_code = attrs.get("period_code")
+
+        if period_code and not period:
+            period = KpiPeriod.objects.filter(period_code=period_code).first()
+
+            if not period:
+                raise serializers.ValidationError(
+                    {"period_code": "Không tìm thấy kỳ KPI."}
+                )
+
+            attrs["period"] = period
+
+        if not period:
+            raise serializers.ValidationError(
+                {"period": "Vui lòng chọn kỳ KPI hoặc period_code."}
+            )
+
+        if period.status == KpiPeriod.STATUS_CLOSED:
+            raise serializers.ValidationError(
+                "Kỳ KPI đã chốt, không thể tổng hợp lại."
+            )
+
+        return attrs
+    
+
+class KpiGroupWriteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = KpiGroup
+        fields = [
+            "id",
+            "period",
+            "group_code",
+            "group_name",
+            "group_type",
+            "weight_percent",
+            "sort_order",
+            "is_active",
+        ]
+
+class KpiPeriodMetricWriteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = KpiPeriodMetric
+        fields = [
+            "id",
+            "period",
+            "group",
+            "metric_definition",
+            "metric_code",
+            "metric_name",
+            "kpi_type",
+            "input_type",
+            "work_description",
+            "measurement_formula",
+            "target_text",
+            "frequency",
+            "weight_percent",
+            "target_value",
+            "min_value",
+            "max_value",
+            "formula_config",
+            "description",
+            "sort_order",
+            "is_active",
+        ]
+
+    def validate(self, attrs):
+        period = attrs.get("period") or getattr(self.instance, "period", None)
+        group = attrs.get("group") or getattr(self.instance, "group", None)
+
+        if period and group and group.period_id != period.id:
+            raise serializers.ValidationError(
+                {"group": "Nhóm KPI không thuộc kỳ KPI đã chọn."}
+            )
+
+        return attrs
+
+    def create(self, validated_data):
+        metric_definition = validated_data["metric_definition"]
+
+        if not validated_data.get("metric_name"):
+            validated_data["metric_name"] = metric_definition.metric_name
+
+        if not validated_data.get("input_type"):
+            validated_data["input_type"] = metric_definition.input_type
+
+        validated_data["formula_key"] = metric_definition.formula_key
+
+        if not validated_data.get("description"):
+            validated_data["description"] = metric_definition.description
+
+        return super().create(validated_data)
+
+
+class KpiPeriodGateConfigWriteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = KpiPeriodGateConfig
+        fields = [
+            "id",
+            "period",
+            "gate_definition",
+            "gate_code",
+            "gate_name",
+            "operator",
+            "threshold_value",
+            "is_required",
+            "is_active",
+            "formula_config",
+        ]
+
+    def create(self, validated_data):
+        gate_definition = validated_data["gate_definition"]
+
+        validated_data["gate_code"] = validated_data.get("gate_code") or gate_definition.gate_code
+        validated_data["gate_name"] = validated_data.get("gate_name") or gate_definition.gate_name
+        validated_data["formula_key"] = gate_definition.formula_key
+
+        if not validated_data.get("operator"):
+            validated_data["operator"] = gate_definition.operator
+
+        if not validated_data.get("threshold_value"):
+            validated_data["threshold_value"] = gate_definition.default_threshold or 0
+
+        return super().create(validated_data)
+
+
+class KpiRewardTierConfigWriteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = KpiRewardTierConfig
+        fields = [
+            "id",
+            "period",
+            "tier_code",
+            "tier_name",
+            "description",
+            "rank_metric_code",
+            "rank_limit",
+            "min_total_score",
+            "require_all_gates_passed",
+            "reward_type",
+            "reward_config",
+            "sort_order",
+            "is_active",
+        ]
+
+
+class KpiWeightGroupItemSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    weight_percent = serializers.DecimalField(max_digits=5, decimal_places=2)
+    is_active = serializers.BooleanField(required=False)
+
+
+class KpiWeightMetricItemSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    weight_percent = serializers.DecimalField(max_digits=5, decimal_places=2)
+    is_active = serializers.BooleanField(required=False)
+
+
+class KpiWeightConfigSaveSerializer(serializers.Serializer):
+    groups = KpiWeightGroupItemSerializer(many=True, required=False)
+    metrics = KpiWeightMetricItemSerializer(many=True, required=False)

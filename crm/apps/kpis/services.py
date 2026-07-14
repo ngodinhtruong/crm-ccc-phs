@@ -204,20 +204,23 @@ def create_default_period_metrics(period: KpiPeriod, groups_by_code: dict):
         if not group:
             raise ValidationError(f"Không tìm thấy nhóm KPI: {item['group_code']}")
 
-        period_metric = KpiPeriodMetric.objects.create(
+        KpiPeriodMetric.objects.create(
             period=period,
             group=group,
-            metric_definition=metric_definition,
+            metric_definition=definition,
             metric_code=item["metric_code"],
-            metric_name=metric_definition.metric_name,
-            input_type=metric_definition.input_type,
-            formula_key=metric_definition.formula_key,
+            metric_name=item["metric_name"],
+            kpi_type=item["kpi_type"],
+            input_type=item["input_type"],
+            formula_key=item["formula_key"],
+            work_description=item.get("work_description", ""),
+            measurement_formula=item.get("measurement_formula", ""),
+            target_text=item.get("target_text", ""),
+            frequency=item.get("frequency", ""),
             weight_percent=item["weight_percent"],
             target_value=item.get("target_value"),
-            score_direction=metric_definition.score_direction,
-            formula_config=item.get("formula_config"),
-            description=metric_definition.description,
-            sort_order=item["sort_order"],
+            description=item.get("work_description", ""),
+            sort_order=item.get("sort_order", 0),
             is_active=True,
         )
 

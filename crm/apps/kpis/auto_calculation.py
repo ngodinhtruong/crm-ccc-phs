@@ -40,27 +40,11 @@ def percent_value(numerator, denominator):
     )
 
 
-def get_score(actual_value, target_value, direction):
+def get_score(actual_value, target_value):
     actual = decimal_value(actual_value)
     target = decimal_value(target_value)
 
-    if direction == KpiMetricDefinition.DIRECTION_LOWER_BETTER:
-        if actual <= target:
-            return Decimal("100.00")
-
-        if actual == 0:
-            return Decimal("100.00")
-
-        if target <= 0:
-            return Decimal("0.00")
-
-        return min(
-            Decimal("100.00"),
-            ((target / actual) * Decimal("100")).quantize(
-                Decimal("0.01"),
-                rounding=ROUND_HALF_UP,
-            ),
-        )
+    
 
     if target <= 0:
         return Decimal("100.00") if actual > 0 else Decimal("0.00")
@@ -397,7 +381,6 @@ def save_auto_metric_result(
     score = get_score(
         actual_value=actual_value,
         target_value=target_value,
-        direction=metric.score_direction,
     )
 
     old_result = KpiUserMetricResult.objects.filter(
@@ -424,7 +407,6 @@ def save_auto_metric_result(
             "result_status": get_result_status(score),
             "calculated_payload": {
                 "formula_key": metric.formula_key,
-                "score_direction": metric.score_direction,
                 "actual_value": str(actual_value),
                 "target_value": str(target_value) if target_value is not None else None,
                 "score": str(score),
