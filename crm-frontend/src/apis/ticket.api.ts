@@ -2,12 +2,15 @@ import api from "@/apis/axios-client";
 import { cleanParams } from "@/utils/api-param.util";
 import { getListData } from "@/utils/response.util";
 
-
 import {
     PaginatedResponse,
     TicketAccountOption,
     TicketClassificationOption,
     TicketCreatePayload,
+    TicketErrorGroupOption,
+    TicketErrorGroupPayload,
+    TicketErrorTypeOption,
+    TicketErrorTypePayload,
     TicketListItem,
     TicketListParams,
     TicketPriorityOption,
@@ -15,8 +18,25 @@ import {
     TicketStatusOption,
     TicketSupportCategoryOption,
 } from "@/types/ticket.type";
+import {
+    CccDashboardParams,
+    CccDashboardResponse,
+} from "@/types/ccc-dashboard.type";
 
 export const ticketApi = {
+    getCccDashboard: async (
+        params: CccDashboardParams = {}
+    ): Promise<CccDashboardResponse> => {
+        const response = await api.get<CccDashboardResponse>(
+            "/api/tickets/ccc-dashboard/",
+            {
+                params: cleanParams(params),
+            }
+        );
+
+        return response.data;
+    },
+
     getTickets: async (
         params: TicketListParams = {}
     ): Promise<PaginatedResponse<TicketListItem>> => {
@@ -62,6 +82,7 @@ export const ticketApi = {
 
         return getListData<TicketAccountOption>(response.data);
     },
+
     getSupportCategories: async (): Promise<TicketSupportCategoryOption[]> => {
         const response = await api.get<
             TicketSupportCategoryOption[] | PaginatedResponse<TicketSupportCategoryOption>
@@ -105,6 +126,73 @@ export const ticketApi = {
 
         return getListData<TicketSourceOption>(response.data);
     },
+
+    getErrorGroups: async (): Promise<TicketErrorGroupOption[]> => {
+        const response = await api.get<
+            TicketErrorGroupOption[] | PaginatedResponse<TicketErrorGroupOption>
+        >("/api/tickets/error-groups/");
+
+        return getListData<TicketErrorGroupOption>(response.data);
+    },
+
+    createErrorGroup: async (
+        payload: TicketErrorGroupPayload
+    ): Promise<TicketErrorGroupOption> => {
+        const response = await api.post<TicketErrorGroupOption>(
+            "/api/tickets/error-groups/",
+            payload
+        );
+
+        return response.data;
+    },
+
+    updateErrorGroup: async (
+        id: number,
+        payload: Partial<TicketErrorGroupPayload>
+    ): Promise<TicketErrorGroupOption> => {
+        const response = await api.patch<TicketErrorGroupOption>(
+            `/api/tickets/error-groups/${id}/`,
+            payload
+        );
+
+        return response.data;
+    },
+
+    getErrorTypes: async (params: { group?: string } = {}): Promise<
+        TicketErrorTypeOption[]
+    > => {
+        const response = await api.get<
+            TicketErrorTypeOption[] | PaginatedResponse<TicketErrorTypeOption>
+        >("/api/tickets/error-types/", {
+            params: cleanParams(params),
+        });
+
+        return getListData<TicketErrorTypeOption>(response.data);
+    },
+
+    createErrorType: async (
+        payload: TicketErrorTypePayload
+    ): Promise<TicketErrorTypeOption> => {
+        const response = await api.post<TicketErrorTypeOption>(
+            "/api/tickets/error-types/",
+            payload
+        );
+
+        return response.data;
+    },
+
+    updateErrorType: async (
+        id: number,
+        payload: Partial<TicketErrorTypePayload>
+    ): Promise<TicketErrorTypeOption> => {
+        const response = await api.patch<TicketErrorTypeOption>(
+            `/api/tickets/error-types/${id}/`,
+            payload
+        );
+
+        return response.data;
+    },
+
 };
 
 export const ticketService = ticketApi;

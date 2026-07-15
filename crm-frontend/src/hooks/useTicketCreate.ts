@@ -14,6 +14,8 @@ import {
   MasterOption,
   TicketCreateFormState,
   TicketContactType,
+  TicketErrorGroupOption,
+  TicketErrorTypeOption,
 } from "@/types/ticket.type";
 import { CompanyListItem } from "@/types/company.type";
 import { CustomerListItem } from "@/types/customer.type";
@@ -48,6 +50,13 @@ const initialForm: TicketCreateFormState = {
   email: "",
 
   slaPolicy: "",
+
+  errorGroup: "",
+  errorType: "",
+  relatedSystem: "",
+  externalStatus: "",
+  errorNote: "",
+
   requestContent: "",
   handlingSolution: "",
   finalResponse: "",
@@ -93,6 +102,9 @@ export function useTicketCreate() {
   const [branches, setBranches] = useState<MasterOption[]>([]);
   const [slaPolicies, setSlaPolicies] = useState<SlaPolicyItem[]>([]);
 
+  const [errorGroups, setErrorGroups] = useState<TicketErrorGroupOption[]>([]);
+  const [errorTypes, setErrorTypes] = useState<TicketErrorTypeOption[]>([]);
+
   const [companies, setCompanies] = useState<CompanyListItem[]>([]);
   const [customers, setCustomers] = useState<CustomerListItem[]>([]);
 
@@ -126,6 +138,15 @@ export function useTicketCreate() {
     );
   }, [slaPolicies, form.supportCategory]);
 
+  const filteredErrorTypes = useMemo(() => {
+    if (!form.errorGroup) return errorTypes;
+
+    return errorTypes.filter(
+      (item) => String(item.group || "") === form.errorGroup
+    );
+  }, [errorTypes, form.errorGroup]);
+
+
   const loadInitialData = async () => {
     try {
       setLoadingDropdowns(true);
@@ -142,6 +163,8 @@ export function useTicketCreate() {
         slaData,
         companyData,
         customerData,
+        errorGroupData,
+        errorTypeData,
       ] = await Promise.all([
         masterDataService.getTicketCategories(),
         masterDataService.getTicketClassifications(),
@@ -155,6 +178,8 @@ export function useTicketCreate() {
         }),
         companyService.getCompanies({}),
         customerService.getCustomers({}),
+        ticketService.getErrorGroups(),
+        ticketService.getErrorTypes(),
       ]);
 
       setSupportCategories(categoryData || []);
@@ -167,6 +192,8 @@ export function useTicketCreate() {
       setSlaPolicies(slaData.results || []);
       setCompanies(companyData.results || []);
       setCustomers(customerData.results || []);
+      setErrorGroups(errorGroupData || []);
+      setErrorTypes(errorTypeData || []);
     } catch (err) {
       setError(getErrorMessage(err, "Không tải được dữ liệu tạo ticket"));
     } finally {
@@ -221,6 +248,24 @@ export function useTicketCreate() {
     }));
   };
 
+  const changeErrorGroup = (value: string) => {
+    setForm((prev) => ({
+      ...prev,
+      errorGroup: value,
+      errorType: "",
+        }));
+  };
+
+  const changeErrorType = (value: string) => {
+    const selectedType = errorTypes.find((item) => String(item.id) === value);
+
+    setForm((prev) => ({
+      ...prev,
+      errorGroup: selectedType?.group ? String(selectedType.group) : prev.errorGroup,
+      errorType: value,
+        }));
+  };
+
   const applyContactInfo = async ({
     company,
     customer,
@@ -228,8 +273,7 @@ export function useTicketCreate() {
     company?: CompanyListItem | null;
     customer?: CustomerListItem | null;
   }) => {
-    const accountNumber =
-      company?.account_number || customer?.account_number || "";
+    let accountNumber = company?.account_number || customer?.account_number || "";
 
     let accountId = "";
 
@@ -244,6 +288,7 @@ export function useTicketCreate() {
 
         if (firstAccount) {
           accountId = String(firstAccount.id);
+          accountNumber = getAccountNumber(firstAccount) || accountNumber;
         }
       }
     } catch {
@@ -291,6 +336,22 @@ export function useTicketCreate() {
     });
   };
 
+  const changeRawAccountNumber = (value: string) => {
+    setForm((prev) => ({
+      ...prev,
+      account: "",
+      accountNumber: value,
+      contactType: getContactTypeByAccount("") as TicketContactType,
+    }));
+  };
+
+  const hasErrorInfo = Boolean(
+    form.errorGroup ||
+      form.errorType ||
+      form.relatedSystem.trim() ||
+      form.errorNote.trim()
+  );
+
   const validateForm = () => {
     if (!form.supportCategory) return "Danh mục hỗ trợ không được để trống.";
     if (!form.classification) return "Phân loại không được để trống.";
@@ -300,6 +361,11 @@ export function useTicketCreate() {
     if (!form.handlingBranch) return "Chi nhánh xử lý không được để trống.";
     if (!form.ownerUser) return "Giao cho không được để trống.";
     if (!form.requestContent.trim()) return "Nội dung yêu cầu không được để trống.";
+
+    if (hasErrorInfo) {
+      if (!form.errorGroup) return "Nhóm lỗi không được để trống khi nhập thông tin lỗi.";
+      if (!form.errorType) return "Loại lỗi không được để trống khi nhập thông tin lỗi.";
+    }
 
     return "";
   };
@@ -332,8 +398,15 @@ export function useTicketCreate() {
         company: form.company ? Number(form.company) : null,
         customer: form.customer ? Number(form.customer) : null,
         customer_account: form.account ? Number(form.account) : null,
+        raw_account_number: form.account ? undefined : form.accountNumber.trim() || undefined,
         classification_method: "MANUAL",
         sla_policy: form.slaPolicy ? Number(form.slaPolicy) : null,
+
+        error_group: form.errorGroup ? Number(form.errorGroup) : null,
+        error_type: form.errorType ? Number(form.errorType) : null,
+        related_system: form.relatedSystem.trim() || undefined,
+        external_status: form.externalStatus.trim() || undefined,
+        error_note: form.errorNote.trim() || undefined,
 
         request_content: form.requestContent.trim() || undefined,
         handling_solution: form.handlingSolution.trim() || undefined,
@@ -382,6 +455,11 @@ export function useTicketCreate() {
     branches,
     slaPolicies,
     filteredSlaPolicies,
+
+    errorGroups,
+    errorTypes,
+    filteredErrorTypes,
+
     companies,
     customers,
 
@@ -393,8 +471,11 @@ export function useTicketCreate() {
 
     changeSupportCategory,
     changeSlaPolicy,
+    changeErrorGroup,
+    changeErrorType,
     changeCompany,
     changeCustomer,
+    changeRawAccountNumber,
 
     submit,
     cancel,

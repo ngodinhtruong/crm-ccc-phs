@@ -6,6 +6,8 @@ from .models import (
     TicketStatus,
     TicketPriority,
     TicketSource,
+    TicketErrorGroup,
+    TicketErrorType,
     Ticket,
     TicketProcessLog,
     TicketAssignment,
@@ -56,6 +58,23 @@ class TicketSourceAdmin(admin.ModelAdmin):
     list_filter = ("is_active",)
 
 
+
+
+@admin.register(TicketErrorGroup)
+class TicketErrorGroupAdmin(admin.ModelAdmin):
+    list_display = ("id", "group_code", "group_name", "related_system", "is_active", "sort_order")
+    search_fields = ("group_code", "group_name", "description", "related_system")
+    list_filter = ("related_system", "is_active")
+
+
+@admin.register(TicketErrorType)
+class TicketErrorTypeAdmin(admin.ModelAdmin):
+    list_display = ("id", "type_code", "type_name", "group", "related_system", "is_active", "sort_order")
+    search_fields = ("type_code", "type_name", "description", "group__group_name", "related_system")
+    list_filter = ("group", "related_system", "is_active")
+
+
+
 @admin.register(Ticket)
 class TicketAdmin(admin.ModelAdmin):
     list_display = (
@@ -63,17 +82,46 @@ class TicketAdmin(admin.ModelAdmin):
         "ticket_code",
         "title",
         "customer",
+        "customer_account",
+        "account_link_status",
+        "raw_account_number",
         "handling_branch",
         "assigned_unit",
         "assigned_employee",
         "owner_user",
         "current_status",
         "priority",
+        "error_group",
+        "error_type",
         "sla_policy",
         "created_at",
     )
-    search_fields = ("ticket_code", "title", "customer__full_name", "customer__customer_code")
-    list_filter = ("handling_branch", "assigned_unit", "current_status", "priority", "source", "sla_policy")
+    search_fields = (
+        "ticket_code",
+        "title",
+        "customer__full_name",
+        "customer__customer_code",
+        "customer_account__account_number",
+        "raw_account_number",
+        "error_group__group_name",
+        "error_type__type_name",
+        "error_note",
+        "related_system",
+        "source_ref_id",
+    )
+    list_filter = (
+        "handling_branch",
+        "assigned_unit",
+        "current_status",
+        "priority",
+        "source",
+        "account_link_status",
+        "sla_policy",
+        "error_group",
+        "error_type",
+        "related_system",
+        "external_status",
+    )
     readonly_fields = ("created_at", "updated_at")
 
 

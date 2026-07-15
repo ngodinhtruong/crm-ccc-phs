@@ -6,10 +6,7 @@ import {
   TicketFormSection,
 } from "@/components/tickets/TicketFormField";
 import { UseTicketCreateReturn } from "@/hooks/useTicketCreate";
-import {
-  getContactTypeLabel,
-  getTicketOptionName,
-} from "@/utils/ticket-option.util";
+import { getTicketOptionName } from "@/utils/ticket-option.util";
 
 export function TicketCreateForm({
   ticket,
@@ -159,11 +156,15 @@ export function TicketCreateForm({
             </select>
           </TicketFormField>
 
-          <TicketFormField label="Loại KH">
+          <TicketFormField label="Trạng thái TK">
             <input
-              value={getContactTypeLabel(form.contactType)}
+              value={form.account ? "Có TK liên kết" : "Chưa có TK liên kết"}
               readOnly
-              className="h-9 w-full rounded border border-slate-300 bg-slate-50 px-3 text-xs outline-none"
+              className={`h-9 w-full rounded border px-3 text-xs font-semibold outline-none ${
+                form.account
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                  : "border-amber-200 bg-amber-50 text-amber-700"
+              }`}
             />
           </TicketFormField>
 
@@ -185,8 +186,9 @@ export function TicketCreateForm({
           <TicketFormField label="Số tài khoản">
             <input
               value={form.accountNumber}
-              readOnly
-              className="h-9 w-full rounded border border-slate-300 bg-slate-50 px-3 text-xs outline-none"
+              onChange={(event) => ticket.changeRawAccountNumber(event.target.value)}
+              placeholder="Nhập số TK nếu chưa xác định được KH"
+              className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400"
             />
           </TicketFormField>
 
@@ -228,6 +230,77 @@ export function TicketCreateForm({
             <p className="mt-1 text-[11px] text-slate-500">
               Chọn danh mục hỗ trợ sẽ tự lọc SLA. Chọn SLA sẽ tự load danh mục hỗ trợ và phân công xử lý.
             </p>
+          </TicketFormField>
+        </div>
+      </TicketFormSection>
+
+
+
+      <TicketFormSection title="Thông tin lỗi" className="z-10">
+        <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-700">
+          Chỉ nhập phần này nếu ticket là ticket lỗi. Khi đã nhập thông tin lỗi, hệ thống sẽ yêu cầu đủ Nhóm lỗi và Loại lỗi. Nội dung chi tiết sẽ nhập ở Ghi chú lỗi thực tế.
+        </div>
+
+        <div className="grid grid-cols-1 gap-x-20 gap-y-3 lg:grid-cols-2">
+          <TicketFormField label="Nhóm lỗi">
+            <select
+              value={form.errorGroup}
+              onChange={(event) => ticket.changeErrorGroup(event.target.value)}
+              className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400"
+            >
+              <option value="">Chọn nhóm lỗi</option>
+              {ticket.errorGroups.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.group_name}
+                </option>
+              ))}
+            </select>
+          </TicketFormField>
+
+          <TicketFormField label="Loại lỗi">
+            <select
+              value={form.errorType}
+              onChange={(event) => ticket.changeErrorType(event.target.value)}
+              disabled={!form.errorGroup}
+              className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400 disabled:bg-slate-100"
+            >
+              <option value="">Chọn loại lỗi</option>
+              {ticket.filteredErrorTypes.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.type_name}
+                </option>
+              ))}
+            </select>
+          </TicketFormField>
+
+          <TicketFormField label="Hệ thống liên quan">
+            <input
+              value={form.relatedSystem}
+              onChange={(event) => setField("relatedSystem", event.target.value)}
+              placeholder="Base / Flex / App / API / CRM..."
+              className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400"
+            />
+          </TicketFormField>
+
+          <TicketFormField label="Trạng thái ngoài">
+            <input
+              value={form.externalStatus}
+              onChange={(event) => setField("externalStatus", event.target.value)}
+              placeholder="OPEN / PROCESSING / DONE... nếu có"
+              className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400"
+            />
+          </TicketFormField>
+        </div>
+
+        <div className="mt-3">
+          <TicketFormField label="Ghi chú lỗi thực tế">
+            <textarea
+              value={form.errorNote}
+              onChange={(event) => setField("errorNote", event.target.value)}
+              rows={3}
+              placeholder="Mô tả tình huống lỗi thực tế do CCC ghi nhận..."
+              className="w-full rounded border border-slate-300 px-3 py-2 text-xs outline-none focus:border-sky-400"
+            />
           </TicketFormField>
         </div>
       </TicketFormSection>

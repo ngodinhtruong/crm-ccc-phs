@@ -41,7 +41,6 @@ export function BranchRankingTable({ rows }: { rows: SaAdminBranchRankingRow[] }
       <div className="flex h-12 items-center justify-between gap-3 border-b bg-white px-4">
         <div>
           <h2 className="text-sm font-semibold text-slate-800">Xếp hạng chi nhánh</h2>
-          <p className="mt-0.5 text-xs text-slate-500">Số cuộc gọi, TK kích hoạt, KH tiềm năng, phí GD và tăng trưởng MoM.</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="w-64">

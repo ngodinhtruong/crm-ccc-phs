@@ -1,4 +1,5 @@
 export type TicketContactType = "HAS_ACCOUNT" | "NO_ACCOUNT";
+export type TicketAccountLinkStatus = "LINKED" | "UNLINKED";
 
 export type MasterOption = {
     id: number;
@@ -11,6 +12,7 @@ export type PaginatedResponse<T> = {
     previous: string | null;
     results: T[];
 };
+
 export type TicketSupportCategoryOption = {
     id: number;
     category_code: string;
@@ -55,6 +57,43 @@ export type TicketSourceOption = {
     is_active: boolean;
 };
 
+export type TicketErrorGroupOption = {
+    id: number;
+    group_code: string;
+    group_name: string;
+    description?: string | null;
+    is_active: boolean;
+    sort_order?: number | null;
+};
+
+export type TicketErrorTypeOption = {
+    id: number;
+    group: number;
+    group_name?: string | null;
+    type_code: string;
+    type_name: string;
+    description?: string | null;
+    is_active: boolean;
+    sort_order?: number | null;
+};
+
+export type TicketErrorGroupPayload = {
+    group_code: string;
+    group_name: string;
+    description?: string;
+    is_active?: boolean;
+    sort_order?: number | null;
+};
+
+export type TicketErrorTypePayload = {
+    group: number;
+    type_code: string;
+    type_name: string;
+    description?: string;
+    is_active?: boolean;
+    sort_order?: number | null;
+};
+
 export type TicketListItem = {
     id: number;
     ticket_code: string;
@@ -69,12 +108,24 @@ export type TicketListItem = {
     company_name?: string | null;
     customer_name?: string | null;
     customer_account_number?: string | null;
+    raw_account_number?: string | null;
+    display_account_number?: string | null;
+    account_link_status?: TicketAccountLinkStatus | string | null;
+    account_link_status_label?: string | null;
 
     handling_branch_name?: string | null;
     assigned_unit_name?: string | null;
     owner_user_name?: string | null;
-
     assigned_employee_name?: string | null;
+
+    error_group?: number | null;
+    error_group_name?: string | null;
+    error_type?: number | null;
+    error_type_name?: string | null;
+    error_note?: string | null;
+    related_system?: string | null;
+    external_status?: string | null;
+    last_synced_at?: string | null;
 
     request_content?: string | null;
     handling_solution?: string | null;
@@ -115,6 +166,8 @@ export type TicketListParams = {
     customer_name?: string;
     customer_phone?: string;
     customer_account_no?: string;
+    raw_account_number?: string;
+    account_link_status?: string;
     company_name?: string;
 
     handling_branch?: string;
@@ -128,6 +181,13 @@ export type TicketListParams = {
 
     owner_user?: string;
     owner_user_name?: string;
+
+    is_error_ticket?: string;
+    error_group?: string;
+    error_type?: string;
+    error_note?: string;
+    related_system?: string;
+    external_status?: string;
 
     request_content?: string;
     handling_solution?: string;
@@ -173,6 +233,13 @@ export type TicketCreateFormState = {
     email: string;
 
     slaPolicy: string;
+
+    errorGroup: string;
+    errorType: string;
+    relatedSystem: string;
+    externalStatus: string;
+    errorNote: string;
+
     requestContent: string;
     handlingSolution: string;
     finalResponse: string;
@@ -192,8 +259,16 @@ export type TicketCreatePayload = {
     company?: number | null;
     customer?: number | null;
     customer_account?: number | null;
+    raw_account_number?: string;
 
+    classification_method?: string;
     sla_policy?: number | null;
+
+    error_group?: number | null;
+    error_type?: number | null;
+    related_system?: string;
+    external_status?: string;
+    error_note?: string;
 
     request_content?: string;
     handling_solution?: string;

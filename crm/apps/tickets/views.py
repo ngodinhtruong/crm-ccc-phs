@@ -9,12 +9,15 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.accounts.scopes import filter_tickets_by_user
+from apps.accounts.api_permissions import MasterDataPermission
 from apps.tickets.serializers import (
     TicketSupportCategorySerializer,
     TicketClassificationSerializer,
     TicketStatusSerializer,
     TicketPrioritySerializer,
     TicketSourceSerializer,
+    TicketErrorGroupSerializer,
+    TicketErrorTypeSerializer,
 )
 
 from apps.tickets.models import (
@@ -24,6 +27,8 @@ from apps.tickets.models import (
     TicketStatus,
     TicketPriority,
     TicketSource,
+    TicketErrorGroup,
+    TicketErrorType,
 )
 
 from apps.tickets.serializers import (
@@ -91,6 +96,76 @@ class TicketSourceViewSet(viewsets.ReadOnlyModelViewSet):
             is_active=True
         ).order_by("id")
 
+
+class TicketErrorGroupViewSet(viewsets.ModelViewSet):
+    permission_classes = [MasterDataPermission]
+    serializer_class = TicketErrorGroupSerializer
+
+    def get_queryset(self):
+        queryset = TicketErrorGroup.objects.all()
+
+        is_active = self.request.query_params.get("is_active")
+        related_system = self.request.query_params.get("related_system")
+        q = self.request.query_params.get("q")
+
+        if is_active in {"true", "True", "1"}:
+            queryset = queryset.filter(is_active=True)
+        elif is_active in {"false", "False", "0"}:
+            queryset = queryset.filter(is_active=False)
+
+        if related_system:
+            queryset = queryset.filter(related_system__icontains=related_system)
+
+        if q:
+            queryset = queryset.filter(
+                Q(group_code__icontains=q)
+                | Q(group_name__icontains=q)
+                | Q(description__icontains=q)
+                | Q(related_system__icontains=q)
+            )
+
+        return queryset.order_by("sort_order", "id")
+
+
+class TicketErrorTypeViewSet(viewsets.ModelViewSet):
+    permission_classes = [MasterDataPermission]
+    serializer_class = TicketErrorTypeSerializer
+
+    def get_queryset(self):
+        queryset = TicketErrorType.objects.select_related("group").all()
+
+        group = self.request.query_params.get("group") or self.request.query_params.get("error_group")
+        is_active = self.request.query_params.get("is_active")
+        related_system = self.request.query_params.get("related_system")
+        q = self.request.query_params.get("q")
+
+        if group:
+            queryset = queryset.filter(group_id=group)
+
+        if is_active in {"true", "True", "1"}:
+            queryset = queryset.filter(is_active=True)
+        elif is_active in {"false", "False", "0"}:
+            queryset = queryset.filter(is_active=False)
+
+        if related_system:
+            queryset = queryset.filter(
+                Q(related_system__icontains=related_system)
+                | Q(group__related_system__icontains=related_system)
+            )
+
+        if q:
+            queryset = queryset.filter(
+                Q(type_code__icontains=q)
+                | Q(type_name__icontains=q)
+                | Q(description__icontains=q)
+                | Q(group__group_code__icontains=q)
+                | Q(group__group_name__icontains=q)
+            )
+
+        return queryset.order_by("group__sort_order", "sort_order", "id")
+
+
+
 class TicketViewSet(
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
@@ -113,6 +188,8 @@ class TicketViewSet(
             "priority",
             "source",
             "sla_policy",
+            "error_group",
+            "error_type",
         ).all()
 
         queryset = filter_tickets_by_user(queryset, self.request.user)
@@ -128,7 +205,9 @@ class TicketViewSet(
 
         customer_name = params.get("customer_name")
         customer_phone = params.get("customer_phone")
-        customer_account_no = params.get("customer_account_no")
+        customer_account_no = params.get("customer_account_no") or params.get("account_number")
+        raw_account_number = params.get("raw_account_number")
+        account_link_status = params.get("account_link_status")
         company_name = params.get("company_name")
 
         handling_branch = params.get("handling_branch") or params.get("branch")
@@ -146,6 +225,13 @@ class TicketViewSet(
         request_content = params.get("request_content")
         handling_solution = params.get("handling_solution")
         final_response = params.get("final_response")
+
+        is_error_ticket = params.get("is_error_ticket") or params.get("has_error")
+        error_group = params.get("error_group")
+        error_type = params.get("error_type")
+        error_note = params.get("error_note")
+        related_system = params.get("related_system")
+        external_status = params.get("external_status")
 
         customer = params.get("customer")
         company = params.get("company")
@@ -175,11 +261,18 @@ class TicketViewSet(
                 | Q(handling_solution__icontains=q)
                 | Q(final_response__icontains=q)
                 | Q(source_ref_id__icontains=q)
+                | Q(error_note__icontains=q)
+                | Q(related_system__icontains=q)
+                | Q(error_group__group_code__icontains=q)
+                | Q(error_group__group_name__icontains=q)
+                | Q(error_type__type_code__icontains=q)
+                | Q(error_type__type_name__icontains=q)
                 | Q(customer__full_name__icontains=q)
                 | Q(customer__phone__icontains=q)
                 | Q(customer__email__icontains=q)
                 | Q(company__company_name__icontains=q)
                 | Q(customer_account__account_number__icontains=q)
+                | Q(raw_account_number__icontains=q)
                 | Q(owner_user__username__icontains=q)
                 | Q(owner_user__email__icontains=q)
                 | Q(assigned_employee__full_name__icontains=q)
@@ -204,7 +297,16 @@ class TicketViewSet(
             queryset = queryset.filter(customer__phone__icontains=customer_phone)
 
         if customer_account_no:
-            queryset = queryset.filter(customer_account__account_number__icontains=customer_account_no)
+            queryset = queryset.filter(
+                Q(customer_account__account_number__icontains=customer_account_no)
+                | Q(raw_account_number__icontains=customer_account_no)
+            )
+
+        if raw_account_number:
+            queryset = queryset.filter(raw_account_number__icontains=raw_account_number)
+
+        if account_link_status:
+            queryset = queryset.filter(account_link_status=account_link_status)
 
         if company_name:
             queryset = queryset.filter(company__company_name__icontains=company_name)
@@ -256,6 +358,33 @@ class TicketViewSet(
 
         if final_response:
             queryset = queryset.filter(final_response__icontains=final_response)
+
+        if is_error_ticket in {"true", "True", "1"}:
+            queryset = queryset.filter(
+                Q(error_group__isnull=False)
+                | Q(error_type__isnull=False)
+            )
+        elif is_error_ticket in {"false", "False", "0"}:
+            queryset = queryset.filter(
+                error_group__isnull=True,
+                error_type__isnull=True,
+            )
+
+        if error_group:
+            queryset = queryset.filter(error_group_id=error_group)
+
+        if error_type:
+            queryset = queryset.filter(error_type_id=error_type)
+
+
+        if error_note:
+            queryset = queryset.filter(error_note__icontains=error_note)
+
+        if related_system:
+            queryset = queryset.filter(related_system__icontains=related_system)
+
+        if external_status:
+            queryset = queryset.filter(external_status__icontains=external_status)
 
         if created_from:
             queryset = queryset.filter(created_at__date__gte=created_from)

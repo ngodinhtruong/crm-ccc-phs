@@ -8,6 +8,8 @@ import { authService } from "@/services/auth.service";
 import { ticketService } from "@/services/ticket.service";
 import {
     TicketClassificationOption,
+    TicketErrorGroupOption,
+    TicketErrorTypeOption,
     TicketListItem,
     TicketListParams,
     TicketStatusOption,
@@ -39,7 +41,7 @@ export function useTickets() {
     const [items, setItems] = useState<TicketListItem[]>([]);
     const [count, setCount] = useState(0);
 
-    const pagination =  useTablePagination(count);
+    const pagination = useTablePagination(count);
 
     const [supportCategories, setSupportCategories] = useState<
         TicketSupportCategoryOption[]
@@ -49,12 +51,22 @@ export function useTickets() {
     >([]);
     const [statuses, setStatuses] = useState<TicketStatusOption[]>([]);
 
+    const [errorGroups, setErrorGroups] = useState<TicketErrorGroupOption[]>([]);
+    const [errorTypes, setErrorTypes] = useState<TicketErrorTypeOption[]>([]);
+
     const [ticketCode, setTicketCode] = useState("");
     const [classificationMethod, setClassificationMethod] = useState("");
+    const [accountLinkStatus, setAccountLinkStatus] = useState("");
+    const [accountNumber, setAccountNumber] = useState("");
 
     const [supportCategory, setSupportCategory] = useState("");
     const [classification, setClassification] = useState("");
     const [currentStatus, setCurrentStatus] = useState("");
+
+    const [isErrorTicket, setIsErrorTicket] = useState("");
+    const [errorGroup, setErrorGroup] = useState("");
+    const [errorType, setErrorType] = useState("");
+    const [relatedSystem, setRelatedSystem] = useState("");
 
     const [companyName, setCompanyName] = useState("");
     const [customerName, setCustomerName] = useState("");
@@ -74,12 +86,14 @@ export function useTickets() {
     const textFilters = useMemo<TicketListParams>(
         () => ({
             ticket_code: ticketCode,
+            customer_account_no: accountNumber,
             company_name: companyName,
             customer_name: customerName,
             owner_user_name: ownerUserName,
             request_content: requestContent,
+            related_system: relatedSystem,
         }),
-        [ticketCode, companyName, customerName, ownerUserName, requestContent]
+        [ticketCode, accountNumber, companyName, customerName, ownerUserName, requestContent, relatedSystem]
     );
 
     const debouncedTextFilters = useDebounce(textFilters, 500);
@@ -92,6 +106,15 @@ export function useTickets() {
         );
     }, [classifications, supportCategory]);
 
+    const filteredErrorTypes = useMemo(() => {
+        if (!errorGroup) return errorTypes;
+
+        return errorTypes.filter(
+            (item) => String(item.group || "") === errorGroup
+        );
+    }, [errorTypes, errorGroup]);
+
+
     const buildParams = (
         customParams?: Partial<TicketListParams>,
         pageValue = pagination.page
@@ -101,28 +124,43 @@ export function useTickets() {
         page: String(pageValue),
 
         classification_method: classificationMethod,
+        account_link_status: accountLinkStatus,
         support_category: supportCategory,
         classification,
         current_status: currentStatus,
+        is_error_ticket: isErrorTicket,
+        error_group: errorGroup,
+        error_type: errorType,
         created_from: createdFrom,
         created_to: createdTo,
 
         ...customParams,
     });
+
     const loadMasterData = async () => {
         try {
             setMasterLoading(true);
             setMasterError("");
 
-            const [categoryData, classificationData, statusData] = await Promise.all([
+            const [
+                categoryData,
+                classificationData,
+                statusData,
+                errorGroupData,
+                errorTypeData,
+            ] = await Promise.all([
                 ticketService.getSupportCategories(),
                 ticketService.getClassifications(),
                 ticketService.getStatuses(),
+                ticketService.getErrorGroups(),
+                ticketService.getErrorTypes(),
             ]);
 
             setSupportCategories(categoryData);
             setClassifications(classificationData);
             setStatuses(statusData);
+            setErrorGroups(errorGroupData);
+            setErrorTypes(errorTypeData);
         } catch (err) {
             setMasterError(getErrorMessage(err, "Không tải được master data Ticket"));
         } finally {
@@ -150,6 +188,7 @@ export function useTickets() {
             setLoading(false);
         }
     };
+
     const goToPage = (nextPage: number) => {
         const safePage = Math.min(Math.max(nextPage, 1), pagination.totalPages);
 
@@ -166,6 +205,7 @@ export function useTickets() {
         if (pagination.page >= pagination.totalPages) return;
         goToPage(pagination.page + 1);
     };
+
     const search = () => {
         pagination.resetPage();
 
@@ -174,10 +214,16 @@ export function useTickets() {
                 page: "1",
 
                 ticket_code: ticketCode,
+                customer_account_no: accountNumber,
                 classification_method: classificationMethod,
+                account_link_status: accountLinkStatus,
                 support_category: supportCategory,
                 classification,
                 current_status: currentStatus,
+                is_error_ticket: isErrorTicket,
+                error_group: errorGroup,
+                error_type: errorType,
+                        related_system: relatedSystem,
                 company_name: companyName,
                 customer_name: customerName,
                 owner_user_name: ownerUserName,
@@ -192,9 +238,15 @@ export function useTickets() {
     const clearFilter = () => {
         setTicketCode("");
         setClassificationMethod("");
+        setAccountLinkStatus("");
+        setAccountNumber("");
         setSupportCategory("");
         setClassification("");
         setCurrentStatus("");
+        setIsErrorTicket("");
+        setErrorGroup("");
+        setErrorType("");
+        setRelatedSystem("");
         setCompanyName("");
         setCustomerName("");
         setOwnerUserName("");
@@ -202,23 +254,17 @@ export function useTickets() {
         setCreatedFrom("");
         setCreatedTo("");
 
-        void loadTickets({
-            ticket_code: "",
-            classification_method: "",
-            support_category: "",
-            classification: "",
-            current_status: "",
-            company_name: "",
-            customer_name: "",
-            owner_user_name: "",
-            request_content: "",
-            created_from: "",
-            created_to: "",
-        });
+        pagination.resetPage();
+
+        void loadTickets({ page: "1" }, 1);
     };
 
     const goCreate = () => {
         router.push("/tickets/create");
+    };
+
+    const goErrorCatalogs = () => {
+        router.push("/tickets/error-catalogs");
     };
 
     useEffect(() => {
@@ -238,15 +284,19 @@ export function useTickets() {
         }
 
         pagination.resetPage();
-        void loadTickets(buildParams({ page: "1" }, pagination.page), pagination.page);
+        void loadTickets(buildParams({ page: "1" }, 1), 1);
 
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [
         debouncedTextFilters,
         classificationMethod,
+        accountLinkStatus,
         supportCategory,
         classification,
         currentStatus,
+        isErrorTicket,
+        errorGroup,
+        errorType,
         createdFrom,
         createdTo,
     ]);
@@ -267,6 +317,21 @@ export function useTickets() {
         }
     }, [supportCategory, classification, classifications]);
 
+    useEffect(() => {
+        if (!errorGroup) {
+            return;
+        }
+
+        const selectedTypeStillValid = errorTypes.some(
+            (item) => String(item.id) === errorType && String(item.group || "") === errorGroup
+        );
+
+        if (!selectedTypeStillValid) {
+            setErrorType("");
+            }
+    }, [errorGroup, errorType, errorTypes]);
+
+
     return {
         items,
         count,
@@ -279,16 +344,26 @@ export function useTickets() {
         previousPage,
         nextPage,
         goToPage,
+
         supportCategories,
         classifications,
         filteredClassifications,
         statuses,
+        errorGroups,
+        errorTypes,
+        filteredErrorTypes,
 
         ticketCode,
         setTicketCode,
 
         classificationMethod,
         setClassificationMethod,
+
+        accountLinkStatus,
+        setAccountLinkStatus,
+
+        accountNumber,
+        setAccountNumber,
 
         supportCategory,
         setSupportCategory,
@@ -298,6 +373,19 @@ export function useTickets() {
 
         currentStatus,
         setCurrentStatus,
+
+        isErrorTicket,
+        setIsErrorTicket,
+
+        errorGroup,
+        setErrorGroup,
+
+        errorType,
+        setErrorType,
+
+
+        relatedSystem,
+        setRelatedSystem,
 
         companyName,
         setCompanyName,
@@ -325,6 +413,7 @@ export function useTickets() {
         search,
         clearFilter,
         goCreate,
+        goErrorCatalogs,
         reload: loadTickets,
     };
 }

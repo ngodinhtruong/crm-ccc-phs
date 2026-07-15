@@ -16,6 +16,7 @@ from apps.sla.services import SlaService
 from apps.tickets.models import (
     Ticket,
     TicketStatus,
+    TicketAccountLinkStatus,
     TicketProcessLog,
     TicketAssignment,
     TicketUpdateLog,
@@ -25,15 +26,34 @@ from apps.tickets.models import (
 
 class TicketService:
     @staticmethod
-    def generate_ticket_code(*, branch):
+    def generate_ticket_code(*, branch=None):
+        """
+        Rule mã ticket: ngày + tháng + 2 số cuối năm + 3 số thứ tự trong ngày.
+        Ví dụ: 150726001.
+        """
         today = timezone.localdate()
-        prefix = f"T{today:%Y%m%d}{branch.branch_code}"
+        prefix = f"{today:%d%m%y}"
 
-        count_today = Ticket.objects.filter(
+        existing_codes = Ticket.objects.filter(
             ticket_code__startswith=prefix,
-        ).count()
+        ).values_list("ticket_code", flat=True)
 
-        return f"{prefix}{count_today + 1:04d}"
+        max_sequence = 0
+
+        for code in existing_codes:
+            suffix = str(code)[len(prefix):]
+
+            if suffix.isdigit():
+                max_sequence = max(max_sequence, int(suffix))
+
+        return f"{prefix}{max_sequence + 1:03d}"
+
+    @staticmethod
+    def resolve_account_link_status(*, customer_account):
+        if customer_account is not None:
+            return TicketAccountLinkStatus.LINKED
+
+        return TicketAccountLinkStatus.UNLINKED
 
     @staticmethod
     @transaction.atomic
@@ -43,32 +63,47 @@ class TicketService:
         customer=None,
         company=None,
         customer_account=None,
-        handling_branch,
+        handling_branch=None,
+        raw_account_number=None,
         assigned_unit=None,
         assigned_employee=None,
+        owner_user=None,
         support_category=None,
         classification=None,
+        current_status=None,
         priority=None,
         source=None,
         sla_policy=None,
         classification_method=ClassificationMethod.MANUAL,
         source_ref_id=None,
+        error_group=None,
+        error_type=None,
+        error_note=None,
+        related_system=None,
+        external_status=None,
+        last_synced_at=None,
         request_content=None,
+        handling_solution=None,
+        final_response=None,
         created_by_user=None,
         check_permission=True,
     ):
         now = timezone.now()
         if check_permission and not PermissionService.can_create_ticket(created_by_user):
             raise PermissionDenied("Bạn không có quyền tạo ticket.")
-        created_status = TicketStatus.objects.get(
+        created_status = current_status or TicketStatus.objects.get(
             status_code=TicketStatusCode.CREATED
         )
 
-        owner_user = created_by_user
+        owner_user = owner_user or created_by_user
         owner_employee = None
 
-        if created_by_user is not None:
-            owner_employee = getattr(created_by_user, "employee", None)
+        if owner_user is not None:
+            owner_employee = getattr(owner_user, "employee", None)
+
+        account_link_status = TicketService.resolve_account_link_status(
+            customer_account=customer_account,
+        )
 
         for _ in range(5):
             ticket_code = TicketService.generate_ticket_code(
@@ -82,6 +117,8 @@ class TicketService:
                     customer=customer,
                     company=company,
                     customer_account=customer_account,
+                    raw_account_number=raw_account_number,
+                    account_link_status=account_link_status,
                     handling_branch=handling_branch,
                     assigned_unit=assigned_unit,
                     assigned_employee=assigned_employee,
@@ -95,7 +132,15 @@ class TicketService:
                     sla_policy=sla_policy,
                     classification_method=classification_method,
                     source_ref_id=source_ref_id,
+                    error_group=error_group,
+                    error_type=error_type,
+                    error_note=error_note,
+                    related_system=related_system,
+                    external_status=external_status,
+                    last_synced_at=last_synced_at,
                     request_content=request_content,
+                    handling_solution=handling_solution,
+                    final_response=final_response,
                     assigned_at=now if assigned_employee else None,
                     created_by_user=created_by_user,
                     updated_by_user=created_by_user,
@@ -676,6 +721,7 @@ class TicketService:
             "customer",
             "company",
             "customer_account",
+            "raw_account_number",
             "support_category",
             "classification",
             "priority",
@@ -683,7 +729,15 @@ class TicketService:
             "sla_policy",
             "classification_method",
             "source_ref_id",
+            "error_group",
+            "error_type",
+            "error_note",
+            "related_system",
+            "external_status",
+            "last_synced_at",
             "request_content",
+            "handling_solution",
+            "final_response",
         }
 
         invalid_fields = set(changes.keys()) - allowed_fields
@@ -720,6 +774,25 @@ class TicketService:
                     "field_name": field_name,
                     "old_value": old_value,
                     "new_value": new_value,
+                }
+            )
+
+        resolved_account_link_status = TicketService.resolve_account_link_status(
+            customer_account=ticket.customer_account,
+        )
+
+        if ticket.account_link_status != resolved_account_link_status:
+            old_value = ticket.account_link_status
+            ticket.account_link_status = resolved_account_link_status
+
+            if "account_link_status" not in update_fields:
+                update_fields.append("account_link_status")
+
+            changed_items.append(
+                {
+                    "field_name": "account_link_status",
+                    "old_value": old_value,
+                    "new_value": resolved_account_link_status,
                 }
             )
 

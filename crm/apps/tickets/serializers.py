@@ -10,6 +10,9 @@ from apps.tickets.models import (
     TicketPriority,
     TicketSource,
     TicketStatus,
+    TicketAccountLinkStatus,
+    TicketErrorGroup,
+    TicketErrorType,
 )
 class TicketSupportCategorySerializer(serializers.ModelSerializer):
     class Meta:
@@ -79,6 +82,77 @@ class TicketSourceSerializer(serializers.ModelSerializer):
             "is_active",
         ]
 
+
+
+class TicketErrorGroupSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TicketErrorGroup
+        fields = [
+            "id",
+            "group_code",
+            "group_name",
+            "description",
+            "related_system",
+            "is_active",
+            "sort_order",
+            "created_at",
+            "updated_at",
+        ]
+
+
+class TicketErrorTypeSerializer(serializers.ModelSerializer):
+    group_code = serializers.CharField(source="group.group_code", read_only=True)
+    group_name = serializers.CharField(source="group.group_name", read_only=True)
+
+    class Meta:
+        model = TicketErrorType
+        fields = [
+            "id",
+            "group",
+            "group_code",
+            "group_name",
+            "type_code",
+            "type_name",
+            "description",
+            "related_system",
+            "is_active",
+            "sort_order",
+            "created_at",
+            "updated_at",
+        ]
+
+    def validate(self, attrs):
+        related_system = attrs.get("related_system")
+        group = attrs.get("group") or getattr(self.instance, "group", None)
+
+        if group and not related_system:
+            attrs["related_system"] = group.related_system
+
+        return attrs
+
+
+
+def normalize_ticket_error_fields(attrs, instance=None):
+    error_group = attrs.get("error_group", getattr(instance, "error_group", None))
+    error_type = attrs.get("error_type", getattr(instance, "error_type", None))
+
+    if error_type:
+        if error_group and error_type.group_id != error_group.id:
+            raise serializers.ValidationError(
+                {"error_type": "Loại lỗi không thuộc nhóm lỗi đã chọn."}
+            )
+
+        error_group = error_type.group
+        attrs["error_group"] = error_group
+
+        if not attrs.get("related_system") and getattr(error_type, "related_system", None):
+            attrs["related_system"] = error_type.related_system
+
+    if error_group and not attrs.get("related_system") and getattr(error_group, "related_system", None):
+        attrs["related_system"] = error_group.related_system
+
+    return attrs
+
 User = get_user_model()
 class TicketReadSerializer(serializers.ModelSerializer):
     support_category_name = serializers.SerializerMethodField()
@@ -87,6 +161,8 @@ class TicketReadSerializer(serializers.ModelSerializer):
     customer_name = serializers.SerializerMethodField()
     company_name = serializers.SerializerMethodField()
     customer_account_number = serializers.SerializerMethodField()
+    display_account_number = serializers.SerializerMethodField()
+    account_link_status_label = serializers.SerializerMethodField()
 
     handling_branch_name = serializers.SerializerMethodField()
     assigned_unit_name = serializers.SerializerMethodField()
@@ -102,6 +178,12 @@ class TicketReadSerializer(serializers.ModelSerializer):
     source_name = serializers.SerializerMethodField()
     sla_policy_name = serializers.SerializerMethodField()
 
+    is_error_ticket = serializers.SerializerMethodField()
+    error_group_code = serializers.SerializerMethodField()
+    error_group_name = serializers.SerializerMethodField()
+    error_type_code = serializers.SerializerMethodField()
+    error_type_name = serializers.SerializerMethodField()
+
     class Meta:
         model = Ticket
         fields = [
@@ -115,6 +197,10 @@ class TicketReadSerializer(serializers.ModelSerializer):
             "company_name",
             "customer_account",
             "customer_account_number",
+            "raw_account_number",
+            "display_account_number",
+            "account_link_status",
+            "account_link_status_label",
 
             "handling_branch",
             "handling_branch_name",
@@ -130,6 +216,18 @@ class TicketReadSerializer(serializers.ModelSerializer):
             "support_category_name",
             "classification",
             "classification_name",
+
+            "is_error_ticket",
+            "error_group",
+            "error_group_code",
+            "error_group_name",
+            "error_type",
+            "error_type_code",
+            "error_type_name",
+            "error_note",
+            "related_system",
+            "external_status",
+            "last_synced_at",
 
             "current_status",
             "current_status_code",
@@ -175,6 +273,18 @@ class TicketReadSerializer(serializers.ModelSerializer):
             or getattr(obj.customer_account, "account_no", None)
         )
 
+    def get_display_account_number(self, obj):
+        return self.get_customer_account_number(obj) or obj.raw_account_number
+
+    def get_account_link_status_label(self, obj):
+        if obj.account_link_status == TicketAccountLinkStatus.LINKED:
+            return "Có TK liên kết"
+
+        if obj.account_link_status == TicketAccountLinkStatus.UNLINKED:
+            return "Chưa có TK liên kết"
+
+        return obj.account_link_status
+
     def get_handling_branch_name(self, obj):
         return obj.handling_branch.branch_name if obj.handling_branch else None
 
@@ -206,6 +316,22 @@ class TicketReadSerializer(serializers.ModelSerializer):
     def get_source_name(self, obj):
         return obj.source.source_name if obj.source else None
 
+
+    def get_is_error_ticket(self, obj):
+        return bool(obj.error_group_id or obj.error_type_id)
+
+    def get_error_group_code(self, obj):
+        return obj.error_group.group_code if obj.error_group else None
+
+    def get_error_group_name(self, obj):
+        return obj.error_group.group_name if obj.error_group else None
+
+    def get_error_type_code(self, obj):
+        return obj.error_type.type_code if obj.error_type else None
+
+    def get_error_type_name(self, obj):
+        return obj.error_type.type_name if obj.error_type else None
+
     def get_sla_policy_name(self, obj):
         return obj.sla_policy.sla_name if obj.sla_policy else None
 
@@ -226,6 +352,11 @@ class TicketCreateSerializer(serializers.Serializer):
     customer_account = serializers.PrimaryKeyRelatedField(
         queryset=CustomerAccount.objects.all(),
         required=False,
+        allow_null=True,
+    )
+    raw_account_number = serializers.CharField(
+        required=False,
+        allow_blank=True,
         allow_null=True,
     )
 
@@ -291,6 +422,37 @@ class TicketCreateSerializer(serializers.Serializer):
         allow_blank=True,
         allow_null=True,
     )
+
+    error_group = serializers.PrimaryKeyRelatedField(
+        queryset=TicketErrorGroup.objects.all(),
+        required=False,
+        allow_null=True,
+    )
+    error_type = serializers.PrimaryKeyRelatedField(
+        queryset=TicketErrorType.objects.all(),
+        required=False,
+        allow_null=True,
+    )
+    error_note = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    related_system = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    external_status = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    last_synced_at = serializers.DateTimeField(
+        required=False,
+        allow_null=True,
+    )
+
     request_content = serializers.CharField(
         required=False,
         allow_blank=True,
@@ -306,6 +468,9 @@ class TicketCreateSerializer(serializers.Serializer):
             allow_blank=True,
             allow_null=True,
         )
+
+    def validate(self, attrs):
+        return normalize_ticket_error_fields(attrs)
 
 
 class TicketAssignSerializer(serializers.Serializer):
@@ -378,6 +543,11 @@ class TicketAmendSerializer(serializers.Serializer):
         required=False,
         allow_null=True,
     )
+    raw_account_number = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
 
     support_category = serializers.PrimaryKeyRelatedField(
         queryset=TicketSupportCategory.objects.all(),
@@ -414,6 +584,37 @@ class TicketAmendSerializer(serializers.Serializer):
         allow_blank=True,
         allow_null=True,
     )
+
+    error_group = serializers.PrimaryKeyRelatedField(
+        queryset=TicketErrorGroup.objects.all(),
+        required=False,
+        allow_null=True,
+    )
+    error_type = serializers.PrimaryKeyRelatedField(
+        queryset=TicketErrorType.objects.all(),
+        required=False,
+        allow_null=True,
+    )
+    error_note = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    related_system = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    external_status = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    last_synced_at = serializers.DateTimeField(
+        required=False,
+        allow_null=True,
+    )
+
     request_content = serializers.CharField(
         required=False,
         allow_blank=True,
@@ -441,6 +642,9 @@ class TicketAmendSerializer(serializers.Serializer):
         allow_null=True,
     )
 
+    def validate(self, attrs):
+        return normalize_ticket_error_fields(attrs, instance=None)
+
 
 
 
@@ -459,6 +663,15 @@ class TicketSerializer(serializers.ModelSerializer):
     )
     priority_name = serializers.CharField(
         source="priority.priority_name",
+        read_only=True,
+    )
+
+    error_group_name = serializers.CharField(
+        source="error_group.group_name",
+        read_only=True,
+    )
+    error_type_name = serializers.CharField(
+        source="error_type.type_name",
         read_only=True,
     )
     source_name = serializers.CharField(

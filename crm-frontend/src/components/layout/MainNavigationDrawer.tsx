@@ -82,7 +82,7 @@ const mainMenuItemsByWorkspace: Record<WorkspaceCode, MainMenuItem[]> = {
   CCC: [
     {
       title: "TRANG CHỦ",
-      href: "/",
+      href: "/tickets/dashboard",
       icon: Gauge,
     },
     {
@@ -222,6 +222,11 @@ const panelGroupsByWorkspace: Record<
       {
         title: "CSKH",
         items: [
+          {
+            title: "Dashboard CCC",
+            href: "/tickets/dashboard",
+            icon: Gauge,
+          },
           {
             title: "Ticket",
             href: "/tickets",

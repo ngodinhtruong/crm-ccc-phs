@@ -95,6 +95,68 @@ class TicketSource(models.Model):
         return self.source_name
 
 
+
+
+class TicketErrorGroup(TimeStampedModel):
+    group_code = models.CharField(max_length=50, unique=True)
+    group_name = models.CharField(max_length=255)
+    description = models.TextField(null=True, blank=True)
+    related_system = models.CharField(max_length=100, null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    sort_order = models.IntegerField(null=True, blank=True)
+
+    class Meta:
+        db_table = "ticket_error_groups"
+        ordering = ["sort_order", "id"]
+        indexes = [
+            models.Index(fields=["group_code"]),
+            models.Index(fields=["group_name"]),
+            models.Index(fields=["related_system"]),
+            models.Index(fields=["is_active"]),
+        ]
+
+    def __str__(self):
+        return self.group_name
+
+
+class TicketErrorType(TimeStampedModel):
+    group = models.ForeignKey(
+        TicketErrorGroup,
+        on_delete=models.PROTECT,
+        related_name="error_types",
+    )
+    type_code = models.CharField(max_length=50, unique=True)
+    type_name = models.CharField(max_length=255)
+    description = models.TextField(null=True, blank=True)
+    related_system = models.CharField(max_length=100, null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    sort_order = models.IntegerField(null=True, blank=True)
+
+    class Meta:
+        db_table = "ticket_error_types"
+        ordering = ["group__sort_order", "sort_order", "id"]
+        indexes = [
+            models.Index(fields=["group"]),
+            models.Index(fields=["type_code"]),
+            models.Index(fields=["type_name"]),
+            models.Index(fields=["related_system"]),
+            models.Index(fields=["is_active"]),
+        ]
+
+    def __str__(self):
+        return self.type_name
+
+
+class TicketAccountLinkStatus:
+    LINKED = "LINKED"
+    UNLINKED = "UNLINKED"
+
+    CHOICES = [
+        (LINKED, "Có TK liên kết"),
+        (UNLINKED, "Chưa có TK liên kết"),
+    ]
+
+
 class Ticket(TimeStampedModel):
     ticket_code = models.CharField(max_length=50, unique=True)
     title = models.CharField(max_length=255, null=True, blank=True)
@@ -121,6 +183,21 @@ class Ticket(TimeStampedModel):
         null=True,
         blank=True,
         related_name="tickets",
+    )
+
+    account_link_status = models.CharField(
+        max_length=20,
+        choices=TicketAccountLinkStatus.CHOICES,
+        default=TicketAccountLinkStatus.UNLINKED,
+        db_index=True,
+    )
+
+    # Số tài khoản KH do CCC nhập khi chưa khớp được với customer_account.
+    raw_account_number = models.CharField(
+        max_length=50,
+        null=True,
+        blank=True,
+        db_index=True,
     )
 
     handling_branch = models.ForeignKey(
@@ -213,6 +290,33 @@ class Ticket(TimeStampedModel):
 
     source_ref_id = models.CharField(max_length=100, null=True, blank=True)
 
+    error_group = models.ForeignKey(
+        TicketErrorGroup,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="tickets",
+    )
+
+    error_type = models.ForeignKey(
+        TicketErrorType,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="tickets",
+    )
+
+
+    error_note = models.TextField(null=True, blank=True)
+
+    # Hệ thống liên quan: BASE / FLEX / APP / CRM / API / CHATBOT / OTHER...
+    related_system = models.CharField(max_length=100, null=True, blank=True)
+
+    # Trạng thái ở hệ thống ngoài khi cần đồng bộ Base/API hai chiều.
+    external_status = models.CharField(max_length=50, null=True, blank=True)
+    last_synced_at = models.DateTimeField(null=True, blank=True)
+
+
     request_content = models.TextField(null=True, blank=True)
     handling_solution = models.TextField(null=True, blank=True)
     final_response = models.TextField(null=True, blank=True)
@@ -292,12 +396,17 @@ class Ticket(TimeStampedModel):
         indexes = [
             models.Index(fields=["ticket_code"]),
             models.Index(fields=["customer"]),
+            models.Index(fields=["customer_account"]),
             models.Index(fields=["handling_branch"]),
             models.Index(fields=["assigned_employee"]),
             models.Index(fields=["owner_user"]),
             models.Index(fields=["current_status"]),
             models.Index(fields=["priority"]),
             models.Index(fields=["source"]),
+            models.Index(fields=["error_group"]),
+            models.Index(fields=["error_type"]),
+            models.Index(fields=["related_system"]),
+            models.Index(fields=["external_status"]),
             models.Index(fields=["sla_policy"]),
             models.Index(fields=["created_at"]),
         ]
