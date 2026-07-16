@@ -15,14 +15,9 @@ from apps.chatbots.models import (
     ChatbotCskhRequest,
     ChatbotSessionSummary,
     ChatbotState,
+    TicketChatbot,
 )
 from apps.customers.models import Customer, CustomerAccount
-from apps.tickets.models import (
-    Ticket,
-    TicketSource,
-    TicketStatus,
-    TicketSupportCategory,
-)
 
 
 def build_full_conversation(logs):
@@ -222,52 +217,12 @@ def rebuild_chatbot_session_summaries(affected_session_ids=None):
     return len(session_ids)
 
 
-def get_or_create_chatbot_source():
-    source, _ = TicketSource.objects.get_or_create(
-        source_code="CHATBOT",
-        defaults={
-            "source_name": "Chatbot",
-            "is_active": True,
-        },
-    )
-
-    return source
-
-
-def get_or_create_ticket_status(code, name, is_final=False):
-    status, _ = TicketStatus.objects.get_or_create(
-        status_code=code,
-        defaults={
-            "status_name": name,
-            "is_final": is_final,
-            "is_active": True,
-        },
-    )
-
-    return status
-
-
-def get_or_create_support_category(summary):
-    category_name = category_label(summary.dashboard_category)
-    category_code = category_name.upper().replace(" ", "_")[:50]
-
-    category, _ = TicketSupportCategory.objects.get_or_create(
-        category_code=category_code,
-        defaults={
-            "category_name": category_name,
-            "is_active": True,
-        },
-    )
-
-    return category
-
-
 def generate_ticket_code():
     today = timezone.localdate()
     prefix = f"CB{today.strftime('%Y%m%d')}"
 
     latest = (
-        Ticket.objects.filter(ticket_code__startswith=prefix)
+        TicketChatbot.objects.filter(ticket_code__startswith=prefix)
         .order_by("-ticket_code")
         .first()
     )
@@ -283,14 +238,25 @@ def generate_ticket_code():
     return f"{prefix}{last_number + 1:04d}"
 
 
-def find_customer_by_contact(contact_type, contact_info):
+def is_account_contact(contact_type):
+    """Loại liên hệ có phải là số tài khoản không (dựa trên contact_type)."""
     contact_type = str(contact_type or "").lower()
+
+    return (
+        "account" in contact_type
+        or "stk" in contact_type
+        or "số tk" in contact_type
+        or "tài khoản" in contact_type
+    )
+
+
+def find_customer_by_contact(contact_type, contact_info):
     contact_info = str(contact_info or "").strip()
 
     if not contact_info:
         return None, None
 
-    if "account" in contact_type or "stk" in contact_type or "số tk" in contact_type:
+    if is_account_contact(contact_type):
         account = (
             CustomerAccount.objects.select_related("customer")
             .filter(account_number=contact_info)
@@ -307,33 +273,83 @@ def find_customer_by_contact(contact_type, contact_info):
     return customer, None
 
 
-def create_crm_tickets_from_chatbot(default_branch):
-    """Tạo ticket CRM cho các phiên đã xin được thông tin khách (outcome = CCC)."""
-    chatbot_source = get_or_create_chatbot_source()
-    status_new = get_or_create_ticket_status("NEW", "Mới", is_final=False)
+def relink_ticket_customer(ticket):
+    """
+    Dò lại khách hàng cho một TicketChatbot chưa nối được (link_status=UNLINKED).
 
+    Dùng khi khách hàng được tạo SAU khi ticket đã sinh ra: mở lại ticket thì
+    tự nối. Trả về True nếu vừa nối được (đã lưu), False nếu vẫn chưa ra khách.
+    """
+    if ticket.customer_id or ticket.customer_account_id:
+        return False
+
+    customer, account = find_customer_by_contact(
+        ticket.contact_type, ticket.contact_info
+    )
+
+    if not customer and not account:
+        return False
+
+    ticket.customer = customer
+    ticket.customer_account = account
+    ticket.link_status = TicketChatbot.LINK_LINKED
+    ticket.save(
+        update_fields=[
+            "customer",
+            "customer_account",
+            "link_status",
+            "updated_at",
+        ]
+    )
+
+    return True
+
+
+def create_crm_tickets_from_chatbot(default_branch=None):
+    """
+    Tạo TicketChatbot cho các phiên đã xin được thông tin khách (outcome = CCC).
+
+    Ticket sinh ra ở bảng TicketChatbot riêng, gần như mọi cột cho phép null:
+    - Lưu thô số điện thoại / số tài khoản khách cho (contact_info).
+    - Nối mềm khách hàng nếu tra ra, không thì để trống (link_status = UNLINKED).
+    - Chưa gán người xử lý (owner_user = null) → nằm hàng chờ chung,
+      trạng thái CHO_TIEP_NHAN, ai cũng thấy, tự bấm nhận.
+
+    default_branch có thể None (khác bảng Ticket chung: ở đây không bắt buộc chi nhánh).
+    """
     summaries = ChatbotSessionSummary.objects.filter(
         outcome_type=ChatbotSessionSummary.OUTCOME_CCC,
-        ticket__isnull=True,
+        ticket_chatbot__isnull=True,
     )
 
     created = 0
 
     for summary in summaries:
-        existing_ticket = Ticket.objects.filter(
-            source=chatbot_source,
+        # Chống tạo trùng: một phiên chỉ có đúng một TicketChatbot
+        existing_ticket = TicketChatbot.objects.filter(
             source_ref_id=summary.session_id,
         ).first()
 
         if existing_ticket:
-            summary.ticket = existing_ticket
-            summary.save(update_fields=["ticket"])
+            summary.ticket_chatbot = existing_ticket
+            summary.save(update_fields=["ticket_chatbot"])
             continue
 
+        # Nối mềm khách hàng
         customer, customer_account = find_customer_by_contact(
             summary.contact_type,
             summary.contact_info,
         )
+
+        if customer or customer_account:
+            link_status = TicketChatbot.LINK_LINKED
+        else:
+            link_status = TicketChatbot.LINK_UNLINKED
+
+        # Tách thô SĐT / STK theo loại liên hệ khách khai
+        is_account = is_account_contact(summary.contact_type)
+        account_number = summary.contact_info if is_account else None
+        phone = None if is_account else summary.contact_info
 
         title = first_non_empty(
             summary.reason,
@@ -354,24 +370,31 @@ def create_crm_tickets_from_chatbot(default_branch):
             ]
         )
 
-        ticket = Ticket.objects.create(
+        ticket = TicketChatbot.objects.create(
             ticket_code=generate_ticket_code(),
             title=title[:255],
+            source_ref_id=summary.session_id,
+            contact_info=summary.contact_info,
+            contact_type=summary.contact_type,
+            phone=phone,
+            account_number=account_number,
             customer=customer,
             customer_account=customer_account,
-            handling_branch=default_branch,
-            support_category=get_or_create_support_category(summary),
-            current_status=status_new,
-            source=chatbot_source,
-            source_ref_id=summary.session_id,
+            link_status=link_status,
+            dashboard_category=summary.dashboard_category,
+            reason=summary.reason,
             request_content=request_content,
-            classification_method="AUTO",
-            created_by_user=None,
-            updated_by_user=None,
+            full_conversation=summary.full_conversation,
+            channel=summary.channel,
+            current_status=TicketChatbot.get_status(
+                TicketChatbot.STATUS_CHO_TIEP_NHAN
+            ),
+            owner_user=None,
+            handling_branch=default_branch,
         )
 
-        summary.ticket = ticket
-        summary.save(update_fields=["ticket"])
+        summary.ticket_chatbot = ticket
+        summary.save(update_fields=["ticket_chatbot"])
         created += 1
 
     return created

@@ -109,7 +109,7 @@ export function ConversationModal({
         {session.reason && (
           <div className="border-b border-slate-100 bg-amber-50 px-5 py-3">
             <div className="text-[11px] font-semibold uppercase text-amber-700">
-              Lý do chuyển CCC
+              CÂU HỎI CỦA KHÁCH HÀNG
             </div>
             <div className="mt-1 whitespace-pre-wrap text-xs text-amber-900">
               {session.reason}

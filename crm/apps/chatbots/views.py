@@ -1,4 +1,5 @@
 from django.db.models import Count, Max, Q, Sum
+from django.utils import timezone
 from django.utils.dateparse import parse_date
 from rest_framework import generics
 from rest_framework.pagination import PageNumberPagination
@@ -10,12 +11,22 @@ from apps.chatbots.constants import (
     SPAM_QUESTION_TYPES,
     UNCATEGORIZED_LABEL,
 )
-from apps.chatbots.models import ChatbotChatLog, ChatbotSessionSummary
+from apps.chatbots.models import (
+    ChatbotChatLog,
+    ChatbotSessionSummary,
+    TicketChatbot,
+)
 from apps.chatbots.serializers import (
     ChatbotChatLogSerializer,
     ChatbotFAQReportSerializer,
     ChatbotSessionSummarySerializer,
+    TicketChatbotSerializer,
 )
+from apps.chatbots.services import relink_ticket_customer
+from apps.accounts.models import User
+from apps.branches.models import Branch, ProcessingUnit
+from apps.sla.models import SlaPolicy
+from apps.tickets.models import TicketPriority
 
 OUTCOME_BOT_DONE = ChatbotSessionSummary.OUTCOME_BOT_DONE
 OUTCOME_CCC = ChatbotSessionSummary.OUTCOME_CCC
@@ -290,6 +301,7 @@ class ChatbotDashboardTicketsAPIView(ChatbotDashboardFilterMixin, generics.ListA
             "ticket__current_status",
             "ticket__customer",
             "ticket__customer_account",
+            "ticket_chatbot",
         ).order_by("-started_at", "-id")
 
         queryset = self.filter_summaries(queryset)
@@ -388,4 +400,303 @@ class ChatbotDashboardFAQAPIView(ChatbotDashboardFilterMixin, generics.ListAPIVi
                 latest_at=Max("external_created_at"),
             )
             .order_by("-hit_count", "-latest_at")
+        )
+
+
+class TicketChatbotListAPIView(generics.ListAPIView):
+    """
+    Danh sách ticket sinh ra từ chatbot.
+
+    Bộ lọc:
+      - status        : lọc theo trạng thái (CHO_TIEP_NHAN, TIEP_NHAN, ...)
+      - link_status   : LINKED / UNLINKED (ticket cần bổ sung thông tin KH)
+      - mine=true     : chỉ ticket của tôi (owner_user = user hiện tại)
+      - unassigned=true: chỉ ticket chưa ai nhận (hàng chờ chung)
+      - q             : tìm theo mã / SĐT / STK / nội dung
+    """
+
+    permission_classes = [IsAuthenticated]
+    serializer_class = TicketChatbotSerializer
+    pagination_class = StandardResultsSetPagination
+
+    def get_queryset(self):
+        queryset = TicketChatbot.objects.select_related(
+            "customer",
+            "customer_account",
+            "owner_user",
+            "handling_branch",
+            "current_status",
+        ).order_by("-created_at", "-id")
+
+        status_value = self.request.query_params.get("status")
+        link_status = self.request.query_params.get("link_status")
+        keyword = self.request.query_params.get("q")
+
+        if status_value:
+            queryset = queryset.filter(current_status__status_code=status_value)
+
+        if link_status:
+            queryset = queryset.filter(link_status=link_status)
+
+        if self.request.query_params.get("mine") == "true":
+            queryset = queryset.filter(owner_user=self.request.user)
+
+        if self.request.query_params.get("unassigned") == "true":
+            queryset = queryset.filter(owner_user__isnull=True)
+
+        if keyword:
+            queryset = queryset.filter(
+                Q(ticket_code__icontains=keyword)
+                | Q(contact_info__icontains=keyword)
+                | Q(phone__icontains=keyword)
+                | Q(account_number__icontains=keyword)
+                | Q(title__icontains=keyword)
+                | Q(reason__icontains=keyword)
+                | Q(full_conversation__icontains=keyword)
+            )
+
+        return queryset
+
+
+class TicketChatbotDetailAPIView(APIView):
+    """Chi tiết một ticket chatbot + toàn bộ hội thoại gốc của phiên."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        ticket = (
+            TicketChatbot.objects.select_related(
+                "customer",
+                "customer_account",
+                "owner_user",
+                "accepted_by_user",
+                "assigned_employee",
+                "handling_branch",
+                "current_status",
+                "assigned_unit",
+                "sla_policy",
+                "priority",
+            )
+            .filter(pk=pk)
+            .first()
+        )
+
+        if not ticket:
+            return Response({"detail": "Không tìm thấy ticket."}, status=404)
+
+        # Ticket chưa nối được KH → thử dò lại (phòng khi KH được tạo sau ticket)
+        if ticket.link_status == TicketChatbot.LINK_UNLINKED:
+            relink_ticket_customer(ticket)
+
+        messages = []
+
+        if ticket.source_ref_id:
+            logs = ChatbotChatLog.objects.filter(
+                session_id=ticket.source_ref_id
+            ).order_by("external_created_at", "id")
+            messages = ChatbotChatLogSerializer(logs, many=True).data
+
+        return Response(
+            {
+                "ticket": TicketChatbotSerializer(ticket).data,
+                "messages": messages,
+            }
+        )
+
+    # Trường text/bool sửa trực tiếp
+    EDITABLE_PLAIN = ["handling_solution", "reason", "send_survey"]
+    # Trường khóa ngoại: nhận id, gán vào <field>_id
+    EDITABLE_FK = [
+        "owner_user",
+        "assigned_unit",
+        "handling_branch",
+        "sla_policy",
+        "priority",
+    ]
+
+    def patch(self, request, pk):
+        """Cập nhật ticket từ modal 'Cập nhật tình trạng' (đầy đủ trường)."""
+        ticket = TicketChatbot.objects.filter(pk=pk).first()
+
+        if not ticket:
+            return Response({"detail": "Không tìm thấy ticket."}, status=404)
+
+        update_fields = []
+
+        # Trạng thái: nhận mã code → tra sang TicketStatus (FK current_status)
+        if "status" in request.data:
+            new_code = request.data.get("status")
+            status = TicketChatbot.get_status(new_code)
+
+            if not status:
+                return Response({"detail": "Trạng thái không hợp lệ."}, status=400)
+
+            ticket.current_status = status
+            update_fields.append("current_status")
+
+            if new_code == TicketChatbot.STATUS_DA_XONG and not ticket.done_at:
+                ticket.done_at = timezone.now()
+                update_fields.append("done_at")
+
+        for field in self.EDITABLE_PLAIN:
+            if field in request.data:
+                setattr(ticket, field, request.data.get(field))
+                update_fields.append(field)
+
+        for field in self.EDITABLE_FK:
+            if field in request.data:
+                setattr(ticket, f"{field}_id", request.data.get(field) or None)
+                update_fields.append(field)
+
+        # Vừa giao cho một người xử lý mà chưa có mốc tiếp nhận → set thời gian nhận
+        if ticket.owner_user_id and not ticket.accepted_at:
+            ticket.accepted_at = timezone.now()
+            ticket.accepted_by_user_id = ticket.owner_user_id
+            update_fields += ["accepted_at", "accepted_by_user"]
+
+        if update_fields:
+            update_fields.append("updated_at")
+            ticket.save(update_fields=update_fields)
+
+        # Trả lại có select_related để tên hiển thị đúng
+        ticket = TicketChatbot.objects.select_related(
+            "customer",
+            "customer_account",
+            "owner_user",
+            "assigned_employee",
+            "assigned_unit",
+            "handling_branch",
+            "sla_policy",
+            "priority",
+            "current_status",
+        ).get(pk=ticket.pk)
+
+        return Response(TicketChatbotSerializer(ticket).data)
+
+
+class TicketChatbotClaimAPIView(APIView):
+    """User bấm 'Nhận xử lý' → gán ticket cho chính mình."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        ticket = TicketChatbot.objects.filter(pk=pk).first()
+
+        if not ticket:
+            return Response({"detail": "Không tìm thấy ticket."}, status=404)
+
+        # Đã có người nhận rồi thì không cho nhận đè
+        if ticket.owner_user_id and ticket.owner_user_id != request.user.id:
+            return Response(
+                {"detail": "Ticket đã được người khác nhận."},
+                status=409,
+            )
+
+        ticket.owner_user = request.user
+        ticket.accepted_by_user = request.user
+        ticket.accepted_at = timezone.now()
+        update_fields = [
+            "owner_user",
+            "accepted_by_user",
+            "accepted_at",
+            "updated_at",
+        ]
+
+        # Chỉ đẩy trạng thái lên TIEP_NHAN nếu còn ở hàng chờ
+        if ticket.status_code == TicketChatbot.STATUS_CHO_TIEP_NHAN:
+            status = TicketChatbot.get_status(TicketChatbot.STATUS_TIEP_NHAN)
+            if status:
+                ticket.current_status = status
+                update_fields.append("current_status")
+
+        ticket.save(update_fields=update_fields)
+
+        return Response(TicketChatbotSerializer(ticket).data)
+
+
+class TicketChatbotChangeStatusAPIView(APIView):
+    """Đổi trạng thái ticket theo workflow của CCC."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        ticket = TicketChatbot.objects.filter(pk=pk).first()
+
+        if not ticket:
+            return Response({"detail": "Không tìm thấy ticket."}, status=404)
+
+        new_code = request.data.get("status")
+        status = TicketChatbot.get_status(new_code)
+
+        if not status:
+            return Response(
+                {"detail": "Trạng thái không hợp lệ."},
+                status=400,
+            )
+
+        ticket.current_status = status
+        update_fields = ["current_status", "updated_at"]
+
+        if new_code == TicketChatbot.STATUS_DA_XONG:
+            ticket.done_at = timezone.now()
+            update_fields.append("done_at")
+        elif new_code == TicketChatbot.STATUS_CHO_HUY:
+            ticket.cancelled_at = timezone.now()
+            ticket.cancelled_reason = request.data.get("cancelled_reason", "")
+            update_fields += ["cancelled_at", "cancelled_reason"]
+
+        ticket.save(update_fields=update_fields)
+
+        return Response(TicketChatbotSerializer(ticket).data)
+
+
+class TicketChatbotOptionsAPIView(APIView):
+    """Trả các danh sách cho dropdown trong modal 'Cập nhật tình trạng'."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        statuses = [
+            {"value": code, "label": label}
+            for code, label in TicketChatbot.STATUS_CHOICES
+        ]
+
+        sla_policies = [
+            {"id": s.id, "name": s.sla_name}
+            for s in SlaPolicy.objects.filter(is_active=True).order_by("sla_name")
+        ]
+
+        priorities = [
+            {"id": p.id, "name": p.priority_name}
+            for p in TicketPriority.objects.filter(is_active=True).order_by(
+                "level_order", "id"
+            )
+        ]
+
+        branches = [
+            {"id": b.id, "name": b.branch_name}
+            for b in Branch.objects.all().order_by("branch_name")
+        ]
+
+        units = [
+            {"id": u.id, "name": u.unit_name}
+            for u in ProcessingUnit.objects.filter(is_active=True).order_by(
+                "unit_name"
+            )
+        ]
+
+        users = [
+            {"id": u.id, "name": str(u)}
+            for u in User.objects.filter(is_active=True).order_by("username")
+        ]
+
+        return Response(
+            {
+                "statuses": statuses,
+                "sla_policies": sla_policies,
+                "priorities": priorities,
+                "branches": branches,
+                "units": units,
+                "users": users,
+            }
         )

@@ -77,6 +77,10 @@ export type ChatbotTicketItem = {
   ticket_code?: string | null;
   ticket_status?: string | null;
 
+  ticket_chatbot_id?: number | null;
+  ticket_chatbot_code?: string | null;
+  ticket_chatbot_status?: string | null;
+
   linked_status?: "LINKED" | "UNLINKED" | string | null;
 };
 

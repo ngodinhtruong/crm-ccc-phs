@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 from apps.common.models import TimeStampedModel
 
@@ -148,6 +149,16 @@ class ChatbotSessionSummary(TimeStampedModel):
         related_name="chatbot_sessions",
     )
 
+    # Ticket sinh ra ở bảng TicketChatbot riêng (luồng mới). Giữ song song với
+    # ticket cũ để không phá dữ liệu/luồng đã có.
+    ticket_chatbot = models.ForeignKey(
+        "chatbots.TicketChatbot",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="chatbot_sessions",
+    )
+
     started_at = models.DateTimeField(null=True, blank=True)
     ended_at = models.DateTimeField(null=True, blank=True)
 
@@ -179,3 +190,195 @@ class ChatbotSyncCursor(TimeStampedModel):
 
     def __str__(self):
         return self.source_name
+
+
+class TicketChatbot(TimeStampedModel):
+    """
+    Ticket sinh ra từ phiên chatbot (luồng chuyển CCC).
+
+    Tách riêng khỏi bảng Ticket chung vì dữ liệu từ chatbot rất thiếu:
+    khách chỉ cho số điện thoại HOẶC số tài khoản, có khi không tra ra
+    khách hàng, chưa có người xử lý. Nên gần như mọi cột đều cho phép null.
+    """
+
+    # --- Trạng thái xử lý (workflow của CCC) ---
+    STATUS_CHO_TIEP_NHAN = "CHO_TIEP_NHAN"      # Mới, chưa ai nhận (hàng chờ chung)
+    STATUS_TIEP_NHAN = "TIEP_NHAN"              # Đã tiếp nhận
+    STATUS_CHUYEN_PHONG_BAN = "CHUYEN_PHONG_BAN"
+    STATUS_DANG_XU_LY = "DANG_XU_LY"
+    STATUS_DA_XONG = "DA_XONG"                  # Đã xong (chờ đóng)
+    STATUS_CHO_HUY = "CHO_HUY"
+
+    STATUS_CHOICES = [
+        (STATUS_CHO_TIEP_NHAN, "Chờ tiếp nhận"),
+        (STATUS_TIEP_NHAN, "Tiếp nhận"),
+        (STATUS_CHUYEN_PHONG_BAN, "Chuyển phòng ban"),
+        (STATUS_DANG_XU_LY, "Đang xử lý"),
+        (STATUS_DA_XONG, "Đã xong (Chờ đóng)"),
+        (STATUS_CHO_HUY, "Chờ hủy"),
+    ]
+
+    # --- Trạng thái liên kết khách hàng ---
+    LINK_LINKED = "LINKED"
+    LINK_UNLINKED = "UNLINKED"
+
+    LINK_STATUS_CHOICES = [
+        (LINK_LINKED, "Đã liên kết KH"),
+        (LINK_UNLINKED, "Chưa có TK liên kết"),
+    ]
+
+    # --- Định danh ---
+    ticket_code = models.CharField(max_length=50, unique=True)
+    title = models.CharField(max_length=255, null=True, blank=True)
+
+    # Nối về phiên chat gốc; source_ref_id = session_id để chống tạo trùng
+    source_ref_id = models.CharField(max_length=100, null=True, blank=True)
+
+    # --- Thông tin liên hệ (lưu thô) ---
+    contact_info = models.CharField(max_length=255, null=True, blank=True)
+    contact_type = models.CharField(max_length=50, null=True, blank=True)
+    phone = models.CharField(max_length=50, null=True, blank=True)
+    email = models.EmailField(max_length=255, null=True, blank=True)
+    account_number = models.CharField(max_length=50, null=True, blank=True)
+
+    # --- Nối mềm khách hàng (có thì gắn, không thì để trống) ---
+    customer = models.ForeignKey(
+        "customers.Customer",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="chatbot_tickets",
+    )
+    customer_account = models.ForeignKey(
+        "customers.CustomerAccount",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="chatbot_tickets",
+    )
+    link_status = models.CharField(
+        max_length=20,
+        choices=LINK_STATUS_CHOICES,
+        default=LINK_UNLINKED,
+    )
+
+    # --- Nội dung ---
+    dashboard_category = models.CharField(max_length=255, null=True, blank=True)
+    reason = models.TextField(null=True, blank=True)
+    request_content = models.TextField(null=True, blank=True)
+    full_conversation = models.TextField(null=True, blank=True)
+    handling_solution = models.TextField(null=True, blank=True)
+
+    # --- Xử lý / phân công ---
+    # Tình trạng ticket → khóa ngoại tới danh mục chung ticket_statuses
+    current_status = models.ForeignKey(
+        "tickets.TicketStatus",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="chatbot_tickets",
+    )
+    channel = models.CharField(max_length=50, null=True, blank=True)
+
+    # Người nhận xử lý (SA) — null = chưa ai nhận, nằm hàng chờ chung
+    owner_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="owned_chatbot_tickets",
+    )
+    # Hồ sơ nhân viên tương ứng (tùy chọn, cho báo cáo)
+    assigned_employee = models.ForeignKey(
+        "branches.Employee",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assigned_chatbot_tickets",
+    )
+    handling_branch = models.ForeignKey(
+        "branches.Branch",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="handled_chatbot_tickets",
+    )
+    # Đơn vị/tổ xử lý (Phân công xử lý)
+    assigned_unit = models.ForeignKey(
+        "branches.ProcessingUnit",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assigned_chatbot_tickets",
+    )
+
+    # --- SLA & ưu tiên (dùng chung bảng gốc với ticket thường) ---
+    sla_policy = models.ForeignKey(
+        "sla.SlaPolicy",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="chatbot_tickets",
+    )
+    priority = models.ForeignKey(
+        "tickets.TicketPriority",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="chatbot_tickets",
+    )
+
+    # Có gửi khảo sát cho khách không
+    send_survey = models.BooleanField(default=False)
+
+    # --- Mốc thời gian ---
+    accepted_at = models.DateTimeField(null=True, blank=True)
+    accepted_by_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="accepted_chatbot_tickets",
+    )
+    done_at = models.DateTimeField(null=True, blank=True)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+    cancelled_reason = models.TextField(null=True, blank=True)
+
+    class Meta:
+        db_table = "ticket_chatbots"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["source_ref_id"],
+                condition=(
+                    models.Q(source_ref_id__isnull=False)
+                    & ~models.Q(source_ref_id="")
+                ),
+                name="uq_ticket_chatbot_source_ref_id",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["ticket_code"]),
+            models.Index(fields=["current_status"]),
+            models.Index(fields=["owner_user"]),
+            models.Index(fields=["link_status"]),
+            models.Index(fields=["created_at"]),
+        ]
+
+    def __str__(self):
+        return self.ticket_code
+
+    @property
+    def status_code(self):
+        """Mã trạng thái (CHO_TIEP_NHAN...) — tiện dùng lại như status text cũ."""
+        return self.current_status.status_code if self.current_status else ""
+
+    @property
+    def status_label(self):
+        return self.current_status.status_name if self.current_status else ""
+
+    @classmethod
+    def get_status(cls, code):
+        """Lấy TicketStatus theo mã (đã seed sẵn 6 trạng thái workflow CCC)."""
+        from apps.tickets.models import TicketStatus
+
+        return TicketStatus.objects.filter(status_code=code).first()

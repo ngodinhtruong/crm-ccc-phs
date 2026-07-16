@@ -1,4 +1,5 @@
-import { Search } from "lucide-react";
+import { Search, Eye } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 import { StatusPill } from "@/components/chatbot-dashboard/StatusPill";
 import { CHATBOT_TICKET_STATUS_OPTIONS } from "@/constants/chatbot-dashboard.constant";
@@ -34,6 +35,7 @@ export function TicketsTab({
   onClearPreset: () => void;
   onOpenSession: (item: ChatbotTicketItem) => void;
 }) {
+  const router = useRouter();
   const hasFilter = Boolean(category) || status !== "ALL" || Boolean(keyword);
 
   return (
@@ -130,7 +132,7 @@ export function TicketsTab({
               <th className="w-[150px] px-3 font-semibold">Thời gian</th>
               <th className="w-[90px] px-3 font-semibold">Kênh</th>
               <th className="w-[170px] px-3 font-semibold">Chủ đề</th>
-              <th className="w-[90px] px-3 font-semibold">Số lượt</th>
+              <th className="w-[90px] px-3 font-semibold"> Số lần chat</th>
               <th className="w-[180px] px-3 font-semibold">Nhóm xử lý</th>
               <th className="w-[160px] px-3 font-semibold">Thông tin KH</th>
               <th className="w-[250px] px-3 font-semibold">Câu hỏi cuối</th>
@@ -156,13 +158,32 @@ export function TicketsTab({
                 } transition hover:bg-sky-50`}
               >
                 <td className="px-3">
-                  {item.ticket_code ? (
-                    <span className="font-semibold text-sky-600">
-                      {item.ticket_code}
-                    </span>
-                  ) : (
-                    <span className="text-slate-400">—</span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {item.ticket_code ? (
+                      <span className="font-semibold text-sky-600">
+                        {item.ticket_code}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400">—</span>
+                    )}
+
+                    {item.ticket_chatbot_id && (
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          router.push(
+                            `/chatbots/tickets/${item.ticket_chatbot_id}`
+                          );
+                        }}
+                        title="Xem chi tiết ticket"
+                        className="flex items-center gap-1 rounded-md border border-sky-200 bg-sky-50 px-2 py-1 text-[11px] font-semibold text-sky-700 transition hover:bg-sky-100"
+                      >
+                        <Eye size={12} />
+                        Chi tiết
+                      </button>
+                    )}
+                  </div>
                 </td>
 
                 <td className="px-3 font-mono text-[11px] text-slate-600">
