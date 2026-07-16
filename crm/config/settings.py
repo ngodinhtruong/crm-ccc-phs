@@ -188,3 +188,22 @@ CACHES = {
 }
 CHATBOT_SYNC_INTERVAL_SECONDS = int(os.getenv("CHATBOT_SYNC_INTERVAL_SECONDS", 60))
 CHATBOT_SYNC_LOOKBACK_MINUTES = int(os.getenv("CHATBOT_SYNC_LOOKBACK_MINUTES", 30))
+
+
+ALLOWED_HOSTS = [
+    "localhost",
+    "127.0.0.1",
+    "192.168.200.133",
+]
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://192.168.200.133:3000",
+]
+
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://192.168.200.133:3000",
+]

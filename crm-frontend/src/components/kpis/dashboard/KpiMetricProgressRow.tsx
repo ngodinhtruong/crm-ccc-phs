@@ -52,11 +52,11 @@ export function KpiMetricProgressRow({
         </div>
       </td>
 
-      <td className="px-3">
+      {/* <td className="px-3">
         <span className="inline-flex rounded-md bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600">
           {item.sourceType === "AUTO" ? "CRM tự động" : "Admin nhập"}
         </span>
-      </td>
+      </td> */}
 
       <td className="whitespace-nowrap px-3">{getFrequencyLabel(item.metric.frequency)}</td>
 
@@ -70,7 +70,7 @@ export function KpiMetricProgressRow({
 
       <td className="px-3">
         <div className="flex min-w-[180px] items-center gap-2">
-          <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
+          <div className="h-3 flex-1 overflow-hidden rounded-full bg-slate-100">
             <div
               className={`h-full rounded-full ${getProgressColorClass(item.progressStatus)}`}
               style={{ width: `${width}%` }}

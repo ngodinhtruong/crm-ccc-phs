@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { authService } from "@/services/auth.service";
 import { customerService } from "@/services/customer.service";
 import { masterDataService } from "@/services/master-data.service";
+import { useUserAssignees } from "@/hooks/useUserAssignees";
 import {
   BranchOption,
   CustomerCreateFormState,
@@ -37,6 +38,8 @@ const initialForm: CustomerCreateFormState = {
   description: "",
 
   assignedTo: "",
+  assignedToLabel: "",
+
   source: "",
   rating: "",
   membershipTier: "",
@@ -61,6 +64,12 @@ function getErrorMessage(err: unknown, fallback: string) {
 
 export function useCustomerCreate() {
   const router = useRouter();
+
+  const {
+    users: assigneeUsers,
+    loading: assigneeLoading,
+    error: assigneeError,
+  } = useUserAssignees();
 
   const [branches, setBranches] = useState<BranchOption[]>([]);
   const [customerTypes, setCustomerTypes] = useState<SelectOption[]>([]);
@@ -142,6 +151,10 @@ export function useCustomerCreate() {
       return "Di động không được để trống.";
     }
 
+    if (!form.assignedTo) {
+      return "Vui lòng chọn nhân viên phụ trách ở trường Giao cho.";
+    }
+
     if (form.accountNumber.trim()) {
       if (!/^[A-Za-z0-9]{10}$/.test(form.accountNumber.trim())) {
         return "Số tài khoản phải gồm đúng 10 ký tự, chỉ bao gồm chữ và số.";
@@ -184,6 +197,7 @@ export function useCustomerCreate() {
         identity_number: form.identityNumber.trim() || undefined,
         birth_date: form.birthDate || undefined,
         gender: form.gender || undefined,
+
         customer_type: form.customerType ? Number(form.customerType) : null,
         branch: form.branch ? Number(form.branch) : null,
         company: form.company ? Number(form.company) : null,
@@ -192,6 +206,9 @@ export function useCustomerCreate() {
         membership_tier: form.membershipTier
           ? Number(form.membershipTier)
           : null,
+
+        assigned_employee: form.assignedTo ? Number(form.assignedTo) : null,
+
         address: [
           form.address,
           form.district,
@@ -206,7 +223,7 @@ export function useCustomerCreate() {
       if (form.accountNumber.trim()) {
         await customerService.createCustomerAccount({
           customer: customer.id,
-          account_number: form.accountNumber.trim(),
+          account_number: form.accountNumber.trim().toUpperCase(),
           account_status: "ACTIVE",
           source_system: "CRM_MINI",
         });
@@ -244,6 +261,10 @@ export function useCustomerCreate() {
     sources,
     ratings,
     membershipTiers,
+
+    assigneeUsers,
+    assigneeLoading,
+    assigneeError,
 
     loadingDropdowns,
     saving,

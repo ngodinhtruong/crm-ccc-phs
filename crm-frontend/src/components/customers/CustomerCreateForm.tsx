@@ -1,7 +1,7 @@
 "use client";
 
 import { Plus, Search } from "lucide-react";
-
+import { UserAssigneeCombobox } from "@/components/common";
 import {
   CustomerDateInput,
   CustomerFormField,
@@ -26,6 +26,11 @@ export function CustomerCreateForm({
     sources,
     ratings,
     membershipTiers,
+
+    assigneeUsers = [],
+    assigneeLoading,
+    assigneeError,
+
     saving,
     submit,
     cancel,
@@ -278,12 +283,30 @@ export function CustomerCreateForm({
 
         <div className="grid grid-cols-1 gap-x-12 gap-y-4 p-4 lg:grid-cols-2">
           <CustomerFormField label="Giao cho" required>
-            <input
-              value={form.assignedTo}
-              onChange={(event) => setField("assignedTo", event.target.value)}
-              placeholder="Nhân viên phụ trách"
-              className="h-9 w-full rounded border px-3 text-xs"
-            />
+            <div>
+              <UserAssigneeCombobox
+                users={assigneeUsers}
+                value={form.assignedTo}
+                label={form.assignedToLabel}
+                placeholder="Nhập tên/email nhân viên phụ trách..."
+                onChange={(userId, label) => {
+                  setField("assignedTo", userId);
+                  setField("assignedToLabel", label);
+                }}
+              />
+
+              {assigneeLoading && (
+                <p className="mt-1 text-[11px] text-slate-500">
+                  Đang tải danh sách nhân viên...
+                </p>
+              )}
+
+              {assigneeError && (
+                <p className="mt-1 text-[11px] text-red-500">
+                  {assigneeError}
+                </p>
+              )}
+            </div>
           </CustomerFormField>
 
           <CustomerFormField label="Đánh giá">

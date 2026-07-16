@@ -458,8 +458,8 @@ const panelGroupsByWorkspace: Record<
             icon: Gauge,
           },
           {
-            title: "Quản lý điểm Phần A",
-            href: "/sale-admin/kpi/manual-scores",
+            title: "Cấu hình KPI",
+            href: "/sale-admin/kpis/config",
             icon: FileCheck2,
           },
           {

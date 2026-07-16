@@ -1,12 +1,7 @@
-export type SaAdminDashboardPeriod = {
-  year: number;
-  month: number;
-  label: string;
-  start_date: string;
-  end_date: string;
-  previous_label: string;
-  previous_start_date: string;
-  previous_end_date: string;
+export type SaAdminDashboardParams = {
+  year?: string;
+  month?: string;
+  branch?: string;
 };
 
 export type SaAdminBranchOption = {
@@ -16,111 +11,86 @@ export type SaAdminBranchOption = {
 };
 
 export type SaAdminOverviewMetric = {
-  key: "total_calls" | "reactivated_accounts" | "transaction_value" | "transaction_fee" | string;
+  key: string;
   label: string;
-  value: string;
-  previous_value: string;
-  growth_percent: number | null;
-  unit: "COUNT" | "VND" | string;
+  value: number | string;
+  previous_value?: number | string | null;
+  growth_percent?: number | null;
+  unit?: "COUNT" | "VND" | "PERCENT" | string | null;
 };
 
 export type SaAdminBranchRankingRow = {
-  rank: number;
   branch_id: number;
   branch_name: string;
+  rank: number;
   total_calls: number;
   reactivated_accounts: number;
   potential_active_accounts: number;
-  transaction_fee: string;
-  previous_transaction_fee: string;
-  mom_growth_percent: number | null;
+  transaction_fee: number | string;
+  mom_growth_percent?: number | null;
 };
 
 export type SaAdminBranchFeeChartRow = {
   branch_id: number;
   branch_name: string;
-  current_fee: string;
-  previous_fee: string;
+  current_fee: number | string;
+  previous_fee: number | string;
 };
 
-export type SaAdminEmployeeAccount = {
+export type SaAdminAccountRow = {
   account_no: string;
-  customer_name: string;
-  branch_name: string;
-  transaction_fee: string;
-  transaction_value: string;
+  customer_name?: string | null;
+  branch_name?: string | null;
+  transaction_fee: number | string;
+  transaction_value: number | string;
   order_count: number;
   call_date?: string | null;
 };
 
 export type SaAdminTopEmployeeRow = {
-  rank: number;
   user_id: number;
-  employee_id?: number | null;
+  username?: string | null;
+  email?: string | null;
   employee_name: string;
-  username: string;
-  email: string;
-  branch_id?: number | null;
   branch_name: string;
-  reactivated_accounts: number;
-  raw_reactivated_accounts: number;
+  rank: number;
   total_calls: number;
-  transaction_fee: string;
-  transaction_value: string;
-  accounts: SaAdminEmployeeAccount[];
+  reactivated_accounts: number;
+  transaction_fee: number | string;
+  transaction_value: number | string;
+  accounts: SaAdminAccountRow[];
 };
 
-export type SaAdminTopAccountRow = {
-  account_no: string;
-  customer_name: string;
-  branch_name: string;
-  transaction_fee: string;
-  transaction_value: string;
-  order_count: number;
-  pic_user_id?: number | null;
-  pic_name: string;
+export type SaAdminTopAccountRow = SaAdminAccountRow & {
+  pic_name?: string | null;
 };
 
 export type SaAdminProductFeeRow = {
   product_code: string;
   product_name: string;
-  transaction_fee: string;
-  transaction_value: string;
-  order_count: number;
+  transaction_fee: number | string;
 };
 
 export type SaAdminIcpDistributionRow = {
   icp_type: string;
   icp_code?: string | null;
-  icp_name?: string | null;
   label: string;
   count: number;
   percent: number;
 };
 
-export type SaAdminDashboardPayload = {
-  period: SaAdminDashboardPeriod;
-  filters: {
-    branch: string;
-    branch_options: SaAdminBranchOption[];
-  };
-  overview: SaAdminOverviewMetric[];
-  branch_ranking: SaAdminBranchRankingRow[];
-  branch_fee_chart: SaAdminBranchFeeChartRow[];
-  top_employees: SaAdminTopEmployeeRow[];
-  top_employee_chart: SaAdminTopEmployeeRow[];
-  top_accounts: SaAdminTopAccountRow[];
-  product_fee_chart: SaAdminProductFeeRow[];
-  icp_distribution: SaAdminIcpDistributionRow[];
-  meta: {
-    data_sources: string[];
-    matched_status: string;
-    potential_account_rule: string;
-  };
+export type SaAdminDashboardFilters = {
+  branch_options: SaAdminBranchOption[];
 };
 
-export type SaAdminDashboardParams = {
-  year?: string;
-  month?: string;
-  branch?: string;
+export type SaAdminDashboardResponse = {
+  generated_at?: string | null;
+  filters: SaAdminDashboardFilters;
+  overview: SaAdminOverviewMetric[];
+  branch_ranking: SaAdminBranchRankingRow[];
+  fee_by_branch: SaAdminBranchFeeChartRow[];
+  top_employees: SaAdminTopEmployeeRow[];
+  top_accounts: SaAdminTopAccountRow[];
+  product_fee: SaAdminProductFeeRow[];
+  icp_distribution: SaAdminIcpDistributionRow[];
 };

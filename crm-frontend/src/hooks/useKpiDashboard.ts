@@ -227,8 +227,8 @@ function buildProgressMetric(
   result: KpiUserMetricResultItem | null,
   group?: KpiGroupItem
 ): KpiProgressMetric {
-  const sourceType =
-    result?.source_type === "AUTO" ? "AUTO" : inferSourceType(metric, group);
+  // const sourceType =
+  //   result?.source_type === "AUTO" ? "AUTO" : inferSourceType(metric, group);
   const targetValue = toNumber(result?.target_value ?? metric.target_value);
   const actualValue = toNumber(result?.actual_value);
   const score = toNumber(result?.score);
@@ -250,7 +250,7 @@ function buildProgressMetric(
     targetValue: targetValue ?? (score !== null ? 100 : null),
     progressPercent,
     progressStatus: getProgressStatus(progressPercent),
-    sourceType,
+    // sourceType,
     displayActual:
       actualValue !== null
         ? `${formatNumber(actualValue)}${displayUnit}`

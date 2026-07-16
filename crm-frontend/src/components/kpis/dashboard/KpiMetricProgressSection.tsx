@@ -63,7 +63,6 @@ export function KpiMetricProgressSection({
                           </th>
                           <th className="w-[120px] px-3 font-semibold">Mã KPI</th>
                           <th className="w-[300px] px-3 font-semibold">Tên KPI</th>
-                          <th className="w-[120px] px-3 font-semibold">Nguồn</th>
                           <th className="w-[100px] px-3 font-semibold">Tần suất</th>
                           <th className="w-[100px] px-3 font-semibold">Đơn vị</th>
                           <th className="w-[120px] px-3 font-semibold">Thực tế</th>

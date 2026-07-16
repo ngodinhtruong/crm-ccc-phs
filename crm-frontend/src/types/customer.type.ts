@@ -162,7 +162,7 @@ export type CustomerCreateFormState = {
     openedDate: string;
     referrer: string;
     company: string;
-
+    assignedToLabel: string;
     address: string;
     province: string;
     country: string;

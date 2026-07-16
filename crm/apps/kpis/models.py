@@ -8,6 +8,15 @@ from django.db.models import Sum
 from apps.common.models import TimeStampedModel
 
 
+from decimal import Decimal, ROUND_HALF_UP
+
+
+def normalize_weight(value):
+    if value is None:
+        return Decimal("0.00")
+
+    return Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
 class KpiPeriod(TimeStampedModel):
     PERIOD_MONTH = "MONTH"
     PERIOD_QUARTER = "QUARTER"
@@ -176,32 +185,33 @@ class KpiProfile(TimeStampedModel):
             group__section__is_active=True,
         )
 
-        section_total = (
-            sections.aggregate(total=Sum("weight_percent"))["total"] or Decimal("0")
-        ).quantize(Decimal("0.01"))
-        group_total = (
-            groups.aggregate(total=Sum("weight_percent"))["total"] or Decimal("0")
-        ).quantize(Decimal("0.01"))
-        metric_total = (
-            metrics.aggregate(total=Sum("weight_percent"))["total"] or Decimal("0")
-        ).quantize(Decimal("0.01"))
+        expected_total = normalize_weight(self.total_weight)
 
-        if section_total != self.total_weight:
+        section_total = normalize_weight(
+            self.sections.filter(is_active=True).aggregate(total=Sum("weight_percent"))["total"]
+        )
+
+        group_total = normalize_weight(
+            self.groups.filter(is_active=True).aggregate(total=Sum("weight_percent"))["total"]
+        )
+
+        metric_total = normalize_weight(
+            self.metrics.filter(is_active=True, group__is_active=True).aggregate(total=Sum("weight_percent"))["total"]
+        )
+
+        if section_total != expected_total:
             errors.append(
-                f"[{self.profile_code}] Tổng trọng số phần KPI hiện là {section_total}%, "
-                f"phải bằng {self.total_weight}%."
+                f"[{self.profile_code}] Tổng trọng số phần KPI hiện là {section_total}%, phải bằng {expected_total}%."
             )
 
-        if group_total != self.total_weight:
+        if group_total != expected_total:
             errors.append(
-                f"[{self.profile_code}] Tổng trọng số nhóm KPI hiện là {group_total}%, "
-                f"phải bằng {self.total_weight}%."
+                f"[{self.profile_code}] Tổng trọng số nhóm KPI hiện là {group_total}%, phải bằng {expected_total}%."
             )
 
-        if metric_total != self.total_weight:
+        if metric_total != expected_total:
             errors.append(
-                f"[{self.profile_code}] Tổng trọng số KPI chi tiết hiện là {metric_total}%, "
-                f"phải bằng {self.total_weight}%."
+                f"[{self.profile_code}] Tổng trọng số KPI chi tiết hiện là {metric_total}%, phải bằng {expected_total}%."
             )
 
         for section in sections:
