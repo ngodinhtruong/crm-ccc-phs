@@ -65,3 +65,19 @@ class SaRecordAuditLogPermission(BasePermission):
             user,
             PermissionCode.SA_RECORD_AUDIT_VIEW,
         )
+
+
+class SaDashboardPermission(BasePermission):
+    def has_permission(self, request, view):
+        user = request.user
+
+        if not user or not user.is_authenticated:
+            return False
+
+        if user.is_superuser:
+            return True
+
+        return PermissionService.has_permission(
+            user,
+            PermissionCode.SA_DASHBOARD_VIEW,
+        )

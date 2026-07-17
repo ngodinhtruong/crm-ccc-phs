@@ -1,5 +1,6 @@
 from django.contrib.auth import get_user_model
-from django.db.models import Count
+from django.db import models
+from django.db.models import Count, Q, Sum
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -287,5 +288,473 @@ class HomeDashboardAPIView(APIView):
                     },
                 ],
                 "total_tickets": total_tickets,
+            }
+        )
+
+
+def _get_model_field(model_class, field_name):
+    try:
+        return model_class._meta.get_field(field_name)
+    except Exception:
+        return None
+
+
+def _has_model_field(model_class, field_name):
+    return _get_model_field(model_class, field_name) is not None
+
+
+def _first_existing_field(model_class, candidates):
+    for field_name in candidates:
+        if _has_model_field(model_class, field_name):
+            return field_name
+
+    return None
+
+
+def _apply_date_range(queryset, field_name, date_from=None, date_to=None):
+    if not field_name:
+        return queryset
+
+    model_field = _get_model_field(queryset.model, field_name)
+
+    if not model_field:
+        return queryset
+
+    lookup_field = f"{field_name}__date" if isinstance(model_field, models.DateTimeField) else field_name
+
+    if date_from:
+        queryset = queryset.filter(**{f"{lookup_field}__gte": date_from})
+
+    if date_to:
+        queryset = queryset.filter(**{f"{lookup_field}__lte": date_to})
+
+    return queryset
+
+
+def _chart_from_queryset(queryset, label_path, empty_label="Không rõ", limit=None):
+    rows = (
+        queryset.values(label_path)
+        .annotate(value=Count("id"))
+        .order_by("-value", label_path)
+    )
+
+    if limit:
+        rows = rows[:limit]
+
+    return [
+        {
+            "name": item.get(label_path) or empty_label,
+            "value": item["value"],
+        }
+        for item in rows
+    ]
+
+
+def _sum_field(queryset, field_name):
+    if not field_name:
+        return 0
+
+    return queryset.aggregate(total=Sum(field_name))["total"] or 0
+
+
+def _transaction_account_values(transactions_qs, transaction_model):
+    if _has_model_field(transaction_model, "account_no"):
+        return transactions_qs.exclude(account_no__isnull=True).exclude(account_no="").values_list(
+            "account_no",
+            flat=True,
+        )
+
+    if _has_model_field(transaction_model, "customer_account"):
+        return transactions_qs.exclude(customer_account__isnull=True).values_list(
+            "customer_account__account_number",
+            flat=True,
+        )
+
+    return []
+
+
+def _filter_transactions_by_branch(transactions_qs, transaction_model, branch_id):
+    if not branch_id:
+        return transactions_qs
+
+    if _has_model_field(transaction_model, "branch"):
+        return transactions_qs.filter(branch_id=branch_id)
+
+    if _has_model_field(transaction_model, "customer"):
+        return transactions_qs.filter(customer__branch_id=branch_id)
+
+    if _has_model_field(transaction_model, "customer_account"):
+        return transactions_qs.filter(customer_account__customer__branch_id=branch_id)
+
+    if _has_model_field(transaction_model, "account_no"):
+        from apps.customers.models import CustomerAccount
+
+        branch_accounts = CustomerAccount.objects.filter(
+            customer__branch_id=branch_id
+        ).values_list("account_number", flat=True)
+
+        return transactions_qs.filter(account_no__in=branch_accounts)
+
+    return transactions_qs
+
+
+def _filter_valid_matched_transactions(transactions_qs, transaction_model):
+    status_field = _first_existing_field(
+        transaction_model,
+        ["order_status", "status", "transaction_status"],
+    )
+
+    if not status_field:
+        return transactions_qs
+
+    cancelled_query = (
+        Q(**{f"{status_field}__iexact": "CANCELLED"})
+        | Q(**{f"{status_field}__iexact": "CANCELED"})
+        | Q(**{f"{status_field}__iexact": "REJECTED"})
+        | Q(**{f"{status_field}__icontains": "HUY"})
+        | Q(**{f"{status_field}__icontains": "HỦY"})
+        | Q(**{f"{status_field}__icontains": "CANCEL"})
+        | Q(**{f"{status_field}__icontains": "REJECT"})
+    )
+
+    return transactions_qs.exclude(cancelled_query)
+
+
+def _direct_field_chart(queryset, model_class, candidates, empty_label="Không rõ", limit=None):
+    field_name = _first_existing_field(model_class, candidates)
+
+    if not field_name:
+        return []
+
+    return _chart_from_queryset(queryset, field_name, empty_label, limit=limit)
+
+
+class GeneralDashboardAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        branch = request.query_params.get("branch") or None
+        date_from = request.query_params.get("date_from") or None
+        date_to = request.query_params.get("date_to") or None
+
+        if branch and branch.lower() == "all":
+            branch = None
+
+        from apps.branches.models import Branch
+        from apps.customers.models import Customer, CustomerAccount
+        from apps.tickets.models import Ticket
+        from apps.sale_admin.models import SaRecord
+
+        try:
+            from apps.kpis.models import TransactionLog
+        except Exception:
+            TransactionLog = None
+
+        customers_qs = Customer.objects.select_related(
+            "branch",
+            "customer_type",
+            "membership_tier",
+            "source",
+        ).all()
+        tickets_qs = Ticket.objects.select_related(
+            "handling_branch",
+            "current_status",
+            "support_category",
+            "source",
+            "priority",
+            "classification",
+            "customer_account",
+        ).all()
+        records_qs = SaRecord.objects.select_related(
+            "branch",
+            "pic_employee",
+            "pic_user",
+            "call_result",
+            "interest_level",
+            "icp_group",
+        ).all()
+
+        if branch:
+            customers_qs = customers_qs.filter(branch_id=branch)
+            tickets_qs = tickets_qs.filter(handling_branch_id=branch)
+            records_qs = records_qs.filter(branch_id=branch)
+
+        customers_qs = _apply_date_range(customers_qs, "created_at", date_from, date_to)
+        tickets_qs = _apply_date_range(tickets_qs, "created_at", date_from, date_to)
+        records_qs = _apply_date_range(records_qs, "call_date", date_from, date_to)
+
+        if TransactionLog:
+            transactions_qs = TransactionLog.objects.all()
+            transactions_qs = _filter_transactions_by_branch(
+                transactions_qs,
+                TransactionLog,
+                branch,
+            )
+
+            transaction_date_field = _first_existing_field(
+                TransactionLog,
+                ["transaction_date", "trading_date", "order_date", "matched_at", "created_at"],
+            )
+            transactions_qs = _apply_date_range(
+                transactions_qs,
+                transaction_date_field,
+                date_from,
+                date_to,
+            )
+        else:
+            transactions_qs = None
+
+        total_customers = customers_qs.count()
+        total_tickets = tickets_qs.count()
+        unlinked_tickets = tickets_qs.filter(customer_account__isnull=True).count()
+
+        total_transactions = transactions_qs.count() if transactions_qs is not None else 0
+
+        if transactions_qs is not None:
+            account_values = _transaction_account_values(transactions_qs, TransactionLog)
+
+            if _has_model_field(TransactionLog, "customer"):
+                active_customer_ids = transactions_qs.exclude(customer__isnull=True).values_list(
+                    "customer_id",
+                    flat=True,
+                )
+                active_customers = customers_qs.filter(id__in=active_customer_ids).distinct().count()
+            elif account_values:
+                active_customers = customers_qs.filter(
+                    accounts__account_number__in=account_values
+                ).distinct().count()
+            else:
+                active_customers = 0
+
+            fee_field = _first_existing_field(
+                TransactionLog,
+                ["transaction_fee", "fee", "matched_fee", "commission_fee"],
+            )
+            value_field = _first_existing_field(
+                TransactionLog,
+                ["transaction_value", "matched_value", "value", "amount"],
+            )
+
+            total_fees = _sum_field(transactions_qs, fee_field)
+            matched_value_sum = _sum_field(
+                _filter_valid_matched_transactions(transactions_qs, TransactionLog),
+                value_field,
+            )
+        else:
+            account_values = []
+            active_customers = 0
+            fee_field = None
+            value_field = None
+            total_fees = 0
+            matched_value_sum = 0
+
+        grouped_customers_count = customers_qs.filter(
+            sa_records__icp_group__isnull=False
+        ).distinct().count()
+        icp_score = round((grouped_customers_count / total_customers * 100), 1) if total_customers else 0
+
+        avg_ltv = round(float(total_fees) / active_customers, 2) if active_customers else 0
+
+        reactivated_records_qs = records_qs.filter(reactivation=True)
+        total_reactivated_records = reactivated_records_qs.count()
+
+        if transactions_qs is not None and account_values:
+            reactivated_with_trades = reactivated_records_qs.filter(
+                account_no__in=account_values
+            ).values("account_no").distinct().count()
+        else:
+            reactivated_with_trades = 0
+
+        aar_score = (
+            round((reactivated_with_trades / total_reactivated_records * 100), 1)
+            if total_reactivated_records
+            else 0
+        )
+
+        churn_count = max(total_customers - active_customers, 0)
+        churn_rate = round((churn_count / total_customers * 100), 1) if total_customers else 0
+
+        referral_count = customers_qs.filter(source__source_code__iexact="REFERRAL").count()
+        referral_rate = round((referral_count / total_customers * 100), 1) if total_customers else 0
+
+        if transactions_qs is not None:
+            product_type_dist = _direct_field_chart(
+                transactions_qs,
+                TransactionLog,
+                ["product_code", "product_type", "product_name", "product"],
+                "Khác",
+                limit=12,
+            )
+            channel_dist = _direct_field_chart(
+                transactions_qs,
+                TransactionLog,
+                ["source_system", "channel", "source"],
+                "Không rõ",
+                limit=12,
+            )
+            order_status_dist = _direct_field_chart(
+                transactions_qs,
+                TransactionLog,
+                ["order_status", "status", "transaction_status"],
+                "Không rõ",
+                limit=12,
+            )
+            top_tickers_dist = _direct_field_chart(
+                transactions_qs,
+                TransactionLog,
+                ["ticker", "stock_code", "symbol", "security_code"],
+                "Không rõ",
+                limit=10,
+            )
+
+            side_field = _first_existing_field(
+                TransactionLog,
+                ["side", "order_side", "buy_sell", "transaction_type"],
+            )
+            buy_sell_dist = (
+                _chart_from_queryset(transactions_qs, side_field, "Không rõ", limit=8)
+                if side_field
+                else []
+            )
+        else:
+            product_type_dist = []
+            channel_dist = []
+            order_status_dist = []
+            top_tickers_dist = []
+            buy_sell_dist = []
+
+        branch_options = [
+            {
+                "id": "all",
+                "name": "Tất cả Chi nhánh",
+            }
+        ] + [
+            {
+                "id": str(item["id"]),
+                "name": item["branch_name"],
+            }
+            for item in Branch.objects.order_by("branch_name").values("id", "branch_name")
+        ]
+
+        return Response(
+            {
+                "filters": {
+                    "branch": branch or "all",
+                    "date_from": date_from or "",
+                    "date_to": date_to or "",
+                    "branch_options": branch_options,
+                },
+                "overview": {
+                    "total_customers": total_customers,
+                    "active_customers": active_customers,
+                    "total_tickets": total_tickets,
+                    "unlinked_tickets": unlinked_tickets,
+                    "total_transactions": total_transactions,
+                    "matched_value": float(matched_value_sum or 0),
+                },
+                "portfolio_health": {
+                    "icp_score": icp_score,
+                    "grouped_customers": grouped_customers_count,
+                    "total_customers_health": total_customers,
+                    "avg_ltv": avg_ltv,
+                    "avg_ltv_fees": float(total_fees or 0),
+                    "active_customers_ltv": active_customers,
+                    "aar": aar_score,
+                    "reactivated_with_trades": reactivated_with_trades,
+                    "total_reactivated_records": total_reactivated_records,
+                    "churn": churn_rate,
+                    "churn_count": churn_count,
+                    "referral": referral_rate,
+                    "referral_count": referral_count,
+                },
+                "charts": {
+                    "vip_tier_distribution": _chart_from_queryset(
+                        customers_qs,
+                        "membership_tier__tier_name",
+                        "Chưa phân hạng",
+                        limit=12,
+                    ),
+                    "branch_distribution": _chart_from_queryset(
+                        customers_qs,
+                        "branch__branch_name",
+                        "Chưa có chi nhánh",
+                        limit=12,
+                    ),
+                    "customer_type_distribution": _chart_from_queryset(
+                        customers_qs,
+                        "customer_type__type_name",
+                        "Chưa phân loại",
+                        limit=12,
+                    ),
+                    "ticket_status_distribution": _chart_from_queryset(
+                        tickets_qs,
+                        "current_status__status_name",
+                        "Chưa có trạng thái",
+                        limit=12,
+                    ),
+                    "ticket_category_distribution": _chart_from_queryset(
+                        tickets_qs,
+                        "support_category__category_name",
+                        "Khác",
+                        limit=14,
+                    ),
+                    "ticket_source_distribution": _chart_from_queryset(
+                        tickets_qs,
+                        "source__source_name",
+                        "Không rõ",
+                        limit=12,
+                    ),
+                    "ticket_priority_distribution": _chart_from_queryset(
+                        tickets_qs,
+                        "priority__priority_name",
+                        "Chưa có mức ưu tiên",
+                        limit=12,
+                    ),
+                    "ticket_classification_distribution": _chart_from_queryset(
+                        tickets_qs,
+                        "classification__classification_name",
+                        "Khác",
+                        limit=20,
+                    ),
+                    "customer_group_distribution": _chart_from_queryset(
+                        records_qs,
+                        "icp_group__icp_name",
+                        "Chưa phân nhóm",
+                        limit=12,
+                    ),
+                    "call_result_distribution": _chart_from_queryset(
+                        records_qs,
+                        "call_result__result_name",
+                        "Không rõ",
+                        limit=12,
+                    ),
+                    "interest_level_distribution": _chart_from_queryset(
+                        records_qs,
+                        "interest_level__level_name",
+                        "Chưa đánh giá",
+                        limit=12,
+                    ),
+                    "pic_distribution": _chart_from_queryset(
+                        records_qs,
+                        "pic_employee__full_name",
+                        "Chưa phân công",
+                        limit=12,
+                    ),
+                    "campaign_distribution": [
+                        {
+                            "name": "Tái kích hoạt",
+                            "value": records_qs.filter(reactivation=True).count(),
+                        },
+                        {
+                            "name": "Liên hệ khác",
+                            "value": records_qs.filter(reactivation=False).count(),
+                        },
+                    ],
+                    "product_type_distribution": product_type_dist,
+                    "channel_distribution": channel_dist,
+                    "order_status_distribution": order_status_dist,
+                    "buy_sell_distribution": buy_sell_dist,
+                    "top_tickers_distribution": top_tickers_dist,
+                },
             }
         )
