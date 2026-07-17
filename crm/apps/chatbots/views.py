@@ -431,12 +431,17 @@ class TicketChatbotListAPIView(generics.ListAPIView):
         status_value = self.request.query_params.get("status")
         link_status = self.request.query_params.get("link_status")
         keyword = self.request.query_params.get("q")
+        customer = self.request.query_params.get("customer")
 
         if status_value:
             queryset = queryset.filter(current_status__status_code=status_value)
 
         if link_status:
             queryset = queryset.filter(link_status=link_status)
+
+        # Lọc ticket chatbot của một khách hàng (dùng ở trang chi tiết KH)
+        if customer:
+            queryset = queryset.filter(customer_id=customer)
 
         if self.request.query_params.get("mine") == "true":
             queryset = queryset.filter(owner_user=self.request.user)

@@ -1,5 +1,7 @@
 import re
 
+from django.contrib.auth import get_user_model
+from django.utils import timezone
 from rest_framework import serializers
 
 from apps.customers.models import (
@@ -12,6 +14,8 @@ from apps.customers.models import (
     CustomerType,
     MembershipTier,
 )
+
+User = get_user_model()
 
 
 class CustomerTypeSerializer(serializers.ModelSerializer):
@@ -156,9 +160,65 @@ class CustomerSerializer(serializers.ModelSerializer):
     birth_date_display = serializers.SerializerMethodField()
     description_display = serializers.SerializerMethodField()
 
+    # Nhân viên phụ trách không phải cột của Customer — nó nằm ở bảng
+    # CustomerEmployeeAssignment. Nhận id User ở đây rồi tự map sang Employee.
+    assigned_employee = serializers.IntegerField(
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
+
     class Meta:
         model = Customer
         fields = "__all__"
+
+    def create(self, validated_data):
+        assigned_user_id = validated_data.pop("assigned_employee", None)
+        customer = super().create(validated_data)
+
+        if assigned_user_id:
+            self._assign_employee(customer, assigned_user_id)
+
+        return customer
+
+    def update(self, instance, validated_data):
+        assigned_user_id = validated_data.pop("assigned_employee", None)
+        customer = super().update(instance, validated_data)
+
+        if assigned_user_id:
+            self._assign_employee(customer, assigned_user_id)
+
+        return customer
+
+    def _assign_employee(self, customer, user_id):
+        """Gán nhân viên phụ trách: nhận id User → tra ra Employee → ghi assignment."""
+        user = User.objects.filter(pk=user_id).select_related("employee").first()
+        employee = getattr(user, "employee", None) if user else None
+
+        if not employee:
+            return
+
+        request = self.context.get("request")
+        now = timezone.now()
+
+        # Đóng phân công cũ để mỗi khách chỉ có một người phụ trách hiện hành
+        CustomerEmployeeAssignment.objects.filter(
+            customer=customer,
+            is_current=True,
+        ).exclude(employee=employee).update(is_current=False, unassigned_at=now)
+
+        CustomerEmployeeAssignment.objects.update_or_create(
+            customer=customer,
+            employee=employee,
+            defaults={
+                "role_type": "BROKER",
+                "is_current": True,
+                "assigned_at": now,
+                "assigned_by_user": getattr(request, "user", None),
+                "created_at": now,
+                "updated_at": now,
+            },
+        )
 
     def get_branch_name(self, obj):
         return obj.branch.branch_name if obj.branch else ""
