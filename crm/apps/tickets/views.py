@@ -1,6 +1,7 @@
 from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Q
+from django.utils import timezone
 
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
@@ -22,6 +23,7 @@ from apps.tickets.serializers import (
 
 from apps.tickets.models import (
     Ticket,
+    TicketFeedback,
     TicketSupportCategory,
     TicketClassification,
     TicketStatus,
@@ -551,3 +553,29 @@ class TicketViewSet(
         ticket.refresh_from_db()
         read_serializer = TicketReadSerializer(ticket)
         return Response(read_serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="survey")
+    def survey(self, request, pk=None):
+        """Đánh dấu gửi khảo sát hài lòng cho ticket (tạo/cập nhật TicketFeedback)."""
+        ticket = self.get_object()
+        send = bool(request.data.get("send_survey"))
+
+        feedback, _ = TicketFeedback.objects.update_or_create(
+            ticket=ticket,
+            defaults={
+                "customer": ticket.customer,
+                "survey_sent": send,
+                "survey_status": "SENT" if send else "NOT_SENT",
+                "sent_at": timezone.now() if send else None,
+                "updated_at": timezone.now(),
+            },
+        )
+
+        return Response(
+            {
+                "ticket": ticket.id,
+                "survey_sent": feedback.survey_sent,
+                "survey_status": feedback.survey_status,
+            },
+            status=status.HTTP_200_OK,
+        )

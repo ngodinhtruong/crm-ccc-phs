@@ -1,4 +1,5 @@
 from rest_framework import viewsets
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 
 from apps.branches.models import Branch, Employee, ProcessingUnit
@@ -30,8 +31,20 @@ from apps.accounts.scopes import (
 )
 
 
+class MasterDataPagination(PageNumberPagination):
+    """
+    Master data dùng để đổ dropdown nên client cần lấy hết trong 1 lần.
+    Mặc định của DRF là 20 dòng/trang và không cho đổi → dropdown mất lựa chọn.
+    """
+
+    page_size = 200
+    page_size_query_param = "page_size"
+    max_page_size = 1000
+
+
 class BranchViewSet(viewsets.ModelViewSet):
     permission_classes = [MasterDataPermission]
+    pagination_class = MasterDataPagination
     serializer_class = BranchSerializer
 
     def get_queryset(self):
@@ -41,6 +54,7 @@ class BranchViewSet(viewsets.ModelViewSet):
 
 class EmployeeViewSet(viewsets.ModelViewSet):
     permission_classes = [MasterDataPermission]
+    pagination_class = MasterDataPagination
     serializer_class = EmployeeSerializer
 
     def get_queryset(self):
@@ -50,47 +64,55 @@ class EmployeeViewSet(viewsets.ModelViewSet):
 
 class ProcessingUnitViewSet(viewsets.ModelViewSet):
     permission_classes = [MasterDataPermission]
+    pagination_class = MasterDataPagination
     serializer_class = ProcessingUnitSerializer
     queryset = ProcessingUnit.objects.select_related("default_branch").all().order_by("id")
 
 
 class TicketStatusViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated]
+    pagination_class = MasterDataPagination
     serializer_class = TicketStatusSerializer
     queryset = TicketStatus.objects.filter(is_active=True).order_by("sort_order", "id")
 
 
 class TicketPriorityViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated]
+    pagination_class = MasterDataPagination
     serializer_class = TicketPrioritySerializer
     queryset = TicketPriority.objects.filter(is_active=True).order_by("level_order", "id")
 
 
 class TicketSourceViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated]
+    pagination_class = MasterDataPagination
     serializer_class = TicketSourceSerializer
     queryset = TicketSource.objects.filter(is_active=True).order_by("id")
 
 
 class TicketSupportCategoryViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated]
+    pagination_class = MasterDataPagination
     serializer_class = TicketSupportCategorySerializer
     queryset = TicketSupportCategory.objects.filter(is_active=True).select_related("parent").order_by("sort_order", "id")
 
 
 class TicketClassificationViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated]
+    pagination_class = MasterDataPagination
     serializer_class = TicketClassificationSerializer
     queryset = TicketClassification.objects.filter(is_active=True).select_related("support_category").order_by("sort_order", "id")
 
 
 class SlaPolicyViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated]
+    pagination_class = MasterDataPagination
     serializer_class = SlaPolicySerializer
     queryset = SlaPolicy.objects.filter(is_active=True).order_by("id")
 
 
 class SlaBreachReasonViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated]
+    pagination_class = MasterDataPagination
     serializer_class = SlaBreachReasonSerializer
     queryset = SlaBreachReason.objects.filter(is_active=True).order_by("sort_order", "id")

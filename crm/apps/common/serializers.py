@@ -134,10 +134,14 @@ class TicketClassificationSerializer(serializers.ModelSerializer):
 class SlaPolicySerializer(serializers.ModelSerializer):
     class Meta:
         model = SlaPolicy
+        # sla_code đã bị xóa khỏi model ở migration sla/0003 — không khai lại ở đây
         fields = [
             "id",
-            "sla_code",
             "sla_name",
+            "description",
+            "support_category",
+            "classification",
+            "priority",
             "status",
             "version",
             "response_time_minutes",
