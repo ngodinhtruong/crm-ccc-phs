@@ -68,7 +68,7 @@ export function getDefaultHomePath(user?: CurrentUser | null): string {
   if (!user) return "/login";
 
   if (isSystemOrGlobalAdmin(user)) {
-    return getDefaultPathByWorkspace("CCC");
+    return "/dashboard";
   }
 
   if (isSaleAdminKpiHomeUser(user)) {
@@ -78,14 +78,14 @@ export function getDefaultHomePath(user?: CurrentUser | null): string {
   const groups = user.accessible_groups || [];
 
   if (groups.includes("CCC")) {
-    return getDefaultPathByWorkspace("CCC");
+    return "/dashboard";
   }
 
   if (groups.includes("SALE_ADMIN")) {
     return getDefaultPathByWorkspace("SALE_ADMIN");
   }
 
-  return getDefaultPathByWorkspace("CCC");
+  return "/dashboard";
 }
 
 export function getDefaultWorkspaceByUser(user?: CurrentUser | null): WorkspaceCode {
