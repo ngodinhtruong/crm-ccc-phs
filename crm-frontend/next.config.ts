@@ -6,7 +6,9 @@ const BACKEND_URL = process.env.BACKEND_URL || "http://127.0.0.1:8000";
 const nextConfig: NextConfig = {
   allowedDevOrigins: [
     "192.168.200.133",
-    "http://192.168.2.16"
+    "http://192.168.2.16",
+    "13.215.176.236",
+    "http:13.215.176.236"
   ],
   /**
    * Giữ nguyên URL, không để Next.js trả 308 redirect cắt dấu "/" cuối —
