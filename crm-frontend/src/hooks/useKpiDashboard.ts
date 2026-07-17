@@ -1,4 +1,5 @@
 "use client";
+import { getErrorMessage } from "@/utils/error.util";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -58,24 +59,6 @@ function formatApiErrorData(data: unknown): string {
   }
 
   return String(data);
-}
-
-function getErrorMessage(err: unknown, fallback: string) {
-  const error = err as {
-    response?: {
-      status?: number;
-      data?: unknown;
-    };
-    message?: string;
-  };
-
-  const apiMessage = formatApiErrorData(error?.response?.data);
-
-  if (apiMessage) return `${fallback}. ${apiMessage}`;
-
-  return `${fallback}. Status: ${error?.response?.status || "unknown"} - ${
-    error?.message || "Không rõ lỗi"
-  }`;
 }
 
 function toNumber(value?: string | number | null) {
@@ -227,8 +210,8 @@ function buildProgressMetric(
   result: KpiUserMetricResultItem | null,
   group?: KpiGroupItem
 ): KpiProgressMetric {
-  // const sourceType =
-  //   result?.source_type === "AUTO" ? "AUTO" : inferSourceType(metric, group);
+  const sourceType =
+    result?.source_type === "AUTO" ? "AUTO" : inferSourceType(metric, group);
   const targetValue = toNumber(result?.target_value ?? metric.target_value);
   const actualValue = toNumber(result?.actual_value);
   const score = toNumber(result?.score);
@@ -250,7 +233,7 @@ function buildProgressMetric(
     targetValue: targetValue ?? (score !== null ? 100 : null),
     progressPercent,
     progressStatus: getProgressStatus(progressPercent),
-    // sourceType,
+    sourceType,
     displayActual:
       actualValue !== null
         ? `${formatNumber(actualValue)}${displayUnit}`

@@ -1,6 +1,7 @@
 "use client";
+import { getErrorMessage } from "@/utils/error.util";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { useDebounce } from "@/hooks/useDebounce";
@@ -17,23 +18,6 @@ import {
 } from "@/types/ticket.type";
 
 import { useTablePagination } from "@/hooks/useTablePagination";
-
-function getErrorMessage(err: unknown, fallback: string) {
-    const error = err as {
-        response?: {
-            status?: number;
-            data?: unknown;
-        };
-        message?: string;
-    };
-
-    const status = error?.response?.status || "unknown";
-    const detail = error?.response?.data
-        ? JSON.stringify(error.response.data)
-        : error?.message;
-
-    return `${fallback}. Status: ${status} - ${detail}`;
-}
 
 export function useTickets() {
     const router = useRouter();
@@ -54,28 +38,114 @@ export function useTickets() {
     const [errorGroups, setErrorGroups] = useState<TicketErrorGroupOption[]>([]);
     const [errorTypes, setErrorTypes] = useState<TicketErrorTypeOption[]>([]);
 
-    const [ticketCode, setTicketCode] = useState("");
-    const [classificationMethod, setClassificationMethod] = useState("");
-    const [accountLinkStatus, setAccountLinkStatus] = useState("");
-    const [accountNumber, setAccountNumber] = useState("");
+    // Grouping all filter states into one object to optimize renders and make reset cleaner
+    const [filters, setFilters] = useState({
+        ticketCode: "",
+        classificationMethod: "",
+        accountLinkStatus: "",
+        accountNumber: "",
+        supportCategory: "",
+        classification: "",
+        currentStatus: "",
+        isErrorTicket: "",
+        errorGroup: "",
+        errorType: "",
+        relatedSystem: "",
+        companyName: "",
+        customerName: "",
+        ownerUserName: "",
+        requestContent: "",
+        createdFrom: "",
+        createdTo: "",
+    });
 
-    const [supportCategory, setSupportCategory] = useState("");
-    const [classification, setClassification] = useState("");
-    const [currentStatus, setCurrentStatus] = useState("");
+    // Individual getters for backwards compatibility
+    const ticketCode = filters.ticketCode;
+    const classificationMethod = filters.classificationMethod;
+    const accountLinkStatus = filters.accountLinkStatus;
+    const accountNumber = filters.accountNumber;
+    const supportCategory = filters.supportCategory;
+    const classification = filters.classification;
+    const currentStatus = filters.currentStatus;
+    const isErrorTicket = filters.isErrorTicket;
+    const errorGroup = filters.errorGroup;
+    const errorType = filters.errorType;
+    const relatedSystem = filters.relatedSystem;
+    const companyName = filters.companyName;
+    const customerName = filters.customerName;
+    const ownerUserName = filters.ownerUserName;
+    const requestContent = filters.requestContent;
+    const createdFrom = filters.createdFrom;
+    const createdTo = filters.createdTo;
 
-    const [isErrorTicket, setIsErrorTicket] = useState("");
-    const [errorGroup, setErrorGroup] = useState("");
-    const [errorType, setErrorType] = useState("");
-    const [relatedSystem, setRelatedSystem] = useState("");
+    // Stable individual setters using useCallback for backwards compatibility
+    const setTicketCode = useCallback((val: string) => {
+        setFilters((prev) => ({ ...prev, ticketCode: val }));
+    }, []);
 
-    const [companyName, setCompanyName] = useState("");
-    const [customerName, setCustomerName] = useState("");
+    const setClassificationMethod = useCallback((val: string) => {
+        setFilters((prev) => ({ ...prev, classificationMethod: val }));
+    }, []);
 
-    const [ownerUserName, setOwnerUserName] = useState("");
-    const [requestContent, setRequestContent] = useState("");
+    const setAccountLinkStatus = useCallback((val: string) => {
+        setFilters((prev) => ({ ...prev, accountLinkStatus: val }));
+    }, []);
 
-    const [createdFrom, setCreatedFrom] = useState("");
-    const [createdTo, setCreatedTo] = useState("");
+    const setAccountNumber = useCallback((val: string) => {
+        setFilters((prev) => ({ ...prev, accountNumber: val }));
+    }, []);
+
+    const setSupportCategory = useCallback((val: string) => {
+        setFilters((prev) => ({ ...prev, supportCategory: val }));
+    }, []);
+
+    const setClassification = useCallback((val: string) => {
+        setFilters((prev) => ({ ...prev, classification: val }));
+    }, []);
+
+    const setCurrentStatus = useCallback((val: string) => {
+        setFilters((prev) => ({ ...prev, currentStatus: val }));
+    }, []);
+
+    const setIsErrorTicket = useCallback((val: string) => {
+        setFilters((prev) => ({ ...prev, isErrorTicket: val }));
+    }, []);
+
+    const setErrorGroup = useCallback((val: string) => {
+        setFilters((prev) => ({ ...prev, errorGroup: val }));
+    }, []);
+
+    const setErrorType = useCallback((val: string) => {
+        setFilters((prev) => ({ ...prev, errorType: val }));
+    }, []);
+
+    const setRelatedSystem = useCallback((val: string) => {
+        setFilters((prev) => ({ ...prev, relatedSystem: val }));
+    }, []);
+
+    const setCompanyName = useCallback((val: string) => {
+        setFilters((prev) => ({ ...prev, companyName: val }));
+    }, []);
+
+    const setCustomerName = useCallback((val: string) => {
+        setFilters((prev) => ({ ...prev, customerName: val }));
+    }, []);
+
+    const setOwnerUserName = useCallback((val: string) => {
+        setFilters((prev) => ({ ...prev, ownerUserName: val }));
+    }, []);
+
+    const setRequestContent = useCallback((val: string) => {
+        setFilters((prev) => ({ ...prev, requestContent: val }));
+    }, []);
+
+    const setCreatedFrom = useCallback((val: string) => {
+        setFilters((prev) => ({ ...prev, createdFrom: val }));
+    }, []);
+
+    const setCreatedTo = useCallback((val: string) => {
+        setFilters((prev) => ({ ...prev, createdTo: val }));
+    }, []);
 
     const [loading, setLoading] = useState(true);
     const [masterLoading, setMasterLoading] = useState(true);
@@ -85,59 +155,66 @@ export function useTickets() {
 
     const textFilters = useMemo<TicketListParams>(
         () => ({
-            ticket_code: ticketCode,
-            customer_account_no: accountNumber,
-            company_name: companyName,
-            customer_name: customerName,
-            owner_user_name: ownerUserName,
-            request_content: requestContent,
-            related_system: relatedSystem,
+            ticket_code: filters.ticketCode,
+            customer_account_no: filters.accountNumber,
+            company_name: filters.companyName,
+            customer_name: filters.customerName,
+            owner_user_name: filters.ownerUserName,
+            request_content: filters.requestContent,
+            related_system: filters.relatedSystem,
         }),
-        [ticketCode, accountNumber, companyName, customerName, ownerUserName, requestContent, relatedSystem]
+        [
+            filters.ticketCode,
+            filters.accountNumber,
+            filters.companyName,
+            filters.customerName,
+            filters.ownerUserName,
+            filters.requestContent,
+            filters.relatedSystem,
+        ]
     );
 
     const debouncedTextFilters = useDebounce(textFilters, 500);
 
     const filteredClassifications = useMemo(() => {
-        if (!supportCategory) return classifications;
+        if (!filters.supportCategory) return classifications;
 
         return classifications.filter(
-            (item) => String(item.support_category || "") === supportCategory
+            (item) => String(item.support_category || "") === filters.supportCategory
         );
-    }, [classifications, supportCategory]);
+    }, [classifications, filters.supportCategory]);
 
     const filteredErrorTypes = useMemo(() => {
-        if (!errorGroup) return errorTypes;
+        if (!filters.errorGroup) return errorTypes;
 
         return errorTypes.filter(
-            (item) => String(item.group || "") === errorGroup
+            (item) => String(item.group || "") === filters.errorGroup
         );
-    }, [errorTypes, errorGroup]);
+    }, [errorTypes, filters.errorGroup]);
 
+    const buildParams = useCallback(
+        (customParams?: Partial<TicketListParams>, pageValue = 1): TicketListParams => ({
+            ...debouncedTextFilters,
 
-    const buildParams = (
-        customParams?: Partial<TicketListParams>,
-        pageValue = pagination.page
-    ): TicketListParams => ({
-        ...debouncedTextFilters,
+            page: String(pageValue),
 
-        page: String(pageValue),
+            classification_method: filters.classificationMethod,
+            account_link_status: filters.accountLinkStatus,
+            support_category: filters.supportCategory,
+            classification: filters.classification,
+            current_status: filters.currentStatus,
+            is_error_ticket: filters.isErrorTicket,
+            error_group: filters.errorGroup,
+            error_type: filters.errorType,
+            created_from: filters.createdFrom,
+            created_to: filters.createdTo,
 
-        classification_method: classificationMethod,
-        account_link_status: accountLinkStatus,
-        support_category: supportCategory,
-        classification,
-        current_status: currentStatus,
-        is_error_ticket: isErrorTicket,
-        error_group: errorGroup,
-        error_type: errorType,
-        created_from: createdFrom,
-        created_to: createdTo,
+            ...customParams,
+        }),
+        [debouncedTextFilters, filters]
+    );
 
-        ...customParams,
-    });
-
-    const loadMasterData = async () => {
+    const loadMasterData = useCallback(async () => {
         try {
             setMasterLoading(true);
             setMasterError("");
@@ -166,106 +243,110 @@ export function useTickets() {
         } finally {
             setMasterLoading(false);
         }
-    };
+    }, []);
 
-    const loadTickets = async (
-        params?: TicketListParams,
-        pageValue = pagination.page
-    ) => {
-        try {
-            setLoading(true);
-            setError("");
+    const loadTickets = useCallback(
+        async (params?: TicketListParams, pageValue = 1) => {
+            try {
+                setLoading(true);
+                setError("");
 
-            const data = await ticketService.getTickets(
-                params || buildParams({}, pageValue)
-            );
+                const data = await ticketService.getTickets(
+                    params || buildParams({}, pageValue)
+                );
 
-            setItems(data.results || []);
-            setCount(data.count || 0);
-        } catch (err) {
-            setError(getErrorMessage(err, "Không tải được danh sách ticket"));
-        } finally {
-            setLoading(false);
-        }
-    };
+                setItems(data.results || []);
+                setCount(data.count || 0);
+            } catch (err) {
+                setError(getErrorMessage(err, "Không tải được danh sách ticket"));
+            } finally {
+                setLoading(false);
+            }
+        },
+        [buildParams]
+    );
 
-    const goToPage = (nextPage: number) => {
-        const safePage = Math.min(Math.max(nextPage, 1), pagination.totalPages);
+    const goToPage = useCallback(
+        (nextPage: number) => {
+            const safePage = Math.min(Math.max(nextPage, 1), pagination.totalPages);
 
-        pagination.setPage(safePage);
-        void loadTickets(buildParams({ page: String(safePage) }, safePage), safePage);
-    };
+            pagination.setPage(safePage);
+            void loadTickets(buildParams({ page: String(safePage) }, safePage), safePage);
+        },
+        [pagination, loadTickets, buildParams]
+    );
 
-    const previousPage = () => {
+    const previousPage = useCallback(() => {
         if (pagination.page <= 1) return;
         goToPage(pagination.page - 1);
-    };
+    }, [pagination.page, goToPage]);
 
-    const nextPage = () => {
+    const nextPage = useCallback(() => {
         if (pagination.page >= pagination.totalPages) return;
         goToPage(pagination.page + 1);
-    };
+    }, [pagination.page, pagination.totalPages, goToPage]);
 
-    const search = () => {
+    const search = useCallback(() => {
         pagination.resetPage();
 
         void loadTickets(
             {
                 page: "1",
-
-                ticket_code: ticketCode,
-                customer_account_no: accountNumber,
-                classification_method: classificationMethod,
-                account_link_status: accountLinkStatus,
-                support_category: supportCategory,
-                classification,
-                current_status: currentStatus,
-                is_error_ticket: isErrorTicket,
-                error_group: errorGroup,
-                error_type: errorType,
-                        related_system: relatedSystem,
-                company_name: companyName,
-                customer_name: customerName,
-                owner_user_name: ownerUserName,
-                request_content: requestContent,
-                created_from: createdFrom,
-                created_to: createdTo,
+                ticket_code: filters.ticketCode,
+                customer_account_no: filters.accountNumber,
+                classification_method: filters.classificationMethod,
+                account_link_status: filters.accountLinkStatus,
+                support_category: filters.supportCategory,
+                classification: filters.classification,
+                current_status: filters.currentStatus,
+                is_error_ticket: filters.isErrorTicket,
+                error_group: filters.errorGroup,
+                error_type: filters.errorType,
+                related_system: filters.relatedSystem,
+                company_name: filters.companyName,
+                customer_name: filters.customerName,
+                owner_user_name: filters.ownerUserName,
+                request_content: filters.requestContent,
+                created_from: filters.createdFrom,
+                created_to: filters.createdTo,
             },
             1
         );
-    };
+    }, [pagination, loadTickets, filters]);
 
-    const clearFilter = () => {
-        setTicketCode("");
-        setClassificationMethod("");
-        setAccountLinkStatus("");
-        setAccountNumber("");
-        setSupportCategory("");
-        setClassification("");
-        setCurrentStatus("");
-        setIsErrorTicket("");
-        setErrorGroup("");
-        setErrorType("");
-        setRelatedSystem("");
-        setCompanyName("");
-        setCustomerName("");
-        setOwnerUserName("");
-        setRequestContent("");
-        setCreatedFrom("");
-        setCreatedTo("");
+    const clearFilter = useCallback(() => {
+        setFilters({
+            ticketCode: "",
+            classificationMethod: "",
+            accountLinkStatus: "",
+            accountNumber: "",
+            supportCategory: "",
+            classification: "",
+            currentStatus: "",
+            isErrorTicket: "",
+            errorGroup: "",
+            errorType: "",
+            relatedSystem: "",
+            companyName: "",
+            customerName: "",
+            ownerUserName: "",
+            requestContent: "",
+            createdFrom: "",
+            createdTo: "",
+        });
 
         pagination.resetPage();
 
         void loadTickets({ page: "1" }, 1);
-    };
+    }, [pagination, loadTickets]);
 
-    const goCreate = () => {
+    const goCreate = useCallback(() => {
         router.push("/tickets/create");
-    };
+    }, [router]);
 
-    const goErrorCatalogs = () => {
+    const goErrorCatalogs = useCallback(() => {
         router.push("/tickets/error-catalogs");
-    };
+    }, [router]);
 
     useEffect(() => {
         if (!authService.isAuthenticated()) {
@@ -274,9 +355,7 @@ export function useTickets() {
         }
 
         void loadMasterData();
-
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [router]);
+    }, [router, loadMasterData]);
 
     useEffect(() => {
         if (!authService.isAuthenticated()) {
@@ -285,52 +364,53 @@ export function useTickets() {
 
         pagination.resetPage();
         void loadTickets(buildParams({ page: "1" }, 1), 1);
-
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [
         debouncedTextFilters,
-        classificationMethod,
-        accountLinkStatus,
-        supportCategory,
-        classification,
-        currentStatus,
-        isErrorTicket,
-        errorGroup,
-        errorType,
-        createdFrom,
-        createdTo,
+        filters.classificationMethod,
+        filters.accountLinkStatus,
+        filters.supportCategory,
+        filters.classification,
+        filters.currentStatus,
+        filters.isErrorTicket,
+        filters.errorGroup,
+        filters.errorType,
+        filters.createdFrom,
+        filters.createdTo,
+        loadTickets,
+        buildParams,
     ]);
 
     useEffect(() => {
-        if (!supportCategory) {
+        if (!filters.supportCategory) {
             return;
         }
 
         const selectedClassificationStillValid = classifications.some(
             (item) =>
-                String(item.id) === classification &&
-                String(item.support_category || "") === supportCategory
+                String(item.id) === filters.classification &&
+                String(item.support_category || "") === filters.supportCategory
         );
 
         if (!selectedClassificationStillValid) {
-            setClassification("");
+            setFilters((prev) => ({ ...prev, classification: "" }));
         }
-    }, [supportCategory, classification, classifications]);
+    }, [filters.supportCategory, filters.classification, classifications]);
 
     useEffect(() => {
-        if (!errorGroup) {
+        if (!filters.errorGroup) {
             return;
         }
 
         const selectedTypeStillValid = errorTypes.some(
-            (item) => String(item.id) === errorType && String(item.group || "") === errorGroup
+            (item) =>
+                String(item.id) === filters.errorType &&
+                String(item.group || "") === filters.errorGroup
         );
 
         if (!selectedTypeStillValid) {
-            setErrorType("");
-            }
-    }, [errorGroup, errorType, errorTypes]);
-
+            setFilters((prev) => ({ ...prev, errorType: "" }));
+        }
+    }, [filters.errorGroup, filters.errorType, errorTypes]);
 
     return {
         items,
@@ -382,7 +462,6 @@ export function useTickets() {
 
         errorType,
         setErrorType,
-
 
         relatedSystem,
         setRelatedSystem,

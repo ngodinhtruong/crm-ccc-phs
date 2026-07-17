@@ -1,4 +1,5 @@
 "use client";
+import { getErrorMessage } from "@/utils/error.util";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -53,24 +54,6 @@ function formatApiErrorData(data: unknown): string {
   return String(data);
 }
 
-function getErrorMessage(err: unknown, fallback: string) {
-  const error = err as {
-    response?: {
-      status?: number;
-      data?: unknown;
-    };
-    message?: string;
-  };
-
-  const apiMessage = formatApiErrorData(error?.response?.data);
-
-  if (apiMessage) return `${fallback}. ${apiMessage}`;
-
-  return `${fallback}. Status: ${error?.response?.status || "unknown"} - ${
-    error?.message || "Không rõ lỗi"
-  }`;
-}
-
 function getCurrentMonthPeriodId(periods: KpiPeriodItem[]) {
   const now = new Date();
   const current = periods.find(
@@ -92,7 +75,7 @@ function buildTargetValueMatrix(targets?: KpiAdminTargetsResponse | null): Targe
     const userId = String(row.user.id);
     matrix[userId] = {};
 
-    (targets.metrics || []).forEach((metric) => {
+    (targets?.metrics || []).forEach((metric) => {
       const target = row.targets[String(metric.id)];
       matrix[userId][String(metric.id)] = target?.target_value ?? "";
     });
@@ -108,7 +91,7 @@ function buildTargetNoteMatrix(targets?: KpiAdminTargetsResponse | null): Target
     const userId = String(row.user.id);
     matrix[userId] = {};
 
-    (targets.metrics || []).forEach((metric) => {
+    (targets?.metrics || []).forEach((metric) => {
       const target = row.targets[String(metric.id)];
       matrix[userId][String(metric.id)] = target?.note ?? "";
     });
@@ -116,7 +99,6 @@ function buildTargetNoteMatrix(targets?: KpiAdminTargetsResponse | null): Target
 
   return matrix;
 }
-
 
 function toSafeNumber(value?: string | number | null) {
   if (value === null || value === undefined || value === "") return 0;
@@ -243,7 +225,6 @@ function mergeKpiAdminDashboards(
       metricMap.set(key, current);
     });
   });
-
 
   const operationalEmployeeMap = new Map<number, NonNullable<KpiAdminDashboardResponse["report"]["operational"]>["employees"][number]>();
 
@@ -430,6 +411,7 @@ export function useKpiAdmin() {
   const [notice, setNotice] = useState("");
 
   const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
+  const [copyFirstEmployeeMode, setCopyFirstEmployeeMode] = useState(false);
   const [targetValues, setTargetValues] = useState<TargetValueMatrix>({});
   const [targetNotes, setTargetNotes] = useState<TargetNoteMatrix>({});
 
@@ -693,6 +675,50 @@ export function useKpiAdmin() {
     }
   };
 
+  const startCopyFromFirstEmployee = () => {
+    setCopyFirstEmployeeMode(true);
+    setSelectedUserIds([]);
+  };
+
+  const cancelCopyFromFirstEmployee = () => {
+    setCopyFirstEmployeeMode(false);
+    setSelectedUserIds([]);
+  };
+
+  const clearCopySelection = () => {
+    setSelectedUserIds([]);
+  };
+
+  const setCopySelection = (userIds: number[]) => {
+    setSelectedUserIds(userIds);
+  };
+
+  const confirmCopyFromFirstEmployee = async () => {
+    await copyFromFirstEmployee();
+    setCopyFirstEmployeeMode(false);
+    setSelectedUserIds([]);
+  };
+
+  const setDefaultTargets = () => {
+    if (!targets) return;
+
+    setTargetValues((prev) => {
+      const next = { ...prev };
+      const userIds = selectedUserIds.length > 0
+        ? selectedUserIds
+        : targets.rows.map((row) => row.user.id);
+
+      userIds.forEach((userId) => {
+        const uIdStr = String(userId);
+        next[uIdStr] = { ...(next[uIdStr] || {}) };
+        targets.metrics.forEach((metric) => {
+          next[uIdStr][String(metric.id)] = String(metric.target_value ?? "");
+        });
+      });
+      return next;
+    });
+  };
+
   return {
     activeTab,
     setActiveTab,
@@ -735,6 +761,14 @@ export function useKpiAdmin() {
     saveTargets,
     copyFromPreviousPeriod,
     copyFromFirstEmployee,
+    setDefaultTargets,
+
+    copyFirstEmployeeMode,
+    startCopyFromFirstEmployee,
+    cancelCopyFromFirstEmployee,
+    clearCopySelection,
+    setCopySelection,
+    confirmCopyFromFirstEmployee,
   };
 }
 

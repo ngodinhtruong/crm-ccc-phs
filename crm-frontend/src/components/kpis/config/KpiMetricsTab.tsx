@@ -612,7 +612,7 @@ export function KpiMetricsTab({ config }: { config: KpiConfigController }) {
       groupId: String(metric.group),
       metricCode: metric.metric_code || "",
       metricName: metric.metric_name || "",
-      // workDescription: metric.work_description || "",
+      workDescription: "",
       measurementFormula: metric.measurement_formula || "",
       targetText: metric.target_text || "",
       targetValue: metric.target_value || "",

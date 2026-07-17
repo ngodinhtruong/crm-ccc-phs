@@ -1,6 +1,7 @@
 "use client";
+import { getErrorMessage } from "@/utils/error.util";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { authService } from "@/services/auth.service";
@@ -23,23 +24,6 @@ function getCurrentPeriod() {
   const month = String(now.getMonth() + 1).padStart(2, "0");
 
   return `${year}-${month}`;
-}
-
-function getErrorMessage(err: unknown, fallback: string) {
-  const error = err as {
-    response?: {
-      status?: number;
-      data?: unknown;
-    };
-    message?: string;
-  };
-
-  const status = error?.response?.status || "unknown";
-  const detail = error?.response?.data
-    ? JSON.stringify(error.response.data)
-    : error?.message;
-
-  return `${fallback}. Status: ${status} - ${detail}`;
 }
 
 export function useCccDashboard() {
@@ -197,6 +181,20 @@ export function useCccDashboard() {
     // Chỉ load lần đầu khi vào dashboard, không tự reload theo từng ký tự filter.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
+
+  const reloadRef = useRef(reload);
+  useEffect(() => {
+    reloadRef.current = reload;
+  });
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      void reloadRef.current();
+    }, 120000); // 120 seconds
+
+    return () => clearInterval(interval);
+  }, []);
+
 
   useEffect(() => {
     if (!errorGroup) return;

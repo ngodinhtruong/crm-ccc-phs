@@ -1,15 +1,10 @@
 "use client";
+import { getErrorMessage } from "@/utils/error.util";
 
 import { useState } from "react";
 
 import { externalErrorService } from "@/services/external-error.service";
 import { ExternalErrorRawImportRow } from "@/types/external-error.type";
-
-function getErrorMessage(err: unknown, fallback: string) {
-  const error = err as { response?: { status?: number; data?: unknown }; message?: string };
-  const detail = error?.response?.data ? JSON.stringify(error.response.data) : error?.message;
-  return `${fallback}. Status: ${error?.response?.status || "unknown"} - ${detail || "Không rõ lỗi"}`;
-}
 
 const sampleRows = JSON.stringify(
   [

@@ -1,26 +1,10 @@
 "use client";
+import { getErrorMessage } from "@/utils/error.util";
 
 import { useEffect, useState } from "react";
 
 import { saleAdminService } from "@/services/sale-admin.service";
 import { SaRecordAuditLogItem } from "@/types/sale-admin.type";
-
-function getErrorMessage(err: unknown, fallback: string) {
-  const error = err as {
-    response?: {
-      status?: number;
-      data?: unknown;
-    };
-    message?: string;
-  };
-
-  const status = error?.response?.status || "unknown";
-  const detail = error?.response?.data
-    ? JSON.stringify(error.response.data)
-    : error?.message;
-
-  return `${fallback}. Status: ${status} - ${detail}`;
-}
 
 export function useSaRecordAuditLogs(recordId: string) {
   const [items, setItems] = useState<SaRecordAuditLogItem[]>([]);

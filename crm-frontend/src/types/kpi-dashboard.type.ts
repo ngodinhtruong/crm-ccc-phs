@@ -273,7 +273,7 @@ export type KpiProgressMetric = {
   targetValue: number | null;
   progressPercent: number | null;
   progressStatus: KpiProgressStatus;
-  // sourceType: "MANUAL" | "AUTO";
+  sourceType: "MANUAL" | "AUTO";
   displayActual: string;
   displayTarget: string;
   displayUnit: string;

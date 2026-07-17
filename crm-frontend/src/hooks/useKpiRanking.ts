@@ -1,4 +1,5 @@
 "use client";
+import { getErrorMessage } from "@/utils/error.util";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -52,24 +53,6 @@ function formatApiErrorData(data: unknown): string {
   }
 
   return String(data);
-}
-
-function getErrorMessage(err: unknown, fallback: string) {
-  const error = err as {
-    response?: {
-      status?: number;
-      data?: unknown;
-    };
-    message?: string;
-  };
-
-  const apiMessage = formatApiErrorData(error?.response?.data);
-
-  if (apiMessage) return `${fallback}. ${apiMessage}`;
-
-  return `${fallback}. Status: ${error?.response?.status || "unknown"} - ${
-    error?.message || "Không rõ lỗi"
-  }`;
 }
 
 function getCurrentMonthPeriodDefault(periods: KpiPeriodItem[]) {

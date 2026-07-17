@@ -1,4 +1,5 @@
 "use client";
+import { getErrorMessage } from "@/utils/error.util";
 
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -23,23 +24,6 @@ const initialForm: SlaCreateFormState = {
   assignedToLabel: "",
   description: "",
 };
-
-function getErrorMessage(err: unknown, fallback: string) {
-  const error = err as {
-    response?: {
-      status?: number;
-      data?: unknown;
-    };
-    message?: string;
-  };
-
-  const status = error?.response?.status || "unknown";
-  const detail = error?.response?.data
-    ? JSON.stringify(error.response.data)
-    : error?.message;
-
-  return `${fallback}. Status: ${status} - ${detail}`;
-}
 
 function convertToMinutes(value: string, unit: SlaTimeUnit) {
   const numberValue = Number(value);
@@ -99,15 +83,16 @@ export function useSlaCreate() {
   };
 
   useEffect(() => {
-    if (!assignees.defaultAssignee) return;
+    const defaultAssignee = assignees.defaultAssignee;
+    if (!defaultAssignee) return;
 
     setForm((prev) => {
       if (prev.assignedTo) return prev;
 
       return {
         ...prev,
-        assignedTo: assignees.defaultAssignee.id,
-        assignedToLabel: assignees.defaultAssignee.label,
+        assignedTo: defaultAssignee.id,
+        assignedToLabel: defaultAssignee.label,
       };
     });
   }, [assignees.defaultAssignee]);

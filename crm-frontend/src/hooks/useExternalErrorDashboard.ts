@@ -1,6 +1,7 @@
 "use client";
+import { getErrorMessage } from "@/utils/error.util";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { externalErrorService } from "@/services/external-error.service";
 import {
@@ -10,12 +11,6 @@ import {
   ExternalErrorSummary,
   ExternalErrorWidget,
 } from "@/types/external-error.type";
-
-function getErrorMessage(err: unknown, fallback: string) {
-  const error = err as { response?: { status?: number; data?: unknown }; message?: string };
-  const detail = error?.response?.data ? JSON.stringify(error.response.data) : error?.message;
-  return `${fallback}. Status: ${error?.response?.status || "unknown"} - ${detail || "Không rõ lỗi"}`;
-}
 
 export type ExternalErrorDashboardCharts = {
   byDevice?: ExternalErrorChartResponse;
@@ -134,6 +129,20 @@ export function useExternalErrorDashboard() {
   useEffect(() => {
     void loadDashboard();
   }, [loadDashboard]);
+
+  const reloadRef = useRef(loadDashboard);
+  useEffect(() => {
+    reloadRef.current = loadDashboard;
+  });
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      void reloadRef.current();
+    }, 120000); // 120 seconds
+
+    return () => clearInterval(interval);
+  }, []);
+
 
   return {
     dateField,

@@ -1,6 +1,7 @@
 "use client";
+import { getErrorMessage } from "@/utils/error.util";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { authService } from "@/services/auth.service";
@@ -62,23 +63,6 @@ const initialForm: TicketCreateFormState = {
   finalResponse: "",
 };
 
-function getErrorMessage(err: unknown, fallback: string) {
-  const error = err as {
-    response?: {
-      status?: number;
-      data?: unknown;
-    };
-    message?: string;
-  };
-
-  const status = error?.response?.status || "unknown";
-  const detail = error?.response?.data
-    ? JSON.stringify(error.response.data)
-    : error?.message;
-
-  return `${fallback}. Status: ${status} - ${detail}`;
-}
-
 function getCompanyLabel(company: CompanyListItem) {
   return company.company_name || `Công ty ${company.id}`;
 }
@@ -112,15 +96,18 @@ export function useTicketCreate() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const setField = <K extends keyof TicketCreateFormState>(
-    key: K,
-    value: TicketCreateFormState[K]
-  ) => {
-    setForm((prev) => ({
-      ...prev,
-      [key]: value,
-    }));
-  };
+  const setField = useCallback(
+    <K extends keyof TicketCreateFormState>(
+      key: K,
+      value: TicketCreateFormState[K]
+    ) => {
+      setForm((prev) => ({
+        ...prev,
+        [key]: value,
+      }));
+    },
+    []
+  );
 
   const filteredClassifications = useMemo(() => {
     if (!form.supportCategory) return classifications;
@@ -146,8 +133,7 @@ export function useTicketCreate() {
     );
   }, [errorTypes, form.errorGroup]);
 
-
-  const loadInitialData = async () => {
+  const loadInitialData = useCallback(async () => {
     try {
       setLoadingDropdowns(true);
       setError("");
@@ -182,13 +168,13 @@ export function useTicketCreate() {
         ticketService.getErrorTypes(),
       ]);
 
-      setSupportCategories(categoryData || []);
-      setClassifications(classificationData || []);
-      setStatuses(statusData || []);
-      setPriorities(priorityData || []);
-      setSources(sourceData || []);
-      setProcessingUnits(processingUnitData || []);
-      setBranches(branchData || []);
+      setSupportCategories((categoryData || []) as MasterOption[]);
+      setClassifications((classificationData || []) as MasterOption[]);
+      setStatuses((statusData || []) as MasterOption[]);
+      setPriorities((priorityData || []) as MasterOption[]);
+      setSources((sourceData || []) as MasterOption[]);
+      setProcessingUnits((processingUnitData || []) as MasterOption[]);
+      setBranches((branchData || []) as MasterOption[]);
       setSlaPolicies(slaData.results || []);
       setCompanies(companyData.results || []);
       setCustomers(customerData.results || []);
@@ -199,151 +185,170 @@ export function useTicketCreate() {
     } finally {
       setLoadingDropdowns(false);
     }
-  };
+  }, []);
 
-  const applyDefaultAssignee = () => {
-    if (!assignees.defaultAssignee) return;
+  const applyDefaultAssignee = useCallback(() => {
+    const defaultAssignee = assignees.defaultAssignee;
+    if (!defaultAssignee) return;
 
     setForm((prev) => {
       if (prev.ownerUser) return prev;
 
       return {
         ...prev,
-        ownerUser: assignees.defaultAssignee.id,
-        ownerUserLabel: assignees.defaultAssignee.label,
+        ownerUser: defaultAssignee.id,
+        ownerUserLabel: defaultAssignee.label,
       };
     });
-  };
+  }, [assignees.defaultAssignee]);
 
-  const changeSupportCategory = (value: string) => {
-    setForm((prev) => {
-      const selectedSla = slaPolicies.find(
-        (sla) => String(sla.id) === prev.slaPolicy
-      );
+  const changeSupportCategory = useCallback(
+    (value: string) => {
+      setForm((prev) => {
+        const selectedSla = slaPolicies.find(
+          (sla) => String(sla.id) === prev.slaPolicy
+        );
 
-      const keepSla =
-        selectedSla && String(selectedSla.support_category || "") === value;
+        const keepSla =
+          selectedSla && String(selectedSla.support_category || "") === value;
 
-      return {
+        return {
+          ...prev,
+          supportCategory: value,
+          classification: "",
+          slaPolicy: keepSla ? prev.slaPolicy : "",
+        };
+      });
+    },
+    [slaPolicies]
+  );
+
+  const changeSlaPolicy = useCallback(
+    (value: string) => {
+      const selectedSla = slaPolicies.find((sla) => String(sla.id) === value);
+
+      setForm((prev) => ({
         ...prev,
-        supportCategory: value,
-        classification: "",
-        slaPolicy: keepSla ? prev.slaPolicy : "",
-      };
-    });
-  };
+        slaPolicy: value,
+        supportCategory: selectedSla?.support_category
+          ? String(selectedSla.support_category)
+          : prev.supportCategory,
+        assignedUnit: selectedSla?.processing_unit
+          ? String(selectedSla.processing_unit)
+          : prev.assignedUnit,
+      }));
+    },
+    [slaPolicies]
+  );
 
-  const changeSlaPolicy = (value: string) => {
-    const selectedSla = slaPolicies.find((sla) => String(sla.id) === value);
-
-    setForm((prev) => ({
-      ...prev,
-      slaPolicy: value,
-      supportCategory: selectedSla?.support_category
-        ? String(selectedSla.support_category)
-        : prev.supportCategory,
-      assignedUnit: selectedSla?.processing_unit
-        ? String(selectedSla.processing_unit)
-        : prev.assignedUnit,
-    }));
-  };
-
-  const changeErrorGroup = (value: string) => {
+  const changeErrorGroup = useCallback((value: string) => {
     setForm((prev) => ({
       ...prev,
       errorGroup: value,
       errorType: "",
-        }));
-  };
-
-  const changeErrorType = (value: string) => {
-    const selectedType = errorTypes.find((item) => String(item.id) === value);
-
-    setForm((prev) => ({
-      ...prev,
-      errorGroup: selectedType?.group ? String(selectedType.group) : prev.errorGroup,
-      errorType: value,
-        }));
-  };
-
-  const applyContactInfo = async ({
-    company,
-    customer,
-  }: {
-    company?: CompanyListItem | null;
-    customer?: CustomerListItem | null;
-  }) => {
-    let accountNumber = company?.account_number || customer?.account_number || "";
-
-    let accountId = "";
-
-    try {
-      if (company?.id || customer?.id) {
-        const accounts = await ticketService.getCustomerAccounts({
-          company: company?.id ? String(company.id) : undefined,
-          customer: customer?.id ? String(customer.id) : undefined,
-        });
-
-        const firstAccount = accounts[0];
-
-        if (firstAccount) {
-          accountId = String(firstAccount.id);
-          accountNumber = getAccountNumber(firstAccount) || accountNumber;
-        }
-      }
-    } catch {
-      accountId = "";
-    }
-
-    setForm((prev) => ({
-      ...prev,
-      account: accountId,
-      accountNumber,
-      contactType: getContactTypeByAccount(accountNumber) as TicketContactType,
-      mobile: customer?.phone || prev.mobile,
-      email: company?.email || customer?.email || prev.email,
     }));
-  };
+  }, []);
 
-  const changeCompany = async (companyId: string) => {
-    const company = companies.find((item) => String(item.id) === companyId);
+  const changeErrorType = useCallback(
+    (value: string) => {
+      const selectedType = errorTypes.find((item) => String(item.id) === value);
 
-    setForm((prev) => ({
-      ...prev,
-      company: companyId,
-      companyLabel: company ? getCompanyLabel(company) : "",
-    }));
+      setForm((prev) => ({
+        ...prev,
+        errorGroup: selectedType?.group ? String(selectedType.group) : prev.errorGroup,
+        errorType: value,
+      }));
+    },
+    [errorTypes]
+  );
 
-    await applyContactInfo({
-      company,
-      customer: customers.find((item) => String(item.id) === form.customer),
-    });
-  };
-
-  const changeCustomer = async (customerId: string) => {
-    const customer = customers.find((item) => String(item.id) === customerId);
-    const company = companies.find((item) => String(item.id) === form.company);
-
-    setForm((prev) => ({
-      ...prev,
-      customer: customerId,
-      customerLabel: customer ? getCustomerLabel(customer) : "",
-    }));
-
-    await applyContactInfo({
+  const applyContactInfo = useCallback(
+    async ({
       company,
       customer,
-    });
-  };
+    }: {
+      company?: CompanyListItem | null;
+      customer?: CustomerListItem | null;
+    }) => {
+      let accountNumber = company?.account_number || customer?.account_number || "";
 
-  const changeRawAccountNumber = (value: string) => {
+      let accountId = "";
+
+      try {
+        if (company?.id || customer?.id) {
+          const accounts = await ticketService.getCustomerAccounts({
+            company: company?.id ? String(company.id) : undefined,
+            customer: customer?.id ? String(customer.id) : undefined,
+          });
+
+          const firstAccount = accounts[0];
+
+          if (firstAccount) {
+            accountId = String(firstAccount.id);
+            accountNumber = getAccountNumber(firstAccount) || accountNumber;
+          }
+        }
+      } catch {
+        accountId = "";
+      }
+
+      setForm((prev) => ({
+        ...prev,
+        account: accountId,
+        accountNumber,
+        contactType: getContactTypeByAccount(accountNumber) as TicketContactType,
+        mobile: customer?.phone || prev.mobile,
+        email: company?.email || customer?.email || prev.email,
+      }));
+    },
+    []
+  );
+
+  const changeCompany = useCallback(
+    async (companyId: string) => {
+      const company = companies.find((item) => String(item.id) === companyId);
+
+      setForm((prev) => ({
+        ...prev,
+        company: companyId,
+        companyLabel: company ? getCompanyLabel(company) : "",
+      }));
+
+      await applyContactInfo({
+        company,
+        customer: customers.find((item) => String(item.id) === form.customer),
+      });
+    },
+    [companies, customers, form.customer, applyContactInfo]
+  );
+
+  const changeCustomer = useCallback(
+    async (customerId: string) => {
+      const customer = customers.find((item) => String(item.id) === customerId);
+      const company = companies.find((item) => String(item.id) === form.company);
+
+      setForm((prev) => ({
+        ...prev,
+        customer: customerId,
+        customerLabel: customer ? getCustomerLabel(customer) : "",
+      }));
+
+      await applyContactInfo({
+        company,
+        customer,
+      });
+    },
+    [companies, customers, form.company, applyContactInfo]
+  );
+
+  const changeRawAccountNumber = useCallback((value: string) => {
     setForm((prev) => ({
       ...prev,
       account: "",
       accountNumber: value,
       contactType: getContactTypeByAccount("") as TicketContactType,
     }));
-  };
+  }, []);
 
   const hasErrorInfo = Boolean(
     form.errorGroup ||
@@ -352,7 +357,7 @@ export function useTicketCreate() {
       form.errorNote.trim()
   );
 
-  const validateForm = () => {
+  const validateForm = useCallback(() => {
     if (!form.supportCategory) return "Danh mục hỗ trợ không được để trống.";
     if (!form.classification) return "Phân loại không được để trống.";
     if (!form.status) return "Tình trạng không được để trống.";
@@ -368,62 +373,65 @@ export function useTicketCreate() {
     }
 
     return "";
-  };
+  }, [form, hasErrorInfo]);
 
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const submit = useCallback(
+    async (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
 
-    try {
-      setSaving(true);
-      setError("");
+      try {
+        setSaving(true);
+        setError("");
 
-      const message = validateForm();
+        const message = validateForm();
 
-      if (message) {
-        setError(message);
-        return;
+        if (message) {
+          setError(message);
+          return;
+        }
+
+        await ticketService.createTicket({
+          support_category: Number(form.supportCategory),
+          classification: Number(form.classification),
+          current_status: Number(form.status),
+          priority: Number(form.priority),
+          source: Number(form.source),
+
+          assigned_unit: form.assignedUnit ? Number(form.assignedUnit) : null,
+          handling_branch: Number(form.handlingBranch),
+          owner_user: form.ownerUser ? Number(form.ownerUser) : null,
+
+          company: form.company ? Number(form.company) : null,
+          customer: form.customer ? Number(form.customer) : null,
+          customer_account: form.account ? Number(form.account) : null,
+          raw_account_number: form.account ? undefined : form.accountNumber.trim() || undefined,
+          classification_method: "MANUAL",
+          sla_policy: form.slaPolicy ? Number(form.slaPolicy) : null,
+
+          error_group: form.errorGroup ? Number(form.errorGroup) : null,
+          error_type: form.errorType ? Number(form.errorType) : null,
+          related_system: form.relatedSystem.trim() || undefined,
+          external_status: form.externalStatus.trim() || undefined,
+          error_note: form.errorNote.trim() || undefined,
+
+          request_content: form.requestContent.trim() || undefined,
+          handling_solution: form.handlingSolution.trim() || undefined,
+          final_response: form.finalResponse.trim() || undefined,
+        });
+
+        router.push("/tickets");
+      } catch (err) {
+        setError(getErrorMessage(err, "Lưu ticket thất bại"));
+      } finally {
+        setSaving(false);
       }
+    },
+    [form, validateForm, router]
+  );
 
-      await ticketService.createTicket({
-        support_category: Number(form.supportCategory),
-        classification: Number(form.classification),
-        current_status: Number(form.status),
-        priority: Number(form.priority),
-        source: Number(form.source),
-
-        assigned_unit: form.assignedUnit ? Number(form.assignedUnit) : null,
-        handling_branch: Number(form.handlingBranch),
-        owner_user: form.ownerUser ? Number(form.ownerUser) : null,
-
-        company: form.company ? Number(form.company) : null,
-        customer: form.customer ? Number(form.customer) : null,
-        customer_account: form.account ? Number(form.account) : null,
-        raw_account_number: form.account ? undefined : form.accountNumber.trim() || undefined,
-        classification_method: "MANUAL",
-        sla_policy: form.slaPolicy ? Number(form.slaPolicy) : null,
-
-        error_group: form.errorGroup ? Number(form.errorGroup) : null,
-        error_type: form.errorType ? Number(form.errorType) : null,
-        related_system: form.relatedSystem.trim() || undefined,
-        external_status: form.externalStatus.trim() || undefined,
-        error_note: form.errorNote.trim() || undefined,
-
-        request_content: form.requestContent.trim() || undefined,
-        handling_solution: form.handlingSolution.trim() || undefined,
-        final_response: form.finalResponse.trim() || undefined,
-      });
-
-      router.push("/tickets");
-    } catch (err) {
-      setError(getErrorMessage(err, "Lưu ticket thất bại"));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const cancel = () => {
+  const cancel = useCallback(() => {
     router.push("/tickets");
-  };
+  }, [router]);
 
   useEffect(() => {
     if (!authService.isAuthenticated()) {
@@ -432,14 +440,11 @@ export function useTicketCreate() {
     }
 
     void loadInitialData();
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router]);
+  }, [router, loadInitialData]);
 
   useEffect(() => {
     applyDefaultAssignee();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [assignees.defaultAssignee]);
+  }, [assignees.defaultAssignee, applyDefaultAssignee]);
 
   return {
     form,

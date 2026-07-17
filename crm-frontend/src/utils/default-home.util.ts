@@ -67,11 +67,35 @@ export function isSaleAdminKpiHomeUser(user?: CurrentUser | null): boolean {
 export function getDefaultHomePath(user?: CurrentUser | null): string {
   if (!user) return "/login";
 
-  if (isSaleAdminKpiHomeUser(user)) {
-    return "/sale-admin/kpi";
+  if (isSystemOrGlobalAdmin(user)) {
+    return getDefaultPathByWorkspace("CCC");
   }
 
-  return "/workspace";
+  if (isSaleAdminKpiHomeUser(user)) {
+    return "/sale-admin/kpi-personal";
+  }
+
+  const groups = user.accessible_groups || [];
+
+  if (groups.includes("CCC")) {
+    return getDefaultPathByWorkspace("CCC");
+  }
+
+  if (groups.includes("SALE_ADMIN")) {
+    return getDefaultPathByWorkspace("SALE_ADMIN");
+  }
+
+  return getDefaultPathByWorkspace("CCC");
+}
+
+export function getDefaultWorkspaceByUser(user?: CurrentUser | null): WorkspaceCode {
+  const defaultHomePath = getDefaultHomePath(user);
+
+  if (defaultHomePath.startsWith("/sale-admin")) {
+    return "SALE_ADMIN";
+  }
+
+  return "CCC";
 }
 
 export function getDefaultPathForWorkspaceByUser(
@@ -79,7 +103,7 @@ export function getDefaultPathForWorkspaceByUser(
   user?: CurrentUser | null
 ): string {
   if (workspace === "SALE_ADMIN" && isSaleAdminKpiHomeUser(user)) {
-    return "/sale-admin/kpi";
+    return "/sale-admin/kpi-personal";
   }
 
   return getDefaultPathByWorkspace(workspace);

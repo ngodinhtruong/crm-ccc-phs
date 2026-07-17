@@ -71,7 +71,7 @@ export function IcpDistributionChart({
                     ))}
                   </Pie>
                   <Tooltip
-                    formatter={(value: number, _name, props) => [
+                    formatter={(value: any, _name, props: any) => [
                       `${value} KH · ${Number(props.payload.percent || 0).toFixed(1)}%`,
                       props.payload.name,
                     ]}

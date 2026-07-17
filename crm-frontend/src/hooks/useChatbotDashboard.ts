@@ -1,6 +1,7 @@
 "use client";
+import { getErrorMessage } from "@/utils/error.util";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { authService } from "@/services/auth.service";
@@ -22,25 +23,6 @@ export type QuickPreset = "TODAY" | "THIS_WEEK" | "THIS_MONTH";
 
 const PAGE_SIZE = 50;
 const DEFAULT_PANEL_TITLE = "Tất cả phiên chatbot";
-
-function getErrorMessage(err: unknown, fallback: string) {
-  const error = err as {
-    response?: { status?: number; data?: unknown };
-    message?: string;
-  };
-
-  const status = error?.response?.status;
-
-  const detail = error?.response?.data
-    ? JSON.stringify(error.response.data)
-    : error?.message;
-
-  if (!status && !detail) {
-    return fallback;
-  }
-
-  return `${fallback} (${status ?? "?"}: ${detail ?? ""})`;
-}
 
 /** Khoảng ngày của preset. Dùng start_date/end_date để tránh đá nhau với year/month. */
 function getPresetFilters(preset: QuickPreset): ChatbotDashboardFilters {
@@ -242,6 +224,24 @@ export function useChatbotDashboard() {
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
+
+  const refreshData = () => {
+    void loadData();
+  };
+
+  const refreshDataRef = useRef(refreshData);
+  useEffect(() => {
+    refreshDataRef.current = refreshData;
+  });
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      void refreshDataRef.current();
+    }, 120000); // 120 seconds
+
+    return () => clearInterval(interval);
+  }, []);
+
 
   return {
     activeTab,

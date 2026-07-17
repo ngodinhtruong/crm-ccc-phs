@@ -1,4 +1,5 @@
 "use client";
+import { getErrorMessage } from "@/utils/error.util";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -44,23 +45,6 @@ const initialForm: CustomerCreateFormState = {
   rating: "",
   membershipTier: "",
 };
-
-function getErrorMessage(err: unknown, fallback: string) {
-  const error = err as {
-    response?: {
-      status?: number;
-      data?: unknown;
-    };
-    message?: string;
-  };
-
-  const status = error?.response?.status;
-  const detail = error?.response?.data
-    ? JSON.stringify(error.response.data)
-    : error?.message;
-
-  return `${fallback}. Status: ${status} - ${detail}`;
-}
 
 export function useCustomerCreate() {
   const router = useRouter();
@@ -129,7 +113,7 @@ export function useCustomerCreate() {
         customerService.getMembershipTiers(),
       ]);
 
-      setBranches(branchData);
+      setBranches(branchData as BranchOption[]);
       setCustomerTypes(typeData);
       setCompanies(companyData);
       setSources(sourceData);

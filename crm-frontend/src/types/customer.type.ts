@@ -136,6 +136,7 @@ export type CreateCustomerPayload = {
     source?: number | null;
     rating?: number | null;
     membership_tier?: number | null;
+    assigned_employee?: number | null;
     address?: string;
     status?: string;
 };

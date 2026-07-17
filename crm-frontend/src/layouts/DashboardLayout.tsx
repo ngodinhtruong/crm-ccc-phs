@@ -35,7 +35,7 @@ export function DashboardLayout({
         defaultSettingsSidebarOpen
     );
 
-    const { activeWorkspace, loading, error } = useWorkspaceGuard();
+    const { currentUser, activeWorkspace, loading, error } = useWorkspaceGuard();
 
     if (loading) {
         return (
@@ -76,6 +76,7 @@ export function DashboardLayout({
                 open={menuOpen}
                 onClose={() => setMenuOpen(false)}
                 activeWorkspace={activeWorkspace}
+                currentUser={currentUser}
             />
 
             <DashboardTopbar onMenuClick={() => setMenuOpen(true)} />
@@ -89,7 +90,7 @@ export function DashboardLayout({
             />
 
             <aside className="fixed left-0 top-14 z-30 h-[calc(100vh-56px)] w-10 bg-[#263747]">
-                <button
+                {/* <button
                     type="button"
                     onClick={() => setSettingsSidebarOpen(true)}
                     className={`flex h-10 w-full items-center justify-center text-white ${settingsSidebarOpen
@@ -99,7 +100,7 @@ export function DashboardLayout({
                     title="Mở cài đặt"
                 >
                     <Settings size={22} />
-                </button>
+                </button> */}
             </aside>
 
             <section className={`min-h-screen pt-14 ${contentClassName}`}>

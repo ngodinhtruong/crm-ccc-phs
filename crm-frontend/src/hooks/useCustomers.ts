@@ -1,6 +1,7 @@
 "use client";
+import { getErrorMessage } from "@/utils/error.util";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { useDebounce } from "@/hooks/useDebounce";
@@ -17,22 +18,6 @@ import {
     MembershipTierOption,
 } from "@/types/customer.type";
 import { useTablePagination } from "@/hooks/useTablePagination";
-function getErrorMessage(err: unknown, fallback: string) {
-    const error = err as {
-        response?: {
-            status?: number;
-            data?: unknown;
-        };
-        message?: string;
-    };
-
-    const status = error?.response?.status || "unknown";
-    const detail = error?.response?.data
-        ? JSON.stringify(error.response.data)
-        : error?.message;
-
-    return `${fallback}. Status: ${status} - ${detail}`;
-}
 
 export function useCustomers() {
     const router = useRouter();
@@ -50,28 +35,114 @@ export function useCustomers() {
         MembershipTierOption[]
     >([]);
 
-    const [openedAccountFrom, setOpenedAccountFrom] = useState("");
-    const [openedAccountTo, setOpenedAccountTo] = useState("");
+    // Grouping all filter states into one object to optimize renders and make reset cleaner
+    const [filters, setFilters] = useState({
+        openedAccountFrom: "",
+        openedAccountTo: "",
+        fullName: "",
+        phone: "",
+        accountNumber: "",
+        companyName: "",
+        email: "",
+        membershipTier: "",
+        assignedEmployeeName: "",
+        source: "",
+        dateOfBirthFrom: "",
+        dateOfBirthTo: "",
+        description: "",
+        status: "",
+        branch: "",
+        customerType: "",
+        rating: "",
+    });
 
-    const [fullName, setFullName] = useState("");
-    const [phone, setPhone] = useState("");
-    const [accountNumber, setAccountNumber] = useState("");
-    const [companyName, setCompanyName] = useState("");
-    const [email, setEmail] = useState("");
+    // Individual getters for backwards compatibility
+    const openedAccountFrom = filters.openedAccountFrom;
+    const openedAccountTo = filters.openedAccountTo;
+    const fullName = filters.fullName;
+    const phone = filters.phone;
+    const accountNumber = filters.accountNumber;
+    const companyName = filters.companyName;
+    const email = filters.email;
+    const membershipTier = filters.membershipTier;
+    const assignedEmployeeName = filters.assignedEmployeeName;
+    const source = filters.source;
+    const dateOfBirthFrom = filters.dateOfBirthFrom;
+    const dateOfBirthTo = filters.dateOfBirthTo;
+    const description = filters.description;
+    const status = filters.status;
+    const branch = filters.branch;
+    const customerType = filters.customerType;
+    const rating = filters.rating;
 
-    const [membershipTier, setMembershipTier] = useState("");
-    const [assignedEmployeeName, setAssignedEmployeeName] = useState("");
-    const [source, setSource] = useState("");
+    // Stable individual setters using useCallback for backwards compatibility
+    const setOpenedAccountFrom = useCallback((val: string) => {
+        setFilters((prev) => ({ ...prev, openedAccountFrom: val }));
+    }, []);
 
-    const [dateOfBirthFrom, setDateOfBirthFrom] = useState("");
-    const [dateOfBirthTo, setDateOfBirthTo] = useState("");
+    const setOpenedAccountTo = useCallback((val: string) => {
+        setFilters((prev) => ({ ...prev, openedAccountTo: val }));
+    }, []);
 
-    const [description, setDescription] = useState("");
+    const setFullName = useCallback((val: string) => {
+        setFilters((prev) => ({ ...prev, fullName: val }));
+    }, []);
 
-    const [status, setStatus] = useState("");
-    const [branch, setBranch] = useState("");
-    const [customerType, setCustomerType] = useState("");
-    const [rating, setRating] = useState("");
+    const setPhone = useCallback((val: string) => {
+        setFilters((prev) => ({ ...prev, phone: val }));
+    }, []);
+
+    const setAccountNumber = useCallback((val: string) => {
+        setFilters((prev) => ({ ...prev, accountNumber: val }));
+    }, []);
+
+    const setCompanyName = useCallback((val: string) => {
+        setFilters((prev) => ({ ...prev, companyName: val }));
+    }, []);
+
+    const setEmail = useCallback((val: string) => {
+        setFilters((prev) => ({ ...prev, email: val }));
+    }, []);
+
+    const setMembershipTier = useCallback((val: string) => {
+        setFilters((prev) => ({ ...prev, membershipTier: val }));
+    }, []);
+
+    const setAssignedEmployeeName = useCallback((val: string) => {
+        setFilters((prev) => ({ ...prev, assignedEmployeeName: val }));
+    }, []);
+
+    const setSource = useCallback((val: string) => {
+        setFilters((prev) => ({ ...prev, source: val }));
+    }, []);
+
+    const setDateOfBirthFrom = useCallback((val: string) => {
+        setFilters((prev) => ({ ...prev, dateOfBirthFrom: val }));
+    }, []);
+
+    const setDateOfBirthTo = useCallback((val: string) => {
+        setFilters((prev) => ({ ...prev, dateOfBirthTo: val }));
+    }, []);
+
+    const setDescription = useCallback((val: string) => {
+        setFilters((prev) => ({ ...prev, description: val }));
+    }, []);
+
+    const setStatus = useCallback((val: string) => {
+        setFilters((prev) => ({ ...prev, status: val }));
+    }, []);
+
+    const setBranch = useCallback((val: string) => {
+        setFilters((prev) => ({ ...prev, branch: val }));
+    }, []);
+
+    const setCustomerType = useCallback((val: string) => {
+        setFilters((prev) => ({ ...prev, customerType: val }));
+    }, []);
+
+    const setRating = useCallback((val: string) => {
+        setFilters((prev) => ({ ...prev, rating: val }));
+    }, []);
 
     const [loading, setLoading] = useState(true);
     const [masterLoading, setMasterLoading] = useState(true);
@@ -80,98 +151,101 @@ export function useCustomers() {
 
     const textFilters = useMemo<CustomerListParams>(
         () => ({
-            full_name: fullName,
-            phone,
-            account_number: accountNumber,
-            company_name: companyName,
-            email,
-            assigned_employee_name: assignedEmployeeName,
-            description,
+            full_name: filters.fullName,
+            phone: filters.phone,
+            account_number: filters.accountNumber,
+            company_name: filters.companyName,
+            email: filters.email,
+            assigned_employee_name: filters.assignedEmployeeName,
+            description: filters.description,
         }),
         [
-            fullName,
-            phone,
-            accountNumber,
-            companyName,
-            email,
-            assignedEmployeeName,
-            description,
+            filters.fullName,
+            filters.phone,
+            filters.accountNumber,
+            filters.companyName,
+            filters.email,
+            filters.assignedEmployeeName,
+            filters.description,
         ]
     );
 
     const debouncedTextFilters = useDebounce(textFilters, 500);
 
-    const buildParams = (
-        customParams?: Partial<CustomerListParams>,
-        pageValue = pagination.page
-    ): CustomerListParams => ({
-        ...debouncedTextFilters,
+    const buildParams = useCallback(
+        (customParams?: Partial<CustomerListParams>, pageValue = 1): CustomerListParams => ({
+            ...debouncedTextFilters,
 
-        page: String(pageValue),
+            page: String(pageValue),
 
-        opened_account_from: openedAccountFrom,
-        opened_account_to: openedAccountTo,
+            opened_account_from: filters.openedAccountFrom,
+            opened_account_to: filters.openedAccountTo,
 
-        membership_tier: membershipTier,
-        source,
-        status,
-        branch,
-        customer_type: customerType,
-        rating,
+            membership_tier: filters.membershipTier,
+            source: filters.source,
+            status: filters.status,
+            branch: filters.branch,
+            customer_type: filters.customerType,
+            rating: filters.rating,
 
-        date_of_birth_from: dateOfBirthFrom,
-        date_of_birth_to: dateOfBirthTo,
+            date_of_birth_from: filters.dateOfBirthFrom,
+            date_of_birth_to: filters.dateOfBirthTo,
 
-        ...customParams,
-    });
+            ...customParams,
+        }),
+        [debouncedTextFilters, filters]
+    );
 
-    const loadCustomers = async (
-        params?: CustomerListParams,
-        pageValue = pagination.page
-    ) => {
-        try {
-            setLoading(true);
-            setError("");
+    const loadCustomers = useCallback(
+        async (params?: CustomerListParams, pageValue = 1) => {
+            try {
+                setLoading(true);
+                setError("");
 
-            const data = await customerService.getCustomers(
-                params || buildParams({}, pageValue)
-            );
+                const data = await customerService.getCustomers(
+                    params || buildParams({}, pageValue)
+                );
 
-            setCustomers(data.results || []);
-            setCount(data.count || 0);
-        } catch (err) {
-            setError(getErrorMessage(err, "Không tải được danh sách khách hàng"));
-        } finally {
-            setLoading(false);
-        }
-    };
+                setCustomers(data.results || []);
+                setCount(data.count || 0);
+            } catch (err) {
+                setError(getErrorMessage(err, "Không tải được danh sách khách hàng"));
+            } finally {
+                setLoading(false);
+            }
+        },
+        [buildParams]
+    );
 
-    const goToPage = (nextPage: number) => {
-        const safePage = Math.min(Math.max(nextPage, 1), pagination.totalPages);
+    const goToPage = useCallback(
+        (nextPage: number) => {
+            const safePage = Math.min(Math.max(nextPage, 1), pagination.totalPages);
 
-        pagination.setPage(safePage);
-        void loadCustomers(
-            buildParams(
-                {
-                    page: String(safePage),
-                },
+            pagination.setPage(safePage);
+            void loadCustomers(
+                buildParams(
+                    {
+                        page: String(safePage),
+                    },
+                    safePage
+                ),
                 safePage
-            ),
-            safePage
-        );
-    };
+            );
+        },
+        [pagination, loadCustomers, buildParams]
+    );
 
-    const previousPage = () => {
+    const previousPage = useCallback(() => {
         if (pagination.page <= 1) return;
         goToPage(pagination.page - 1);
-    };
+    }, [pagination.page, goToPage]);
 
-    const nextPage = () => {
+    const nextPage = useCallback(() => {
         if (pagination.page >= pagination.totalPages) return;
         goToPage(pagination.page + 1);
-    };
+    }, [pagination.page, pagination.totalPages, goToPage]);
 
-    const loadMasterData = async () => {
+    const loadMasterData = useCallback(async () => {
         try {
             setMasterLoading(true);
             setMasterError("");
@@ -190,7 +264,7 @@ export function useCustomers() {
                 customerService.getMembershipTiers(),
             ]);
 
-            setBranches(branchData);
+            setBranches(branchData as BranchOption[]);
             setCustomerTypes(customerTypeData);
             setSources(sourceData);
             setRatings(ratingData);
@@ -202,96 +276,66 @@ export function useCustomers() {
         } finally {
             setMasterLoading(false);
         }
-    };
+    }, []);
 
-    const search = () => {
+    const search = useCallback(() => {
         pagination.resetPage();
 
         void loadCustomers(
             {
                 page: "1",
 
-                opened_account_from: openedAccountFrom,
-                opened_account_to: openedAccountTo,
+                opened_account_from: filters.openedAccountFrom,
+                opened_account_to: filters.openedAccountTo,
 
-                full_name: fullName,
-                phone,
-                account_number: accountNumber,
-                company_name: companyName,
-                email,
+                full_name: filters.fullName,
+                phone: filters.phone,
+                account_number: filters.accountNumber,
+                company_name: filters.companyName,
+                email: filters.email,
 
-                membership_tier: membershipTier,
-                assigned_employee_name: assignedEmployeeName,
-                source,
+                membership_tier: filters.membershipTier,
+                assigned_employee_name: filters.assignedEmployeeName,
+                source: filters.source,
 
-                date_of_birth_from: dateOfBirthFrom,
-                date_of_birth_to: dateOfBirthTo,
+                date_of_birth_from: filters.dateOfBirthFrom,
+                date_of_birth_to: filters.dateOfBirthTo,
 
-                description,
-                status,
-                branch,
-                customer_type: customerType,
-                rating,
+                description: filters.description,
+                status: filters.status,
+                branch: filters.branch,
+                customer_type: filters.customerType,
+                rating: filters.rating,
             },
             1
         );
-    };
+    }, [pagination, loadCustomers, filters]);
 
-    const clearFilter = () => {
-        setOpenedAccountFrom("");
-        setOpenedAccountTo("");
-
-        setFullName("");
-        setPhone("");
-        setAccountNumber("");
-        setCompanyName("");
-        setEmail("");
-
-        setMembershipTier("");
-        setAssignedEmployeeName("");
-        setSource("");
-
-        setDateOfBirthFrom("");
-        setDateOfBirthTo("");
-
-        setDescription("");
-
-        setStatus("");
-        setBranch("");
-        setCustomerType("");
-        setRating("");
+    const clearFilter = useCallback(() => {
+        setFilters({
+            openedAccountFrom: "",
+            openedAccountTo: "",
+            fullName: "",
+            phone: "",
+            accountNumber: "",
+            companyName: "",
+            email: "",
+            membershipTier: "",
+            assignedEmployeeName: "",
+            source: "",
+            dateOfBirthFrom: "",
+            dateOfBirthTo: "",
+            description: "",
+            status: "",
+            branch: "",
+            customerType: "",
+            rating: "",
+        });
 
         pagination.resetPage();
 
-        void loadCustomers(
-            {
-                page: "1",
-
-                opened_account_from: "",
-                opened_account_to: "",
-
-                full_name: "",
-                phone: "",
-                account_number: "",
-                company_name: "",
-                email: "",
-
-                membership_tier: "",
-                assigned_employee_name: "",
-                source: "",
-
-                date_of_birth_from: "",
-                date_of_birth_to: "",
-
-                description: "",
-                status: "",
-                branch: "",
-                customer_type: "",
-                rating: "",
-            },
-            1
-        );
-    };
+        void loadCustomers({ page: "1" }, 1);
+    }, [pagination, loadCustomers]);
 
     useEffect(() => {
         if (!authService.isAuthenticated()) {
@@ -300,9 +344,7 @@ export function useCustomers() {
         }
 
         void loadMasterData();
-
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [router]);
+    }, [router, loadMasterData]);
 
     useEffect(() => {
         if (!authService.isAuthenticated()) {
@@ -311,23 +353,20 @@ export function useCustomers() {
 
         pagination.resetPage();
         void loadCustomers(buildParams({ page: "1" }, 1), 1);
-
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [
         debouncedTextFilters,
-
-        openedAccountFrom,
-        openedAccountTo,
-
-        membershipTier,
-        source,
-        status,
-        branch,
-        customerType,
-        rating,
-
-        dateOfBirthFrom,
-        dateOfBirthTo,
+        filters.openedAccountFrom,
+        filters.openedAccountTo,
+        filters.membershipTier,
+        filters.source,
+        filters.status,
+        filters.branch,
+        filters.customerType,
+        filters.rating,
+        filters.dateOfBirthFrom,
+        filters.dateOfBirthTo,
+        loadCustomers,
+        buildParams,
     ]);
 
     return {

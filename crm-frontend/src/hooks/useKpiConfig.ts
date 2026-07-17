@@ -1,4 +1,5 @@
 "use client";
+import { getErrorMessage } from "@/utils/error.util";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -18,6 +19,7 @@ import {
   KpiPeriodGateConfigItem,
   KpiPeriodItem,
   KpiPeriodMetricItem,
+  KpiPeriodPayload,
   KpiProfileItem,
   KpiRewardTierConfigItem,
   KpiRewardTierPayload,
@@ -73,26 +75,6 @@ function formatApiErrorData(data: unknown): string {
   }
 
   return String(data);
-}
-
-function getErrorMessage(err: unknown, fallback: string) {
-  const error = err as {
-    response?: {
-      status?: number;
-      data?: unknown;
-    };
-    message?: string;
-  };
-
-  const apiMessage = formatApiErrorData(error?.response?.data);
-
-  if (apiMessage) {
-    return `${fallback}. ${apiMessage}`;
-  }
-
-  return `${fallback}. Status: ${error?.response?.status || "unknown"} - ${
-    error?.message || "Không rõ lỗi"
-  }`;
 }
 
 function normalizeDecimal(value?: string | number | null) {
@@ -664,7 +646,7 @@ export function useKpiConfig() {
         target_text: item.target_text || "",
         target_value: item.target_value || null,
         target_unit: item.target_unit || null,
-        frequency: item.frequency || "",
+        frequency: item.frequency || null,
         is_active: item.is_active,
       });
 
@@ -1015,7 +997,7 @@ export function useKpiConfig() {
       setSaving(true);
       clearMessages();
 
-      const response = await kpiService.updatePeriod(periodId, payload);
+      const response = await kpiService.updatePeriod(periodId, payload as KpiPeriodPayload);
 
       setNotice(response.detail);
       await loadPeriods();

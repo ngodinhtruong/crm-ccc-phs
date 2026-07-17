@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Copy, Save, SquareCheckBig, X } from "lucide-react";
+import { Copy, Save, Settings, SquareCheckBig, X } from "lucide-react";
 
 import {
   ColumnSelectFilter,
@@ -208,6 +208,17 @@ export function KpiAdminTargetsTab({ admin }: { admin: KpiAdminController }) {
             <Copy size={14} />
             Copy tháng trước
           </button>
+
+          <button
+            type="button"
+            onClick={admin.setDefaultTargets}
+            disabled={admin.saving || rows.length === 0}
+            className="flex h-8 items-center gap-1 rounded border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Settings size={14} />
+            Set chỉ tiêu mặc định
+          </button>
+
 
           {!admin.copyFirstEmployeeMode ? (
             <button

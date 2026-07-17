@@ -1,4 +1,5 @@
 "use client";
+import { getErrorMessage } from "@/utils/error.util";
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -13,7 +14,6 @@ import {
   UserEmployeeOption,
   UserRoleOption,
 } from "@/types/user.type";
-
 
 function getEmployeeStatus(employee: UserEmployeeOption) {
   return employee.status || "ACTIVE";
@@ -71,25 +71,6 @@ function formatApiErrorData(data: unknown): string {
   }
 
   return String(data);
-}
-
-function getErrorMessage(err: unknown, fallback: string) {
-  const error = err as {
-    response?: {
-      status?: number;
-      data?: unknown;
-    };
-    message?: string;
-  };
-
-  const status = error?.response?.status || "unknown";
-  const apiMessage = formatApiErrorData(error?.response?.data);
-
-  if (apiMessage) {
-    return `${fallback}. ${apiMessage}`;
-  }
-
-  return `${fallback}. Status: ${status} - ${error?.message || "Không rõ lỗi"}`;
 }
 
 const initialForm: UserCreateFormState = {
@@ -368,7 +349,6 @@ export function useUserCreate() {
     return {
       username: form.username.trim(),
       email: form.email.trim(),
-
 
       employee: form.employeeId ? Number(form.employeeId) : null,
       employee_data: employeeData,

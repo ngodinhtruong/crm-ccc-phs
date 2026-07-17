@@ -1,6 +1,7 @@
 "use client";
+import { getErrorMessage } from "@/utils/error.util";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { authService } from "@/services/auth.service";
@@ -9,23 +10,6 @@ import {
   SaAdminDashboardParams,
   SaAdminDashboardResponse,
 } from "@/types/sale-admin-dashboard.type";
-
-function getErrorMessage(err: unknown, fallback: string) {
-  const error = err as {
-    response?: {
-      status?: number;
-      data?: unknown;
-    };
-    message?: string;
-  };
-
-  const status = error?.response?.status || "unknown";
-  const detail = error?.response?.data
-    ? JSON.stringify(error.response.data)
-    : error?.message;
-
-  return `${fallback}. Status: ${status} - ${detail}`;
-}
 
 function toDateInputValue(date: Date) {
   const year = date.getFullYear();
@@ -182,6 +166,20 @@ export function useSaleAdminDashboard() {
     void loadDashboard(params);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
+
+  const refreshRef = useRef(refresh);
+  useEffect(() => {
+    refreshRef.current = refresh;
+  });
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      void refreshRef.current();
+    }, 120000); // 120 seconds
+
+    return () => clearInterval(interval);
+  }, []);
+
 
   return {
     data,

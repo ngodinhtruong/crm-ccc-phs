@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 
 import { DashboardLayout } from "@/layouts/DashboardLayout";
+import { AccessDenied } from "@/components/common";
+import { PermissionCode, useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { useSaleAdminDashboard } from "@/hooks/useSaleAdminDashboard";
 import {
   AdminDashboardFilters,
@@ -101,6 +103,7 @@ function HeroStats({ dashboard }: { dashboard: ReturnType<typeof useSaleAdminDas
 }
 
 export function SaleAdminDashboardPage() {
+  const authz = useCurrentUserPermissions();
   const dashboard = useSaleAdminDashboard();
   const [filterOpen, setFilterOpen] = useState(false);
 
@@ -116,6 +119,30 @@ export function SaleAdminDashboardPage() {
     dashboard.data?.period?.label
   );
   const previousLabel = dashboard.data?.period?.previous_label || "Kỳ trước";
+
+  if (!authz.loading && !authz.hasPermission(PermissionCode.SA_DASHBOARD_VIEW)) {
+    return (
+      <DashboardLayout
+        breadcrumbs={[
+          {
+            label: "TRANG CHỦ",
+            href: "/workspace",
+          },
+          {
+            label: "Sale Admin",
+          },
+          {
+            label: "Báo cáo",
+          },
+        ]}
+      >
+        <AccessDenied
+          title="Không có quyền xem Dashboard"
+          description="Bạn không có quyền truy cập Dashboard Sale Admin. Vui lòng liên hệ Quản trị viên nếu cần thiết."
+        />
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout

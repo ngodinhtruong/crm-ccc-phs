@@ -122,7 +122,7 @@ export function BranchRankingTable({
             />
 
             {visibleRows.map((row, index) => (
-              <RankingRow key={row.branch_id} row={row} index={index} />
+              <RankingRow key={`${row.branch_id}-${index}`} row={row} index={index} />
             ))}
 
             {totalRow && visibleRows.length > 0 && (

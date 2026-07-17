@@ -1,4 +1,5 @@
 "use client";
+import { getErrorMessage } from "@/utils/error.util";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -11,12 +12,6 @@ import {
 } from "@/types/external-error.type";
 
 const PAGE_SIZE = 20;
-
-function getErrorMessage(err: unknown, fallback: string) {
-  const error = err as { response?: { status?: number; data?: unknown }; message?: string };
-  const detail = error?.response?.data ? JSON.stringify(error.response.data) : error?.message;
-  return `${fallback}. Status: ${error?.response?.status || "unknown"} - ${detail || "Không rõ lỗi"}`;
-}
 
 export function useExternalErrors() {
   const [records, setRecords] = useState<ExternalErrorRecord[]>([]);

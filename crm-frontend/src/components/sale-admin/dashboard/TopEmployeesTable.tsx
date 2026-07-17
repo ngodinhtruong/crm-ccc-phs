@@ -108,7 +108,7 @@ export function TopEmployeesTable({
               {pagedRows.map((row, index) => {
                 const rowBg = index % 2 === 0 ? "bg-white" : "bg-slate-50/50";
                 return (
-                  <tr key={row.user_id} className={`h-12 border-b border-slate-100 ${rowBg} hover:bg-sky-50/70`}>
+                  <tr key={`${row.user_id}-${index}`} className={`h-12 border-b border-slate-100 ${rowBg} hover:bg-sky-50/70`}>
                     <td className={`sticky left-0 z-10 px-3 ${rowBg}`}>
                       <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-bold ring-1 ${rankClass(row.rank)}`}>
                         <Trophy size={12} /> {row.rank}
