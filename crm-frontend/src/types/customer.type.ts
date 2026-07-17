@@ -125,10 +125,11 @@ export type BranchOption = {
 
 export type CreateCustomerPayload = {
     full_name: string;
+    salutation?: string;
     phone: string;
     email?: string;
     identity_number?: string;
-    birth_date?: string;
+    date_of_birth?: string;
     gender?: string;
     customer_type?: number | null;
     branch?: number | null;
@@ -136,8 +137,11 @@ export type CreateCustomerPayload = {
     source?: number | null;
     rating?: number | null;
     membership_tier?: number | null;
-    assigned_employee?: number | null;
     address?: string;
+    ward?: string;
+    district?: string;
+    province?: string;
+    country?: string;
     status?: string;
 };
 
@@ -146,6 +150,8 @@ export type CreateCustomerAccountPayload = {
     account_number: string;
     account_status: string;
     source_system?: string;
+    /** Ngày mở tài khoản chứng khoán (YYYY-MM-DD) */
+    opened_at?: string;
 };
 
 export type CustomerCreateFormState = {
@@ -175,4 +181,17 @@ export type CustomerCreateFormState = {
     source: string;
     rating: string;
     membershipTier: string;
+};
+/** Chi tiết khách hàng — khớp response GET /api/customers/customers/{id}/ */
+export type CustomerDetail = CustomerListItem & {
+    salutation?: string | null;
+    gender?: string | null;
+    ward?: string | null;
+    province?: string | null;
+    district?: string | null;
+    country?: string | null;
+    status_label?: string | null;
+    opened_account_date?: string | null;
+    created_at?: string | null;
+    updated_at?: string | null;
 };

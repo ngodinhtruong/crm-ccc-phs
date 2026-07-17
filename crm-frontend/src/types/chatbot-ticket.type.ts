@@ -103,6 +103,7 @@ export type ChatbotTicketListParams = {
   link_status?: ChatbotTicketLinkStatus | "";
   mine?: boolean;
   unassigned?: boolean;
+  customer?: number;
   q?: string;
   page?: number;
   page_size?: number;

@@ -1,4 +1,5 @@
 import { Eye, MoreVertical, Phone } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 import {
   ColumnDateRangeFilter,
@@ -21,7 +22,10 @@ export function CustomerTable({
 }: {
   customerState: ReturnType<typeof useCustomers>;
 }) {
+  const router = useRouter();
   const customers = customerState.customers;
+
+  const openDetail = (id: number) => router.push(`/customers/${id}`);
 
   return (
     <div className="overflow-x-auto">
@@ -203,17 +207,27 @@ export function CustomerTable({
               return (
                 <tr
                   key={customer.id}
-                  className={`h-14 border-b border-slate-100 ${rowBg} hover:bg-sky-50`}
+                  onClick={() => openDetail(customer.id)}
+                  className={`h-14 cursor-pointer border-b border-slate-100 ${rowBg} hover:bg-sky-50`}
                 >
                   <td className={`sticky left-0 z-10 px-3 ${rowBg}`}>
                     <div className="flex items-center gap-3 text-slate-400">
-                      <button type="button" title="Xem" className="hover:text-sky-600">
+                      <button
+                        type="button"
+                        title="Xem chi tiết"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          openDetail(customer.id);
+                        }}
+                        className="hover:text-sky-600"
+                      >
                         <Eye size={15} />
                       </button>
 
                       <button
                         type="button"
                         title="Thêm"
+                        onClick={(event) => event.stopPropagation()}
                         className="hover:text-sky-600"
                       >
                         <MoreVertical size={15} />

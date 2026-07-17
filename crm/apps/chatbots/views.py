@@ -528,6 +528,20 @@ class TicketChatbotDetailAPIView(APIView):
 
         update_fields = []
 
+        # Lý do vượt SLA (nếu người dùng khai kèm)
+        breach_reason = request.data.get("breach_reason")
+        breach_note = request.data.get("breach_note")
+
+        if breach_reason:
+            ticket.breach_reason_id = breach_reason
+            ticket.breach_note = breach_note or ""
+            ticket.breach_reason_submitted = True
+            update_fields += [
+                "breach_reason",
+                "breach_note",
+                "breach_reason_submitted",
+            ]
+
         # Trạng thái: nhận mã code → tra sang TicketStatus (FK current_status)
         if "status" in request.data:
             new_code = request.data.get("status")
@@ -536,6 +550,23 @@ class TicketChatbotDetailAPIView(APIView):
             if not status:
                 return Response({"detail": "Trạng thái không hợp lệ."}, status=400)
 
+            # Cùng quy tắc với ticket thường: đã vượt SLA thì phải khai lý do
+            # trước khi đưa ticket về trạng thái kết thúc.
+            closing = new_code in (
+                TicketChatbot.STATUS_DA_XONG,
+                TicketChatbot.STATUS_CHO_HUY,
+            )
+            has_reason = ticket.breach_reason_id or ticket.breach_note
+
+            if closing and ticket.is_sla_overdue and not has_reason:
+                return Response(
+                    {
+                        "detail": "Ticket đã vượt SLA. "
+                        "Cần nhập lý do vượt SLA trước khi đóng ticket."
+                    },
+                    status=400,
+                )
+
             ticket.current_status = status
             update_fields.append("current_status")
 
@@ -543,10 +574,17 @@ class TicketChatbotDetailAPIView(APIView):
                 ticket.done_at = timezone.now()
                 update_fields.append("done_at")
 
+                # Đóng đúng hạn → chốt ON_TIME
+                if not ticket.is_sla_overdue:
+                    ticket.sla_status = TicketChatbot.SLA_ON_TIME
+                    update_fields.append("sla_status")
+
         for field in self.EDITABLE_PLAIN:
             if field in request.data:
                 setattr(ticket, field, request.data.get(field))
                 update_fields.append(field)
+
+        old_sla_policy_id = ticket.sla_policy_id
 
         for field in self.EDITABLE_FK:
             if field in request.data:
@@ -562,6 +600,10 @@ class TicketChatbotDetailAPIView(APIView):
         if update_fields:
             update_fields.append("updated_at")
             ticket.save(update_fields=update_fields)
+
+        # Đổi sang chính sách SLA khác → tính lại toàn bộ deadline
+        if ticket.sla_policy_id and ticket.sla_policy_id != old_sla_policy_id:
+            ticket.apply_sla_policy()
 
         # Trả lại có select_related để tên hiển thị đúng
         ticket = TicketChatbot.objects.select_related(

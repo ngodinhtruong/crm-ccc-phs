@@ -273,6 +273,22 @@ def find_customer_by_contact(contact_type, contact_info):
     return customer, None
 
 
+def get_default_sla_policy():
+    """
+    Chính sách SLA áp cho ticket chatbot.
+
+    Ưu tiên policy được đánh dấu is_default; không có thì lấy policy active đầu tiên.
+    Trả None nếu hệ thống chưa cấu hình SLA nào — khi đó ticket vẫn tạo được,
+    chỉ là không có đồng hồ đếm.
+    """
+    from apps.sla.models import SlaPolicy
+
+    return (
+        SlaPolicy.objects.filter(is_default=True, is_active=True).first()
+        or SlaPolicy.objects.filter(is_active=True).order_by("id").first()
+    )
+
+
 def relink_ticket_customer(ticket):
     """
     Dò lại khách hàng cho một TicketChatbot chưa nối được (link_status=UNLINKED).
@@ -392,6 +408,12 @@ def create_crm_tickets_from_chatbot(default_branch=None):
             owner_user=None,
             handling_branch=default_branch,
         )
+
+        # Áp SLA mặc định để đồng hồ bắt đầu đếm ngay từ khi ticket sinh ra
+        policy = get_default_sla_policy()
+
+        if policy:
+            ticket.apply_sla_policy(policy)
 
         summary.ticket_chatbot = ticket
         summary.save(update_fields=["ticket_chatbot"])

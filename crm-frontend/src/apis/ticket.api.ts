@@ -7,6 +7,7 @@ import {
     TicketAccountOption,
     TicketClassificationOption,
     TicketCreatePayload,
+    TicketDetail,
     TicketErrorGroupOption,
     TicketErrorGroupPayload,
     TicketErrorTypeOption,
@@ -68,6 +69,84 @@ export const ticketApi = {
             "/api/tickets/tickets/",
             payload
         );
+
+        return response.data;
+    },
+
+    getTicketById: async (id: number): Promise<TicketDetail> => {
+        const response = await api.get<TicketDetail>(
+            `/api/tickets/tickets/${id}/`
+        );
+
+        return response.data;
+    },
+
+    /** Đổi trạng thái ticket. Nếu SLA đã vượt, backend bắt buộc phải có lý do vượt. */
+    updateTicketStatus: async (
+        id: number,
+        payload: {
+            to_status_code: string;
+            note?: string;
+            breach_reason?: number | null;
+            breach_note?: string;
+            cancelled_reason?: string;
+        }
+    ): Promise<TicketDetail> => {
+        const response = await api.post<TicketDetail>(
+            `/api/tickets/tickets/${id}/status/`,
+            cleanParams(payload)
+        );
+
+        return response.data;
+    },
+
+    /** Sửa thông tin ticket (SLA, ưu tiên, phân loại, mô tả, giải pháp...). Ghi log từng field đổi. */
+    amendTicket: async (
+        id: number,
+        payload: {
+            title?: string;
+            support_category?: number | null;
+            classification?: number | null;
+            source?: number | null;
+            priority?: number | null;
+            sla_policy?: number | null;
+            request_content?: string;
+            handling_solution?: string;
+            final_response?: string;
+        }
+    ): Promise<TicketDetail> => {
+        const response = await api.post<TicketDetail>(
+            `/api/tickets/tickets/${id}/amend/`,
+            cleanParams(payload)
+        );
+
+        return response.data;
+    },
+
+    /** Phân công xử lý: đổi đơn vị / chi nhánh / nhân viên. Tự đóng phân công cũ. */
+    assignTicket: async (
+        id: number,
+        payload: {
+            to_unit?: number | null;
+            to_branch?: number | null;
+            to_employee?: number | null;
+            transfer_reason?: string;
+            note?: string;
+        }
+    ): Promise<TicketDetail> => {
+        const response = await api.post<TicketDetail>(
+            `/api/tickets/tickets/${id}/assign/`,
+            cleanParams(payload)
+        );
+
+        return response.data;
+    },
+
+    /** Đánh dấu gửi khảo sát hài lòng cho ticket. */
+    sendTicketSurvey: async (id: number, sendSurvey: boolean) => {
+        const response = await api.post(`/api/tickets/tickets/${id}/survey/`, {
+            send_survey: sendSurvey,
+        });
 
         return response.data;
     },

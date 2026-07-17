@@ -2,56 +2,40 @@ import api from "@/apis/axios-client";
 import { getListData } from "@/utils/response.util";
 import { SlaSelectOption } from "@/types/sla.type";
 
+/**
+ * Master data dùng để đổ dropdown nên phải lấy HẾT, không phân trang.
+ * Backend mặc định 20 dòng/trang → thiếu là dropdown mất lựa chọn.
+ */
+const PAGE_SIZE = 1000;
+
+async function fetchAll<T = unknown>(path: string): Promise<T[]> {
+  const response = await api.get(path, { params: { page_size: PAGE_SIZE } });
+  return getListData<T>(response.data);
+}
+
 export const masterDataApi = {
-  getBranches: async () => {
-    const response = await api.get("/api/master-data/branches/");
-    return getListData(response.data);
-  },
+  getBranches: () => fetchAll("/api/master-data/branches/"),
 
-  getEmployees: async () => {
-    const response = await api.get("/api/master-data/employees/");
-    return getListData(response.data);
-  },
+  getEmployees: () => fetchAll("/api/master-data/employees/"),
 
-  getTicketStatuses: async () => {
-    const response = await api.get("/api/master-data/ticket-statuses/");
-    return getListData(response.data);
-  },
+  getTicketStatuses: () => fetchAll("/api/master-data/ticket-statuses/"),
 
-  getTicketPriorities: async () => {
-    const response = await api.get("/api/master-data/ticket-priorities/");
-    return getListData(response.data);
-  },
+  getTicketPriorities: () => fetchAll("/api/master-data/ticket-priorities/"),
 
-  getTicketSources: async () => {
-    const response = await api.get("/api/master-data/ticket-sources/");
-    return getListData(response.data);
-  },
+  getTicketSources: () => fetchAll("/api/master-data/ticket-sources/"),
 
-  getTicketCategories: async (): Promise<SlaSelectOption[]> => {
-    const response = await api.get("/api/master-data/ticket-categories/");
-    return getListData<SlaSelectOption>(response.data);
-  },
+  getTicketCategories: (): Promise<SlaSelectOption[]> =>
+    fetchAll<SlaSelectOption>("/api/master-data/ticket-categories/"),
 
-  getTicketClassifications: async () => {
-    const response = await api.get("/api/master-data/ticket-classifications/");
-    return getListData(response.data);
-  },
+  getTicketClassifications: () =>
+    fetchAll("/api/master-data/ticket-classifications/"),
 
-  getProcessingUnits: async (): Promise<SlaSelectOption[]> => {
-    const response = await api.get("/api/master-data/processing-units/");
-    return getListData<SlaSelectOption>(response.data);
-  },
+  getProcessingUnits: (): Promise<SlaSelectOption[]> =>
+    fetchAll<SlaSelectOption>("/api/master-data/processing-units/"),
 
-  getSlaPolicies: async () => {
-    const response = await api.get("/api/master-data/sla-policies/");
-    return getListData(response.data);
-  },
+  getSlaPolicies: () => fetchAll("/api/master-data/sla-policies/"),
 
-  getSlaBreachReasons: async () => {
-    const response = await api.get("/api/master-data/sla-breach-reasons/");
-    return getListData(response.data);
-  },
+  getSlaBreachReasons: () => fetchAll("/api/master-data/sla-breach-reasons/"),
 };
 
 export const masterDataService = masterDataApi;

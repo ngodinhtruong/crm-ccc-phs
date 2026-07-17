@@ -4,6 +4,7 @@ import { getListData } from "@/utils/response.util";
 import {
   CreateCustomerAccountPayload,
   CreateCustomerPayload,
+  CustomerDetail,
   CustomerListItem,
   CustomerListParams,
   CustomerRatingOption,
@@ -23,6 +24,14 @@ export const customerApi = {
       {
         params: cleanParams(params),
       }
+    );
+
+    return response.data;
+  },
+
+  getCustomerById: async (id: number): Promise<CustomerDetail> => {
+    const response = await api.get<CustomerDetail>(
+      `/api/customers/customers/${id}/`
     );
 
     return response.data;

@@ -331,6 +331,43 @@ class TicketChatbot(TimeStampedModel):
     # Có gửi khảo sát cho khách không
     send_survey = models.BooleanField(default=False)
 
+    # --- Đồng hồ SLA ---
+    # TicketSlaTracking khóa ngoại cứng tới tickets.Ticket nên không dùng lại được.
+    # Bảng chatbot tách riêng → lưu deadline ngay tại đây cho gọn.
+    SLA_ON_TIME = "ON_TIME"
+    SLA_OVERDUE = "OVERDUE"
+    SLA_PROCESSING = "PROCESSING"
+
+    SLA_STATUS_CHOICES = [
+        (SLA_ON_TIME, "Đúng hạn"),
+        (SLA_OVERDUE, "Quá hạn"),
+        (SLA_PROCESSING, "Đang xử lý"),
+    ]
+
+    sla_status = models.CharField(
+        max_length=30,
+        choices=SLA_STATUS_CHOICES,
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+
+    response_due_at = models.DateTimeField(null=True, blank=True)
+    assignment_due_at = models.DateTimeField(null=True, blank=True)
+    processing_due_at = models.DateTimeField(null=True, blank=True)
+    resolution_due_at = models.DateTimeField(null=True, blank=True)
+
+    breached_at = models.DateTimeField(null=True, blank=True)
+    breach_reason = models.ForeignKey(
+        "sla.SlaBreachReason",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="chatbot_tickets",
+    )
+    breach_note = models.TextField(null=True, blank=True)
+    breach_reason_submitted = models.BooleanField(default=False)
+
     # --- Mốc thời gian ---
     accepted_at = models.DateTimeField(null=True, blank=True)
     accepted_by_user = models.ForeignKey(
@@ -382,3 +419,54 @@ class TicketChatbot(TimeStampedModel):
         from apps.tickets.models import TicketStatus
 
         return TicketStatus.objects.filter(status_code=code).first()
+
+    def apply_sla_policy(self, policy=None, save=True):
+        """
+        Tính lại deadline 4 mốc từ chính sách SLA. Gọi khi tạo ticket hoặc đổi policy.
+        Mốc tính từ thời điểm áp policy (giống TicketSlaTracking của ticket thường).
+        """
+        from datetime import timedelta
+        from django.utils import timezone
+
+        policy = policy or self.sla_policy
+
+        if not policy:
+            return
+
+        now = timezone.now()
+        minutes = lambda m: now + timedelta(minutes=m) if m is not None else None
+
+        self.sla_policy = policy
+        self.response_due_at = minutes(policy.response_time_minutes)
+        self.assignment_due_at = minutes(policy.assignment_time_minutes)
+        self.processing_due_at = minutes(policy.processing_time_minutes)
+        self.resolution_due_at = minutes(policy.resolution_time_minutes)
+        self.sla_status = self.SLA_PROCESSING
+        self.breached_at = None
+
+        if save:
+            self.save(
+                update_fields=[
+                    "sla_policy",
+                    "response_due_at",
+                    "assignment_due_at",
+                    "processing_due_at",
+                    "resolution_due_at",
+                    "sla_status",
+                    "breached_at",
+                    "updated_at",
+                ]
+            )
+
+    @property
+    def is_sla_overdue(self):
+        """Quá hạn = đã đánh dấu OVERDUE, hoặc đã qua hạn hoàn tất."""
+        from django.utils import timezone
+
+        if self.sla_status == self.SLA_OVERDUE or self.breached_at:
+            return True
+
+        if self.resolution_due_at and timezone.now() > self.resolution_due_at:
+            return True
+
+        return False

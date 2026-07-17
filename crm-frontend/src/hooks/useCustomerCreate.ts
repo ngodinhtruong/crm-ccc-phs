@@ -176,10 +176,11 @@ export function useCustomerCreate() {
 
       const customer = await customerService.createCustomer({
         full_name: `${form.genderPrefix} ${form.fullName}`.trim(),
+        salutation: form.genderPrefix || undefined,
         phone: form.phone.trim(),
         email: form.email.trim() || undefined,
         identity_number: form.identityNumber.trim() || undefined,
-        birth_date: form.birthDate || undefined,
+        date_of_birth: form.birthDate || undefined,
         gender: form.gender || undefined,
 
         customer_type: form.customerType ? Number(form.customerType) : null,
@@ -193,14 +194,11 @@ export function useCustomerCreate() {
 
         assigned_employee: form.assignedTo ? Number(form.assignedTo) : null,
 
-        address: [
-          form.address,
-          form.district,
-          form.province,
-          form.country,
-        ]
-          .filter(Boolean)
-          .join(", "),
+        // Lưu từng cấp địa chỉ vào đúng cột riêng, không gộp thành một chuỗi
+        address: form.address.trim() || undefined,
+        district: form.district.trim() || undefined,
+        province: form.province.trim() || undefined,
+        country: form.country.trim() || undefined,
         status: "ACTIVE",
       });
 
@@ -210,6 +208,7 @@ export function useCustomerCreate() {
           account_number: form.accountNumber.trim().toUpperCase(),
           account_status: "ACTIVE",
           source_system: "CRM_MINI",
+          opened_at: form.openedDate || undefined,
         });
       }
 

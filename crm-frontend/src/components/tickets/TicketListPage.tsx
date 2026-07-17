@@ -1,6 +1,7 @@
 "use client";
 
-import { FolderTree, Plus } from "lucide-react";
+import { Eye, FolderTree, Plus } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 import {
   ColumnDateRangeFilter,
@@ -85,6 +86,7 @@ const accountTabs = [
 ];
 
 export function TicketListPage() {
+  const router = useRouter();
   const tickets = useTickets();
 
   return (
@@ -394,10 +396,28 @@ export function TicketListPage() {
                   return (
                     <tr
                       key={item.id}
-                      className={`h-14 border-b border-slate-100 ${rowBg} hover:bg-sky-50`}
+                      onClick={() => router.push(`/tickets/${item.id}`)}
+                      className={`h-14 cursor-pointer border-b border-slate-100 ${rowBg} hover:bg-sky-50`}
                     >
-                      <td className="px-3 font-semibold text-sky-600">
-                        {item.ticket_code || `TICKET-${item.id}`}
+                      <td className="px-3">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-sky-600">
+                            {item.ticket_code || `TICKET-${item.id}`}
+                          </span>
+
+                          <button
+                            type="button"
+                            title="Xem chi tiết ticket"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              router.push(`/tickets/${item.id}`);
+                            }}
+                            className="flex items-center gap-1 rounded-md border border-sky-200 bg-sky-50 px-2 py-1 text-[11px] font-semibold text-sky-700 transition hover:bg-sky-100"
+                          >
+                            <Eye size={12} />
+                            Chi tiết
+                          </button>
+                        </div>
                       </td>
 
                       <td className="px-3">

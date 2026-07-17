@@ -146,9 +146,9 @@ export function CustomerCreateForm({
               className="h-9 w-full rounded border px-3 text-xs"
             >
               <option value="">Chọn một giá trị</option>
-              <option value="MALE">Nam</option>
-              <option value="FEMALE">Nữ</option>
-              <option value="OTHER">Khác</option>
+              <option value="Nam">Nam</option>
+              <option value="Nữ">Nữ</option>
+              <option value="Khác">Khác</option>
             </select>
           </CustomerFormField>
 

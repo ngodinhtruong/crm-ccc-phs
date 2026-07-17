@@ -137,12 +137,15 @@ export type TicketListItem = {
 
 export type TicketListParams = {
     page?: string;
+    page_size?: string;
     q?: string;
 
     ticket_code?: string;
     title?: string;
     classification_method?: string;
     source_ref_id?: string;
+
+    customer?: string;
 
     support_category?: string;
     support_category_name?: string;
@@ -274,3 +277,41 @@ export type TicketCreatePayload = {
     handling_solution?: string;
     final_response?: string;
 };
+
+/** Chi tiết ticket thường — khớp GET /api/tickets/tickets/{id}/ */
+export type TicketDetail = TicketListItem & {
+    is_error_ticket?: boolean;
+    error_group_code?: string | null;
+    error_type_code?: string | null;
+    current_status?: number | null;
+    current_status_code?: string | null;
+    current_status_name?: string | null;
+    support_category?: number | null;
+    classification?: number | null;
+    priority?: number | null;
+    source?: number | null;
+    customer?: number | null;
+    customer_account?: number | null;
+    handling_branch?: number | null;
+    assigned_unit?: number | null;
+    assigned_employee?: number | null;
+    owner_user?: number | null;
+    sla_policy?: number | null;
+    sla_policy_name?: string | null;
+    accepted_at?: string | null;
+    processing_started_at?: string | null;
+    done_at?: string | null;
+    closed_at?: string | null;
+    cancelled_at?: string | null;
+    cancelled_reason?: string | null;
+    is_locked_for_amend?: boolean;
+};
+
+/** Mã trạng thái luồng ticket thường */
+export type TicketStatusCode =
+    | "CREATED"
+    | "ACCEPTED"
+    | "PROCESSING"
+    | "DONE_WAIT_CLOSE"
+    | "CLOSED"
+    | "CANCELLED";
