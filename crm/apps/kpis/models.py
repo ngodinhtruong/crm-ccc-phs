@@ -376,7 +376,7 @@ class KpiPeriodMetric(TimeStampedModel):
     metric_code = models.CharField(max_length=50)
     metric_name = models.CharField(max_length=255)
     weight_percent = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0.00"))
-    work_description = models.TextField(null=True, blank=True)
+    # work_description = models.TextField(null=True, blank=True)
     measurement_formula = models.TextField()
     target_text = models.TextField(null=True, blank=True)
     target_value = models.DecimalField(max_digits=20, decimal_places=4, null=True, blank=True)
@@ -548,7 +548,19 @@ class KpiUserMetricResult(TimeStampedModel):
         ]
 
     def save(self, *args, **kwargs):
-        self.weighted_score = (self.score or Decimal("0")) * self.weight_percent / Decimal("100")
+        self.weighted_score = (self.score or Decimal("0")) * (self.weight_percent or Decimal("0")) / Decimal("100")
+
+        # Khi update_or_create/update_fields cập nhật score hoặc weight_percent,
+        # Django chỉ lưu các field nằm trong update_fields. Nếu không thêm
+        # weighted_score vào update_fields thì điểm tổng từng phần A/B và tổng KPI
+        # sẽ vẫn giữ giá trị cũ dù score chi tiết đã đổi.
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None:
+            update_fields = set(update_fields)
+            if {"score", "weight_percent", "weighted_score"} & update_fields:
+                update_fields.add("weighted_score")
+                kwargs["update_fields"] = update_fields
+
         super().save(*args, **kwargs)
 
 

@@ -1,5 +1,15 @@
 import api from "@/apis/axios-client";
 import {
+  KpiAdminTargetsResponse,
+  KpiAdminReportResponse,
+  KpiAdminRankingResponse,
+  KpiAdminQueryParams,
+  KpiAdminMutationResponse,
+  KpiAdminMetaResponse,
+  KpiAdminDashboardResponse,
+  KpiAdminCopyPreviousPayload,
+  KpiAdminCopyEmployeePayload,
+  KpiAdminBulkTargetPayload,
   KpiConfigMutationResponse,
   KpiCreateMonthlyPayload,
   KpiCreateMonthlyResponse,
@@ -35,6 +45,15 @@ const KPI_METRIC_ENDPOINT = "/api/kpis/metrics/";
 const KPI_GATE_CONFIG_ENDPOINT = "/api/kpis/gate-configs/";
 const KPI_REWARD_TIER_ENDPOINT = "/api/kpis/reward-tiers/";
 const KPI_GATE_DEFINITION_ENDPOINT = "/api/kpis/gate-definitions/";
+const KPI_ADMIN_META_ENDPOINT = "/api/kpis/admin/meta/";
+const KPI_ADMIN_PERIOD_OPTIONS_ENDPOINT = "/api/kpis/admin/period-options/";
+const KPI_ADMIN_DASHBOARD_ENDPOINT = "/api/kpis/admin/dashboard/";
+const KPI_ADMIN_RANKING_ENDPOINT = "/api/kpis/admin/ranking/";
+const KPI_ADMIN_REPORT_ENDPOINT = "/api/kpis/admin/report/";
+const KPI_ADMIN_TARGETS_ENDPOINT = "/api/kpis/admin/targets/";
+const KPI_ADMIN_TARGETS_BULK_UPDATE_ENDPOINT = "/api/kpis/admin/targets/bulk-update/";
+const KPI_ADMIN_TARGETS_COPY_PREVIOUS_ENDPOINT = "/api/kpis/admin/targets/copy-from-previous-period/";
+const KPI_ADMIN_TARGETS_COPY_EMPLOYEE_ENDPOINT = "/api/kpis/admin/targets/copy-from-employee/";
 
 function getListData<T>(data: T[] | PaginatedResponse<T>): T[] {
   if (Array.isArray(data)) return data;
@@ -50,7 +69,7 @@ function normalizeMetricPayload(payload: Partial<KpiMetricPayload>) {
     metric_code: payload.metric_code,
     metric_name: payload.metric_name,
     weight_percent: payload.weight_percent,
-    work_description: payload.work_description ?? "",
+    // work_description: payload.work_description ?? "",
     measurement_formula:
       payload.measurement_formula?.trim() || "Chưa cấu hình công thức tính",
     target_text: payload.target_text ?? "",
@@ -434,6 +453,92 @@ export const kpiApi = {
       `${KPI_GATE_DEFINITION_ENDPOINT}${id}/`
     );
 
+    return response.data;
+  },
+
+
+  getKpiAdminPeriodOptions: async (
+    params: Record<string, string> = {}
+  ): Promise<KpiPeriodItem[]> => {
+    const response = await api.get<KpiPeriodItem[]>(KPI_ADMIN_PERIOD_OPTIONS_ENDPOINT, {
+      params: { limit: "48", ...params },
+    });
+
+    return response.data;
+  },
+
+
+  getKpiAdminMeta: async (
+    params: KpiAdminQueryParams = {}
+  ): Promise<KpiAdminMetaResponse> => {
+    const response = await api.get<KpiAdminMetaResponse>(KPI_ADMIN_META_ENDPOINT, { params });
+    return response.data;
+  },
+
+  getKpiAdminDashboard: async (
+    params: KpiAdminQueryParams = {}
+  ): Promise<KpiAdminDashboardResponse> => {
+    const response = await api.get<KpiAdminDashboardResponse>(
+      KPI_ADMIN_DASHBOARD_ENDPOINT,
+      { params }
+    );
+    return response.data;
+  },
+
+  getKpiAdminRanking: async (
+    params: KpiAdminQueryParams = {}
+  ): Promise<KpiAdminRankingResponse> => {
+    const response = await api.get<KpiAdminRankingResponse>(KPI_ADMIN_RANKING_ENDPOINT, {
+      params,
+    });
+    return response.data;
+  },
+
+  getKpiAdminReport: async (
+    params: KpiAdminQueryParams = {}
+  ): Promise<KpiAdminReportResponse> => {
+    const response = await api.get<KpiAdminReportResponse>(KPI_ADMIN_REPORT_ENDPOINT, {
+      params,
+    });
+    return response.data;
+  },
+
+  getKpiAdminTargets: async (
+    params: KpiAdminQueryParams = {}
+  ): Promise<KpiAdminTargetsResponse> => {
+    const response = await api.get<KpiAdminTargetsResponse>(KPI_ADMIN_TARGETS_ENDPOINT, {
+      params,
+    });
+    return response.data;
+  },
+
+  bulkUpdateKpiAdminTargets: async (
+    payload: KpiAdminBulkTargetPayload
+  ): Promise<KpiAdminMutationResponse> => {
+    const response = await api.post<KpiAdminMutationResponse>(
+      KPI_ADMIN_TARGETS_BULK_UPDATE_ENDPOINT,
+      payload
+    );
+    return response.data;
+  },
+
+  copyKpiAdminTargetsFromPreviousPeriod: async (
+    payload: KpiAdminCopyPreviousPayload
+  ): Promise<KpiAdminMutationResponse> => {
+    const response = await api.post<KpiAdminMutationResponse>(
+      KPI_ADMIN_TARGETS_COPY_PREVIOUS_ENDPOINT,
+      payload
+    );
+    return response.data;
+  },
+
+  copyKpiAdminTargetsFromEmployee: async (
+    payload: KpiAdminCopyEmployeePayload
+  ): Promise<KpiAdminMutationResponse> => {
+    const response = await api.post<KpiAdminMutationResponse>(
+      KPI_ADMIN_TARGETS_COPY_EMPLOYEE_ENDPOINT,
+      payload
+    );
     return response.data;
   },
 

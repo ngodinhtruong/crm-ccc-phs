@@ -179,7 +179,7 @@ class Command(BaseCommand):
                     "group": group,
                     "metric_name": metric_item["metric_name"],
                     "weight_percent": metric_item["weight_percent"],
-                    "work_description": metric_item.get("work_description", ""),
+                    # "work_description": metric_item.get("work_description", ""),
                     "measurement_formula": metric_item.get("measurement_formula", ""),
                     "target_text": metric_item.get("target_text", ""),
                     "target_value": metric_item.get("target_value"),

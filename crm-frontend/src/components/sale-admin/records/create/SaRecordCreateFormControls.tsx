@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { FocusEventHandler, KeyboardEventHandler, ReactNode } from "react";
 
 export function FieldLabel({
   children,
@@ -23,21 +23,36 @@ export function TextInput({
   placeholder,
   type = "text",
   readOnly = false,
+  onFocus,
+  onBlur,
+  onKeyDown,
+  autoComplete = "off",
+  inputMode,
 }: {
   value: string;
   onChange?: (value: string) => void;
   placeholder?: string;
   type?: string;
   readOnly?: boolean;
+  onFocus?: FocusEventHandler<HTMLInputElement>;
+  onBlur?: FocusEventHandler<HTMLInputElement>;
+  onKeyDown?: KeyboardEventHandler<HTMLInputElement>;
+  autoComplete?: string;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
 }) {
   return (
     <input
       type={type}
       value={value}
       readOnly={readOnly}
+      autoComplete={autoComplete}
+      inputMode={inputMode}
+      onFocus={onFocus}
+      onBlur={onBlur}
+      onKeyDown={onKeyDown}
       onChange={(event) => {
         if (readOnly) return;
-        onChange?.(event.target.value);
+        onChange?.(event.currentTarget.value);
       }}
       placeholder={placeholder}
       className={[
@@ -54,16 +69,24 @@ export function SelectInput({
   value,
   onChange,
   children,
+  disabled = false,
 }: {
   value: string;
   onChange: (value: string) => void;
   children: ReactNode;
+  disabled?: boolean;
 }) {
   return (
     <select
       value={value}
+      disabled={disabled}
       onChange={(event) => onChange(event.target.value)}
-      className="h-9 w-full rounded border border-slate-300 bg-white px-3 text-xs outline-none focus:border-sky-400"
+      className={[
+        "h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400",
+        disabled
+          ? "cursor-not-allowed bg-slate-100 text-slate-500"
+          : "bg-white",
+      ].join(" ")}
     >
       {children}
     </select>

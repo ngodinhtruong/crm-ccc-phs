@@ -11,6 +11,8 @@ import {
   SaRecordCreatePayload,
   SaRecordAuditLogItem,
   SaRecordUpdatePayload,
+  SaCustomerAccountSuggestion,
+  SaSelectOption,
 } from "@/types/sale-admin.type";
 
 const SA_RECORD_ENDPOINT = "/api/sale-admin/records/";
@@ -18,6 +20,9 @@ const SA_RECORD_AUDIT_LOG_ENDPOINT = "/api/sale-admin/record-audit-logs/";
 const SA_CALL_RESULT_ENDPOINT = "/api/sale-admin/call-results/";
 const SA_INTEREST_LEVEL_ENDPOINT = "/api/sale-admin/interest-levels/";
 const SA_ICP_GROUP_ENDPOINT = "/api/sale-admin/icp-groups/";
+const SA_ACCOUNT_SUGGESTION_ENDPOINT = "/api/sale-admin/customer-account-suggestions/";
+const SA_ACCOUNT_STATUS_OPTION_ENDPOINT = "/api/sale-admin/account-status-options/";
+const SA_VIP_CLASSIFICATION_OPTION_ENDPOINT = "/api/sale-admin/vip-classification-options/";
 
 function normalizePaginated<T>(
   data: T[] | PaginatedResponse<T>
@@ -72,6 +77,34 @@ export const saleAdminApi = {
     );
 
     return getListData<SaIcpGroup>(response.data);
+  },
+
+  searchCustomerAccounts: async (
+    keyword: string
+  ): Promise<SaCustomerAccountSuggestion[]> => {
+    const response = await api.get<
+      { count: number; results: SaCustomerAccountSuggestion[] } | SaCustomerAccountSuggestion[]
+    >(SA_ACCOUNT_SUGGESTION_ENDPOINT, {
+      params: cleanParams({ q: keyword }),
+    });
+
+    return getListData<SaCustomerAccountSuggestion>(response.data);
+  },
+
+  getAccountStatusOptions: async (): Promise<SaSelectOption[]> => {
+    const response = await api.get<
+      { count: number; results: SaSelectOption[] } | SaSelectOption[]
+    >(SA_ACCOUNT_STATUS_OPTION_ENDPOINT);
+
+    return getListData<SaSelectOption>(response.data);
+  },
+
+  getVipClassificationOptions: async (): Promise<SaSelectOption[]> => {
+    const response = await api.get<
+      { count: number; results: SaSelectOption[] } | SaSelectOption[]
+    >(SA_VIP_CLASSIFICATION_OPTION_ENDPOINT);
+
+    return getListData<SaSelectOption>(response.data);
   },
   createSaRecord: async (
     payload: SaRecordCreatePayload

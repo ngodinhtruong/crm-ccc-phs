@@ -133,7 +133,7 @@ class KpiPeriodMetricAdmin(admin.ModelAdmin):
         "group__group_code",
         "metric_code",
         "metric_name",
-        "work_description",
+        # "work_description",
         "measurement_formula",
         "target_text",
     )

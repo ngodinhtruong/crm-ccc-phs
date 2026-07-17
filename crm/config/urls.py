@@ -38,4 +38,7 @@ urlpatterns = [
 
     #kpi
     path("api/kpis/", include("apps.kpis.urls")),
+
+    #error
+    path("api/external-errors/", include("apps.external_errors.urls")),
 ]

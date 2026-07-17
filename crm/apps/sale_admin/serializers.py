@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from apps.customers.models import CustomerAccount, MembershipTier
+
 from apps.sale_admin.models import (
     SaCallResult,
     SaInterestLevel,
@@ -151,10 +153,84 @@ class SaRecordReadSerializer(serializers.ModelSerializer):
             or str(obj.broker_employee)
         )
 
+
+def get_default_vip_classification(customer):
+    membership_tier = getattr(customer, "membership_tier", None)
+
+    return (
+        getattr(membership_tier, "tier_name", None)
+        or getattr(membership_tier, "tier_code", None)
+        or ""
+    )
+
+
+def get_available_account_status_values():
+    return set(
+        CustomerAccount.objects
+        .exclude(account_status__isnull=True)
+        .exclude(account_status="")
+        .values_list("account_status", flat=True)
+    )
+
+
+def get_available_vip_classification_values():
+    tier_values = set(
+        MembershipTier.objects
+        .filter(is_active=True)
+        .values_list("tier_name", flat=True)
+    )
+    tier_code_values = set(
+        MembershipTier.objects
+        .filter(is_active=True)
+        .values_list("tier_code", flat=True)
+    )
+    existing_values = set(
+        SaRecord.objects
+        .exclude(vip_classification__isnull=True)
+        .exclude(vip_classification="")
+        .values_list("vip_classification", flat=True)
+    )
+
+    return {value for value in tier_values | tier_code_values | existing_values if value}
+
+
+def apply_customer_account_to_sa_record_attrs(attrs, customer_account):
+    """
+    Khóa SA Record theo tài khoản có thật trong CRM.
+    Nhân viên chỉ nhập/chọn số TK đã tồn tại trong customer_accounts;
+    các trường customer/branch/company được lấy từ DB.
+
+    account_status và vip_classification là snapshot cho SA Record,
+    được phép chọn lại từ danh mục DB nếu frontend gửi lên.
+    """
+    customer = customer_account.customer
+    branch = getattr(customer, "branch", None)
+    company = getattr(customer, "company", None)
+
+    submitted_account_status = str(attrs.get("account_status") or "").strip()
+    submitted_vip_classification = str(attrs.get("vip_classification") or "").strip()
+
+    default_account_status = customer_account.account_status or getattr(customer, "status", "") or ""
+    default_vip_classification = get_default_vip_classification(customer)
+
+    attrs["account_no"] = customer_account.account_number
+    attrs["customer_account"] = customer_account
+    attrs["customer"] = customer
+    attrs["company"] = company
+    attrs["branch"] = branch
+
+    attrs["customer_name_snapshot"] = customer.full_name
+    attrs["branch_name_snapshot"] = (
+        getattr(branch, "branch_name", None)
+        or getattr(branch, "name", None)
+        or ""
+    )
+    attrs["account_status"] = submitted_account_status or default_account_status
+    attrs["vip_classification"] = submitted_vip_classification or default_vip_classification
+
+    return attrs
+
 class SaRecordWriteSerializer(serializers.ModelSerializer):
-
-    
-
     class Meta:
         model = SaRecord
         fields = [
@@ -203,7 +279,7 @@ class SaRecordWriteSerializer(serializers.ModelSerializer):
         ]
 
     def validate_account_no(self, value):
-        value = str(value or "").strip()
+        value = str(value or "").strip().upper()
 
         if not value:
             raise serializers.ValidationError("Số tài khoản không được để trống.")
@@ -215,9 +291,63 @@ class SaRecordWriteSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Lần follow phải lớn hơn hoặc bằng 1.")
 
         return value
-    
+
+    def resolve_customer_account(self, attrs):
+        account_no = attrs.get("account_no")
+        customer_account = attrs.get("customer_account")
+
+        if not account_no and customer_account:
+            account_no = customer_account.account_number
+
+        if not account_no:
+            if self.instance and self.instance.customer_account_id:
+                return self.instance.customer_account
+
+            raise serializers.ValidationError(
+                {"account_no": "Vui lòng chọn số tài khoản có trong hệ thống."}
+            )
+
+        resolved = (
+            CustomerAccount.objects.select_related(
+                "customer",
+                "customer__branch",
+                "customer__company",
+                "customer__membership_tier",
+            )
+            .filter(account_number__iexact=str(account_no).strip())
+            .first()
+        )
+
+        if not resolved:
+            raise serializers.ValidationError(
+                {"account_no": "Số tài khoản không tồn tại trong hệ thống. Vui lòng chọn từ danh sách gợi ý."}
+            )
+
+        if customer_account and customer_account.id != resolved.id:
+            raise serializers.ValidationError(
+                {"customer_account": "Tài khoản đã chọn không khớp với số tài khoản nhập."}
+            )
+
+        return resolved
+
     def validate(self, attrs):
         request = self.context.get("request")
+
+        customer_account = self.resolve_customer_account(attrs)
+        attrs = apply_customer_account_to_sa_record_attrs(attrs, customer_account)
+
+        account_status = str(attrs.get("account_status") or "").strip()
+        vip_classification = str(attrs.get("vip_classification") or "").strip()
+
+        if account_status and account_status not in get_available_account_status_values():
+            raise serializers.ValidationError(
+                {"account_status": "Trạng thái tài khoản không nằm trong danh mục hệ thống."}
+            )
+
+        if vip_classification and vip_classification not in get_available_vip_classification_values():
+            raise serializers.ValidationError(
+                {"vip_classification": "Phân loại VIP không nằm trong danh mục hệ thống."}
+            )
 
         account_no = attrs.get("account_no")
         call_date = attrs.get("call_date")

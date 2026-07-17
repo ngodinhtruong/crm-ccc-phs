@@ -1,4 +1,20 @@
-import { getMaxValue } from "@/components/sale-admin/dashboard/SaleAdminDashboardUtils";
+"use client";
+
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+
+import {
+  formatCompactNumber,
+  toNumber,
+} from "@/components/sale-admin/dashboard/SaleAdminDashboardUtils";
 
 type ChartRow = {
   key: string | number;
@@ -7,11 +23,41 @@ type ChartRow = {
   secondValue?: string | number;
   valueLabel: string;
   secondValueLabel?: string;
+  currentLabel?: string;
   secondLabel?: string;
 };
 
-function asNumber(value: string | number | null | undefined) {
-  return Number(value || 0);
+type ChartDatum = ChartRow & {
+  current: number;
+  previous: number;
+};
+
+function EmptyChart({ message }: { message: string }) {
+  return (
+    <div className="flex h-[260px] items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50 text-sm text-slate-400">
+      {message}
+    </div>
+  );
+}
+
+function ChartTooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload: ChartDatum }> }) {
+  if (!active || !payload?.length) return null;
+
+  const row = payload[0].payload;
+
+  return (
+    <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs shadow-lg">
+      <p className="mb-1 font-semibold text-slate-800">{row.label}</p>
+      <p className="text-[#0097cf]">
+        {row.currentLabel || "Hiện tại"}: <span className="font-semibold">{row.valueLabel}</span>
+      </p>
+      {row.secondValue !== undefined && (
+        <p className="mt-0.5 text-slate-500">
+          {row.secondLabel || "Tháng trước"}: <span className="font-semibold">{row.secondValueLabel}</span>
+        </p>
+      )}
+    </div>
+  );
 }
 
 export function SimpleBarChart({
@@ -19,102 +65,112 @@ export function SimpleBarChart({
   description,
   rows,
   emptyText = "Chưa có dữ liệu biểu đồ.",
+  layout = "horizontal",
+  height = 290,
 }: {
   title: string;
   description?: string;
   rows: ChartRow[];
   emptyText?: string;
+  layout?: "horizontal" | "vertical";
+  height?: number;
 }) {
-  const data = rows.slice(0, 12);
+  const data: ChartDatum[] = rows.slice(0, 12).map((row) => ({
+    ...row,
+    current: toNumber(row.value),
+    previous: toNumber(row.secondValue),
+  }));
   const hasComparison = data.some((row) => row.secondValue !== undefined);
-  const maxValue = getMaxValue(data.flatMap((row) => [row.value, row.secondValue]));
+  const hasData = data.some((row) => row.current > 0 || row.previous > 0);
+  const currentLabel = data.find((row) => row.currentLabel)?.currentLabel || "Tháng hiện tại";
+  const previousLabel = data.find((row) => row.secondLabel)?.secondLabel || "Tháng trước";
+  const isVertical = layout === "vertical";
 
   return (
-    <div className="rounded-md border border-slate-200 bg-white shadow-sm">
-      <div className="border-b px-4 py-3">
-        <h2 className="text-sm font-semibold text-slate-800">{title}</h2>
-        {description && <p className="mt-0.5 text-xs text-slate-500">{description}</p>}
+    <section className="h-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="border-b border-slate-100 bg-white px-4 py-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-bold text-slate-800">{title}</h2>
+            {description && <p className="mt-0.5 text-xs leading-5 text-slate-500">{description}</p>}
+          </div>
+          <span className="rounded-full bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-500 ring-1 ring-slate-200">
+            Top {data.length}
+          </span>
+        </div>
       </div>
 
-      {data.length === 0 ? (
-        <div className="p-5 text-sm text-slate-500">{emptyText}</div>
-      ) : (
-        <div className="p-4">
-          <div className="flex h-[240px] items-end gap-4 overflow-x-auto border-b border-slate-100 pb-3">
-            {data.map((row, index) => {
-              const currentHeight = Math.max((asNumber(row.value) / maxValue) * 170, asNumber(row.value) > 0 ? 8 : 0);
-              const previousHeight = Math.max((asNumber(row.secondValue) / maxValue) * 170, asNumber(row.secondValue) > 0 ? 8 : 0);
-
-              return (
-                <div
-                  key={row.key}
-                  className="flex min-w-[72px] flex-1 flex-col items-center justify-end"
-                  title={`${row.label}: ${row.valueLabel}${row.secondValueLabel ? ` · ${row.secondValueLabel}` : ""}`}
-                >
-                  <div className="mb-2 flex h-8 flex-col items-center justify-end text-center">
-                    <span className="max-w-[92px] truncate text-[10px] font-semibold text-slate-700">
-                      {row.valueLabel}
-                    </span>
-                    {hasComparison && row.secondValueLabel && (
-                      <span className="max-w-[92px] truncate text-[10px] text-slate-400">
-                        {row.secondValueLabel}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex h-[175px] items-end justify-center gap-1.5">
-                    <div
-                      className={`w-7 rounded-t-md bg-gradient-to-t ${
-                        index % 4 === 0
-                          ? "from-[#0097cf] to-sky-300"
-                          : index % 4 === 1
-                            ? "from-emerald-500 to-emerald-300"
-                            : index % 4 === 2
-                              ? "from-amber-500 to-amber-300"
-                              : "from-violet-500 to-violet-300"
-                      }`}
-                      style={{ height: currentHeight }}
+      <div className="p-4">
+        {data.length === 0 || !hasData ? (
+          <EmptyChart message={emptyText} />
+        ) : (
+          <div style={{ width: "100%", height }}>
+            <ResponsiveContainer>
+              <BarChart
+                data={data}
+                layout={isVertical ? "vertical" : "horizontal"}
+                margin={isVertical ? { top: 8, right: 18, left: 10, bottom: 8 } : { top: 12, right: 14, left: 0, bottom: 6 }}
+                barCategoryGap={isVertical ? 10 : 18}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={!isVertical} vertical={isVertical} />
+                {isVertical ? (
+                  <>
+                    <XAxis
+                      type="number"
+                      tickFormatter={formatCompactNumber}
+                      tick={{ fontSize: 11, fill: "#64748b" }}
+                      axisLine={false}
+                      tickLine={false}
                     />
-
-                    {hasComparison && (
-                      <div
-                        className="w-5 rounded-t-md bg-slate-300"
-                        style={{ height: previousHeight }}
-                      />
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+                    <YAxis
+                      type="category"
+                      dataKey="label"
+                      width={118}
+                      tick={{ fontSize: 11, fill: "#475569" }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <XAxis
+                      dataKey="label"
+                      interval={0}
+                      tick={{ fontSize: 10, fill: "#64748b" }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      tickFormatter={formatCompactNumber}
+                      tick={{ fontSize: 11, fill: "#64748b" }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                  </>
+                )}
+                <Tooltip content={<ChartTooltip />} cursor={{ fill: "#f8fafc" }} />
+                <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
+                {hasComparison && (
+                  <Bar
+                    dataKey="previous"
+                    name={previousLabel}
+                    fill="#00CC99"
+                    radius={isVertical ? [0, 6, 6, 0] : [6, 6, 0, 0]}
+                    maxBarSize={isVertical ? 16 : 32}
+                  />
+                )}
+                <Bar
+                  dataKey="current"
+                  name={currentLabel}
+                  fill="#0097cf"
+                  radius={isVertical ? [0, 6, 6, 0] : [6, 6, 0, 0]}
+                  maxBarSize={isVertical ? 16 : 32}
+                />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
-
-          <div
-            className="mt-3 grid gap-2"
-            style={{ gridTemplateColumns: `repeat(${data.length}, minmax(72px, 1fr))` }}
-          >
-            {data.map((row) => (
-              <div key={`${row.key}-label`} className="text-center">
-                <p className="mx-auto max-w-[96px] truncate text-[11px] font-medium text-slate-600" title={row.label}>
-                  {row.label}
-                </p>
-              </div>
-            ))}
-          </div>
-
-          {hasComparison && (
-            <div className="mt-4 flex flex-wrap items-center gap-4 text-[11px] text-slate-500">
-              <div className="flex items-center gap-1.5">
-                <span className="h-3 w-3 rounded-sm bg-[#0097cf]" />
-                <span>Tháng hiện tại</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="h-3 w-3 rounded-sm bg-slate-300" />
-                <span>{data.find((row) => row.secondLabel)?.secondLabel || "Tháng trước"}</span>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </section>
   );
 }

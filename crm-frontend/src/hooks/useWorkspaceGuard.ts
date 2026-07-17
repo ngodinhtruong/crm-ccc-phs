@@ -42,6 +42,10 @@ function isAdminPath(pathname: string) {
   return pathname.startsWith("/accounts");
 }
 
+function isExternalErrorPath(pathname: string) {
+  return pathname.startsWith("/external-errors");
+}
+
 function isCccPath(pathname: string) {
   return (
     pathname.startsWith("/workspace") ||
@@ -49,7 +53,8 @@ function isCccPath(pathname: string) {
     pathname.startsWith("/customers") ||
     pathname.startsWith("/companies") ||
     pathname.startsWith("/sla") ||
-    pathname.startsWith("/chatbots")
+    pathname.startsWith("/chatbots") ||
+    isExternalErrorPath(pathname)
   );
 }
 
@@ -171,6 +176,7 @@ export function useWorkspaceGuard() {
          * 3. Chặn route CCC.
          * CCC only / Both / System Admin được vào.
          * SA only không được vào CCC.
+         * /external-errors cũng thuộc workspace CCC nhưng là dashboard lỗi riêng.
          */
         if (isCccPath(path) && !isEntryPath(path)) {
           if (!canAccessCcc) {
@@ -187,9 +193,16 @@ export function useWorkspaceGuard() {
          * 4. Auto redirect chỉ chạy ở entry page:
          * / hoặc /workspace.
          * Không được redirect khi đang ở /accounts/users/create,
-         * /sale-admin/records, /tickets, ...
+         * /sale-admin/records, /tickets, /external-errors, ...
          */
         if (!isEntryPath(path)) {
+          const workspaceFromPath = getWorkspaceFromPath(path);
+
+          if (workspaceFromPath) {
+            setActiveWorkspaceState(workspaceFromPath);
+            setActiveWorkspace(workspaceFromPath);
+          }
+
           return;
         }
 
@@ -227,8 +240,6 @@ export function useWorkspaceGuard() {
 
         router.push(getDefaultPathForWorkspaceByUser(workspace, me));
       } catch (err) {
-        // Không có catch thì activeWorkspace mãi là null và màn hình kẹt ở
-        // "Đang kiểm tra phân hệ..." mà không báo lỗi gì.
         const status = (err as { response?: { status?: number } })?.response
           ?.status;
 

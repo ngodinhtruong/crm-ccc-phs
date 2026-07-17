@@ -39,29 +39,7 @@ function StatusBadge({ active }: { active: boolean }) {
   );
 }
 
-function TypeBadge({ value }: { value: KpiGroupType }) {
-  if (value === "AUTO") {
-    return (
-      <span className="inline-flex rounded-md bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700">
-        AUTO
-      </span>
-    );
-  }
 
-  if (value === "MIXED") {
-    return (
-      <span className="inline-flex rounded-md bg-violet-100 px-3 py-1 text-xs font-semibold text-violet-700">
-        MIXED
-      </span>
-    );
-  }
-
-  return (
-    <span className="inline-flex rounded-md bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
-      MANUAL
-    </span>
-  );
-}
 
 function FormLabel({ children }: { children: string }) {
   return (
@@ -302,9 +280,7 @@ function SectionBlock({
                       <option value="AUTO">AUTO</option>
                       <option value="MIXED">MIXED</option>
                     </select>
-                    <div className="mt-1">
-                      <TypeBadge value={group.group_type} />
-                    </div>
+                    
                   </td>
 
                   <td className="px-3">

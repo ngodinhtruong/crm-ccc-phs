@@ -1,345 +1,411 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { accountService } from "@/services/account.service";
 
 import { authService } from "@/services/auth.service";
 import { saleAdminService } from "@/services/sale-admin.service";
+import { useDebounce } from "@/hooks/useDebounce";
 import {
-    SaCallResult,
-    SaIcpGroup,
-    SaInterestLevel,
-    SaRecordCreateFormState,
-    SaRecordCreatePayload,
+  SaCallResult,
+  SaCustomerAccountSuggestion,
+  SaIcpGroup,
+  SaInterestLevel,
+  SaRecordCreateFormState,
+  SaSelectOption,
 } from "@/types/sale-admin.type";
 
-function getToday() {
-    return new Date().toISOString().slice(0, 10);
-}
-
-function formatApiErrorData(data: unknown): string {
-    if (!data) {
-        return "";
-    }
-
-    if (typeof data === "string") {
-        return data;
-    }
-
-    if (Array.isArray(data)) {
-        return data.map(String).join(" ");
-    }
-
-    if (typeof data === "object") {
-        const obj = data as Record<string, unknown>;
-
-        const fieldLabels: Record<string, string> = {
-            account_no: "Số tài khoản",
-            call_date: "Ngày gọi",
-            follow_no: "Lần follow",
-            call_result: "Kết quả cuộc gọi",
-            interest_level: "Mức quan tâm",
-            icp_group: "Nhóm ICP",
-            transaction_value_snapshot: "Tổng giá trị giao dịch",
-            transaction_fee_snapshot: "Phí giao dịch",
-            non_field_errors: "Lỗi",
-            detail: "Lỗi",
-        };
-
-        const messages: string[] = [];
-
-        Object.entries(obj).forEach(([key, value]) => {
-            const label = fieldLabels[key] || key;
-
-            if (Array.isArray(value)) {
-                messages.push(`${label}: ${value.map(String).join(" ")}`);
-                return;
-            }
-
-            if (typeof value === "string") {
-                messages.push(`${label}: ${value}`);
-                return;
-            }
-
-            if (value && typeof value === "object") {
-                messages.push(`${label}: ${JSON.stringify(value)}`);
-            }
-        });
-
-        return messages.join(" ");
-    }
-
-    return String(data);
-}
-
-function getErrorMessage(err: unknown, fallback: string) {
-    const error = err as {
-        response?: {
-            status?: number;
-            data?: unknown;
-        };
-        message?: string;
-    };
-
-    const status = error?.response?.status || "unknown";
-    const apiMessage = formatApiErrorData(error?.response?.data);
-
-    if (apiMessage) {
-        return `${fallback}. ${apiMessage}`;
-    }
-
-    return `${fallback}. Status: ${status} - ${error?.message || "Không rõ lỗi"}`;
+function todayIso() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 const initialForm: SaRecordCreateFormState = {
-    accountNo: "",
-    customerNameSnapshot: "",
-    branchNameSnapshot: "",
-    picNameSnapshot: "",
-    accountStatus: "",
-    vipClassification: "",
+  accountNo: "",
+  customerNameSnapshot: "",
+  branchNameSnapshot: "",
+  picNameSnapshot: "",
+  accountStatus: "",
+  vipClassification: "",
 
-    callDate: getToday(),
-    followNo: "1",
+  customerAccount: "",
+  customer: "",
+  company: "",
+  branch: "",
+  accountSelected: false,
 
-    callResult: "",
-    interestLevel: "",
-    icpGroup: "",
+  callDate: todayIso(),
+  followNo: "1",
 
-    introducedProduct: false,
-    reactivation: false,
-    supportInfo: false,
-    referredRm: false,
+  callResult: "",
+  interestLevel: "",
+  icpGroup: "",
 
-    handoverToBroker: false,
-    brokerHandoverNote: "",
+  introducedProduct: false,
+  reactivation: false,
+  supportInfo: false,
+  referredRm: false,
 
-    transactionValueSnapshot: "0",
-    transactionFeeSnapshot: "0",
+  handoverToBroker: false,
+  brokerHandoverNote: "",
 
-    note: "",
-    editReason: "",
+  transactionValueSnapshot: "0",
+  transactionFeeSnapshot: "0",
+
+  note: "",
 };
 
+function getErrorMessage(err: unknown, fallback: string) {
+  const error = err as {
+    response?: {
+      status?: number;
+      data?: unknown;
+    };
+    message?: string;
+  };
 
-function getSaPicName(me: any) {
-    return (
-        me.employee_name ||
-        me.employee?.full_name ||
-        [me.last_name, me.first_name].filter(Boolean).join(" ") ||
-        me.username ||
-        ""
-    );
+  const status = error?.response?.status || "unknown";
+  const detail = error?.response?.data
+    ? JSON.stringify(error.response.data)
+    : error?.message;
+
+  return `${fallback}. Status: ${status} - ${detail}`;
 }
 
-function getSaBranchName(me: any) {
-    return (
-        me.branch_name ||
-        me.employee?.branch_name ||
-        me.employee?.branch?.branch_name ||
-        ""
-    );
+function toId(value?: string) {
+  return value ? Number(value) : null;
+}
+
+function normalizeAccountNoInput(value: string) {
+  return String(value || "")
+    .replace(/\s+/g, "")
+    .toUpperCase();
+}
+
+function getSuggestionVipClassification(account: SaCustomerAccountSuggestion) {
+  return (
+    account.vip_classification ||
+    account.vip_classification_label ||
+    account.membership_tier_name ||
+    ""
+  );
+}
+
+function addSelectOptionIfMissing(
+  options: SaSelectOption[],
+  value?: string | null,
+  label?: string | null
+) {
+  const cleanValue = String(value || "").trim();
+
+  if (!cleanValue) return options;
+
+  if (options.some((option) => option.value === cleanValue)) {
+    return options;
+  }
+
+  return [
+    ...options,
+    {
+      value: cleanValue,
+      label: String(label || cleanValue).trim() || cleanValue,
+    },
+  ];
 }
 
 export function useSaRecordCreate() {
-    const router = useRouter();
+  const router = useRouter();
+  const accountSearchSeqRef = useRef(0);
 
-    const [form, setForm] = useState<SaRecordCreateFormState>(initialForm);
+  const [form, setForm] = useState<SaRecordCreateFormState>(initialForm);
+  const [accountQuery, setAccountQuery] = useState("");
 
-    const [callResults, setCallResults] = useState<SaCallResult[]>([]);
-    const [interestLevels, setInterestLevels] = useState<SaInterestLevel[]>([]);
-    const [icpGroups, setIcpGroups] = useState<SaIcpGroup[]>([]);
+  const [callResults, setCallResults] = useState<SaCallResult[]>([]);
+  const [interestLevels, setInterestLevels] = useState<SaInterestLevel[]>([]);
+  const [icpGroups, setIcpGroups] = useState<SaIcpGroup[]>([]);
+  const [accountStatusOptions, setAccountStatusOptions] = useState<SaSelectOption[]>([]);
+  const [vipClassificationOptions, setVipClassificationOptions] = useState<SaSelectOption[]>([]);
 
-    const [loadingMaster, setLoadingMaster] = useState(true);
-    const [submitting, setSubmitting] = useState(false);
+  const [accountSuggestions, setAccountSuggestions] = useState<SaCustomerAccountSuggestion[]>([]);
+  const [accountSuggestionLoading, setAccountSuggestionLoading] = useState(false);
+  const [accountSuggestionError, setAccountSuggestionError] = useState("");
+  const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
 
-    const [error, setError] = useState("");
-    const [masterError, setMasterError] = useState("");
+  const [loadingMaster, setLoadingMaster] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [masterError, setMasterError] = useState("");
 
+  const debouncedAccountQuery = useDebounce(accountQuery, 180);
 
-    const loadSaProfile = async () => {
-        try {
-            const me = await accountService.getMe();
+  const setField = <K extends keyof SaRecordCreateFormState>(
+    key: K,
+    value: SaRecordCreateFormState[K]
+  ) => {
+    setForm((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
+  };
 
-            const picName = getSaPicName(me);
-            const branchName = getSaBranchName(me);
+  const handleAccountNoChange = (rawValue: string) => {
+    const nextValue = normalizeAccountNoInput(rawValue);
 
-            setForm((prev) => ({
-                ...prev,
-                picNameSnapshot: picName,
-                branchNameSnapshot: branchName,
-            }));
+    setAccountQuery(nextValue);
+    setAccountDropdownOpen(nextValue.length > 0);
+    setAccountSuggestionError("");
 
-            if (!picName || !branchName) {
-                setError(
-                    "Tài khoản SA chưa được liên kết hồ sơ nhân viên hoặc chi nhánh. Vui lòng kiểm tra User Management."
-                );
-            }
-        } catch {
-            setError("Không tải được hồ sơ người dùng SA.");
+    setForm((prev) => ({
+      ...prev,
+      accountNo: nextValue,
+      customerNameSnapshot: "",
+      branchNameSnapshot: "",
+      accountStatus: "",
+      vipClassification: "",
+      customerAccount: "",
+      customer: "",
+      company: "",
+      branch: "",
+      accountSelected: false,
+    }));
+
+    if (!nextValue) {
+      setAccountSuggestions([]);
+      setAccountSuggestionLoading(false);
+    }
+  };
+
+  const selectCustomerAccountSuggestion = (account: SaCustomerAccountSuggestion) => {
+    const selectedAccountNo = normalizeAccountNoInput(account.account_number || "");
+    const accountStatus = account.account_status || "";
+    const vipClassification = getSuggestionVipClassification(account);
+
+    setAccountQuery(selectedAccountNo);
+
+    setAccountStatusOptions((prev) =>
+      addSelectOptionIfMissing(prev, accountStatus)
+    );
+    setVipClassificationOptions((prev) =>
+      addSelectOptionIfMissing(
+        prev,
+        vipClassification,
+        account.vip_classification_label || vipClassification
+      )
+    );
+
+    setForm((prev) => ({
+      ...prev,
+      accountNo: selectedAccountNo,
+      customerNameSnapshot: account.customer_name || "",
+      branchNameSnapshot: account.branch_name || "",
+      accountStatus,
+      vipClassification,
+      customerAccount: String(account.id),
+      customer: account.customer ? String(account.customer) : "",
+      company: account.company ? String(account.company) : "",
+      branch: account.branch ? String(account.branch) : "",
+      accountSelected: true,
+    }));
+
+    setAccountDropdownOpen(false);
+    setAccountSuggestions([]);
+    setAccountSuggestionError("");
+    setAccountSuggestionLoading(false);
+  };
+
+  const loadMasterData = async () => {
+    try {
+      setLoadingMaster(true);
+      setMasterError("");
+
+      const [
+        callResultData,
+        interestLevelData,
+        icpGroupData,
+        accountStatusData,
+        vipClassificationData,
+      ] = await Promise.all([
+        saleAdminService.getCallResults(),
+        saleAdminService.getInterestLevels(),
+        saleAdminService.getIcpGroups(),
+        saleAdminService.getAccountStatusOptions(),
+        saleAdminService.getVipClassificationOptions(),
+      ]);
+
+      setCallResults(callResultData);
+      setInterestLevels(interestLevelData);
+      setIcpGroups(icpGroupData);
+      setAccountStatusOptions(accountStatusData);
+      setVipClassificationOptions(vipClassificationData);
+    } catch (err) {
+      setMasterError(getErrorMessage(err, "Không tải được dữ liệu SA Record"));
+    } finally {
+      setLoadingMaster(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!authService.isAuthenticated()) {
+      router.push("/login");
+      return;
+    }
+
+    void loadMasterData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router]);
+
+  useEffect(() => {
+    const keyword = normalizeAccountNoInput(debouncedAccountQuery || "");
+
+    if (!keyword) {
+      setAccountSuggestions([]);
+      setAccountSuggestionError("");
+      setAccountSuggestionLoading(false);
+      return;
+    }
+
+    if (form.accountSelected && keyword === form.accountNo) {
+      return;
+    }
+
+    const requestSeq = accountSearchSeqRef.current + 1;
+    accountSearchSeqRef.current = requestSeq;
+
+    const searchAccounts = async () => {
+      try {
+        setAccountSuggestionLoading(true);
+        setAccountSuggestionError("");
+
+        const results = await saleAdminService.searchCustomerAccounts(keyword);
+
+        if (accountSearchSeqRef.current !== requestSeq) return;
+
+        setAccountSuggestions(results);
+        setAccountDropdownOpen(true);
+      } catch (err) {
+        if (accountSearchSeqRef.current !== requestSeq) return;
+        setAccountSuggestions([]);
+        setAccountSuggestionError(getErrorMessage(err, "Không tìm được số tài khoản"));
+      } finally {
+        if (accountSearchSeqRef.current === requestSeq) {
+          setAccountSuggestionLoading(false);
         }
+      }
     };
-    const setField = <K extends keyof SaRecordCreateFormState>(
-        key: K,
-        value: SaRecordCreateFormState[K]
-    ) => {
-        setForm((prev) => ({
-            ...prev,
-            [key]: value,
-        }));
+
+    void searchAccounts();
+  }, [debouncedAccountQuery, form.accountNo, form.accountSelected]);
+
+  const validateForm = useMemo(() => {
+    return () => {
+      if (!form.accountNo.trim()) {
+        return "Số tài khoản không được để trống.";
+      }
+
+      if (!form.accountSelected || !form.customerAccount) {
+        return "Vui lòng chọn số tài khoản có trong hệ thống từ danh sách gợi ý.";
+      }
+
+      if (!form.callDate) {
+        return "Ngày gọi không được để trống.";
+      }
+
+      if (!form.followNo || Number(form.followNo) < 1) {
+        return "Lần follow phải lớn hơn hoặc bằng 1.";
+      }
+
+      if (!form.callResult) {
+        return "Kết quả cuộc gọi không được để trống.";
+      }
+
+      return "";
     };
+  }, [form]);
 
-    const loadMasterData = async () => {
-        try {
-            setLoadingMaster(true);
-            setMasterError("");
+  const submit = async () => {
+    try {
+      setSubmitting(true);
+      setError("");
 
-            const [callResultData, interestLevelData, icpGroupData] =
-                await Promise.all([
-                    saleAdminService.getCallResults(),
-                    saleAdminService.getInterestLevels(),
-                    saleAdminService.getIcpGroups(),
-                ]);
+      const validateMessage = validateForm();
 
-            setCallResults(callResultData);
-            setInterestLevels(interestLevelData);
-            setIcpGroups(icpGroupData);
-        } catch (err) {
-            setMasterError(
-                getErrorMessage(err, "Không tải được master data SA Record")
-            );
-        } finally {
-            setLoadingMaster(false);
-        }
-    };
+      if (validateMessage) {
+        setError(validateMessage);
+        return;
+      }
 
-    const buildPayload = (): SaRecordCreatePayload => {
-        return {
-            account_no: form.accountNo.trim(),
+      await saleAdminService.createSaRecord({
+        account_no: normalizeAccountNoInput(form.accountNo),
+        customer_name_snapshot: form.customerNameSnapshot.trim(),
+        branch_name_snapshot: form.branchNameSnapshot.trim(),
+        pic_name_snapshot: form.picNameSnapshot.trim(),
+        account_status: form.accountStatus.trim(),
+        vip_classification: form.vipClassification.trim(),
 
-            customer_name_snapshot: form.customerNameSnapshot.trim(),
-            branch_name_snapshot: form.branchNameSnapshot.trim(),
-            pic_name_snapshot: form.picNameSnapshot.trim(),
-            account_status: form.accountStatus.trim(),
-            vip_classification: form.vipClassification.trim(),
+        customer_account: toId(form.customerAccount),
+        customer: toId(form.customer),
+        company: toId(form.company),
+        branch: toId(form.branch),
 
-            call_date: form.callDate,
-            follow_no: Number(form.followNo || 1),
+        call_date: form.callDate,
+        follow_no: Number(form.followNo || 1),
+        call_result: Number(form.callResult),
+        interest_level: toId(form.interestLevel),
+        icp_group: toId(form.icpGroup),
 
-            call_result: Number(form.callResult),
-            interest_level: form.interestLevel ? Number(form.interestLevel) : null,
-            icp_group: form.icpGroup ? Number(form.icpGroup) : null,
+        reactivation: form.reactivation,
+        introduced_product: form.introducedProduct,
+        support_info: form.supportInfo,
+        referred_rm: form.referredRm,
+        handover_to_broker: form.handoverToBroker,
+        broker_handover_note: form.brokerHandoverNote.trim(),
 
-            introduced_product: form.introducedProduct,
-            reactivation: form.reactivation,
-            support_info: form.supportInfo,
-            referred_rm: form.referredRm,
+        transaction_value_snapshot: form.transactionValueSnapshot || "0",
+        transaction_fee_snapshot: form.transactionFeeSnapshot || "0",
 
-            handover_to_broker: form.handoverToBroker,
-            broker_handover_note: form.brokerHandoverNote.trim(),
+        note: form.note.trim(),
+        source_system: "CRM_MINI",
+        data_status: "VALID",
+      });
 
-            transaction_value_snapshot: form.transactionValueSnapshot || "0",
-            transaction_fee_snapshot: form.transactionFeeSnapshot || "0",
+      router.push("/sale-admin/records");
+    } catch (err) {
+      setError(getErrorMessage(err, "Lưu SA Record thất bại"));
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
-            note: form.note.trim(),
+  const cancel = () => {
+    router.push("/sale-admin/records");
+  };
 
-            source_system: "CRM_MINI",
-            data_status: "VALID",
-        };
-    };
+  return {
+    form,
+    setField,
 
-    const validate = () => {
-        if (!form.accountNo.trim()) {
-            return "Vui lòng nhập số tài khoản lưu ký.";
-        }
+    callResults,
+    interestLevels,
+    icpGroups,
+    accountStatusOptions,
+    vipClassificationOptions,
 
-        if (!form.callDate) {
-            return "Vui lòng chọn ngày gọi.";
-        }
+    accountSuggestions,
+    accountSuggestionLoading,
+    accountSuggestionError,
+    accountDropdownOpen,
+    setAccountDropdownOpen,
+    handleAccountNoChange,
+    selectCustomerAccountSuggestion,
 
-        if (!form.callResult) {
-            return "Vui lòng chọn kết quả cuộc gọi.";
-        }
+    loadingMaster,
+    submitting,
 
-        if (Number(form.followNo || 0) < 1) {
-            return "Lần follow phải lớn hơn hoặc bằng 1.";
-        }
+    error,
+    masterError,
 
-        if (
-            form.transactionValueSnapshot &&
-            Number(form.transactionValueSnapshot) < 0
-        ) {
-            return "Tổng giá trị giao dịch không được âm.";
-        }
-
-        if (form.transactionFeeSnapshot && Number(form.transactionFeeSnapshot) < 0) {
-            return "Phí giao dịch không được âm.";
-        }
-
-        return "";
-    };
-
-    const submit = async () => {
-        const message = validate();
-
-        if (message) {
-            setError(message);
-            return;
-        }
-
-        if (!form.picNameSnapshot.trim() || !form.branchNameSnapshot.trim()) {
-            setError(
-                "Không thể tạo SA Record vì tài khoản SA chưa có hồ sơ nhân viên hoặc chi nhánh."
-            );
-            return;
-        }
-
-        try {
-            setSubmitting(true);
-            setError("");
-
-            await saleAdminService.createSaRecord(buildPayload());
-
-            router.push("/sale-admin/records");
-        } catch (err) {
-            setError(getErrorMessage(err, "Không tạo được SA Record"));
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
-    const cancel = () => {
-        router.push("/sale-admin/records");
-    };
-
-    useEffect(() => {
-        if (!authService.isAuthenticated()) {
-            router.push("/login");
-            return;
-        }
-
-        void loadMasterData();
-        void loadSaProfile();
-
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [router]);
-
-    return {
-        form,
-        setField,
-
-        callResults,
-        interestLevels,
-        icpGroups,
-
-        loadingMaster,
-        submitting,
-
-        error,
-        masterError,
-
-        submit,
-        cancel,
-    };
+    submit,
+    cancel,
+  };
 }
+
+export type UseSaRecordCreateReturn = ReturnType<typeof useSaRecordCreate>;

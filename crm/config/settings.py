@@ -62,7 +62,8 @@ INSTALLED_APPS = [
     "apps.chatbots",
     # "apps.dashboard",
     "apps.sale_admin",
-    "apps.kpis"
+    "apps.kpis",
+    "apps.external_errors"
 ]
 
 MIDDLEWARE = [
@@ -194,16 +195,19 @@ ALLOWED_HOSTS = [
     "localhost",
     "127.0.0.1",
     "192.168.200.133",
+    "192.168.2.16"
 ]
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "http://192.168.200.133:3000",
+    "http://192.168.2.16:3000"
 ]
 
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "http://192.168.200.133:3000",
+    "http://192.168.2.16:3000"
 ]

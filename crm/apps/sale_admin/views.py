@@ -1,7 +1,8 @@
-from django.db.models import Q
+from django.db.models import Case, IntegerField, Q, Value, When
 from rest_framework import status, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from django.db import IntegrityError, transaction
 from apps.sale_admin.models import (
     SaCallResult,
@@ -24,9 +25,171 @@ from apps.sale_admin.services import (
     serialize_sa_record,
 )
 from apps.accounts.scopes import filter_sa_records_by_user
+from apps.customers.models import CustomerAccount, MembershipTier
 from apps.sale_admin.permissions import SaRecordAuditLogPermission, SaRecordPermission
 from apps.kpis.realtime import schedule_kpi_recalculation_after_sa_record_change
 
+
+
+def build_customer_account_suggestion(account):
+    customer = account.customer
+    branch = getattr(customer, "branch", None)
+    company = getattr(customer, "company", None)
+    membership_tier = getattr(customer, "membership_tier", None)
+
+    return {
+        "id": account.id,
+        "account_number": account.account_number,
+        "account_status": account.account_status or "",
+        "customer": customer.id if customer else None,
+        "customer_name": customer.full_name if customer else "",
+        "customer_phone": getattr(customer, "phone", "") or "",
+        "customer_email": getattr(customer, "email", "") or "",
+        "company": company.id if company else None,
+        "company_name": getattr(company, "company_name", "") or "",
+        "branch": branch.id if branch else None,
+        "branch_name": (
+            getattr(branch, "branch_name", None)
+            or getattr(branch, "name", None)
+            or ""
+        ),
+        "membership_tier": membership_tier.id if membership_tier else None,
+        "membership_tier_name": (
+            getattr(membership_tier, "tier_name", None)
+            or getattr(membership_tier, "tier_code", None)
+            or ""
+        ),
+    }
+
+
+class SaCustomerAccountSuggestionAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_customer_vip_classification(customer):
+        if not customer:
+            return ""
+
+        membership_tier = getattr(customer, "membership_tier", None)
+
+        if membership_tier:
+            return (
+                getattr(membership_tier, "tier_name", None)
+                or getattr(membership_tier, "tier_code", None)
+                or ""
+            )
+
+        return (
+            getattr(customer, "vip_type", None)
+            or getattr(customer, "vip_classification", None)
+            or ""
+        )
+    def get(self, request):
+        raw_keyword = (
+            request.query_params.get("q")
+            or request.query_params.get("account_number")
+            or request.query_params.get("account_no")
+            or request.query_params.get("search")
+            or ""
+        ).strip()
+        account_keyword = raw_keyword.upper().replace(" ", "")
+
+        if len(raw_keyword) < 1:
+            return Response({"count": 0, "results": []})
+
+        # SA Record yêu cầu số TK phải tồn tại trong hệ thống. Vì vậy endpoint gợi ý
+        # tra trực tiếp bảng customer_accounts thay vì lọc theo customer scope.
+        # Lý do: nhiều SA/SUP có thể được giao gọi KH ngoài branch đang gán quyền,
+        # nếu dùng filter_customers_by_user() thì autocomplete trả rỗng dù tài khoản có thật.
+        queryset = (
+            CustomerAccount.objects.select_related(
+                "customer",
+                "customer__branch",
+                "customer__company",
+                "customer__membership_tier",
+            )
+            .filter(customer__isnull=False)
+            .filter(
+                Q(account_number__istartswith=account_keyword)
+                | Q(account_number__icontains=account_keyword)
+                | Q(customer__full_name__icontains=raw_keyword)
+                | Q(customer__phone__icontains=raw_keyword)
+            )
+            .annotate(
+                match_rank=Case(
+                    When(account_number__iexact=account_keyword, then=Value(0)),
+                    When(account_number__istartswith=account_keyword, then=Value(1)),
+                    default=Value(2),
+                    output_field=IntegerField(),
+                )
+            )
+            .order_by("match_rank", "account_number")
+        )
+
+        results = [
+            build_customer_account_suggestion(account)
+            for account in queryset[:20]
+        ]
+
+        return Response({"count": queryset.count(), "results": results})
+
+
+def build_option(value, label=None):
+    clean_value = str(value or "").strip()
+    return {
+        "value": clean_value,
+        "label": str(label or clean_value).strip() or clean_value,
+    }
+
+
+class SaAccountStatusOptionAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        values = (
+            CustomerAccount.objects
+            .exclude(account_status__isnull=True)
+            .exclude(account_status="")
+            .values_list("account_status", flat=True)
+            .distinct()
+            .order_by("account_status")
+        )
+
+        results = [build_option(value) for value in values]
+
+        return Response({"count": len(results), "results": results})
+
+
+class SaVipClassificationOptionAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        tier_values = [
+            build_option(
+                tier.tier_name or tier.tier_code,
+                tier.tier_name or tier.tier_code,
+            )
+            for tier in MembershipTier.objects.filter(is_active=True).order_by("id")
+        ]
+
+        existing_values = (
+            SaRecord.objects
+            .exclude(vip_classification__isnull=True)
+            .exclude(vip_classification="")
+            .values_list("vip_classification", flat=True)
+            .distinct()
+            .order_by("vip_classification")
+        )
+
+        seen = set()
+        results = []
+        for option in tier_values + [build_option(value) for value in existing_values]:
+            key = option["value"]
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            results.append(option)
+
+        return Response({"count": len(results), "results": results})
 
 
 class SaCallResultViewSet(viewsets.ReadOnlyModelViewSet):

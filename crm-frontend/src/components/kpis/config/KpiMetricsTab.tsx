@@ -431,8 +431,8 @@ function GroupMetricTable({
               </th>
               <th className="w-[120px] px-3 font-semibold">Mã KPI</th>
               <th className="w-[260px] px-3 font-semibold">Tên KPI</th>
-              <th className="w-[260px] px-3 font-semibold">Mô tả</th>
-              <th className="w-[300px] px-3 font-semibold">Công thức đo lường</th>
+              {/* <th className="w-[260px] px-3 font-semibold">Mô tả</th> */}
+              <th className="w-[300px] px-3 font-semibold">Công thức</th>
               <th className="w-[160px] px-3 font-semibold">Chỉ tiêu</th>
               <th className="w-[130px] px-3 font-semibold">Tần suất</th>
               <th className="w-[120px] px-3 font-semibold">Trọng số %</th>
@@ -510,11 +510,11 @@ function GroupMetricTable({
                     </span>
                   </td>
 
-                  <td className="max-w-[260px] px-3">
+                  {/* <td className="max-w-[260px] px-3">
                     <span className="line-clamp-2">
                       {metric.work_description || "-"}
                     </span>
-                  </td>
+                  </td> */}
 
                   <td className="max-w-[300px] px-3">
                     <span className="line-clamp-2">
@@ -612,7 +612,7 @@ export function KpiMetricsTab({ config }: { config: KpiConfigController }) {
       groupId: String(metric.group),
       metricCode: metric.metric_code || "",
       metricName: metric.metric_name || "",
-      workDescription: metric.work_description || "",
+      // workDescription: metric.work_description || "",
       measurementFormula: metric.measurement_formula || "",
       targetText: metric.target_text || "",
       targetValue: metric.target_value || "",
@@ -643,7 +643,7 @@ export function KpiMetricsTab({ config }: { config: KpiConfigController }) {
       group: Number(form.groupId),
       metric_code: metricCode,
       metric_name: form.metricName.trim(),
-      work_description: form.workDescription || "",
+      // work_description: form.workDescription || "",
       measurement_formula: form.measurementFormula.trim(),
       target_text: form.targetText || "",
       target_value: form.targetValue || null,
@@ -661,7 +661,7 @@ export function KpiMetricsTab({ config }: { config: KpiConfigController }) {
     await config.saveMetric({
       ...selectedMetric,
       metric_name: form.metricName.trim(),
-      work_description: form.workDescription || "",
+      // work_description: form.workDescription || "",
       measurement_formula: form.measurementFormula.trim(),
       target_text: form.targetText || "",
       target_value: form.targetValue || null,

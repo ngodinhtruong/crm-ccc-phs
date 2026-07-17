@@ -34,6 +34,32 @@ export type SaIcpGroup = {
     sort_order?: number | null;
 };
 
+
+
+
+export type SaSelectOption = {
+    value: string;
+    label: string;
+};
+
+export type SaCustomerAccountSuggestion = {
+    id: number;
+    account_number: string;
+    account_status?: string | null;
+    customer?: number | null;
+    customer_name?: string | null;
+    customer_phone?: string | null;
+    customer_email?: string | null;
+    company?: number | null;
+    company_name?: string | null;
+    branch?: number | null;
+    branch_name?: string | null;
+    membership_tier?: number | null;
+    membership_tier_name?: string | null;
+    vip_classification?: string | null;
+    vip_classification_label?: string | null;
+};
+
 export type SaRecordItem = {
     id: number;
     record_code: string;
@@ -142,6 +168,16 @@ export type SaRecordFormController = {
   callResults: SaCallResult[];
   interestLevels: SaInterestLevel[];
   icpGroups: SaIcpGroup[];
+  accountStatusOptions: SaSelectOption[];
+  vipClassificationOptions: SaSelectOption[];
+
+  accountSuggestions: SaCustomerAccountSuggestion[];
+  accountSuggestionLoading: boolean;
+  accountSuggestionError: string;
+  accountDropdownOpen: boolean;
+  setAccountDropdownOpen: (value: boolean) => void;
+  handleAccountNoChange: (value: string) => void;
+  selectCustomerAccountSuggestion: (account: SaCustomerAccountSuggestion) => void;
 
   loadingMaster: boolean;
   submitting: boolean;
@@ -202,6 +238,12 @@ export type SaRecordCreateFormState = {
     picNameSnapshot: string;
     accountStatus: string;
     vipClassification: string;
+
+    customerAccount?: string;
+    customer?: string;
+    company?: string;
+    branch?: string;
+    accountSelected?: boolean;
 
     callDate: string;
     followNo: string;

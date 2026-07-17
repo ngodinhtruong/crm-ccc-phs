@@ -1,14 +1,17 @@
 import {
+  AlertTriangle,
   BarChart3,
   Bot,
   Building2,
   ClipboardList,
   FileSpreadsheet,
   Gauge,
+  ListChecks,
   Headphones,
   ShieldCheck,
   Target,
   Ticket,
+  Upload,
   UserRound,
   UsersRound,
 } from "lucide-react";
@@ -65,6 +68,31 @@ export const WORKSPACE_NAVIGATION: Record<
           label: "SLA",
           href: "/sla",
           icon: ShieldCheck,
+        },
+      ],
+    },
+
+    {
+      key: "ccc-external-errors",
+      label: "Lỗi bên ngoài",
+      items: [
+        {
+          key: "external-error-dashboard",
+          label: "Dashboard lỗi",
+          href: "/external-errors/dashboard",
+          icon: BarChart3,
+        },
+        {
+          key: "external-error-list",
+          label: "Danh sách lỗi",
+          href: "/external-errors",
+          icon: ListChecks,
+        },
+        {
+          key: "external-error-import",
+          label: "Import lỗi",
+          href: "/external-errors/import",
+          icon: Upload,
         },
       ],
     },
@@ -128,6 +156,12 @@ export const WORKSPACE_NAVIGATION: Record<
           label: "KPI Sale Admin",
           href: "/sale-admin/kpi",
           icon: Target,
+        },
+        {
+          key: "sa-kpi-admin",
+          label: "KPI Admin",
+          href: "/sale-admin/kpi-admin",
+          icon: BarChart3,
         },
         {
           key: "sa-import",

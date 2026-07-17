@@ -286,7 +286,7 @@ def create_default_period_metrics(period: KpiPeriod, profiles_by_code: dict, gro
             metric_code=item["metric_code"],
             metric_name=item["metric_name"],
             weight_percent=item["weight_percent"],
-            work_description=item.get("work_description", ""),
+            # work_description=item.get("work_description", ""),
             measurement_formula=item.get("measurement_formula", ""),
             target_text=item.get("target_text", ""),
             target_value=item.get("target_value"),

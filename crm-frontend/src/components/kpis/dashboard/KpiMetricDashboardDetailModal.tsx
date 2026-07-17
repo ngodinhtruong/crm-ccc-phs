@@ -452,9 +452,9 @@ export function KpiMetricDashboardDetailModal({
 
               <div className="grid grid-cols-12 gap-3">
                 <div className="col-span-12 md:col-span-6">
-                  <InfoCell label="Mô tả công việc">
+                  {/* <InfoCell label="Mô tả công việc">
                     <EmptyText>{item.metric.work_description}</EmptyText>
-                  </InfoCell>
+                  </InfoCell> */}
                 </div>
 
                 <div className="col-span-12 md:col-span-6">

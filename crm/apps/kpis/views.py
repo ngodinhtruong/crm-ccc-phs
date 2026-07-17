@@ -802,7 +802,7 @@ class KpiPeriodMetricViewSet(KpiPeriodConfigCrudMixin, viewsets.ModelViewSet):
             queryset = queryset.filter(
                 Q(metric_code__icontains=q)
                 | Q(metric_name__icontains=q)
-                | Q(work_description__icontains=q)
+                # | Q(work_description__icontains=q)
                 | Q(measurement_formula__icontains=q)
                 | Q(target_text__icontains=q)
             )

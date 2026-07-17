@@ -96,7 +96,7 @@ export type KpiPeriodMetricItem = {
   metric_code: string;
   metric_name: string;
   weight_percent: string;
-  work_description?: string | null;
+  // work_description?: string | null;
   measurement_formula?: string | null;
   target_text?: string | null;
   target_value?: string | null;

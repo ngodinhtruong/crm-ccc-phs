@@ -1,577 +1,894 @@
 from __future__ import annotations
 
-import calendar
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import date
-from decimal import Decimal
-from typing import Iterable
+from datetime import date, timedelta
+from decimal import Decimal, ROUND_HALF_UP
+from typing import Any
 
-from django.contrib.auth import get_user_model
-from django.db.models import Count, Q, Sum
+from django.db.models import Q
+from django.utils import timezone
 
-from apps.accounts.services import PermissionService
+from apps.accounts.scopes import filter_branches_by_user, filter_sa_records_by_user
 from apps.branches.models import Branch
-from apps.kpis.models import TransactionLog
-from apps.sale_admin.models import SaIcpGroup, SaRecord
+from apps.sale_admin.models import SaRecord, SaIcpGroup
 
-MATCHED_STATUS = "MATCHED"
-SA_STAFF_ROLE_CODES = {"SA", "SA_STAFF", "SALE_ADMIN_STAFF"}
-ADMIN_ROLE_CODES = {"SYSTEM_ADMIN", "SA_ADMIN", "SA_MANAGER", "ADMIN", "BOM"}
-ADMIN_PERMISSION_CODES = {"KPI_DASHBOARD_VIEW_ALL", "SA_DASHBOARD_VIEW"}
+try:
+    from apps.kpis.models import TransactionLog
+except Exception:  # pragma: no cover - only for older deployments during transition
+    TransactionLog = None
+
+
+ZERO = Decimal("0.00")
 
 
 @dataclass(frozen=True)
-class MonthWindow:
+class PeriodRange:
     year: int
     month: int
-    start_date: date
-    end_date: date
+    start: date
+    end: date
     label: str
+    code: str
 
 
-def decimal_to_float(value) -> float:
-    if value is None:
-        return 0.0
-    return float(Decimal(str(value)))
+def _decimal(value: Any) -> Decimal:
+    if value is None or value == "":
+        return ZERO
+
+    try:
+        return Decimal(str(value))
+    except Exception:
+        return ZERO
 
 
-def decimal_to_string(value) -> str:
-    return str(value or Decimal("0.00"))
+def _money(value: Any) -> str:
+    return str(_decimal(value).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
 
 
-def get_month_window(year: int, month: int) -> MonthWindow:
-    last_day = calendar.monthrange(year, month)[1]
-    return MonthWindow(
-        year=year,
-        month=month,
-        start_date=date(year, month, 1),
-        end_date=date(year, month, last_day),
-        label=f"Tháng {month:02d}/{year}",
+def _number(value: Any) -> int:
+    try:
+        return int(value or 0)
+    except Exception:
+        return 0
+
+
+def _safe_percent(numerator: Any, denominator: Any) -> Decimal:
+    numerator_value = _decimal(numerator)
+    denominator_value = _decimal(denominator)
+
+    if denominator_value == 0:
+        return ZERO
+
+    return (numerator_value / denominator_value * Decimal("100.00")).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
     )
 
 
-def get_previous_month_window(year: int, month: int) -> MonthWindow:
-    if month == 1:
-        return get_month_window(year - 1, 12)
-    return get_month_window(year, month - 1)
+def _growth_percent(current: Any, previous: Any) -> float | None:
+    current_value = _decimal(current)
+    previous_value = _decimal(previous)
 
-
-def get_role_codes(user) -> set[str]:
-    if not user or not user.is_authenticated:
-        return set()
-    if user.is_superuser:
-        return ADMIN_ROLE_CODES | SA_STAFF_ROLE_CODES
-    return set(PermissionService.get_user_role_codes(user))
-
-
-def can_view_admin_dashboard(user) -> bool:
-    if not user or not user.is_authenticated:
-        return False
-    if user.is_superuser:
-        return True
-
-    role_codes = get_role_codes(user)
-    if role_codes & ADMIN_ROLE_CODES:
-        return True
-
-    return any(PermissionService.has_permission(user, code) for code in ADMIN_PERMISSION_CODES)
-
-
-
-def can_view_all_branches(user) -> bool:
-    if not user or not user.is_authenticated:
-        return False
-    if user.is_superuser:
-        return True
-
-    role_codes = get_role_codes(user)
-    return bool(role_codes & ADMIN_ROLE_CODES) or PermissionService.has_permission(user, "KPI_DASHBOARD_VIEW_ALL")
-
-def get_accessible_branch_ids(user) -> set[int]:
-    if not user or not user.is_authenticated:
-        return set()
-    if user.is_superuser:
-        return set(Branch.objects.values_list("id", flat=True))
-
-    if can_view_all_branches(user):
-        return set(Branch.objects.values_list("id", flat=True))
-
-    return set(PermissionService.get_user_branch_ids(user))
-
-
-def serialize_branch(branch: Branch) -> dict:
-    return {
-        "id": branch.id,
-        "branch_code": getattr(branch, "branch_code", None) or getattr(branch, "code", None) or str(branch.id),
-        "branch_name": getattr(branch, "branch_name", None) or getattr(branch, "name", None) or f"Chi nhánh {branch.id}",
-    }
-
-
-def branch_name(branch: Branch | None, fallback: str = "Không xác định") -> str:
-    if not branch:
-        return fallback
-    return getattr(branch, "branch_name", None) or getattr(branch, "name", None) or fallback
-
-
-def employee_display_name(user) -> str:
-    employee = getattr(user, "employee", None)
-    if employee and getattr(employee, "full_name", None):
-        return employee.full_name
-    full_name = user.get_full_name() if hasattr(user, "get_full_name") else ""
-    return full_name or getattr(user, "username", None) or getattr(user, "email", None) or f"User {user.id}"
-
-
-def apply_branch_filter(queryset, branch_id: int | str | list | set | tuple | None):
-    if not branch_id:
-        return queryset
-
-    if isinstance(branch_id, (list, set, tuple)):
-        branch_ids = [item for item in branch_id if item]
-        if not branch_ids:
-            return queryset.none()
-        return queryset.filter(Q(branch_id__in=branch_ids) | Q(pic_user__employee__branch_id__in=branch_ids)).distinct()
-
-    return queryset.filter(Q(branch_id=branch_id) | Q(pic_user__employee__branch_id=branch_id)).distinct()
-
-
-def get_records_for_window(window: MonthWindow, branch_id: int | str | None = None):
-    queryset = (
-        SaRecord.objects.select_related(
-            "branch",
-            "pic_user",
-            "pic_user__employee",
-            "pic_user__employee__branch",
-            "pic_employee",
-            "call_result",
-            "interest_level",
-            "icp_group",
-        )
-        .filter(call_date__gte=window.start_date, call_date__lte=window.end_date)
-        .distinct()
-    )
-    return apply_branch_filter(queryset, branch_id)
-
-
-def distinct_account_nos(records_queryset) -> list[str]:
-    return list(
-        records_queryset.exclude(account_no__isnull=True)
-        .exclude(account_no="")
-        .values_list("account_no", flat=True)
-        .distinct()
-    )
-
-
-def get_reactivated_account_nos(records_queryset) -> list[str]:
-    return distinct_account_nos(records_queryset.filter(reactivation=True))
-
-
-def get_matched_transactions(window: MonthWindow, account_nos: Iterable[str]):
-    account_nos = list(account_nos)
-    if not account_nos:
-        return TransactionLog.objects.none()
-
-    return TransactionLog.objects.filter(
-        account_no__in=account_nos,
-        transaction_date__gte=window.start_date,
-        transaction_date__lte=window.end_date,
-        order_status__iexact=MATCHED_STATUS,
-    )
-
-
-def get_active_account_nos(window: MonthWindow, account_nos: Iterable[str]) -> list[str]:
-    return list(
-        get_matched_transactions(window, account_nos)
-        .exclude(account_no__isnull=True)
-        .exclude(account_no="")
-        .values_list("account_no", flat=True)
-        .distinct()
-    )
-
-
-def aggregate_transaction_amounts(window: MonthWindow, account_nos: Iterable[str]) -> dict:
-    aggregate = get_matched_transactions(window, account_nos).aggregate(
-        transaction_value=Sum("transaction_value"),
-        transaction_fee=Sum("transaction_fee"),
-    )
-    return {
-        "transaction_value": aggregate["transaction_value"] or Decimal("0.00"),
-        "transaction_fee": aggregate["transaction_fee"] or Decimal("0.00"),
-    }
-
-
-def growth_percent(current_value, previous_value) -> float | None:
-    current = Decimal(str(current_value or 0))
-    previous = Decimal(str(previous_value or 0))
-
-    if previous == 0:
-        if current == 0:
-            return 0.0
+    if previous_value == 0:
+        if current_value == 0:
+            return None
         return 100.0
 
-    return float(((current - previous) / previous) * Decimal("100"))
+    value = (current_value - previous_value) / previous_value * Decimal("100.00")
+    return float(value.quantize(Decimal("0.1"), rounding=ROUND_HALF_UP))
 
 
-def build_metric_card(key: str, label: str, current_value, previous_value, unit: str) -> dict:
+def _range_label(start: date, end_exclusive: date) -> str:
+    inclusive_end = end_exclusive - timedelta(days=1)
+
+    is_full_month = (
+        start.day == 1
+        and start.year == inclusive_end.year
+        and start.month == inclusive_end.month
+        and inclusive_end.day == (date(start.year + int(start.month == 12), 1 if start.month == 12 else start.month + 1, 1) - timedelta(days=1)).day
+    )
+
+    if is_full_month:
+        return f"T{start.month}/{start.year}"
+
+    return f"{start.strftime('%d/%m/%Y')} - {inclusive_end.strftime('%d/%m/%Y')}"
+
+
+def _period(year: int, month: int) -> PeriodRange:
+    start = date(year, month, 1)
+
+    if month == 12:
+        end = date(year + 1, 1, 1)
+    else:
+        end = date(year, month + 1, 1)
+
+    return PeriodRange(
+        year=year,
+        month=month,
+        start=start,
+        end=end,
+        label=f"T{month}/{year}",
+        code=f"{year}-{month:02d}",
+    )
+
+
+def _period_from_range(start: date, inclusive_end: date) -> PeriodRange:
+    if inclusive_end < start:
+        inclusive_end = start
+
+    end = inclusive_end + timedelta(days=1)
+
+    return PeriodRange(
+        year=start.year,
+        month=start.month,
+        start=start,
+        end=end,
+        label=_range_label(start, end),
+        code=f"{start.isoformat()}_{inclusive_end.isoformat()}",
+    )
+
+
+def _is_full_month(period: PeriodRange) -> bool:
+    return period.start.day == 1 and period.end == _period(period.year, period.month).end
+
+
+def _previous_period(period: PeriodRange) -> PeriodRange:
+    if _is_full_month(period):
+        if period.month == 1:
+            return _period(period.year - 1, 12)
+        return _period(period.year, period.month - 1)
+
+    duration = period.end - period.start
+    previous_end = period.start
+    previous_start = previous_end - duration
+    return _period_from_range(previous_start, previous_end - timedelta(days=1))
+
+
+def _parse_date_param(value: str | None) -> date | None:
+    if not value:
+        return None
+
+    try:
+        return date.fromisoformat(str(value)[:10])
+    except Exception:
+        return None
+
+
+def _get_request_period(request) -> PeriodRange:
+    today = timezone.localdate()
+
+    date_from = _parse_date_param(request.query_params.get("date_from"))
+    date_to = _parse_date_param(request.query_params.get("date_to"))
+
+    if date_from or date_to:
+        if not date_from:
+            date_from = date_to or today
+        if not date_to:
+            date_to = date_from
+        return _period_from_range(date_from, date_to)
+
+    try:
+        year = int(request.query_params.get("year") or today.year)
+    except Exception:
+        year = today.year
+
+    try:
+        month = int(request.query_params.get("month") or today.month)
+    except Exception:
+        month = today.month
+
+    month = min(12, max(1, month))
+    return _period(year, month)
+
+
+def _branch_name(branch: Branch | None, fallback: str | None = None) -> str:
+    if branch:
+        return branch.branch_name or branch.branch_code or f"Chi nhánh {branch.id}"
+
+    return fallback or "Không xác định"
+
+
+def _user_display_name(user=None, employee=None, fallback: str | None = None) -> str:
+    if employee:
+        return employee.full_name or employee.employee_code or fallback or "-"
+
+    if user:
+        full_name = f"{getattr(user, 'first_name', '') or ''} {getattr(user, 'last_name', '') or ''}".strip()
+        return full_name or getattr(user, "username", None) or getattr(user, "email", None) or fallback or "-"
+
+    return fallback or "-"
+
+
+def _records_for_period(records_qs, period: PeriodRange):
+    return records_qs.filter(call_date__gte=period.start, call_date__lt=period.end)
+
+
+def _transactions_for_period(account_nos: set[str], period: PeriodRange):
+    if not TransactionLog or not account_nos:
+        return []
+
+    qs = TransactionLog.objects.filter(
+        account_no__in=account_nos,
+        transaction_date__gte=period.start,
+        transaction_date__lt=period.end,
+    ).select_related("branch", "customer")
+
+    # Không hard-code một trạng thái khớp duy nhất vì dữ liệu có thể từ nhiều hệ thống.
+    # Chỉ loại các trạng thái hủy/từ chối phổ biến nếu có.
+    qs = qs.exclude(
+        Q(order_status__iexact="CANCELLED")
+        | Q(order_status__iexact="CANCELED")
+        | Q(order_status__iexact="REJECTED")
+        | Q(order_status__icontains="HUY")
+        | Q(order_status__icontains="HỦY")
+    )
+
+    return list(qs)
+
+
+def _transaction_totals(transactions) -> dict[str, Decimal]:
+    value = ZERO
+    fee = ZERO
+    order_count = 0
+
+    for transaction in transactions:
+        value += _decimal(getattr(transaction, "transaction_value", 0))
+        fee += _decimal(getattr(transaction, "transaction_fee", 0))
+        order_count += 1
+
     return {
-        "key": key,
-        "label": label,
-        "value": decimal_to_string(current_value),
-        "previous_value": decimal_to_string(previous_value),
-        "growth_percent": growth_percent(current_value, previous_value),
-        "unit": unit,
+        "transaction_value": value,
+        "transaction_fee": fee,
+        "order_count": Decimal(order_count),
     }
 
 
-def calculate_scope(window: MonthWindow, branch_id: int | str | None = None) -> dict:
-    records = get_records_for_window(window, branch_id)
-    reactivated_account_nos = get_reactivated_account_nos(records)
-    active_account_nos = get_active_account_nos(window, reactivated_account_nos)
-    amounts = aggregate_transaction_amounts(window, active_account_nos)
+def _build_account_transaction_map(transactions) -> dict[str, dict[str, Any]]:
+    account_map: dict[str, dict[str, Any]] = defaultdict(
+        lambda: {
+            "transaction_value": ZERO,
+            "transaction_fee": ZERO,
+            "order_count": 0,
+            "product_fee": defaultdict(Decimal),
+            "branch_id": None,
+            "branch_name": None,
+            "customer_name": None,
+        }
+    )
 
-    return {
-        "records": records,
-        "total_calls": records.count(),
-        "reactivated_account_nos": reactivated_account_nos,
-        "reactivated_accounts": len(reactivated_account_nos),
-        "potential_active_account_nos": active_account_nos,
-        "potential_active_accounts": len(active_account_nos),
-        "transaction_value": amounts["transaction_value"],
-        "transaction_fee": amounts["transaction_fee"],
-    }
+    for transaction in transactions:
+        account_no = str(getattr(transaction, "account_no", "") or "").strip()
+        if not account_no:
+            continue
+
+        item = account_map[account_no]
+        item["transaction_value"] += _decimal(getattr(transaction, "transaction_value", 0))
+        item["transaction_fee"] += _decimal(getattr(transaction, "transaction_fee", 0))
+        item["order_count"] += 1
+
+        product_code = str(getattr(transaction, "product_code", "") or "Không xác định").strip() or "Không xác định"
+        item["product_fee"][product_code] += _decimal(getattr(transaction, "transaction_fee", 0))
+
+        branch = getattr(transaction, "branch", None)
+        if branch and not item["branch_id"]:
+            item["branch_id"] = branch.id
+            item["branch_name"] = _branch_name(branch)
+
+        customer = getattr(transaction, "customer", None)
+        if customer and not item["customer_name"]:
+            item["customer_name"] = getattr(customer, "full_name", None)
+
+    return account_map
 
 
-def build_overview(current_scope: dict, previous_scope: dict) -> list[dict]:
-    return [
-        build_metric_card(
-            "total_calls",
-            "Tổng cuộc gọi",
-            current_scope["total_calls"],
-            previous_scope["total_calls"],
-            "COUNT",
-        ),
-        build_metric_card(
-            "reactivated_accounts",
-            "TK kích hoạt",
-            current_scope["reactivated_accounts"],
-            previous_scope["reactivated_accounts"],
-            "COUNT",
-        ),
-        build_metric_card(
-            "transaction_value",
-            "Giá trị GD",
-            current_scope["transaction_value"],
-            previous_scope["transaction_value"],
-            "VND",
-        ),
-        build_metric_card(
-            "transaction_fee",
-            "Phí GD thực tế",
-            current_scope["transaction_fee"],
-            previous_scope["transaction_fee"],
-            "VND",
-        ),
+def _record_customer_name(record: SaRecord) -> str:
+    customer = getattr(record, "customer", None)
+    if customer:
+        return customer.full_name or record.customer_name_snapshot or "-"
+
+    return record.customer_name_snapshot or "-"
+
+
+def _record_branch_id(record: SaRecord) -> int | None:
+    branch = getattr(record, "branch", None)
+    return branch.id if branch else None
+
+
+def _record_branch_name(record: SaRecord) -> str:
+    return _branch_name(getattr(record, "branch", None), getattr(record, "branch_name_snapshot", None))
+
+
+def _record_pic_name(record: SaRecord) -> str:
+    return _user_display_name(
+        getattr(record, "pic_user", None),
+        getattr(record, "pic_employee", None),
+        getattr(record, "pic_name_snapshot", None),
+    )
+
+
+def _latest_records_by_account(records) -> dict[str, SaRecord]:
+    account_map: dict[str, SaRecord] = {}
+
+    for record in sorted(records, key=lambda item: (item.call_date, item.id)):
+        account_no = str(record.account_no or "").strip()
+        if account_no:
+            account_map[account_no] = record
+
+    return account_map
+
+
+def _build_branch_options(user, scoped_records):
+    branches = filter_branches_by_user(
+        Branch.objects.filter(status="ACTIVE").order_by("branch_name", "id"),
+        user,
+    )
+
+    options = [
+        {
+            "id": branch.id,
+            "branch_code": branch.branch_code,
+            "branch_name": _branch_name(branch),
+        }
+        for branch in branches
     ]
 
+    if options:
+        return options
 
-def get_record_branch(record) -> Branch | None:
-    if getattr(record, "branch_id", None):
-        return record.branch
-    employee = getattr(getattr(record, "pic_user", None), "employee", None)
-    if employee and getattr(employee, "branch_id", None):
-        return employee.branch
-    return None
-
-
-def collect_branch_ids(*record_querysets) -> set[int]:
-    branch_ids: set[int] = set()
-    for queryset in record_querysets:
-        for record in queryset:
-            branch = get_record_branch(record)
-            if branch:
-                branch_ids.add(branch.id)
-    return branch_ids
-
-
-def build_branch_scope(window: MonthWindow, branch_id: int):
-    return calculate_scope(window, branch_id=branch_id)
-
-
-def build_branch_ranking(current_window: MonthWindow, previous_window: MonthWindow, selected_branch_id=None) -> tuple[list[dict], list[dict]]:
-    current_records = get_records_for_window(current_window, selected_branch_id)
-    previous_records = get_records_for_window(previous_window, selected_branch_id)
-
-    if selected_branch_id:
-        branch_ids = {int(selected_branch_id)}
-    else:
-        branch_ids = collect_branch_ids(current_records, previous_records)
-
-    branches_by_id = {
-        branch.id: branch
-        for branch in Branch.objects.filter(id__in=branch_ids).order_by("id")
-    }
-
-    rows = []
-    chart = []
-
-    for branch_id in sorted(branch_ids):
-        branch = branches_by_id.get(branch_id)
-        current_scope = build_branch_scope(current_window, branch_id)
-        previous_scope = build_branch_scope(previous_window, branch_id)
-
-        row = {
-            "branch_id": branch_id,
-            "branch_name": branch_name(branch, f"Chi nhánh {branch_id}"),
-            "total_calls": current_scope["total_calls"],
-            "reactivated_accounts": current_scope["reactivated_accounts"],
-            "potential_active_accounts": current_scope["potential_active_accounts"],
-            "transaction_fee": decimal_to_string(current_scope["transaction_fee"]),
-            "previous_transaction_fee": decimal_to_string(previous_scope["transaction_fee"]),
-            "mom_growth_percent": growth_percent(current_scope["transaction_fee"], previous_scope["transaction_fee"]),
-        }
-        rows.append(row)
-        chart.append(
-            {
-                "branch_id": branch_id,
-                "branch_name": row["branch_name"],
-                "current_fee": row["transaction_fee"],
-                "previous_fee": row["previous_transaction_fee"],
-            }
-        )
-
-    rows.sort(key=lambda item: (-Decimal(str(item["transaction_fee"] or 0)), item["branch_name"]))
-    for index, row in enumerate(rows, start=1):
-        row["rank"] = index
-
-    chart.sort(key=lambda item: -Decimal(str(item["current_fee"] or 0)))
-    return rows, chart
-
-
-def build_employee_accounts(window: MonthWindow, records_queryset, account_nos: list[str]) -> list[dict]:
-    transactions_by_account = {
-        item["account_no"]: item
-        for item in get_matched_transactions(window, account_nos)
-        .values("account_no")
-        .annotate(
-            transaction_fee=Sum("transaction_fee"),
-            transaction_value=Sum("transaction_value"),
-            order_count=Count("id"),
-        )
-    }
-
-    rows = []
-    for record in records_queryset.filter(account_no__in=account_nos).order_by("account_no", "-call_date", "-id"):
-        if any(row["account_no"] == record.account_no for row in rows):
-            continue
-        tx = transactions_by_account.get(record.account_no, {})
-        rows.append(
-            {
-                "account_no": record.account_no,
-                "customer_name": record.customer_name_snapshot or getattr(record.customer, "full_name", None) or "-",
-                "branch_name": branch_name(get_record_branch(record)),
-                "transaction_fee": decimal_to_string(tx.get("transaction_fee") or Decimal("0.00")),
-                "transaction_value": decimal_to_string(tx.get("transaction_value") or Decimal("0.00")),
-                "order_count": tx.get("order_count") or 0,
-                "call_date": str(record.call_date) if record.call_date else None,
-            }
-        )
-
-    rows.sort(key=lambda item: -Decimal(str(item["transaction_fee"] or 0)))
-    return rows[:100]
-
-
-def build_top_employees(current_window: MonthWindow, selected_branch_id=None) -> list[dict]:
-    records = get_records_for_window(current_window, selected_branch_id)
-    user_ids = list(records.exclude(pic_user__isnull=True).values_list("pic_user_id", flat=True).distinct())
-    User = get_user_model()
-    users = User.objects.select_related("employee", "employee__branch").filter(id__in=user_ids)
-
-    rows = []
-    for user in users:
-        user_records = records.filter(pic_user=user)
-        reactivated_account_nos = get_reactivated_account_nos(user_records)
-        active_account_nos = get_active_account_nos(current_window, reactivated_account_nos)
-        amounts = aggregate_transaction_amounts(current_window, active_account_nos)
-        branch = getattr(getattr(user, "employee", None), "branch", None)
-
-        rows.append(
-            {
-                "user_id": user.id,
-                "employee_id": getattr(getattr(user, "employee", None), "id", None),
-                "employee_name": employee_display_name(user),
-                "username": user.username,
-                "email": user.email,
-                "branch_id": getattr(branch, "id", None),
-                "branch_name": branch_name(branch),
-                "reactivated_accounts": len(active_account_nos),
-                "raw_reactivated_accounts": len(reactivated_account_nos),
-                "total_calls": user_records.count(),
-                "transaction_fee": decimal_to_string(amounts["transaction_fee"]),
-                "transaction_value": decimal_to_string(amounts["transaction_value"]),
-                "accounts": build_employee_accounts(current_window, user_records, active_account_nos),
-            }
-        )
-
-    rows.sort(key=lambda item: (-item["reactivated_accounts"], -item["total_calls"], item["employee_name"]))
-    for index, row in enumerate(rows, start=1):
-        row["rank"] = index
-
-    return rows[:20]
-
-
-def build_top_accounts(current_window: MonthWindow, current_scope: dict, selected_branch_id=None) -> list[dict]:
-    records = current_scope["records"]
-    account_nos = current_scope["potential_active_account_nos"]
-    tx_rows = list(
-        get_matched_transactions(current_window, account_nos)
-        .values("account_no")
-        .annotate(
-            transaction_fee=Sum("transaction_fee"),
-            transaction_value=Sum("transaction_value"),
-            order_count=Count("id"),
-        )
-        .order_by("-transaction_fee")[:20]
-    )
-
-    result = []
-    for item in tx_rows:
-        record = records.filter(account_no=item["account_no"]).order_by("-call_date", "-id").first()
-        pic_user = getattr(record, "pic_user", None) if record else None
-        result.append(
-            {
-                "account_no": item["account_no"],
-                "customer_name": getattr(record, "customer_name_snapshot", None) or getattr(getattr(record, "customer", None), "full_name", None) or "-",
-                "branch_name": branch_name(get_record_branch(record)) if record else "-",
-                "transaction_fee": decimal_to_string(item["transaction_fee"] or Decimal("0.00")),
-                "transaction_value": decimal_to_string(item["transaction_value"] or Decimal("0.00")),
-                "order_count": item["order_count"],
-                "pic_user_id": getattr(pic_user, "id", None),
-                "pic_name": employee_display_name(pic_user) if pic_user else "-",
-            }
-        )
-    return result
-
-
-def build_product_fee_chart(current_window: MonthWindow, active_account_nos: list[str]) -> list[dict]:
-    rows = list(
-        get_matched_transactions(current_window, active_account_nos)
-        .values("product_code")
-        .annotate(
-            transaction_fee=Sum("transaction_fee"),
-            transaction_value=Sum("transaction_value"),
-            order_count=Count("id"),
-        )
-        .order_by("-transaction_fee")
-    )
+    branch_map: dict[int, str] = {}
+    for item in scoped_records:
+        if item.branch_id:
+            branch_map[item.branch_id] = _record_branch_name(item)
 
     return [
         {
-            "product_code": row["product_code"] or "UNKNOWN",
-            "product_name": row["product_code"] or "Chưa phân loại",
-            "transaction_fee": decimal_to_string(row["transaction_fee"] or Decimal("0.00")),
-            "transaction_value": decimal_to_string(row["transaction_value"] or Decimal("0.00")),
-            "order_count": row["order_count"],
+            "id": branch_id,
+            "branch_code": None,
+            "branch_name": branch_name,
         }
-        for row in rows[:12]
+        for branch_id, branch_name in sorted(branch_map.items(), key=lambda row: row[1])
     ]
 
 
-def normalize_icp_label(icp_type: str | None, code: str | None, name: str | None) -> str:
-    if icp_type == SaIcpGroup.TYPE_POTENTIAL:
-        return f"Tiềm năng {code or ''}".strip()
-    if icp_type == SaIcpGroup.TYPE_NURTURE:
-        return f"Nuôi dưỡng {code or ''}".strip()
-    if icp_type == SaIcpGroup.TYPE_NON_POTENTIAL:
-        return f"Không TN {code or ''}".strip()
-    if icp_type == SaIcpGroup.TYPE_INVALID:
-        return f"Ảo/Không liên lạc {code or ''}".strip()
-    return name or code or "Chưa phân nhóm"
+def _build_overview(period: PeriodRange, previous_period: PeriodRange, current_records, previous_records, current_transactions, previous_transactions, current_active_accounts: set[str], previous_active_accounts: set[str]):
+    current_totals = _transaction_totals(current_transactions)
+    previous_totals = _transaction_totals(previous_transactions)
+
+    current_calls = len(current_records)
+    previous_calls = len(previous_records)
+
+    current_reactivated = len(current_active_accounts)
+    previous_reactivated = len(previous_active_accounts)
+
+    return [
+        {
+            "key": "total_calls",
+            "label": "Tổng cuộc gọi",
+            "value": current_calls,
+            "previous_value": previous_calls,
+            "previous_label": f"{previous_period.label}: {previous_calls} cuộc",
+            "growth_percent": _growth_percent(current_calls, previous_calls),
+            "unit": "COUNT",
+        },
+        {
+            "key": "reactivated_accounts",
+            "label": "TK kích hoạt",
+            "value": current_reactivated,
+            "previous_value": previous_reactivated,
+            "previous_label": f"{previous_period.label}: {previous_reactivated} TK",
+            "growth_percent": _growth_percent(current_reactivated, previous_reactivated),
+            "unit": "COUNT",
+        },
+        {
+            "key": "transaction_value",
+            "label": "Giá trị GD",
+            "value": _money(current_totals["transaction_value"]),
+            "previous_value": _money(previous_totals["transaction_value"]),
+            "previous_label": f"{previous_period.label}: {_money(previous_totals['transaction_value'])} VNĐ",
+            "growth_percent": _growth_percent(current_totals["transaction_value"], previous_totals["transaction_value"]),
+            "unit": "VND",
+        },
+        {
+            "key": "transaction_fee",
+            "label": "Phí GD thực tế",
+            "value": _money(current_totals["transaction_fee"]),
+            "previous_value": _money(previous_totals["transaction_fee"]),
+            "previous_label": f"{previous_period.label}: {_money(previous_totals['transaction_fee'])} VNĐ",
+            "growth_percent": _growth_percent(current_totals["transaction_fee"], previous_totals["transaction_fee"]),
+            "unit": "VND",
+        },
+    ]
 
 
-def build_icp_distribution(records_queryset) -> list[dict]:
-    rows = list(
-        records_queryset.values(
-            "icp_group__icp_type",
-            "icp_group__icp_code",
-            "icp_group__icp_name",
-        )
-        .annotate(count=Count("id"))
-        .order_by("-count")
-    )
-    total = sum(row["count"] for row in rows) or 0
-    result = []
-    for row in rows:
-        count = row["count"]
-        result.append(
+def _build_branch_ranking(branch_options, current_records, previous_records, current_account_map, previous_account_map, current_active_accounts: set[str]):
+    ranking: list[dict[str, Any]] = []
+
+    records_by_branch: dict[int, list[SaRecord]] = defaultdict(list)
+    previous_records_by_branch: dict[int, list[SaRecord]] = defaultdict(list)
+
+    for record in current_records:
+        if record.branch_id:
+            records_by_branch[record.branch_id].append(record)
+
+    for record in previous_records:
+        if record.branch_id:
+            previous_records_by_branch[record.branch_id].append(record)
+
+    branch_ids = {item["id"] for item in branch_options}
+    branch_ids.update(records_by_branch.keys())
+    branch_ids.update(previous_records_by_branch.keys())
+
+    branch_name_map = {item["id"]: item["branch_name"] for item in branch_options}
+
+    for branch_id in branch_ids:
+        records = records_by_branch.get(branch_id, [])
+        previous_branch_records = previous_records_by_branch.get(branch_id, [])
+
+        account_nos = {str(record.account_no or "").strip() for record in records if record.account_no}
+        previous_account_nos = {str(record.account_no or "").strip() for record in previous_branch_records if record.account_no}
+
+        reactivated_nos = {
+            str(record.account_no or "").strip()
+            for record in records
+            if record.reactivation and record.account_no
+        }
+        potential_active_nos = reactivated_nos.intersection(current_active_accounts)
+
+        sa_value = ZERO
+        sa_fee = ZERO
+        broker_value = ZERO
+        broker_fee = ZERO
+        total_value = ZERO
+        total_fee = ZERO
+
+        latest_record_map = _latest_records_by_account(records)
+
+        for account_no in account_nos:
+            totals = current_account_map.get(account_no)
+            if not totals:
+                continue
+
+            value = _decimal(totals["transaction_value"])
+            fee = _decimal(totals["transaction_fee"])
+            total_value += value
+            total_fee += fee
+
+            record = latest_record_map.get(account_no)
+            if record and (record.handover_to_broker or record.broker_user_id or record.broker_employee_id):
+                broker_value += value
+                broker_fee += fee
+            else:
+                sa_value += value
+                sa_fee += fee
+
+        previous_fee = ZERO
+        for account_no in previous_account_nos:
+            previous_fee += _decimal(previous_account_map.get(account_no, {}).get("transaction_fee", 0))
+
+        branch_name = branch_name_map.get(branch_id)
+        if not branch_name and records:
+            branch_name = _record_branch_name(records[0])
+        if not branch_name and previous_branch_records:
+            branch_name = _record_branch_name(previous_branch_records[0])
+
+        ranking.append(
             {
-                "icp_type": row["icp_group__icp_type"] or "UNKNOWN",
-                "icp_code": row["icp_group__icp_code"],
-                "icp_name": row["icp_group__icp_name"],
-                "label": normalize_icp_label(row["icp_group__icp_type"], row["icp_group__icp_code"], row["icp_group__icp_name"]),
-                "count": count,
-                "percent": float((Decimal(count) / Decimal(total) * Decimal("100")) if total else Decimal("0")),
+                "branch_id": branch_id,
+                "branch_name": branch_name or f"Chi nhánh {branch_id}",
+                "rank": 0,
+                "total_calls": len(records),
+                "reactivated_accounts": len(reactivated_nos),
+                "potential_active_accounts": len(potential_active_nos),
+                "sa_transaction_value": _money(sa_value),
+                "sa_transaction_fee": _money(sa_fee),
+                "broker_transaction_value": _money(broker_value),
+                "broker_transaction_fee": _money(broker_fee),
+                "total_transaction_value": _money(total_value),
+                "total_transaction_fee": _money(total_fee),
+                "transaction_value": _money(total_value),
+                "transaction_fee": _money(total_fee),
+                "previous_transaction_fee": _money(previous_fee),
+                "mom_growth_percent": _growth_percent(total_fee, previous_fee),
             }
         )
-    return result
+
+    ranking.sort(key=lambda row: (_decimal(row["total_transaction_fee"]), row["reactivated_accounts"], row["total_calls"]), reverse=True)
+
+    for index, row in enumerate(ranking, start=1):
+        row["rank"] = index
+
+    total_row = {
+        "branch_id": None,
+        "branch_name": "TOTAL",
+        "rank": None,
+        "total_calls": sum(row["total_calls"] for row in ranking),
+        "reactivated_accounts": sum(row["reactivated_accounts"] for row in ranking),
+        "potential_active_accounts": sum(row["potential_active_accounts"] for row in ranking),
+        "sa_transaction_value": _money(sum((_decimal(row["sa_transaction_value"]) for row in ranking), ZERO)),
+        "sa_transaction_fee": _money(sum((_decimal(row["sa_transaction_fee"]) for row in ranking), ZERO)),
+        "broker_transaction_value": _money(sum((_decimal(row["broker_transaction_value"]) for row in ranking), ZERO)),
+        "broker_transaction_fee": _money(sum((_decimal(row["broker_transaction_fee"]) for row in ranking), ZERO)),
+        "total_transaction_value": _money(sum((_decimal(row["total_transaction_value"]) for row in ranking), ZERO)),
+        "total_transaction_fee": _money(sum((_decimal(row["total_transaction_fee"]) for row in ranking), ZERO)),
+        "transaction_value": _money(sum((_decimal(row["transaction_value"]) for row in ranking), ZERO)),
+        "transaction_fee": _money(sum((_decimal(row["transaction_fee"]) for row in ranking), ZERO)),
+        "previous_transaction_fee": _money(sum((_decimal(row["previous_transaction_fee"]) for row in ranking), ZERO)),
+    }
+    total_row["mom_growth_percent"] = _growth_percent(total_row["total_transaction_fee"], total_row["previous_transaction_fee"])
+
+    return ranking, total_row
 
 
-def get_branch_options_for_user(user) -> list[dict]:
-    branch_ids = get_accessible_branch_ids(user)
+def _build_fee_by_branch(branch_ranking, previous_period: PeriodRange, period: PeriodRange):
+    return [
+        {
+            "branch_id": row["branch_id"],
+            "branch_name": row["branch_name"],
+            "previous_fee": row["previous_transaction_fee"],
+            "current_fee": row["total_transaction_fee"],
+            "previous_label": previous_period.label,
+            "current_label": period.label,
+        }
+        for row in branch_ranking
+        if row.get("branch_id") is not None
+    ]
 
-    if not can_view_all_branches(user) and not branch_ids:
-        return []
 
-    queryset = Branch.objects.all().order_by("id")
-    if branch_ids:
-        queryset = queryset.filter(id__in=branch_ids)
-    return [serialize_branch(branch) for branch in queryset]
+def _build_top_accounts(current_records, current_account_map):
+    latest_record_map = _latest_records_by_account(current_records)
+    rows = []
+
+    for account_no, totals in current_account_map.items():
+        record = latest_record_map.get(account_no)
+        if not record:
+            continue
+
+        rows.append(
+            {
+                "account_no": account_no,
+                "customer_name": _record_customer_name(record),
+                "branch_name": totals.get("branch_name") or _record_branch_name(record),
+                "transaction_fee": _money(totals["transaction_fee"]),
+                "transaction_value": _money(totals["transaction_value"]),
+                "order_count": _number(totals["order_count"]),
+                "call_date": record.call_date.isoformat() if record.call_date else None,
+                "pic_name": _record_pic_name(record),
+                "reactivation": bool(record.reactivation),
+            }
+        )
+
+    rows.sort(key=lambda row: _decimal(row["transaction_fee"]), reverse=True)
+
+    for index, row in enumerate(rows, start=1):
+        row["rank"] = index
+
+    return rows[:50]
 
 
-def build_sale_admin_dashboard_payload(*, user, year: int, month: int, branch_id=None) -> dict:
-    current_window = get_month_window(year, month)
-    previous_window = get_previous_month_window(year, month)
+def _build_top_employees(current_records, current_account_map, current_active_accounts: set[str]):
+    rows_by_key: dict[str, dict[str, Any]] = {}
 
-    accessible_branch_ids = get_accessible_branch_ids(user)
-    all_branch_access = can_view_all_branches(user)
+    for record in current_records:
+        if record.pic_user_id:
+            key = f"user:{record.pic_user_id}"
+            user_id = record.pic_user_id
+            username = getattr(record.pic_user, "username", None) if record.pic_user else None
+            email = getattr(record.pic_user, "email", None) if record.pic_user else None
+        elif record.pic_employee_id:
+            key = f"employee:{record.pic_employee_id}"
+            user_id = None
+            username = None
+            email = getattr(record.pic_employee, "email", None) if record.pic_employee else None
+        else:
+            key = f"unknown:{record.pic_name_snapshot or 'unknown'}"
+            user_id = None
+            username = None
+            email = None
 
-    if branch_id:
-        if not all_branch_access and int(branch_id) not in accessible_branch_ids:
-            raise PermissionError("Bạn không có quyền xem chi nhánh này.")
-        scope_branch_filter = branch_id
-    else:
-        scope_branch_filter = None if all_branch_access else list(accessible_branch_ids)
+        if key not in rows_by_key:
+            rows_by_key[key] = {
+                "user_id": user_id,
+                "username": username,
+                "email": email,
+                "employee_name": _record_pic_name(record),
+                "branch_name": _record_branch_name(record),
+                "rank": 0,
+                "total_calls": 0,
+                "reactivated_accounts": set(),
+                "transaction_fee": ZERO,
+                "transaction_value": ZERO,
+                "accounts": {},
+            }
 
-    current_scope = calculate_scope(current_window, branch_id=scope_branch_filter)
-    previous_scope = calculate_scope(previous_window, branch_id=scope_branch_filter)
-    branch_ranking, branch_fee_chart = build_branch_ranking(current_window, previous_window, selected_branch_id=scope_branch_filter)
-    top_employees = build_top_employees(current_window, selected_branch_id=scope_branch_filter)
+        row = rows_by_key[key]
+        row["total_calls"] += 1
+
+        account_no = str(record.account_no or "").strip()
+        if not account_no:
+            continue
+
+        if record.reactivation and account_no in current_active_accounts:
+            row["reactivated_accounts"].add(account_no)
+
+        totals = current_account_map.get(account_no)
+        if not totals:
+            continue
+
+        row["transaction_fee"] += _decimal(totals["transaction_fee"])
+        row["transaction_value"] += _decimal(totals["transaction_value"])
+
+        if account_no not in row["accounts"]:
+            row["accounts"][account_no] = {
+                "account_no": account_no,
+                "customer_name": _record_customer_name(record),
+                "branch_name": totals.get("branch_name") or _record_branch_name(record),
+                "transaction_fee": _money(totals["transaction_fee"]),
+                "transaction_value": _money(totals["transaction_value"]),
+                "order_count": _number(totals["order_count"]),
+                "call_date": record.call_date.isoformat() if record.call_date else None,
+            }
+
+    rows = []
+    for row in rows_by_key.values():
+        accounts = list(row["accounts"].values())
+        accounts.sort(key=lambda item: _decimal(item["transaction_fee"]), reverse=True)
+
+        rows.append(
+            {
+                "user_id": row["user_id"] or 0,
+                "username": row["username"],
+                "email": row["email"],
+                "employee_name": row["employee_name"],
+                "branch_name": row["branch_name"],
+                "rank": 0,
+                "total_calls": row["total_calls"],
+                "reactivated_accounts": len(row["reactivated_accounts"]),
+                "transaction_fee": _money(row["transaction_fee"]),
+                "transaction_value": _money(row["transaction_value"]),
+                "accounts": accounts,
+            }
+        )
+
+    rows.sort(key=lambda item: (item["reactivated_accounts"], _decimal(item["transaction_fee"]), item["total_calls"]), reverse=True)
+
+    for index, row in enumerate(rows, start=1):
+        row["rank"] = index
+
+    return rows[:50]
+
+
+def _build_product_fee(current_account_map):
+    product_map: dict[str, Decimal] = defaultdict(Decimal)
+
+    for account_item in current_account_map.values():
+        for product_code, fee in account_item["product_fee"].items():
+            product_map[product_code] += _decimal(fee)
+
+    rows = [
+        {
+            "product_code": code,
+            "product_name": code,
+            "transaction_fee": _money(fee),
+        }
+        for code, fee in product_map.items()
+    ]
+    rows.sort(key=lambda item: _decimal(item["transaction_fee"]), reverse=True)
+    return rows
+
+
+def _build_icp_distribution(current_records):
+    total = len(current_records)
+    type_map: dict[str, dict[str, Any]] = defaultdict(lambda: {"count": 0, "label": "Chưa phân nhóm"})
+
+    label_map = dict(SaIcpGroup.ICP_TYPE_CHOICES)
+
+    for record in current_records:
+        icp_group = getattr(record, "icp_group", None)
+        icp_type = getattr(icp_group, "icp_type", None) or "UNKNOWN"
+        type_map[icp_type]["count"] += 1
+        type_map[icp_type]["label"] = label_map.get(icp_type, "Chưa phân nhóm")
+
+    rows = []
+    for icp_type, item in type_map.items():
+        rows.append(
+            {
+                "icp_type": icp_type,
+                "icp_code": icp_type,
+                "label": item["label"],
+                "count": item["count"],
+                "percent": float(_safe_percent(item["count"], total)),
+            }
+        )
+
+    rows.sort(key=lambda item: item["count"], reverse=True)
+    return rows
+
+
+def _build_customer_group_distribution(current_records, current_account_map):
+    total = len(current_records)
+    groups: dict[str, dict[str, Any]] = {}
+
+    for record in current_records:
+        icp_group = getattr(record, "icp_group", None)
+
+        if icp_group:
+            key = str(icp_group.id)
+            code = icp_group.icp_code
+            name = icp_group.icp_name
+            icp_type = icp_group.icp_type
+            description = icp_group.description
+        else:
+            key = "UNKNOWN"
+            code = "-"
+            name = "Chưa phân nhóm"
+            icp_type = "UNKNOWN"
+            description = None
+
+        if key not in groups:
+            groups[key] = {
+                "group_id": getattr(icp_group, "id", None),
+                "icp_code": code,
+                "icp_name": name,
+                "icp_type": icp_type,
+                "description": description,
+                "count": 0,
+                "percent": 0,
+                "accounts": [],
+            }
+
+        groups[key]["count"] += 1
+
+        account_no = str(record.account_no or "").strip()
+        totals = current_account_map.get(account_no, {})
+        groups[key]["accounts"].append(
+            {
+                "account_no": account_no,
+                "customer_name": _record_customer_name(record),
+                "branch_name": _record_branch_name(record),
+                "pic_name": _record_pic_name(record),
+                "call_date": record.call_date.isoformat() if record.call_date else None,
+                "reactivation": bool(record.reactivation),
+                "transaction_fee": _money(totals.get("transaction_fee", 0)),
+                "transaction_value": _money(totals.get("transaction_value", 0)),
+                "order_count": _number(totals.get("order_count", 0)),
+            }
+        )
+
+    rows = list(groups.values())
+    for row in rows:
+        row["percent"] = float(_safe_percent(row["count"], total))
+        row["accounts"].sort(key=lambda item: _decimal(item["transaction_fee"]), reverse=True)
+        row["accounts"] = row["accounts"][:50]
+
+    rows.sort(key=lambda item: item["count"], reverse=True)
+    return rows
+
+
+def _build_criteria():
+    return {
+        "title": "Tiêu chí đánh giá tài khoản Kích Hoạt Tiềm năng",
+        "formula": "KH có reactivation = true trong tháng và có giao dịch khớp trong transaction_logs của tháng đó.",
+        "groups": [
+            {"code": "A", "name": "Rất tiềm năng", "description": "Hoạt động thường xuyên, giao dịch đều."},
+            {"code": "B", "name": "Tiềm năng", "description": "Có giao dịch nhưng chưa ổn định."},
+            {"code": "C", "name": "Nuôi dưỡng", "description": "Ít giao dịch, cần chăm sóc thêm."},
+            {"code": "D", "name": "Không tiềm năng", "description": "Không phát sinh giao dịch."},
+            {"code": "E-H", "name": "Ảo / Không liên lạc", "description": "Số điện thoại lỗi, tài khoản ảo, không nghe máy."},
+        ],
+        "note": "Chuẩn phân nhóm lấy từ dữ liệu ICP trên CRM và dữ liệu giao dịch thực tế.",
+    }
+
+
+def get_sale_admin_report_payload(request) -> dict[str, Any]:
+    period = _get_request_period(request)
+    previous = _previous_period(period)
+
+    branch_param = str(request.query_params.get("branch") or "").strip()
+    if branch_param.lower() == "all":
+        branch_param = ""
+
+    scoped_records_qs = filter_sa_records_by_user(
+        SaRecord.objects.select_related(
+            "customer",
+            "customer_account",
+            "company",
+            "branch",
+            "pic_user",
+            "pic_employee",
+            "broker_user",
+            "broker_employee",
+            "call_result",
+            "interest_level",
+            "icp_group",
+        ),
+        request.user,
+    )
+
+    if branch_param:
+        scoped_records_qs = scoped_records_qs.filter(branch_id=branch_param)
+
+    current_records = list(_records_for_period(scoped_records_qs, period))
+    previous_records = list(_records_for_period(scoped_records_qs, previous))
+
+    branch_options = _build_branch_options(request.user, current_records + previous_records)
+
+    current_account_nos = {str(record.account_no or "").strip() for record in current_records if record.account_no}
+    previous_account_nos = {str(record.account_no or "").strip() for record in previous_records if record.account_no}
+
+    current_transactions = _transactions_for_period(current_account_nos, period)
+    previous_transactions = _transactions_for_period(previous_account_nos, previous)
+
+    current_account_map = _build_account_transaction_map(current_transactions)
+    previous_account_map = _build_account_transaction_map(previous_transactions)
+
+    current_reactivated_nos = {
+        str(record.account_no or "").strip()
+        for record in current_records
+        if record.reactivation and record.account_no
+    }
+    previous_reactivated_nos = {
+        str(record.account_no or "").strip()
+        for record in previous_records
+        if record.reactivation and record.account_no
+    }
+
+    current_active_accounts = current_reactivated_nos.intersection(set(current_account_map.keys()))
+    previous_active_accounts = previous_reactivated_nos.intersection(set(previous_account_map.keys()))
+
+    overview = _build_overview(
+        period,
+        previous,
+        current_records,
+        previous_records,
+        current_transactions,
+        previous_transactions,
+        current_active_accounts,
+        previous_active_accounts,
+    )
+
+    branch_ranking, branch_total = _build_branch_ranking(
+        branch_options,
+        current_records,
+        previous_records,
+        current_account_map,
+        previous_account_map,
+        current_active_accounts,
+    )
+
+    top_accounts = _build_top_accounts(current_records, current_account_map)
+    top_employees = _build_top_employees(current_records, current_account_map, current_active_accounts)
 
     return {
+        "generated_at": timezone.now().isoformat(),
         "period": {
-            "year": current_window.year,
-            "month": current_window.month,
-            "label": current_window.label,
-            "start_date": current_window.start_date.isoformat(),
-            "end_date": current_window.end_date.isoformat(),
-            "previous_label": previous_window.label,
-            "previous_start_date": previous_window.start_date.isoformat(),
-            "previous_end_date": previous_window.end_date.isoformat(),
+            "year": period.year,
+            "month": period.month,
+            "label": period.label,
+            "code": period.code,
+            "date_from": period.start.isoformat(),
+            "date_to": (period.end - timedelta(days=1)).isoformat(),
+            "previous_year": previous.year,
+            "previous_month": previous.month,
+            "previous_label": previous.label,
+            "previous_code": previous.code,
         },
         "filters": {
-            "branch": str(branch_id or ""),
-            "branch_options": get_branch_options_for_user(user),
+            "year": str(period.year),
+            "month": str(period.month),
+            "date_from": period.start.isoformat(),
+            "date_to": (period.end - timedelta(days=1)).isoformat(),
+            "branch": branch_param,
+            "branch_options": branch_options,
         },
-        "overview": build_overview(current_scope, previous_scope),
+        "overview": overview,
+        "summary_cards": overview,
         "branch_ranking": branch_ranking,
-        "branch_fee_chart": branch_fee_chart,
+        "branch_total": branch_total,
+        "fee_by_branch": _build_fee_by_branch(branch_ranking, previous, period),
         "top_employees": top_employees,
-        "top_employee_chart": top_employees[:7],
-        "top_accounts": build_top_accounts(current_window, current_scope, selected_branch_id=branch_id),
-        "product_fee_chart": build_product_fee_chart(current_window, current_scope["potential_active_account_nos"]),
-        "icp_distribution": build_icp_distribution(current_scope["records"]),
-        "meta": {
-            "data_sources": ["sa_records", "transaction_logs", "users/employees/roles"],
-            "matched_status": MATCHED_STATUS,
-            "potential_account_rule": "reactivation=true và có ít nhất một transaction_log order_status=MATCHED trong tháng đang xem.",
-        },
+        "top_accounts": top_accounts,
+        "product_fee": _build_product_fee(current_account_map),
+        "icp_distribution": _build_icp_distribution(current_records),
+        "customer_group_distribution": _build_customer_group_distribution(current_records, current_account_map),
+        "criteria": _build_criteria(),
     }

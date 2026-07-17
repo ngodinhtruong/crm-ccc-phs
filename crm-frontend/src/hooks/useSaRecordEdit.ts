@@ -10,8 +10,10 @@ import {
   SaIcpGroup,
   SaInterestLevel,
   SaRecordCreateFormState,
+  SaCustomerAccountSuggestion,
   SaRecordItem,
   SaRecordUpdatePayload,
+  SaSelectOption,
 } from "@/types/sale-admin.type";
 
 function getErrorMessage(err: unknown, fallback: string) {
@@ -44,6 +46,12 @@ const initialForm: SaRecordCreateFormState = {
   picNameSnapshot: "",
   accountStatus: "",
   vipClassification: "",
+
+  customerAccount: "",
+  customer: "",
+  company: "",
+  branch: "",
+  accountSelected: false,
 
   callDate: "",
   followNo: "1",
@@ -82,6 +90,12 @@ function mapRecordToForm(item: SaRecordItem): SaRecordCreateFormState {
     accountStatus: item.account_status || "",
     vipClassification: item.vip_classification || "",
 
+    customerAccount: item.customer_account ? String(item.customer_account) : "",
+    customer: item.customer ? String(item.customer) : "",
+    company: item.company ? String(item.company) : "",
+    branch: item.branch ? String(item.branch) : "",
+    accountSelected: Boolean(item.customer_account || item.account_no),
+
     callDate: toDateInputValue(item.call_date),
     followNo: String(item.follow_no || 1),
 
@@ -114,6 +128,8 @@ export function useSaRecordEdit(recordId: string) {
   const [callResults, setCallResults] = useState<SaCallResult[]>([]);
   const [interestLevels, setInterestLevels] = useState<SaInterestLevel[]>([]);
   const [icpGroups, setIcpGroups] = useState<SaIcpGroup[]>([]);
+  const [accountStatusOptions, setAccountStatusOptions] = useState<SaSelectOption[]>([]);
+  const [vipClassificationOptions, setVipClassificationOptions] = useState<SaSelectOption[]>([]);
 
   const [loadingRecord, setLoadingRecord] = useState(true);
   const [loadingMaster, setLoadingMaster] = useState(true);
@@ -137,16 +153,25 @@ export function useSaRecordEdit(recordId: string) {
       setLoadingMaster(true);
       setMasterError("");
 
-      const [callResultData, interestLevelData, icpGroupData] =
-        await Promise.all([
-          saleAdminService.getCallResults(),
-          saleAdminService.getInterestLevels(),
-          saleAdminService.getIcpGroups(),
-        ]);
+      const [
+        callResultData,
+        interestLevelData,
+        icpGroupData,
+        accountStatusData,
+        vipClassificationData,
+      ] = await Promise.all([
+        saleAdminService.getCallResults(),
+        saleAdminService.getInterestLevels(),
+        saleAdminService.getIcpGroups(),
+        saleAdminService.getAccountStatusOptions(),
+        saleAdminService.getVipClassificationOptions(),
+      ]);
 
       setCallResults(callResultData);
       setInterestLevels(interestLevelData);
       setIcpGroups(icpGroupData);
+      setAccountStatusOptions(accountStatusData);
+      setVipClassificationOptions(vipClassificationData);
     } catch (err) {
       setMasterError(
         getErrorMessage(err, "Không tải được master data SA Record")
@@ -270,6 +295,19 @@ export function useSaRecordEdit(recordId: string) {
     router.push(`/sale-admin/records/${recordId}`);
   };
 
+  const handleAccountNoChange = (value: string) => {
+    setField(
+      "accountNo",
+      String(value || "")
+        .replace(/\s+/g, "")
+        .toUpperCase()
+    );
+  };
+
+  const selectCustomerAccountSuggestion = (_account: SaCustomerAccountSuggestion) => {
+    // Edit mode không dùng autocomplete đổi tài khoản. Giữ hàm này để dùng chung form controller.
+  };
+
   useEffect(() => {
     if (!authService.isAuthenticated()) {
       router.push("/login");
@@ -291,6 +329,16 @@ export function useSaRecordEdit(recordId: string) {
     callResults,
     interestLevels,
     icpGroups,
+    accountStatusOptions,
+    vipClassificationOptions,
+
+    accountSuggestions: [],
+    accountSuggestionLoading: false,
+    accountSuggestionError: "",
+    accountDropdownOpen: false,
+    setAccountDropdownOpen: () => undefined,
+    handleAccountNoChange,
+    selectCustomerAccountSuggestion,
 
     loadingRecord,
     loadingMaster,

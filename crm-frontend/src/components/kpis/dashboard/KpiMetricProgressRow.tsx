@@ -47,9 +47,9 @@ export function KpiMetricProgressRow({
 
       <td className="px-3">
         <div className="font-semibold text-slate-800">{item.metric.metric_name}</div>
-        <div className="mt-0.5 line-clamp-1 text-[11px] text-slate-500">
+        {/* <div className="mt-0.5 line-clamp-1 text-[11px] text-slate-500">
           {item.metric.work_description || item.metric.measurement_formula || "-"}
-        </div>
+        </div> */}
       </td>
 
       {/* <td className="px-3">

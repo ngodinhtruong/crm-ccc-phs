@@ -118,7 +118,7 @@ export type KpiPeriodMetricItem = {
   metric_code: string;
   metric_name: string;
   weight_percent: string;
-  work_description?: string | null;
+  // work_description?: string | null;
   measurement_formula: string;
   target_text?: string | null;
   target_value?: string | null;
@@ -298,7 +298,7 @@ export type KpiMetricPayload = {
   metric_code: string;
   metric_name: string;
   weight_percent: string;
-  work_description?: string | null;
+  // work_description?: string | null;
   measurement_formula: string;
   target_text?: string | null;
   target_value?: string | null;
@@ -402,4 +402,243 @@ export type KpiMetricDefinitionPayload = {
   min_score?: string;
   max_score?: string;
   is_active?: boolean;
+};
+
+// KPI Admin page: ranking, report, and target-setting matrix.
+export type KpiAdminEmployee = {
+  id: number;
+  username?: string | null;
+  email?: string | null;
+  full_name: string;
+  employee_id?: number | null;
+  employee_code?: string | null;
+  branch_id?: number | null;
+  branch_name?: string | null;
+  role_codes: string[];
+  role_type: "SA" | "SUP" | string;
+};
+
+export type KpiAdminBranchOption = {
+  id: number;
+  branch_code?: string | null;
+  branch_name: string;
+};
+
+export type KpiAdminProfileOption = {
+  id: number;
+  profile_code: KpiProfileCode;
+  profile_name: string;
+  target_role_code: string;
+};
+
+export type KpiAdminMetaResponse = {
+  period: KpiPeriodItem;
+  selected_profile: KpiAdminProfileOption;
+  profiles: KpiAdminProfileOption[];
+  manageable_profiles: KpiAdminProfileOption[];
+  branches: KpiAdminBranchOption[];
+  employee_count: number;
+  can_view_all: boolean;
+  can_manage_targets: boolean;
+};
+
+export type KpiAdminMetricResult = {
+  metric_id: number;
+  metric_code: string;
+  metric_name: string;
+  group_code?: string | null;
+  actual_value?: string | null;
+  target_value?: string | null;
+  score: string;
+  weighted_score: string;
+  result_status?: string | null;
+};
+
+export type KpiAdminRankingRow = {
+  rank: number;
+  user: KpiAdminEmployee;
+  summary_id?: number | null;
+  manual_score: string;
+  auto_score: string;
+  total_score: string;
+  part_a_score: string;
+  part_b_score: string;
+  reward_tier_code?: string | null;
+  reward_tier_name?: string | null;
+  rank_overall?: number | null;
+  rank_branch?: number | null;
+  metrics: KpiAdminMetricResult[];
+};
+
+export type KpiAdminRankingResponse = {
+  period: KpiPeriodItem;
+  profile: Pick<KpiAdminProfileOption, "id" | "profile_code" | "profile_name">;
+  metrics: KpiPeriodMetricItem[];
+  count: number;
+  results: KpiAdminRankingRow[];
+};
+
+
+export type KpiAdminOperationalOverview = {
+  call_count: number;
+  activated_account_count: number;
+  transaction_fee: string;
+  transaction_value: string;
+  activation_rate: string;
+  fee_per_call: string;
+  value_per_call: string;
+};
+
+export type KpiAdminOperationalEmployeeRow = {
+  user: KpiAdminEmployee;
+  branch_id?: number | null;
+  branch_name: string;
+  call_count: number;
+  activated_account_count: number;
+  transaction_fee: string;
+  transaction_value: string;
+  activation_rate: string;
+  fee_per_call: string;
+  value_per_call: string;
+};
+
+export type KpiAdminOperationalBranchRow = {
+  branch_id?: number | null;
+  branch_name: string;
+  employee_count: number;
+  call_count: number;
+  activated_account_count: number;
+  transaction_fee: string;
+  transaction_value: string;
+  activation_rate: string;
+  fee_per_call: string;
+  value_per_call: string;
+};
+
+export type KpiAdminOperationalReport = {
+  overview: KpiAdminOperationalOverview;
+  employees: KpiAdminOperationalEmployeeRow[];
+  branches: KpiAdminOperationalBranchRow[];
+};
+
+export type KpiAdminReportResponse = {
+  period: KpiPeriodItem;
+  profile: Pick<KpiAdminProfileOption, "id" | "profile_code" | "profile_name">;
+  overview: {
+    employee_count: number;
+    summary_count: number;
+    avg_total_score: string;
+    avg_manual_score: string;
+    avg_auto_score: string;
+  };
+  by_branch: {
+    branch_id?: number | null;
+    branch_name: string;
+    employee_count: number;
+    avg_total_score: string;
+    total_score: string;
+  }[];
+  by_metric: {
+    metric_id: number;
+    metric_code: string;
+    metric_name: string;
+    group_code?: string | null;
+    employee_count: number;
+    avg_score: string;
+    avg_actual_value?: string | null;
+    avg_target_value?: string | null;
+  }[];
+  operational?: KpiAdminOperationalReport;
+};
+
+export type KpiAdminUserTarget = {
+  id: number;
+  period: number;
+  profile: number;
+  metric: number;
+  user: number;
+  employee?: number | null;
+  branch?: number | null;
+  target_value?: string | null;
+  target_text?: string | null;
+  target_unit?: string | null;
+  note?: string | null;
+  assigned_by_user?: number | null;
+  assigned_at?: string | null;
+};
+
+export type KpiAdminTargetRow = {
+  user: KpiAdminEmployee;
+  targets: Record<string, KpiAdminUserTarget | null>;
+};
+
+export type KpiAdminTargetsResponse = {
+  period: KpiPeriodItem;
+  profile: KpiAdminProfileOption;
+  branches: KpiAdminBranchOption[];
+  metrics: KpiPeriodMetricItem[];
+  employees: KpiAdminEmployee[];
+  rows: KpiAdminTargetRow[];
+  can_select_all: boolean;
+  can_copy_from_previous_period: boolean;
+  can_copy_from_first_employee: boolean;
+};
+
+export type KpiAdminDashboardResponse = {
+  meta: KpiAdminMetaResponse;
+  ranking: KpiAdminRankingResponse;
+  report: KpiAdminReportResponse;
+  targets?: KpiAdminTargetsResponse | null;
+};
+
+export type KpiAdminQueryParams = {
+  period?: string;
+  period_code?: string;
+  year?: string;
+  month?: string;
+  profile_code?: KpiProfileCode;
+  branch?: string;
+  q?: string;
+  role_type?: "ALL" | "SA" | "SUP" | "";
+};
+
+export type KpiAdminTargetUpdateItem = {
+  user: number;
+  metric: number;
+  target_value?: string | null;
+  target_text?: string | null;
+  target_unit?: string | null;
+  note?: string | null;
+};
+
+export type KpiAdminBulkTargetPayload = {
+  period: number | string;
+  profile_code: KpiProfileCode;
+  targets: KpiAdminTargetUpdateItem[];
+};
+
+export type KpiAdminCopyPreviousPayload = {
+  period: number | string;
+  profile_code: KpiProfileCode;
+  user_ids: number[];
+  metric_ids?: number[];
+};
+
+export type KpiAdminCopyEmployeePayload = {
+  period: number | string;
+  profile_code: KpiProfileCode;
+  source_user: number;
+  target_user_ids: number[];
+  metric_ids?: number[];
+};
+
+export type KpiAdminMutationResponse = {
+  detail: string;
+  changed_count?: number;
+  copied_count?: number;
+  previous_period?: KpiPeriodItem;
+  results: {
+    target: KpiAdminUserTarget;
+    created: boolean;
+  }[];
 };

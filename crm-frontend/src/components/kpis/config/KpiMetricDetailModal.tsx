@@ -116,9 +116,9 @@ export function KpiMetricDetailModal({
             </div>
           </div>
 
-          <InfoBlock label="Mô tả công việc">
+          {/* <InfoBlock label="Mô tả công việc">
             <EmptyText>{metric.work_description}</EmptyText>
-          </InfoBlock>
+          </InfoBlock> */}
 
           <InfoBlock label="Công thức / cách đo lường CRM">
             <EmptyText>{metric.measurement_formula}</EmptyText>

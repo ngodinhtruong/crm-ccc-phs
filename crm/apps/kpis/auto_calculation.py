@@ -24,10 +24,6 @@ SA_PROFILE_CODE = KpiProfile.PROFILE_SA
 SA_SUP_PROFILE_CODE = KpiProfile.PROFILE_SA_SUP
 
 
-SA_ROLE_CODES = {"SA", "SA_STAFF", "SALE_ADMIN_STAFF", KpiProfile.TARGET_ROLE_SA}
-SA_SUP_ROLE_CODES = {"SA_SUP", "SA_SUPERVISOR", "SALE_ADMIN_SUPERVISOR", KpiProfile.TARGET_ROLE_SA_SUP}
-
-
 # Vì đã bỏ KPI master/formula_key, phần tự động tính dùng metric_code thực tế trong từng bộ KPI.
 AUTO_FORMULA_BY_PROFILE_AND_METRIC = {
     SA_PROFILE_CODE: {
@@ -124,6 +120,14 @@ def get_result_status(score):
     return KpiUserMetricResult.STATUS_BAD
 
 
+def get_weighted_score(score, weight_percent):
+    return (
+        decimal_value(score)
+        * decimal_value(weight_percent)
+        / Decimal("100")
+    ).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+
+
 def get_user_target(period, profile, metric, user):
     return KpiUserTarget.objects.filter(
         period=period,
@@ -159,35 +163,20 @@ def user_has_role(user, role_code):
     return user.user_roles.filter(role__role_code=role_code).exists()
 
 
-def user_role_codes(user):
-    if not user or not getattr(user, "is_authenticated", False):
-        return set()
-
-    if getattr(user, "is_superuser", False):
-        return SA_ROLE_CODES | SA_SUP_ROLE_CODES
-
-    return set(
-        user.user_roles.select_related("role")
-        .values_list("role__role_code", flat=True)
-    )
-
-
 def resolve_profile_for_user(period, user, profile=None):
     if profile:
         return profile
 
-    role_codes = user_role_codes(user)
-
-    # Nếu user bị gán cả SA_STAFF và SA_SUPERVISOR thì ưu tiên SA_SUP cho dashboard/tính KPI cá nhân.
-    profile_code = (
-        KpiProfile.PROFILE_SA_SUP
-        if role_codes.intersection(SA_SUP_ROLE_CODES)
-        else KpiProfile.PROFILE_SA
-    )
+    if user_has_role(user, KpiProfile.TARGET_ROLE_SA_SUP):
+        return KpiProfile.objects.filter(
+            period=period,
+            profile_code=KpiProfile.PROFILE_SA_SUP,
+            is_active=True,
+        ).first()
 
     return KpiProfile.objects.filter(
         period=period,
-        profile_code=profile_code,
+        profile_code=KpiProfile.PROFILE_SA,
         is_active=True,
     ).first()
 
@@ -196,14 +185,9 @@ def get_default_kpi_users(profile=None, branch_id=None):
     User = get_user_model()
 
     if profile:
-        if profile.profile_code == KpiProfile.PROFILE_SA_SUP:
-            role_codes = list(SA_SUP_ROLE_CODES)
-        elif profile.profile_code == KpiProfile.PROFILE_SA:
-            role_codes = list(SA_ROLE_CODES)
-        else:
-            role_codes = [profile.target_role_code]
+        role_codes = [profile.target_role_code]
     else:
-        role_codes = list(SA_ROLE_CODES | SA_SUP_ROLE_CODES)
+        role_codes = [KpiProfile.TARGET_ROLE_SA, KpiProfile.TARGET_ROLE_SA_SUP]
 
     queryset = User.objects.filter(
         user_roles__role__role_code__in=role_codes,
@@ -753,6 +737,7 @@ def save_auto_metric_result(
             "contributing_record_count": contributing_record_count,
             "score": score,
             "weight_percent": metric.weight_percent,
+            "weighted_score": get_weighted_score(score, metric.weight_percent),
             "result_status": get_result_status(score),
             "calculated_payload": {
                 "metric_code": metric.metric_code,
@@ -760,6 +745,8 @@ def save_auto_metric_result(
                 "actual_value": str(actual_value),
                 "target_value": str(target_value) if target_value is not None else None,
                 "score": str(score),
+                "weighted_score": str(get_weighted_score(score, metric.weight_percent)),
+                "weight_percent": str(metric.weight_percent),
                 "window_start_date": str(window.start_date),
                 "window_end_date": str(window.end_date),
                 "denominator_value": str(denominator_value) if denominator_value is not None else None,

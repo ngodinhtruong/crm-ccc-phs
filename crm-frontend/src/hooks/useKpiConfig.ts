@@ -659,7 +659,7 @@ export function useKpiConfig() {
         metric_code: item.metric_code,
         metric_name: item.metric_name,
         weight_percent: item.weight_percent,
-        work_description: item.work_description || "",
+        // work_description: item.work_description || "",
         measurement_formula: getSafeMeasurementFormula(item.measurement_formula),
         target_text: item.target_text || "",
         target_value: item.target_value || null,

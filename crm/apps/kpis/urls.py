@@ -1,6 +1,18 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
+from apps.kpis.admin_api import (
+    KpiAdminBulkTargetUpdateAPIView,
+    KpiAdminCopyEmployeeTargetsAPIView,
+    KpiAdminCopyPreviousPeriodTargetsAPIView,
+    KpiAdminDashboardAPIView,
+    KpiAdminMetaAPIView,
+    KpiAdminPeriodOptionsAPIView,
+    KpiAdminRankingAPIView,
+    KpiAdminReportAPIView,
+    KpiAdminTargetMatrixAPIView,
+)
+
 from apps.kpis.views import (
     KpiGateDefinitionViewSet,
     KpiGroupViewSet,
@@ -31,5 +43,14 @@ router.register("gate-results", KpiUserGateResultViewSet, basename="kpi-gate-res
 router.register("summaries", KpiUserSummaryViewSet, basename="kpi-summaries")
 
 urlpatterns = [
+    path("admin/meta/", KpiAdminMetaAPIView.as_view(), name="kpi-admin-meta"),
+    path("admin/period-options/", KpiAdminPeriodOptionsAPIView.as_view(), name="kpi-admin-period-options"),
+    path("admin/dashboard/", KpiAdminDashboardAPIView.as_view(), name="kpi-admin-dashboard"),
+    path("admin/ranking/", KpiAdminRankingAPIView.as_view(), name="kpi-admin-ranking"),
+    path("admin/report/", KpiAdminReportAPIView.as_view(), name="kpi-admin-report"),
+    path("admin/targets/", KpiAdminTargetMatrixAPIView.as_view(), name="kpi-admin-targets"),
+    path("admin/targets/bulk-update/", KpiAdminBulkTargetUpdateAPIView.as_view(), name="kpi-admin-targets-bulk-update"),
+    path("admin/targets/copy-from-previous-period/", KpiAdminCopyPreviousPeriodTargetsAPIView.as_view(), name="kpi-admin-targets-copy-previous"),
+    path("admin/targets/copy-from-employee/", KpiAdminCopyEmployeeTargetsAPIView.as_view(), name="kpi-admin-targets-copy-employee"),
     path("", include(router.urls)),
 ]
