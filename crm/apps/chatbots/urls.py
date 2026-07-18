@@ -8,6 +8,7 @@ from apps.chatbots.views import (
     TicketChatbotChangeStatusAPIView,
     TicketChatbotClaimAPIView,
     TicketChatbotDetailAPIView,
+    TicketChatbotHistoryAPIView,
     TicketChatbotListAPIView,
     TicketChatbotOptionsAPIView,
 )
@@ -47,6 +48,11 @@ urlpatterns = [
         "ticket-chatbots/<int:pk>/",
         TicketChatbotDetailAPIView.as_view(),
         name="ticket-chatbot-detail",
+    ),
+    path(
+        "ticket-chatbots/<int:pk>/history/",
+        TicketChatbotHistoryAPIView.as_view(),
+        name="ticket-chatbot-history",
     ),
     path(
         "ticket-chatbots/<int:pk>/claim/",

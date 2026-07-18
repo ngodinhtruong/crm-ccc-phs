@@ -9,6 +9,7 @@ import {
   ChatbotTicketUpdatePayload,
   PaginatedResponse,
 } from "@/types/chatbot-ticket.type";
+import { TicketHistoryItem } from "@/types/ticket.type";
 
 const BASE = "/api/chatbots/ticket-chatbots";
 
@@ -25,6 +26,15 @@ export const chatbotTicketApi = {
 
   getDetail: async (id: number): Promise<ChatbotTicketDetail> => {
     const response = await api.get<ChatbotTicketDetail>(`${BASE}/${id}/`);
+
+    return response.data;
+  },
+
+  /** Lịch sử thay đổi ticket chatbot. */
+  getHistory: async (id: number): Promise<TicketHistoryItem[]> => {
+    const response = await api.get<TicketHistoryItem[]>(
+      `${BASE}/${id}/history/`
+    );
 
     return response.data;
   },

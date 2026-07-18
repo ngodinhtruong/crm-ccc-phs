@@ -519,12 +519,67 @@ class TicketChatbotDetailAPIView(APIView):
         "priority",
     ]
 
+    # Các trường được theo dõi để ghi lịch sử: (nhãn, cách lấy giá trị hiển thị)
+    TRACKED_FIELDS = {
+        "Tình trạng": lambda t: t.status_label,
+        "Danh mục SLA": lambda t: t.sla_policy.sla_name if t.sla_policy else "",
+        "Mức ưu tiên": lambda t: t.priority.priority_name if t.priority else "",
+        "Giao cho": lambda t: str(t.owner_user) if t.owner_user else "",
+        "Phân công xử lý": lambda t: (
+            t.assigned_unit.unit_name if t.assigned_unit else ""
+        ),
+        "Chi nhánh xử lý": lambda t: (
+            t.handling_branch.branch_name if t.handling_branch else ""
+        ),
+        "Hướng xử lý": lambda t: t.handling_solution or "",
+        "Có gửi khảo sát": lambda t: "Có" if t.send_survey else "Không",
+    }
+
+    def _snapshot(self, ticket):
+        """Chụp giá trị hiển thị của các trường theo dõi, để so trước/sau."""
+        return {
+            label: getter(ticket)
+            for label, getter in self.TRACKED_FIELDS.items()
+        }
+
+    def _write_activity_logs(self, ticket, before, after, user):
+        """Ghi một dòng log cho mỗi trường có thay đổi."""
+        from apps.chatbots.models import TicketChatbotActivityLog
+
+        now = timezone.now()
+        logs = []
+
+        for label in self.TRACKED_FIELDS:
+            old = before.get(label, "")
+            new = after.get(label, "")
+
+            if old == new:
+                continue
+
+            logs.append(
+                TicketChatbotActivityLog(
+                    ticket=ticket,
+                    action_type="AMEND",
+                    action_name=f"Sửa {label}",
+                    old_value=str(old) if old else "",
+                    new_value=str(new) if new else "",
+                    created_by_user=user,
+                    created_at=now,
+                )
+            )
+
+        if logs:
+            TicketChatbotActivityLog.objects.bulk_create(logs)
+
     def patch(self, request, pk):
-        """Cập nhật ticket từ modal 'Cập nhật tình trạng' (đầy đủ trường)."""
+        """Cập nhật ticket từ trang chi tiết. Ghi lịch sử từng trường đổi."""
         ticket = TicketChatbot.objects.filter(pk=pk).first()
 
         if not ticket:
             return Response({"detail": "Không tìm thấy ticket."}, status=404)
+
+        # Chụp trạng thái trước khi sửa, để so ra field nào đổi
+        before = self._snapshot(ticket)
 
         update_fields = []
 
@@ -618,7 +673,44 @@ class TicketChatbotDetailAPIView(APIView):
             "current_status",
         ).get(pk=ticket.pk)
 
+        # Ghi lịch sử: so trạng thái sau với trước, mỗi field đổi một dòng log
+        after = self._snapshot(ticket)
+        self._write_activity_logs(ticket, before, after, request.user)
+
         return Response(TicketChatbotSerializer(ticket).data)
+
+
+class TicketChatbotHistoryAPIView(APIView):
+    """Lịch sử thay đổi ticket chatbot: đổi gì, ai đổi, khi nào."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        from apps.chatbots.models import TicketChatbotActivityLog
+
+        logs = (
+            TicketChatbotActivityLog.objects.filter(ticket_id=pk)
+            .select_related("created_by_user")
+            .order_by("-created_at", "-id")
+        )
+
+        data = [
+            {
+                "id": log.id,
+                "action_type": log.action_type,
+                "action_name": log.action_name,
+                "old_value": log.old_value,
+                "new_value": log.new_value,
+                "changed_by": (
+                    str(log.created_by_user) if log.created_by_user else ""
+                ),
+                "created_at": log.created_at,
+                "note": log.note,
+            }
+            for log in logs
+        ]
+
+        return Response(data)
 
 
 class TicketChatbotClaimAPIView(APIView):

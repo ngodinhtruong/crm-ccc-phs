@@ -470,3 +470,41 @@ class TicketChatbot(TimeStampedModel):
             return True
 
         return False
+
+class TicketChatbotActivityLog(models.Model):
+    """
+    Lịch sử thay đổi của ticket chatbot: đổi field gì, từ → đến, ai đổi, khi nào.
+    Song song với TicketActivityLog của ticket thường.
+    """
+
+    ticket = models.ForeignKey(
+        TicketChatbot,
+        on_delete=models.CASCADE,
+        related_name="activity_logs",
+    )
+
+    # CREATE / AMEND / UPDATE_STATUS / ASSIGN / CLAIM
+    action_type = models.CharField(max_length=50)
+    action_name = models.CharField(max_length=255, null=True, blank=True)
+
+    old_value = models.TextField(null=True, blank=True)
+    new_value = models.TextField(null=True, blank=True)
+
+    created_by_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="chatbot_ticket_activity_logs",
+    )
+
+    created_at = models.DateTimeField(null=True, blank=True)
+    note = models.TextField(null=True, blank=True)
+
+    class Meta:
+        db_table = "ticket_chatbot_activity_logs"
+        indexes = [
+            models.Index(fields=["ticket"]),
+            models.Index(fields=["action_type"]),
+            models.Index(fields=["created_at"]),
+        ]

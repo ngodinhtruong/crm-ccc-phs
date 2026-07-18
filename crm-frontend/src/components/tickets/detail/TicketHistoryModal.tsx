@@ -76,10 +76,13 @@ const ACTION_COLOR: Record<string, string> = {
 export function TicketHistoryModal({
   ticketId,
   ticketCode,
+  fetchHistory,
   onClose,
 }: {
   ticketId: number;
   ticketCode?: string;
+  /** Hàm lấy lịch sử — mặc định ticket thường; ticket chatbot truyền hàm riêng. */
+  fetchHistory?: (id: number) => Promise<TicketHistoryItem[]>;
   onClose: () => void;
 }) {
   const [items, setItems] = useState<TicketHistoryItem[]>([]);
@@ -89,8 +92,9 @@ export function TicketHistoryModal({
   useEffect(() => {
     let active = true;
 
-    ticketApi
-      .getTicketHistory(ticketId)
+    const loader = fetchHistory || ticketApi.getTicketHistory;
+
+    loader(ticketId)
       .then((data) => {
         if (active) setItems(data);
       })
@@ -104,7 +108,7 @@ export function TicketHistoryModal({
     return () => {
       active = false;
     };
-  }, [ticketId]);
+  }, [ticketId, fetchHistory]);
 
   return (
     <div

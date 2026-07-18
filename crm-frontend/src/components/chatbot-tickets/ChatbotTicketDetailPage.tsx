@@ -2,31 +2,48 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, MessageSquareText, Pencil, Phone } from "lucide-react";
+import { ArrowLeft, History, MessageSquareText, Pencil, Phone, X } from "lucide-react";
 
 import { chatbotTicketApi } from "@/apis/chatbot-ticket.api";
 import { ConversationModal } from "@/components/chatbot-dashboard/ConversationModal";
+import { TicketHistoryModal } from "@/components/tickets/detail/TicketHistoryModal";
 import { TicketStatusFlow } from "@/components/chatbot-tickets/TicketStatusFlow";
-import { UpdateStatusModal } from "@/components/chatbot-tickets/UpdateStatusModal";
 import { CHATBOT_TICKET_STATUS_PILL } from "@/constants/chatbot-ticket.constant";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
 import { ChatbotTicketItem } from "@/types/chatbot-dashboard.type";
-import { ChatbotTicket } from "@/types/chatbot-ticket.type";
+import {
+  ChatbotTicket,
+  ChatbotTicketOptions,
+  ChatbotTicketStatus,
+} from "@/types/chatbot-ticket.type";
 import { formatDateTime } from "@/utils/date.util";
+
+type Opt = { id: number; name: string };
 
 function Field({
   label,
-  children,
+  editing,
+  view,
+  edit,
 }: {
   label: string;
-  children: React.ReactNode;
+  editing: boolean;
+  view: React.ReactNode;
+  edit?: React.ReactNode;
 }) {
+  const empty = view === null || view === undefined || view === "";
   return (
-    <div className="grid grid-cols-3 gap-3 py-2">
+    <div className="grid grid-cols-3 items-center gap-3 py-2">
       <div className="col-span-1 text-right text-xs font-semibold text-slate-500">
         {label}
       </div>
-      <div className="col-span-2 text-xs text-slate-800">{children || "-"}</div>
+      <div className="col-span-2 text-xs text-slate-800">
+        {editing && edit ? edit : empty ? (
+          <span className="text-slate-300">—</span>
+        ) : (
+          view
+        )}
+      </div>
     </div>
   );
 }
@@ -48,54 +65,142 @@ function Section({
   );
 }
 
+const SELECT_CLS =
+  "h-8 w-full rounded-lg border border-slate-300 bg-white px-2 text-xs outline-none focus:border-sky-400";
+
+function EditSelect({
+  value,
+  onChange,
+  options,
+  placeholder,
+}: {
+  value: number | null;
+  onChange: (v: number | null) => void;
+  options: Opt[];
+  placeholder: string;
+}) {
+  return (
+    <select
+      value={value ?? ""}
+      onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
+      className={SELECT_CLS}
+    >
+      <option value="">{placeholder}</option>
+      {options.map((o) => (
+        <option key={o.id} value={o.id}>
+          {o.name}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 export function ChatbotTicketDetailPage({ id }: { id: number }) {
   const router = useRouter();
 
   const [ticket, setTicket] = useState<ChatbotTicket | null>(null);
+  const [options, setOptions] = useState<ChatbotTicketOptions | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const [solution, setSolution] = useState("");
-  const [solutionSaved, setSolutionSaved] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [showConversation, setShowConversation] = useState(false);
-  const [showUpdate, setShowUpdate] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+
+  // Form state
+  const [status, setStatus] = useState<ChatbotTicketStatus>("CHO_TIEP_NHAN");
+  const [slaPolicy, setSlaPolicy] = useState<number | null>(null);
+  const [priority, setPriority] = useState<number | null>(null);
+  const [owner, setOwner] = useState<number | null>(null);
+  const [unit, setUnit] = useState<number | null>(null);
+  const [branch, setBranch] = useState<number | null>(null);
+  const [sendSurvey, setSendSurvey] = useState(false);
+  const [solution, setSolution] = useState("");
+
+  const resetForm = useCallback((t: ChatbotTicket) => {
+    setStatus(t.status);
+    setSlaPolicy(t.sla_policy ?? null);
+    setPriority(t.priority ?? null);
+    setOwner(t.owner_user ?? null);
+    setUnit(t.assigned_unit ?? null);
+    setBranch(t.handling_branch ?? null);
+    setSendSurvey(t.send_survey ?? false);
+    setSolution(t.handling_solution || "");
+  }, []);
 
   const load = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
-
       const data = await chatbotTicketApi.getDetail(id);
-
       setTicket(data.ticket);
-      setSolution(data.ticket.handling_solution || "");
+      resetForm(data.ticket);
     } catch {
       setError("Không tải được chi tiết ticket.");
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, resetForm]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  const saveSolution = async () => {
-    if (!ticket) return;
+  useEffect(() => {
+    chatbotTicketApi.getOptions().then(setOptions).catch(() => {});
+  }, []);
 
+  const save = async () => {
+    if (!ticket) return;
     try {
       setSaving(true);
-      setSolutionSaved(false);
-      const updated = await chatbotTicketApi.updateSolution(ticket.id, solution);
+      setError("");
+      const updated = await chatbotTicketApi.update(ticket.id, {
+        status,
+        sla_policy: slaPolicy,
+        priority,
+        owner_user: owner,
+        assigned_unit: unit,
+        handling_branch: branch,
+        send_survey: sendSurvey,
+        handling_solution: solution,
+      });
       setTicket(updated);
-      setSolutionSaved(true);
+      resetForm(updated);
+      setEditing(false);
     } catch {
-      setError("Không lưu được giải pháp xử lý.");
+      setError("Không lưu được. Vui lòng thử lại.");
     } finally {
       setSaving(false);
     }
   };
+
+  if (loading) {
+    return (
+      <DashboardLayout breadcrumbs={[{ label: "TRANG CHỦ", href: "/" }]}>
+        <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
+          Đang tải...
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!ticket) {
+    return (
+      <DashboardLayout breadcrumbs={[{ label: "TRANG CHỦ", href: "/" }]}>
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-8 text-center text-sm text-rose-600">
+          {error || "Không tìm thấy ticket."}
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  const slaOpts: Opt[] = options?.sla_policies ?? [];
+  const priOpts: Opt[] = options?.priorities ?? [];
+  const unitOpts: Opt[] = options?.units ?? [];
+  const branchOpts: Opt[] = options?.branches ?? [];
+  const userOpts: Opt[] = options?.users ?? [];
 
   return (
     <DashboardLayout
@@ -103,7 +208,7 @@ export function ChatbotTicketDetailPage({ id }: { id: number }) {
         { label: "TRANG CHỦ", href: "/" },
         { label: "Chatbot", href: "/chatbots/dashboard" },
         { label: "Ticket chuyển CCC" },
-        { label: ticket?.ticket_code || "Chi tiết" },
+        { label: ticket.ticket_code || "Chi tiết" },
       ]}
       rightAction={
         <button
@@ -116,69 +221,70 @@ export function ChatbotTicketDetailPage({ id }: { id: number }) {
         </button>
       }
     >
-      {loading && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
-          Đang tải...
-        </div>
-      )}
-
-      {!loading && error && !ticket && (
-        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-8 text-center text-sm text-rose-600">
-          {error}
-        </div>
-      )}
-
-      {ticket && (
-        <div className="flex flex-col gap-4">
-          {/* Header: mã ticket + nút Sửa + thanh trạng thái */}
-          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
-              <p className="text-sm text-slate-600">
-                Mã ticket:{" "}
-                <span className="font-bold text-sky-600">
-                  {ticket.ticket_code}
+      <div className="flex flex-col gap-4 pb-24">
+        {/* Header + thanh trạng thái */}
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-3">
+            <p className="text-sm text-slate-600">
+              Mã ticket:{" "}
+              <span className="font-bold text-sky-600">
+                {ticket.ticket_code}
+              </span>
+              {editing && (
+                <span className="ml-3 rounded bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
+                  Đang chỉnh sửa
                 </span>
-              </p>
+              )}
+            </p>
 
-              <div className="flex items-center gap-3">
-                {error && (
-                  <span className="text-xs font-semibold text-rose-600">
-                    {error}
-                  </span>
-                )}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowHistory(true)}
+                className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+              >
+                <History size={13} />
+                Lịch sử
+              </button>
 
+              {!editing && (
                 <button
                   type="button"
-                  onClick={() => setShowUpdate(true)}
+                  onClick={() => setEditing(true)}
                   className="flex items-center gap-1.5 rounded-lg bg-emerald-500 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-600"
                 >
                   <Pencil size={13} />
                   Cập nhật tình trạng
                 </button>
-              </div>
+              )}
             </div>
-
-            <TicketStatusFlow status={ticket.status} />
           </div>
 
-          <Section title="Thông tin chung">
-            <div className="grid grid-cols-1 md:grid-cols-2 md:gap-x-6">
-              <Field label="Mã Ticket">{ticket.ticket_code}</Field>
+          <TicketStatusFlow status={editing ? status : ticket.status} />
+        </div>
 
-              <Field label="Danh mục hỗ trợ">
-                {ticket.dashboard_category ? (
+        {/* Thông tin chung */}
+        <Section title="Thông tin chung">
+          <div className="grid grid-cols-1 md:grid-cols-2 md:gap-x-6">
+            <Field label="Mã Ticket" editing={false} view={ticket.ticket_code} />
+            <Field
+              label="Danh mục hỗ trợ"
+              editing={false}
+              view={
+                ticket.dashboard_category ? (
                   <span className="rounded-md bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-700">
                     {ticket.dashboard_category}
                   </span>
                 ) : (
                   <span className="text-slate-400">Chưa phân loại</span>
-                )}
-              </Field>
-
-              <Field label="Kênh">{ticket.channel}</Field>
-
-              {/* Tình trạng: chỉ hiển thị, đổi qua nút "Cập nhật tình trạng" */}
-              <Field label="Tình trạng">
+                )
+              }
+            />
+            <Field label="Kênh" editing={false} view={ticket.channel} />
+            <Field
+              label="Tình trạng"
+              editing={editing}
+              view={
                 <span
                   className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
                     CHATBOT_TICKET_STATUS_PILL[ticket.status]
@@ -186,22 +292,53 @@ export function ChatbotTicketDetailPage({ id }: { id: number }) {
                 >
                   {ticket.status_label || ticket.status}
                 </span>
-              </Field>
+              }
+              edit={
+                <select
+                  value={status}
+                  onChange={(e) =>
+                    setStatus(e.target.value as ChatbotTicketStatus)
+                  }
+                  className={SELECT_CLS}
+                >
+                  {(options?.statuses ?? []).map((s) => (
+                    <option key={s.value} value={s.value}>
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+              }
+            />
+            <Field label="Nguồn" editing={false} view="Chatbot" />
+            <Field
+              label="Mức ưu tiên"
+              editing={editing}
+              view={ticket.priority_name}
+              edit={
+                <EditSelect
+                  value={priority}
+                  onChange={setPriority}
+                  options={priOpts}
+                  placeholder="-- Chọn ưu tiên --"
+                />
+              }
+            />
+          </div>
+        </Section>
 
-              <Field label="Nguồn">Chatbot</Field>
-              <Field label="Mức ưu tiên">{ticket.priority_name}</Field>
-            </div>
-          </Section>
-
-          <Section title="Thông tin liên hệ">
-            <div className="grid grid-cols-1 md:grid-cols-2 md:gap-x-6">
-              <Field label="Khách hàng">
-                {ticket.customer_name || (
-                  <span className="text-slate-400">Chưa xác định</span>
-                )}
-              </Field>
-              <Field label="Trạng thái TK">
-                {ticket.link_status === "LINKED" ? (
+        {/* Thông tin liên hệ (chỉ xem) */}
+        <Section title="Thông tin liên hệ">
+          <div className="grid grid-cols-1 md:grid-cols-2 md:gap-x-6">
+            <Field
+              label="Khách hàng"
+              editing={false}
+              view={ticket.customer_name}
+            />
+            <Field
+              label="Trạng thái TK"
+              editing={false}
+              view={
+                ticket.link_status === "LINKED" ? (
                   <span className="font-semibold text-emerald-600">
                     Đã liên kết KH
                   </span>
@@ -209,132 +346,223 @@ export function ChatbotTicketDetailPage({ id }: { id: number }) {
                   <span className="font-semibold text-amber-600">
                     Chưa có TK liên kết
                   </span>
-                )}
-              </Field>
-              <Field label="Di động">
-                {ticket.phone ? (
+                )
+              }
+            />
+            <Field
+              label="Di động"
+              editing={false}
+              view={
+                ticket.phone ? (
                   <span className="inline-flex items-center gap-1 text-sky-600">
                     {ticket.phone}
                     <Phone size={12} />
                   </span>
-                ) : null}
-              </Field>
-              <Field label="Số tài khoản">{ticket.account_number}</Field>
-              <Field label="Email">{ticket.email}</Field>
-            </div>
-          </Section>
-
-          {/* Thông tin mô tả — bấm nút mới mở modal xem lịch sử trò chuyện */}
-          <Section title="Thông tin mô tả">
-            <div className="flex flex-col gap-3">
-              {ticket.reason && (
-                <div className="rounded-lg bg-amber-50 px-4 py-3">
-                  <div className="text-[11px] font-semibold uppercase text-amber-700">
-                    CÂU HỎI CỦA KHÁCH HÀNG
-                  </div>
-                  <div className="mt-1 whitespace-pre-wrap text-xs text-amber-900">
-                    {ticket.reason}
-                  </div>
-                </div>
-              )}
-
-              <button
-                type="button"
-                onClick={() => setShowConversation(true)}
-                className="flex w-fit items-center gap-2 rounded-lg bg-[#0097cf] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#0089bd]"
-              >
-                <MessageSquareText size={14} />
-                Xem lịch sử trò chuyện
-              </button>
-            </div>
-          </Section>
-
-          {/* Giải pháp xử lý: người xử lý điền */}
-          <Section title="Giải pháp xử lý">
-            <textarea
-              value={solution}
-              onChange={(event) => {
-                setSolution(event.target.value);
-                setSolutionSaved(false);
-              }}
-              rows={4}
-              placeholder="Nhập cách xử lý ticket..."
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-sky-400"
+                ) : null
+              }
             />
-            <div className="mt-2 flex items-center gap-3">
-              <button
-                type="button"
-                disabled={saving}
-                onClick={() => void saveSolution()}
-                className="rounded-lg bg-[#0097cf] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#0089bd] disabled:opacity-60"
-              >
-                Lưu giải pháp
-              </button>
-              {solutionSaved && (
-                <span className="text-xs font-semibold text-emerald-600">
-                  Đã lưu
-                </span>
-              )}
-            </div>
-          </Section>
+            <Field
+              label="Số tài khoản"
+              editing={false}
+              view={ticket.account_number}
+            />
+            <Field label="Email" editing={false} view={ticket.email} />
+          </div>
+        </Section>
 
-          {/* Quản lý SLA */}
-          <Section title="Quản lý SLA">
-            <div className="grid grid-cols-1 md:grid-cols-2 md:gap-x-6">
-              <Field label="Danh mục SLA">
-                {ticket.sla_policy_name || (
-                  <span className="text-slate-400">Chưa chọn</span>
-                )}
-              </Field>
-              <Field label="Mức ưu tiên">{ticket.priority_name}</Field>
-              <Field label="Ngày tiếp nhận">
-                {formatDateTime(ticket.accepted_at)}
-              </Field>
-              <Field label="Ngày hoàn thành">
-                {formatDateTime(ticket.done_at)}
-              </Field>
-              <Field label="Có gửi khảo sát">
-                {ticket.send_survey ? "Có" : "Không"}
-              </Field>
-            </div>
-          </Section>
+        {/* Thông tin mô tả — nút mở hội thoại */}
+        <Section title="Thông tin mô tả">
+          <div className="flex flex-col gap-3">
+            {ticket.reason && (
+              <div className="rounded-lg bg-amber-50 px-4 py-3">
+                <div className="text-[11px] font-semibold uppercase text-amber-700">
+                  Câu hỏi của khách hàng
+                </div>
+                <div className="mt-1 whitespace-pre-wrap text-xs text-amber-900">
+                  {ticket.reason}
+                </div>
+              </div>
+            )}
 
-          {/* Thông tin quản lý */}
-          <Section title="Thông tin quản lý">
-            <div className="grid grid-cols-1 md:grid-cols-2 md:gap-x-6">
-              <Field label="Giao cho">
-                {ticket.owner_username || (
-                  <span className="text-slate-400">Chưa giao</span>
-                )}
-              </Field>
-              <Field label="Người phụ trách">
-                {ticket.assigned_employee_name ||
-                  ticket.owner_username || (
-                    <span className="text-slate-400">Chưa có</span>
-                  )}
-              </Field>
-              <Field label="Phòng ban">
-                {ticket.assigned_employee_department || "-"}
-              </Field>
-              <Field label="Phân công xử lý">
-                {ticket.assigned_unit_name || "-"}
-              </Field>
-              <Field label="Chi nhánh xử lý">
-                {ticket.handling_branch_name || "-"}
-              </Field>
-              <Field label="Thời gian nhận ticket">
-                {formatDateTime(ticket.accepted_at)}
-              </Field>
-              <Field label="Lần sửa đổi cuối">
-                {formatDateTime(ticket.updated_at)}
-              </Field>
-            </div>
-          </Section>
+            <button
+              type="button"
+              onClick={() => setShowConversation(true)}
+              className="flex w-fit items-center gap-2 rounded-lg bg-[#0097cf] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#0089bd]"
+            >
+              <MessageSquareText size={14} />
+              Xem lịch sử trò chuyện
+            </button>
+          </div>
+        </Section>
+
+        {/* Giải pháp xử lý */}
+        <Section title="Giải pháp xử lý">
+          <Field
+            label="Hướng xử lý"
+            editing={editing}
+            view={
+              <span className="whitespace-pre-wrap">
+                {ticket.handling_solution}
+              </span>
+            }
+            edit={
+              <textarea
+                value={solution}
+                onChange={(e) => setSolution(e.target.value)}
+                rows={3}
+                placeholder="Nhập cách xử lý ticket..."
+                className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs outline-none focus:border-sky-400"
+              />
+            }
+          />
+        </Section>
+
+        {/* Quản lý SLA */}
+        <Section title="Quản lý SLA">
+          <div className="grid grid-cols-1 md:grid-cols-2 md:gap-x-6">
+            <Field
+              label="Danh mục SLA"
+              editing={editing}
+              view={ticket.sla_policy_name}
+              edit={
+                <EditSelect
+                  value={slaPolicy}
+                  onChange={setSlaPolicy}
+                  options={slaOpts}
+                  placeholder="-- Chọn danh mục SLA --"
+                />
+              }
+            />
+            <Field
+              label="Tình trạng SLA"
+              editing={false}
+              view={
+                ticket.sla_status === "OVERDUE" ? (
+                  <span className="rounded-md bg-rose-100 px-2 py-1 text-[11px] font-semibold text-rose-700">
+                    Quá hạn
+                  </span>
+                ) : ticket.sla_status === "ON_TIME" ? (
+                  <span className="rounded-md bg-emerald-100 px-2 py-1 text-[11px] font-semibold text-emerald-700">
+                    Đúng hạn
+                  </span>
+                ) : (
+                  <span className="rounded-md bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600">
+                    Đang xử lý
+                  </span>
+                )
+              }
+            />
+            <Field
+              label="Hạn hoàn tất"
+              editing={false}
+              view={formatDateTime(ticket.resolution_due_at)}
+            />
+            <Field
+              label="Có gửi khảo sát"
+              editing={editing}
+              view={ticket.send_survey ? "Có" : "Không"}
+              edit={
+                <input
+                  type="checkbox"
+                  checked={sendSurvey}
+                  onChange={(e) => setSendSurvey(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300"
+                />
+              }
+            />
+          </div>
+        </Section>
+
+        {/* Thông tin quản lý */}
+        <Section title="Thông tin quản lý">
+          <div className="grid grid-cols-1 md:grid-cols-2 md:gap-x-6">
+            <Field
+              label="Giao cho"
+              editing={editing}
+              view={ticket.owner_username}
+              edit={
+                <EditSelect
+                  value={owner}
+                  onChange={setOwner}
+                  options={userOpts}
+                  placeholder="-- Chọn người xử lý --"
+                />
+              }
+            />
+            <Field
+              label="Phân công xử lý"
+              editing={editing}
+              view={ticket.assigned_unit_name}
+              edit={
+                <EditSelect
+                  value={unit}
+                  onChange={setUnit}
+                  options={unitOpts}
+                  placeholder="-- Chọn đơn vị --"
+                />
+              }
+            />
+            <Field
+              label="Chi nhánh xử lý"
+              editing={editing}
+              view={ticket.handling_branch_name}
+              edit={
+                <EditSelect
+                  value={branch}
+                  onChange={setBranch}
+                  options={branchOpts}
+                  placeholder="-- Chọn chi nhánh --"
+                />
+              }
+            />
+            <Field
+              label="Thời gian nhận"
+              editing={false}
+              view={formatDateTime(ticket.accepted_at)}
+            />
+            <Field
+              label="Lần sửa đổi cuối"
+              editing={false}
+              view={formatDateTime(ticket.updated_at)}
+            />
+          </div>
+        </Section>
+
+        {error && (
+          <div className="rounded-lg bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-600">
+            {error}
+          </div>
+        )}
+      </div>
+
+      {/* Thanh Lưu/Hủy dính đáy khi đang sửa */}
+      {editing && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-center gap-4 border-t border-slate-200 bg-white/95 px-6 py-3 shadow-[0_-2px_10px_rgba(0,0,0,0.05)] backdrop-blur">
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => void save()}
+            className="rounded-lg bg-emerald-500 px-8 py-2 text-xs font-semibold text-white transition hover:bg-emerald-600 disabled:opacity-60"
+          >
+            {saving ? "Đang lưu..." : "Lưu"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setError("");
+              resetForm(ticket);
+              setEditing(false);
+            }}
+            className="flex items-center gap-1 text-xs font-semibold text-rose-500 hover:underline"
+          >
+            <X size={13} />
+            Hủy bỏ
+          </button>
         </div>
       )}
 
-      {/* Modal lịch sử trò chuyện — giống hệt bấm ở ngoài danh sách */}
-      {ticket && showConversation && (
+      {/* Modal lịch sử trò chuyện */}
+      {showConversation && (
         <ConversationModal
           session={
             {
@@ -354,15 +582,13 @@ export function ChatbotTicketDetailPage({ id }: { id: number }) {
         />
       )}
 
-      {/* Modal cập nhật tình trạng */}
-      {ticket && showUpdate && (
-        <UpdateStatusModal
-          ticket={ticket}
-          onClose={() => setShowUpdate(false)}
-          onSaved={(updated) => {
-            setTicket(updated);
-            setSolution(updated.handling_solution || "");
-          }}
+      {/* Modal lịch sử thay đổi */}
+      {showHistory && (
+        <TicketHistoryModal
+          ticketId={ticket.id}
+          ticketCode={ticket.ticket_code}
+          fetchHistory={chatbotTicketApi.getHistory}
+          onClose={() => setShowHistory(false)}
         />
       )}
     </DashboardLayout>
