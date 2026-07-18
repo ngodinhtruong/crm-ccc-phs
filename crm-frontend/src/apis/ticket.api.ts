@@ -8,6 +8,7 @@ import {
     TicketClassificationOption,
     TicketCreatePayload,
     TicketDetail,
+    TicketHistoryItem,
     TicketErrorGroupOption,
     TicketErrorGroupPayload,
     TicketErrorTypeOption,
@@ -100,7 +101,7 @@ export const ticketApi = {
         return response.data;
     },
 
-    /** Sửa thông tin ticket (SLA, ưu tiên, phân loại, mô tả, giải pháp...). Ghi log từng field đổi. */
+    /** Sửa thông tin ticket. Backend ghi log từng field đổi vào lịch sử. */
     amendTicket: async (
         id: number,
         payload: {
@@ -110,6 +111,13 @@ export const ticketApi = {
             source?: number | null;
             priority?: number | null;
             sla_policy?: number | null;
+            customer?: number | null;
+            company?: number | null;
+            customer_account?: number | null;
+            error_group?: number | null;
+            error_type?: number | null;
+            related_system?: string;
+            error_note?: string;
             request_content?: string;
             handling_solution?: string;
             final_response?: string;
@@ -147,6 +155,15 @@ export const ticketApi = {
         const response = await api.post(`/api/tickets/tickets/${id}/survey/`, {
             send_survey: sendSurvey,
         });
+
+        return response.data;
+    },
+
+    /** Lịch sử thay đổi ticket: đổi gì, từ → đến, ai đổi, khi nào. */
+    getTicketHistory: async (id: number): Promise<TicketHistoryItem[]> => {
+        const response = await api.get<TicketHistoryItem[]>(
+            `/api/tickets/tickets/${id}/history/`
+        );
 
         return response.data;
     },

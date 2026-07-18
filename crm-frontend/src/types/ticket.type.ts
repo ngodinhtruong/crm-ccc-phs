@@ -315,3 +315,15 @@ export type TicketStatusCode =
     | "DONE_WAIT_CLOSE"
     | "CLOSED"
     | "CANCELLED";
+
+/** Một dòng lịch sử thay đổi ticket. */
+export type TicketHistoryItem = {
+    id: number;
+    action_type: string;
+    action_name: string;
+    old_value?: string | null;
+    new_value?: string | null;
+    changed_by?: string | null;
+    created_at?: string | null;
+    note?: string | null;
+};
