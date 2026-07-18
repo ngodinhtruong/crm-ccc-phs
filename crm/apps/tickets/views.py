@@ -23,6 +23,7 @@ from apps.tickets.serializers import (
 
 from apps.tickets.models import (
     Ticket,
+    TicketActivityLog,
     TicketFeedback,
     TicketSupportCategory,
     TicketClassification,
@@ -579,3 +580,32 @@ class TicketViewSet(
             },
             status=status.HTTP_200_OK,
         )
+
+    @action(detail=True, methods=["get"], url_path="history")
+    def history(self, request, pk=None):
+        """Lịch sử thay đổi ticket: đổi gì, từ → đến, ai đổi, khi nào."""
+        ticket = self.get_object()
+
+        logs = (
+            TicketActivityLog.objects.filter(ticket=ticket)
+            .select_related("created_by_user")
+            .order_by("-created_at", "-id")
+        )
+
+        data = [
+            {
+                "id": log.id,
+                "action_type": log.action_type,
+                "action_name": log.action_name,
+                "old_value": log.old_value,
+                "new_value": log.new_value,
+                "changed_by": (
+                    str(log.created_by_user) if log.created_by_user else ""
+                ),
+                "created_at": log.created_at,
+                "note": log.note,
+            }
+            for log in logs
+        ]
+
+        return Response(data, status=status.HTTP_200_OK)
