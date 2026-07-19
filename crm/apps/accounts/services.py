@@ -214,8 +214,9 @@ class PermissionService:
         if getattr(ticket, "is_locked_for_amend", False):
             return False
 
+        # "Đã xong" vẫn cho sửa (để dời mốc hoàn thành); chỉ chặn khi đã đóng/hủy.
+        # Ticket đã đóng chỉ superuser sửa được — đã return True ở trên.
         if ticket.current_status and ticket.current_status.status_code in [
-            TicketStatusCode.DONE_WAIT_CLOSE,
             TicketStatusCode.CLOSED,
             TicketStatusCode.CANCELLED,
         ]:

@@ -232,6 +232,66 @@ def scan_chatbot_tickets():
     return result
 
 
+# Ticket ở "Đã xong" quá số phút này thì tự đóng
+AUTO_CLOSE_AFTER_MINUTES = 60
+
+
+def auto_close_done_tickets():
+    """
+    Ticket ở 'Đã xong' (DONE_WAIT_CLOSE) quá 1 tiếng → tự chuyển 'Đã đóng' (CLOSED).
+    Mốc đếm là completed_at; sửa ticket khi đang Đã xong sẽ dời mốc này.
+    Áp cho cả ticket thường lẫn ticket chatbot.
+    """
+    from apps.chatbots.models import TicketChatbot
+    from apps.tickets.models import Ticket, TicketStatus
+
+    now = timezone.now()
+    threshold = now - timedelta(minutes=AUTO_CLOSE_AFTER_MINUTES)
+    result = {"normal_closed": 0, "chatbot_closed": 0}
+
+    closed_status = TicketStatus.objects.filter(status_code="CLOSED").first()
+    if not closed_status:
+        return result
+
+    # ── Ticket thường: mốc completed_at nằm ở TicketSlaTracking ──
+    normal = (
+        Ticket.objects.select_related("current_status", "sla_tracking")
+        .filter(current_status__status_code="DONE_WAIT_CLOSE")
+        .filter(sla_tracking__completed_at__isnull=False)
+        .filter(sla_tracking__completed_at__lt=threshold)
+    )
+
+    for ticket in normal:
+        ticket.current_status = closed_status
+        ticket.closed_at = now
+        ticket.is_locked_for_amend = True
+        ticket.updated_at = now
+        ticket.save(
+            update_fields=[
+                "current_status",
+                "closed_at",
+                "is_locked_for_amend",
+                "updated_at",
+            ]
+        )
+        result["normal_closed"] += 1
+
+    # ── Ticket chatbot: mốc done_at nằm ngay trên ticket ──
+    chatbot = (
+        TicketChatbot.objects.select_related("current_status")
+        .filter(current_status__status_code="DONE_WAIT_CLOSE")
+        .filter(done_at__isnull=False, done_at__lt=threshold)
+    )
+
+    for ticket in chatbot:
+        ticket.current_status = closed_status
+        ticket.updated_at = now
+        ticket.save(update_fields=["current_status", "updated_at"])
+        result["chatbot_closed"] += 1
+
+    return result
+
+
 @shared_task(
     bind=True,
     autoretry_for=(Exception,),
@@ -253,11 +313,13 @@ def scan_sla_overdue_task(self):
     try:
         normal = scan_normal_tickets()
         chatbot = scan_chatbot_tickets()
+        auto_closed = auto_close_done_tickets()
 
         return {
             "status": "SUCCESS",
             "normal_tickets": normal,
             "chatbot_tickets": chatbot,
+            "auto_closed": auto_closed,
         }
     finally:
         cache.delete(lock_key)

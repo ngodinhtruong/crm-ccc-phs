@@ -201,21 +201,25 @@ class TicketChatbot(TimeStampedModel):
     khách hàng, chưa có người xử lý. Nên gần như mọi cột đều cho phép null.
     """
 
-    # --- Trạng thái xử lý (workflow của CCC) ---
-    STATUS_CHO_TIEP_NHAN = "CHO_TIEP_NHAN"      # Mới, chưa ai nhận (hàng chờ chung)
-    STATUS_TIEP_NHAN = "TIEP_NHAN"              # Đã tiếp nhận
-    STATUS_CHUYEN_PHONG_BAN = "CHUYEN_PHONG_BAN"
-    STATUS_DANG_XU_LY = "DANG_XU_LY"
-    STATUS_DA_XONG = "DA_XONG"                  # Đã xong (chờ đóng)
-    STATUS_CHO_HUY = "CHO_HUY"
+    # --- Trạng thái xử lý (dùng CHUNG mã với ticket thường) ---
+    STATUS_CHO_TIEP_NHAN = "CREATED"        # Mở (ban đầu, chưa ai nhận)
+    STATUS_TIEP_NHAN = "ACCEPTED"           # Tiếp nhận
+    STATUS_DANG_XU_LY = "PROCESSING"        # Đang xử lý
+    STATUS_DA_XONG = "DONE_WAIT_CLOSE"      # Đã xong (đếm 1h trước khi tự đóng)
+    STATUS_CHO_DONG = "PENDING_CLOSE"       # Chờ đóng
+    STATUS_DA_DONG = "CLOSED"               # Đã đóng (khóa)
+
+    # Giữ tên cũ trỏ tới mã mới để code cũ không vỡ
+    STATUS_CHUYEN_PHONG_BAN = STATUS_DANG_XU_LY
+    STATUS_CHO_HUY = STATUS_CHO_DONG
 
     STATUS_CHOICES = [
-        (STATUS_CHO_TIEP_NHAN, "Chờ tiếp nhận"),
+        (STATUS_CHO_TIEP_NHAN, "Mở"),
         (STATUS_TIEP_NHAN, "Tiếp nhận"),
-        (STATUS_CHUYEN_PHONG_BAN, "Chuyển phòng ban"),
         (STATUS_DANG_XU_LY, "Đang xử lý"),
-        (STATUS_DA_XONG, "Đã xong (Chờ đóng)"),
-        (STATUS_CHO_HUY, "Chờ hủy"),
+        (STATUS_DA_XONG, "Đã xong"),
+        (STATUS_CHO_DONG, "Chờ đóng"),
+        (STATUS_DA_DONG, "Đã đóng"),
     ]
 
     # --- Trạng thái liên kết khách hàng ---

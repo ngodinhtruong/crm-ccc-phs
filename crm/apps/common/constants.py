@@ -1,10 +1,22 @@
 class TicketStatusCode:
-    CREATED = "CREATED"
-    ACCEPTED = "ACCEPTED"
-    PROCESSING = "PROCESSING"
-    DONE_WAIT_CLOSE = "DONE_WAIT_CLOSE"
-    CLOSED = "CLOSED"
+    CREATED = "CREATED"              # Mở (ban đầu khi tạo ticket)
+    ACCEPTED = "ACCEPTED"            # Tiếp nhận
+    PROCESSING = "PROCESSING"       # Đang xử lý
+    DONE_WAIT_CLOSE = "DONE_WAIT_CLOSE"  # Đã xong (đếm 1h trước khi tự đóng)
+    PENDING_CLOSE = "PENDING_CLOSE"  # Chờ đóng (bước trung gian)
+    CLOSED = "CLOSED"               # Đã đóng (khóa, chỉ admin sửa)
     CANCELLED = "CANCELLED"
+
+    # Nhãn hiển thị tiếng Việt
+    LABELS = {
+        CREATED: "Mở",
+        ACCEPTED: "Tiếp nhận",
+        PROCESSING: "Đang xử lý",
+        DONE_WAIT_CLOSE: "Đã xong",
+        PENDING_CLOSE: "Chờ đóng",
+        CLOSED: "Đã đóng",
+        CANCELLED: "Đã hủy",
+    }
 
 
 class TicketActionType:

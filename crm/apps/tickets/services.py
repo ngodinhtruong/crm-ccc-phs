@@ -836,4 +836,16 @@ class TicketService:
                 sla_policy=new_sla_policy,
             )
 
+        # Sửa ticket khi đang "Đã xong" → dời mốc hoàn thành tới lúc sửa, và
+        # reset đồng hồ đếm 1h (auto-close tính lại từ lần sửa cuối cùng).
+        current_code = (
+            ticket.current_status.status_code if ticket.current_status else None
+        )
+        if current_code == TicketStatusCode.DONE_WAIT_CLOSE:
+            tracking = getattr(ticket, "sla_tracking", None)
+            if tracking:
+                tracking.completed_at = now
+                tracking.updated_at = now
+                tracking.save(update_fields=["completed_at", "updated_at"])
+
         return ticket
