@@ -1,4 +1,4 @@
-from django.db.models import Count, Max, Q, Sum
+from django.db.models import Count, F, Max, Q, Sum
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from rest_framework import generics
@@ -251,19 +251,28 @@ class ChatbotDashboardOverviewAPIView(ChatbotDashboardFilterMixin, APIView):
         """
         Một ô KPI: số lượt hỏi + số phiên của một nhóm xử lý.
 
-        Số lượt lấy từ msg_count_* đã tính sẵn khi rebuild, nên bốn nhóm
-        luôn cộng đúng bằng tổng tiếp nhận. Số phiên đếm theo outcome nên
-        mỗi phiên chỉ thuộc đúng một nhóm.
-        """
-        group = summaries.filter(outcome_type=outcome)
+        Hai con số cố ý lấy từ hai phạm vi khác nhau:
 
+        - value (số lượt): cộng msg_count_* trên TOÀN BỘ phiên, không lọc
+          theo outcome. Lý do: câu rác nằm rải trong cả phiên CCC/PENDING,
+          nên msg_count_spam của một phiên CCC vẫn phải tính vào ô "Câu hỏi
+          rác". Nhờ vậy bốn nhóm luôn cộng đúng bằng tổng tiếp nhận.
+          Nếu lọc theo outcome ở đây, tổng bốn nhóm sẽ hụt so với tổng.
+
+        - session_count (số phiên): đếm theo outcome, vì mỗi phiên chỉ
+          thuộc đúng một nhóm.
+
+        Hệ quả cần biết khi đọc dashboard: số lượt rác thường lớn hơn
+        nhiều so với số phiên rác.
+        """
         value = summaries.aggregate(total=Sum(count_field))["total"] or 0
+        session_count = summaries.filter(outcome_type=outcome).count()
 
         return {
             "code": outcome,
             "label": label,
             "value": value,
-            "session_count": group.count(),
+            "session_count": session_count,
             "rate": self.rate(value, total_messages),
         }
 
@@ -397,7 +406,15 @@ class ChatbotDashboardTicketsAPIView(ChatbotDashboardFilterMixin, generics.ListA
             "ticket__customer",
             "ticket__customer_account",
             "ticket_chatbot",
-        ).order_by("-started_at", "-id")
+            "ticket_chatbot__current_status",
+        ).order_by(
+            # Ticket chưa xử lý xong lên trước (sort_order theo vòng đời:
+            # Mở → Tiếp nhận → ... → Đã đóng), sau đó mới tới mới nhất.
+            # Phiên không có ticket (F() = NULL) xuống cuối.
+            F("ticket_chatbot__current_status__sort_order").asc(nulls_last=True),
+            "-started_at",
+            "-id",
+        )
 
         queryset = self.filter_summaries(queryset)
 

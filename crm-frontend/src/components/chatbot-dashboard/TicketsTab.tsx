@@ -2,7 +2,10 @@ import { Search, Eye } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { StatusPill } from "@/components/chatbot-dashboard/StatusPill";
-import { CHATBOT_TICKET_STATUS_OPTIONS } from "@/constants/chatbot-dashboard.constant";
+import {
+  CHATBOT_TICKET_STATUS_OPTIONS,
+  ticketStatusPillClass,
+} from "@/constants/chatbot-dashboard.constant";
 import {
   ChatbotTicketItem,
   OutcomeCode,
@@ -36,7 +39,11 @@ export function TicketsTab({
   onOpenSession: (item: ChatbotTicketItem) => void;
 }) {
   const router = useRouter();
-  const hasFilter = Boolean(category) || status !== "ALL" || Boolean(keyword);
+  // "CCC" là mặc định của tab nên không tính là đang lọc.
+  // Mọi giá trị khác (kể cả "ALL") đều là người dùng đã chủ động đổi,
+  // nên phải cho họ đường quay về mặc định.
+  const hasFilter =
+    Boolean(category) || status !== "CCC" || Boolean(keyword);
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -124,15 +131,16 @@ export function TicketsTab({
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1300px] border-collapse text-left text-xs">
+        <table className="w-full min-w-[1430px] border-collapse text-left text-xs">
           <thead>
             <tr className="h-11 border-b bg-white text-slate-700">
               <th className="w-[150px] px-3 font-semibold">Mã ticket</th>
+              <th className="w-[130px] px-3 font-semibold">Trạng thái</th>
               <th className="w-[190px] px-3 font-semibold">Session ID</th>
               <th className="w-[150px] px-3 font-semibold">Thời gian</th>
               <th className="w-[90px] px-3 font-semibold">Kênh</th>
               <th className="w-[170px] px-3 font-semibold">Chủ đề</th>
-              <th className="w-[90px] px-3 font-semibold"> Số lần chat</th>
+              <th className="w-[90px] px-3 font-semibold">Số lần chat</th>
               <th className="w-[180px] px-3 font-semibold">Nhóm xử lý</th>
               <th className="w-[160px] px-3 font-semibold">Thông tin KH</th>
               <th className="w-[250px] px-3 font-semibold">Câu hỏi cuối</th>
@@ -143,7 +151,7 @@ export function TicketsTab({
           <tbody>
             {tickets.length === 0 && (
               <tr>
-                <td colSpan={10} className="h-24 text-center text-slate-500">
+                <td colSpan={11} className="h-24 text-center text-slate-500">
                   Không có dữ liệu.
                 </td>
               </tr>
@@ -184,6 +192,20 @@ export function TicketsTab({
                       </button>
                     )}
                   </div>
+                </td>
+
+                <td className="px-3">
+                  {item.ticket_chatbot_status ? (
+                    <span
+                      className={`whitespace-nowrap rounded-full px-2 py-1 text-[11px] font-semibold ${ticketStatusPillClass(
+                        item.ticket_chatbot_status
+                      )}`}
+                    >
+                      {item.ticket_chatbot_status}
+                    </span>
+                  ) : (
+                    <span className="text-slate-400">—</span>
+                  )}
                 </td>
 
                 <td className="px-3 font-mono text-[11px] text-slate-600">

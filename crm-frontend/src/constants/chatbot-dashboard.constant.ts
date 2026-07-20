@@ -39,3 +39,28 @@ export const DEFAULT_OUTCOME_STYLE = {
   pill: "bg-slate-100 text-slate-600",
   bar: "from-slate-400 to-slate-300",
 };
+
+/**
+ * Màu pill theo NHÃN trạng thái ticket chatbot (status_label từ backend).
+ *
+ * Backend trả nhãn tiếng Việt nên map theo nhãn. "Mở" tô đỏ đậm vì đó là
+ * ticket chưa ai tiếp nhận — thứ cần chú ý nhất trong danh sách.
+ */
+export const TICKET_STATUS_PILL: Record<string, string> = {
+  Mở: "bg-rose-600 text-white",
+  "Tiếp nhận": "bg-sky-100 text-sky-700",
+  "Đang xử lý": "bg-violet-100 text-violet-700",
+  "Đã xong": "bg-teal-100 text-teal-700",
+  "Chờ đóng": "bg-orange-100 text-orange-700",
+  "Đã đóng": "bg-emerald-100 text-emerald-700",
+  "Đã hủy": "bg-rose-100 text-rose-700",
+};
+
+export const DEFAULT_TICKET_STATUS_PILL = "bg-slate-100 text-slate-600";
+
+/** Class pill cho một nhãn trạng thái, có fallback khi gặp nhãn lạ. */
+export function ticketStatusPillClass(label?: string | null): string {
+  return (
+    (label && TICKET_STATUS_PILL[label]) || DEFAULT_TICKET_STATUS_PILL
+  );
+}

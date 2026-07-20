@@ -3,16 +3,17 @@
 import { useRouter } from "next/navigation";
 import { Eye, Inbox } from "lucide-react";
 
+import { ticketStatusPillClass } from "@/constants/chatbot-dashboard.constant";
 import { ChatbotTicketItem } from "@/types/chatbot-dashboard.type";
 import { formatDateTime } from "@/utils/date.util";
 import { shortText } from "@/utils/text.util";
 
 /**
- * Hàng chờ ticket chatbot chưa ai xử lý.
+ * Hàng chờ ticket chatbot chưa ai xử lý — hiển thị ở tab Tổng quan.
  *
- * Hiển thị cố định trên đầu cả 3 tab (Tổng quan / Ticket / FAQ) vì đây là
- * thông tin cần hành động ngay: ticket vừa sinh ra từ chatbot, đang ở trạng
- * thái "Mở" và chưa có người nhận.
+ * Ticket vào đây khi đang ở trạng thái "Mở" và chưa có người nhận
+ * (owner_user = null). Đổi tông màu theo việc còn hay hết việc để nhìn
+ * là biết ngay có cần hành động không.
  */
 export function PendingTicketsPanel({
   rows,
@@ -27,13 +28,13 @@ export function PendingTicketsPanel({
   return (
     <div
       className={`overflow-hidden rounded-2xl border bg-white shadow-sm ${
-        hasPending ? "border-amber-300" : "border-slate-200"
+        hasPending ? "border-rose-200" : "border-slate-200"
       }`}
     >
       <div
         className={`flex flex-wrap items-center justify-between gap-3 border-b px-4 py-4 ${
           hasPending
-            ? "border-amber-100 bg-amber-50"
+            ? "border-rose-100 bg-rose-50"
             : "border-slate-100 bg-white"
         }`}
       >
@@ -41,7 +42,7 @@ export function PendingTicketsPanel({
           <span
             className={`flex h-9 w-9 items-center justify-center rounded-xl ${
               hasPending
-                ? "bg-amber-100 text-amber-600"
+                ? "bg-rose-100 text-rose-600"
                 : "bg-slate-100 text-slate-500"
             }`}
           >
@@ -57,7 +58,7 @@ export function PendingTicketsPanel({
               <span
                 className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
                   hasPending
-                    ? "bg-amber-500 text-white"
+                    ? "bg-rose-500 text-white"
                     : "bg-slate-200 text-slate-600"
                 }`}
               >
@@ -117,7 +118,11 @@ export function PendingTicketsPanel({
                   {shortText(item.reason || item.last_question, 60)}
                 </td>
                 <td className="px-3">
-                  <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600">
+                  <span
+                    className={`rounded-full px-2 py-1 text-[11px] font-semibold ${ticketStatusPillClass(
+                      item.ticket_chatbot_status || "Mở"
+                    )}`}
+                  >
                     {item.ticket_chatbot_status || "Mở"}
                   </span>
                 </td>

@@ -15,10 +15,11 @@ import {
 } from "@/types/chatbot-dashboard.type";
 
 /**
- * Hàng thẻ KPI của dashboard chatbot.
+ * Hàng thẻ KPI của dashboard chatbot — hiển thị ở tab Tổng quan.
  *
- * Tách khỏi OverviewTab để hiển thị được ở cả 3 tab — số liệu tổng quan
- * và hàng chờ cần xử lý luôn nhìn thấy dù đang xem tab nào.
+ * Tách khỏi OverviewTab để panel hàng chờ chèn được ngay bên dưới,
+ * đồng thời giữ OverviewTab gọn, chỉ còn phần biểu đồ.
+ * Bấm vào thẻ sẽ mở tab Ticket đã lọc sẵn theo nhóm tương ứng.
  */
 export function KpiCards({
   summary,

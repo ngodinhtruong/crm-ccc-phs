@@ -56,8 +56,8 @@ export function ChatbotDashboardPage() {
           onChange={dashboard.changeTab}
         />
 
-        {/* KPI + hàng chờ cần xử lý: hiện ở cả 3 tab, không đổi theo tab */}
-        {dashboard.overview && (
+        {/* KPI + hàng chờ cần xử lý: chỉ hiển thị ở tab Tổng quan */}
+        {dashboard.activeTab === "overview" && dashboard.overview && (
           <>
             <KpiCards
               summary={dashboard.overview.summary}
@@ -106,7 +106,7 @@ export function ChatbotDashboardPage() {
               status={dashboard.ticketStatus}
               keyword={dashboard.ticketKeyword}
               category={dashboard.ticketCategory}
-              onStatusChange={dashboard.setTicketStatus}
+              onStatusChange={dashboard.changeTicketStatus}
               onKeywordChange={dashboard.setTicketKeyword}
               onSearch={dashboard.searchTickets}
               onClearPreset={dashboard.clearTicketFilters}

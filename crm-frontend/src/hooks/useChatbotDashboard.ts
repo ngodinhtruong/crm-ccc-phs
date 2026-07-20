@@ -1,9 +1,9 @@
 "use client";
-import { getErrorMessage } from "@/utils/error.util";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { CHATBOT_TICKET_STATUS_OPTIONS } from "@/constants/chatbot-dashboard.constant";
 import { authService } from "@/services/auth.service";
 import { chatbotDashboardService } from "@/services/chatbot-dashboard.service";
 import {
@@ -16,13 +16,21 @@ import {
   TicketListParams,
   TicketOpenOptions,
 } from "@/types/chatbot-dashboard.type";
-import { formatDateInput, getStartOfWeek } from "@/utils/date.util";
 import { normalizeFilters } from "@/utils/chatbot-filter.util";
+import { formatDateInput, getStartOfWeek } from "@/utils/date.util";
+import { getErrorMessage } from "@/utils/error.util";
 
 export type QuickPreset = "TODAY" | "THIS_WEEK" | "THIS_MONTH";
 
 const PAGE_SIZE = 50;
 const DEFAULT_PANEL_TITLE = "Tất cả phiên chatbot";
+const DEFAULT_CCC_PANEL_TITLE = "Chuyển CCC xử lý";
+
+/** Nhóm mặc định của tab Ticket: nhóm cần người xử lý. */
+const DEFAULT_TICKET_STATUS: OutcomeCode = "CCC";
+
+/** Chu kỳ tự làm mới dashboard: 2 phút. */
+const AUTO_REFRESH_MS = 120_000;
 
 /** Khoảng ngày của preset. Dùng start_date/end_date để tránh đá nhau với year/month. */
 function getPresetFilters(preset: QuickPreset): ChatbotDashboardFilters {
@@ -65,10 +73,12 @@ export function useChatbotDashboard() {
 
   const [tickets, setTickets] = useState<ChatbotTicketItem[]>([]);
   const [ticketCount, setTicketCount] = useState(0);
-  const [ticketStatus, setTicketStatus] = useState<OutcomeCode>("ALL");
+  const [ticketStatus, setTicketStatus] =
+    useState<OutcomeCode>(DEFAULT_TICKET_STATUS);
   const [ticketKeyword, setTicketKeyword] = useState("");
   const [ticketCategory, setTicketCategory] = useState("");
-  const [ticketPanelTitle, setTicketPanelTitle] = useState(DEFAULT_PANEL_TITLE);
+  const [ticketPanelTitle, setTicketPanelTitle] =
+    useState(DEFAULT_CCC_PANEL_TITLE);
 
   const [selectedSession, setSelectedSession] =
     useState<ChatbotTicketItem | null>(null);
@@ -89,13 +99,36 @@ export function useChatbotDashboard() {
     setFilters((prev) => ({ ...prev, [key]: value }));
   };
 
-  const loadOverview = async (activeFilters: ChatbotDashboardFilters) => {
-    setOverview(await chatbotDashboardService.getOverview(activeFilters));
+  /**
+   * Số thứ tự của request mới nhất.
+   *
+   * Bấm nhanh nhiều ô KPI (hoặc auto-refresh chen vào giữa) làm nhiều
+   * request cùng bay; response về không đúng thứ tự gửi. Chỉ response của
+   * request mới nhất mới được ghi vào state, nếu không bảng sẽ hiển thị
+   * dữ liệu cũ trong khi tiêu đề đã là bộ lọc mới.
+   */
+  const requestIdRef = useRef(0);
+
+  const nextRequestId = () => {
+    requestIdRef.current += 1;
+    return requestIdRef.current;
+  };
+
+  const isLatest = (id: number) => id === requestIdRef.current;
+
+  const loadOverview = async (
+    activeFilters: ChatbotDashboardFilters,
+    requestId: number
+  ) => {
+    const data = await chatbotDashboardService.getOverview(activeFilters);
+
+    if (isLatest(requestId)) setOverview(data);
   };
 
   const loadTickets = async (
     activeFilters: ChatbotDashboardFilters,
-    overrides: Partial<TicketListParams> = {}
+    overrides: Partial<TicketListParams> = {},
+    requestId = nextRequestId()
   ) => {
     const data = await chatbotDashboardService.getTickets({
       ...activeFilters,
@@ -105,16 +138,23 @@ export function useChatbotDashboard() {
       page_size: PAGE_SIZE,
     });
 
+    if (!isLatest(requestId)) return;
+
     setTickets(data.results || []);
     setTicketCount(data.count || 0);
   };
 
-  const loadFaqs = async (activeFilters: ChatbotDashboardFilters) => {
+  const loadFaqs = async (
+    activeFilters: ChatbotDashboardFilters,
+    requestId: number
+  ) => {
     const data = await chatbotDashboardService.getFaqs({
       ...activeFilters,
       q: faqKeyword,
       page_size: PAGE_SIZE,
     });
+
+    if (!isLatest(requestId)) return;
 
     setFaqs(data.results || []);
     setFaqCount(data.count || 0);
@@ -130,29 +170,31 @@ export function useChatbotDashboard() {
       ? normalizeFilters(overrideFilters)
       : normalizedFilters;
 
+    const requestId = nextRequestId();
+
     try {
       setLoading(true);
       setError("");
 
-      // Overview luôn nạp: panel "Vấn đề cần CCC xử lý" nằm trên đầu và
-      // hiển thị ở cả 3 tab, nên cần dữ liệu này kể cả khi đang xem tab khác.
+      // KPI và hàng chờ chỉ nằm ở tab Tổng quan nên các tab khác không
+      // cần gọi overview — tránh một request thừa mỗi lần đổi tab.
       if (tab === "overview") {
-        await loadOverview(activeFilters);
+        await loadOverview(activeFilters, requestId);
       } else if (tab === "tickets") {
-        await Promise.all([
-          loadOverview(activeFilters),
-          loadTickets(activeFilters),
-        ]);
+        await loadTickets(activeFilters, {}, requestId);
       } else if (tab === "faqs") {
-        await Promise.all([
-          loadOverview(activeFilters),
-          loadFaqs(activeFilters),
-        ]);
+        await loadFaqs(activeFilters, requestId);
       }
     } catch (err) {
-      setError(getErrorMessage(err, "Không tải được dữ liệu dashboard chatbot"));
+      if (isLatest(requestId)) {
+        setError(
+          getErrorMessage(err, "Không tải được dữ liệu dashboard chatbot")
+        );
+      }
     } finally {
-      setLoading(false);
+      // Chỉ request mới nhất được tắt loading, tránh request cũ về sau
+      // làm mất trạng thái đang tải của request đang chạy.
+      if (isLatest(requestId)) setLoading(false);
     }
   };
 
@@ -173,6 +215,30 @@ export function useChatbotDashboard() {
     void loadData(EMPTY_FILTERS);
   };
 
+  /**
+   * Tải lại danh sách phiên với bộ lọc chỉ định.
+   *
+   * Luôn truyền tường minh qua overrides thay vì để loadTickets đọc state:
+   * các setState phía trên là async nên state lúc này vẫn là giá trị của
+   * render trước (stale closure).
+   */
+  const runTicketQuery = async (overrides: Partial<TicketListParams>) => {
+    const requestId = nextRequestId();
+
+    try {
+      setLoading(true);
+      setError("");
+
+      await loadTickets(normalizedFilters, overrides, requestId);
+    } catch (err) {
+      if (isLatest(requestId)) {
+        setError(getErrorMessage(err, "Không tải được danh sách phiên chat"));
+      }
+    } finally {
+      if (isLatest(requestId)) setLoading(false);
+    }
+  };
+
   /** Bấm vào một ô KPI / một cột biểu đồ -> mở danh sách phiên tương ứng. */
   const openTicketsFromOverview = async (options: TicketOpenOptions) => {
     const status = options.status || "ALL";
@@ -184,42 +250,39 @@ export function useChatbotDashboard() {
     setTicketPanelTitle(options.title);
     setActiveTab("tickets");
 
-    try {
-      setLoading(true);
-      setError("");
-
-      await loadTickets(normalizedFilters, {
-        status,
-        q: "",
-        dashboard_category: category,
-      });
-    } catch (err) {
-      setError(getErrorMessage(err, "Không tải được danh sách phiên chat"));
-    } finally {
-      setLoading(false);
-    }
+    await runTicketQuery({ status, q: "", dashboard_category: category });
   };
 
+  /**
+   * Đổi nhóm xử lý ở dropdown -> lọc lại ngay.
+   *
+   * Xóa luôn dashboard_category: chủ đề chỉ được đặt khi bấm từ biểu đồ.
+   * Giữ lại sẽ lọc chồng chéo và thường ra 0 kết quả, khiến người dùng
+   * tưởng nhóm đó không có dữ liệu.
+   */
+  const changeTicketStatus = async (status: OutcomeCode) => {
+    setTicketStatus(status);
+    setTicketCategory("");
+    setTicketPanelTitle(
+      CHATBOT_TICKET_STATUS_OPTIONS.find((item) => item.value === status)
+        ?.label || DEFAULT_PANEL_TITLE
+    );
+
+    await runTicketQuery({ status, dashboard_category: "" });
+  };
+
+  /** Về lại trạng thái mặc định của tab Ticket, không phải "Tất cả". */
   const clearTicketFilters = async () => {
-    setTicketStatus("ALL");
+    setTicketStatus(DEFAULT_TICKET_STATUS);
     setTicketKeyword("");
     setTicketCategory("");
-    setTicketPanelTitle(DEFAULT_PANEL_TITLE);
+    setTicketPanelTitle(DEFAULT_CCC_PANEL_TITLE);
 
-    try {
-      setLoading(true);
-      setError("");
-
-      await loadTickets(normalizedFilters, {
-        status: "ALL",
-        q: "",
-        dashboard_category: "",
-      });
-    } catch (err) {
-      setError(getErrorMessage(err, "Không tải được danh sách phiên chat"));
-    } finally {
-      setLoading(false);
-    }
+    await runTicketQuery({
+      status: DEFAULT_TICKET_STATUS,
+      q: "",
+      dashboard_category: "",
+    });
   };
 
   useEffect(() => {
@@ -237,6 +300,8 @@ export function useChatbotDashboard() {
     void loadData();
   };
 
+  // Ref được cập nhật mỗi render để setInterval bên dưới luôn gọi bản
+  // mới nhất của refreshData, thay vì bản đóng băng lúc tạo interval.
   const refreshDataRef = useRef(refreshData);
   useEffect(() => {
     refreshDataRef.current = refreshData;
@@ -244,12 +309,11 @@ export function useChatbotDashboard() {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      void refreshDataRef.current();
-    }, 120000); // 120 seconds
+      refreshDataRef.current();
+    }, AUTO_REFRESH_MS);
 
     return () => clearInterval(interval);
   }, []);
-
 
   return {
     activeTab,
@@ -268,7 +332,9 @@ export function useChatbotDashboard() {
     ticketKeyword,
     ticketCategory,
     ticketPanelTitle,
-    setTicketStatus,
+    // Không export setTicketStatus thô: gọi nó chỉ đổi state mà không
+    // tải lại dữ liệu. Luôn dùng changeTicketStatus.
+    changeTicketStatus,
     setTicketKeyword,
     clearTicketFilters,
     openTicketsFromOverview,

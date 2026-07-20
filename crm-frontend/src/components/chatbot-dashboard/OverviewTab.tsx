@@ -1,7 +1,7 @@
-import { BarChart3, Layers3, PieChart } from "lucide-react";
+import { BarChart3, Layers3, ListOrdered } from "lucide-react";
 
 import { AnalyticsPanel } from "@/components/chatbot-dashboard/charts/AnalyticsPanel";
-import { CategoryShareList } from "@/components/chatbot-dashboard/charts/CategoryShareList";
+import { CategoryRankBars } from "@/components/chatbot-dashboard/charts/CategoryRankBars";
 import { MetricBars } from "@/components/chatbot-dashboard/charts/MetricBars";
 import { TopicRankingList } from "@/components/chatbot-dashboard/charts/TopicRankingList";
 import {
@@ -41,10 +41,10 @@ export function OverviewTab({
         <div className="xl:col-span-4">
           <AnalyticsPanel
             title="Vấn đề CCC xử lý"
-            description="Chủ đề của các phiên đã chuyển CCC"
-            icon={<PieChart size={18} />}
+            description="Chủ đề của các phiên đã chuyển CCC, xếp theo số phiên"
+            icon={<ListOrdered size={18} />}
           >
-            <CategoryShareList
+            <CategoryRankBars
               data={charts.ccc_issue_pie}
               onItemClick={(item) =>
                 onOpenTickets({
