@@ -145,10 +145,7 @@ USE_TZ = True
 STATIC_URL = 'static/'
 
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://192.168.200.36:3000"
-]
+
 
 AUTH_USER_MODEL = "accounts.User"
 
@@ -199,11 +196,12 @@ ALLOWED_HOSTS = [
     "13.215.176.236"
 ]
 
+
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "http://192.168.200.133:3000",
-    "http://192.168.2.16:3000"
+    "http://192.168.2.16:3000",
 "http://13.215.176.236:3000"
 ]
 
@@ -212,5 +210,5 @@ CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1:3000",
     "http://192.168.200.133:3000",
     "http://192.168.2.16:3000",
-    "http:13.215.176.236:3000"
+    "http://13.215.176.236:3000"
 ]
