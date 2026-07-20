@@ -134,12 +134,20 @@ export function useChatbotDashboard() {
       setLoading(true);
       setError("");
 
+      // Overview luôn nạp: panel "Vấn đề cần CCC xử lý" nằm trên đầu và
+      // hiển thị ở cả 3 tab, nên cần dữ liệu này kể cả khi đang xem tab khác.
       if (tab === "overview") {
         await loadOverview(activeFilters);
       } else if (tab === "tickets") {
-        await loadTickets(activeFilters);
+        await Promise.all([
+          loadOverview(activeFilters),
+          loadTickets(activeFilters),
+        ]);
       } else if (tab === "faqs") {
-        await loadFaqs(activeFilters);
+        await Promise.all([
+          loadOverview(activeFilters),
+          loadFaqs(activeFilters),
+        ]);
       }
     } catch (err) {
       setError(getErrorMessage(err, "Không tải được dữ liệu dashboard chatbot"));

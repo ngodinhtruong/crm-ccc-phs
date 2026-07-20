@@ -3,15 +3,19 @@ import { ChatbotMessage, PaginatedResponse } from "@/types/chatbot-dashboard.typ
 export type { PaginatedResponse };
 
 /** Trạng thái xử lý của ticket chatbot (workflow CCC). */
+// Dùng chung mã trạng thái với ticket thường
 export type ChatbotTicketStatus =
-  | "CHO_TIEP_NHAN"
-  | "TIEP_NHAN"
-  | "CHUYEN_PHONG_BAN"
-  | "DANG_XU_LY"
-  | "DA_XONG"
-  | "CHO_HUY";
+  | "CREATED"
+  | "ACCEPTED"
+  | "PROCESSING"
+  | "DONE_WAIT_CLOSE"
+  | "PENDING_CLOSE"
+  | "CLOSED";
 
 export type ChatbotTicketLinkStatus = "LINKED" | "UNLINKED";
+
+/** Tình trạng SLA của ticket chatbot. Khớp TicketChatbot.SLA_STATUS_CHOICES. */
+export type ChatbotSlaStatus = "ON_TIME" | "OVERDUE" | "PROCESSING";
 
 /** Một ticket sinh ra từ chatbot. Khớp với TicketChatbotSerializer bên Django. */
 export type ChatbotTicket = {
@@ -60,6 +64,17 @@ export type ChatbotTicket = {
   priority_name?: string | null;
   send_survey?: boolean;
 
+  /** Đồng hồ SLA — TicketChatbot lưu deadline ngay trên chính nó. */
+  sla_status?: ChatbotSlaStatus | null;
+  response_due_at?: string | null;
+  assignment_due_at?: string | null;
+  processing_due_at?: string | null;
+  resolution_due_at?: string | null;
+  breached_at?: string | null;
+  breach_reason?: number | null;
+  breach_note?: string | null;
+  breach_reason_submitted?: boolean;
+
   accepted_at?: string | null;
   done_at?: string | null;
   cancelled_at?: string | null;
@@ -91,6 +106,13 @@ export type ChatbotTicketUpdatePayload = {
   priority?: number | null;
   send_survey?: boolean;
   handling_solution?: string;
+
+  /**
+   * Lý do vượt SLA — backend bắt buộc khai trước khi đưa ticket đã trễ
+   * về trạng thái kết thúc (DONE_WAIT_CLOSE / PENDING_CLOSE).
+   */
+  breach_reason?: number | null;
+  breach_note?: string;
 };
 
 export type ChatbotTicketDetail = {

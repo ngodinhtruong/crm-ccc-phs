@@ -6,7 +6,9 @@ import { ConversationModal } from "@/components/chatbot-dashboard/ConversationMo
 import { DashboardTabs } from "@/components/chatbot-dashboard/DashboardTabs";
 import { DashboardToolbar } from "@/components/chatbot-dashboard/DashboardToolbar";
 import { FaqTab } from "@/components/chatbot-dashboard/FaqTab";
+import { KpiCards } from "@/components/chatbot-dashboard/KpiCards";
 import { OverviewTab } from "@/components/chatbot-dashboard/OverviewTab";
+import { PendingTicketsPanel } from "@/components/chatbot-dashboard/PendingTicketsPanel";
 import { TicketsTab } from "@/components/chatbot-dashboard/TicketsTab";
 import { useChatbotDashboard } from "@/hooks/useChatbotDashboard";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
@@ -53,6 +55,24 @@ export function ChatbotDashboardPage() {
           activeTab={dashboard.activeTab}
           onChange={dashboard.changeTab}
         />
+
+        {/* KPI + hàng chờ cần xử lý: hiện ở cả 3 tab, không đổi theo tab */}
+        {dashboard.overview && (
+          <>
+            <KpiCards
+              summary={dashboard.overview.summary}
+              onOpenTickets={dashboard.openTicketsFromOverview}
+            />
+
+            <PendingTicketsPanel
+              rows={dashboard.overview.quick_lists.latest_ccc_tickets}
+              total={
+                dashboard.overview.quick_lists.pending_ticket_total ??
+                dashboard.overview.quick_lists.latest_ccc_tickets.length
+              }
+            />
+          </>
+        )}
 
         {dashboard.error && (
           <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">

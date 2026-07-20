@@ -143,6 +143,12 @@ export type CreateCustomerPayload = {
     province?: string;
     country?: string;
     status?: string;
+
+    /**
+     * ID của User phụ trách (không phải Employee) — backend tra sang
+     * user.employee rồi tạo CustomerEmployeeAssignment với role BROKER.
+     */
+    assigned_employee?: number | null;
 };
 
 export type CreateCustomerAccountPayload = {

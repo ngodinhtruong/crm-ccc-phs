@@ -280,6 +280,8 @@ export type TicketCreatePayload = {
 
 /** Chi tiết ticket thường — khớp GET /api/tickets/tickets/{id}/ */
 export type TicketDetail = TicketListItem & {
+    /** Đã gửi khảo sát chưa — backend đọc từ TicketFeedback.survey_sent. */
+    send_survey?: boolean;
     is_error_ticket?: boolean;
     error_group_code?: string | null;
     error_type_code?: string | null;
@@ -313,6 +315,7 @@ export type TicketStatusCode =
     | "ACCEPTED"
     | "PROCESSING"
     | "DONE_WAIT_CLOSE"
+    | "PENDING_CLOSE"
     | "CLOSED"
     | "CANCELLED";
 

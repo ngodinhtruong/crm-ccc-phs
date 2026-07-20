@@ -5,8 +5,13 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, History, MessageSquareText, Pencil, Phone, X } from "lucide-react";
 
 import { chatbotTicketApi } from "@/apis/chatbot-ticket.api";
+import { masterDataApi } from "@/apis/master-data.api";
 import { ConversationModal } from "@/components/chatbot-dashboard/ConversationModal";
 import { TicketHistoryModal } from "@/components/tickets/detail/TicketHistoryModal";
+import {
+  BreachReasonOption,
+  SlaBreachReasonModal,
+} from "@/components/tickets/detail/SlaBreachReasonModal";
 import { TicketStatusFlow } from "@/components/chatbot-tickets/TicketStatusFlow";
 import { CHATBOT_TICKET_STATUS_PILL } from "@/constants/chatbot-ticket.constant";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
@@ -15,8 +20,17 @@ import {
   ChatbotTicket,
   ChatbotTicketOptions,
   ChatbotTicketStatus,
+  ChatbotTicketUpdatePayload,
 } from "@/types/chatbot-ticket.type";
 import { formatDateTime } from "@/utils/date.util";
+import { getApiErrorDetail } from "@/utils/error.util";
+
+/** Trạng thái kết thúc — backend bắt khai lý do nếu ticket đã vượt SLA. */
+const CLOSING_STATUSES: ChatbotTicketStatus[] = [
+  "DONE_WAIT_CLOSE",
+  "PENDING_CLOSE",
+  "CLOSED",
+];
 
 type Opt = { id: number; name: string };
 
@@ -108,8 +122,12 @@ export function ChatbotTicketDetailPage({ id }: { id: number }) {
   const [showConversation, setShowConversation] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
 
+  // Lý do vượt SLA: chỉ bật khi backend chặn việc đóng ticket đã trễ hạn
+  const [breachReasons, setBreachReasons] = useState<BreachReasonOption[]>([]);
+  const [showBreachModal, setShowBreachModal] = useState(false);
+
   // Form state
-  const [status, setStatus] = useState<ChatbotTicketStatus>("CHO_TIEP_NHAN");
+  const [status, setStatus] = useState<ChatbotTicketStatus>("CREATED");
   const [slaPolicy, setSlaPolicy] = useState<number | null>(null);
   const [priority, setPriority] = useState<number | null>(null);
   const [owner, setOwner] = useState<number | null>(null);
@@ -136,8 +154,8 @@ export function ChatbotTicketDetailPage({ id }: { id: number }) {
       const data = await chatbotTicketApi.getDetail(id);
       setTicket(data.ticket);
       resetForm(data.ticket);
-    } catch {
-      setError("Không tải được chi tiết ticket.");
+    } catch (err) {
+      setError(getApiErrorDetail(err, "Không tải được chi tiết ticket."));
     } finally {
       setLoading(false);
     }
@@ -147,33 +165,115 @@ export function ChatbotTicketDetailPage({ id }: { id: number }) {
     void load();
   }, [load]);
 
+  // Bỏ qua response về muộn khi component đã unmount
   useEffect(() => {
-    chatbotTicketApi.getOptions().then(setOptions).catch(() => {});
+    let active = true;
+
+    chatbotTicketApi
+      .getOptions()
+      .then((data) => {
+        if (active) setOptions(data);
+      })
+      .catch((err) => {
+        if (active) {
+          setError(
+            getApiErrorDetail(err, "Không tải được danh sách lựa chọn.")
+          );
+        }
+      });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
-  const save = async () => {
-    if (!ticket) return;
-    try {
-      setSaving(true);
-      setError("");
-      const updated = await chatbotTicketApi.update(ticket.id, {
-        status,
-        sla_policy: slaPolicy,
-        priority,
-        owner_user: owner,
-        assigned_unit: unit,
-        handling_branch: branch,
-        send_survey: sendSurvey,
-        handling_solution: solution,
+  // Danh mục lý do vượt SLA — nạp sẵn để modal mở là dùng được ngay
+  useEffect(() => {
+    let active = true;
+
+    masterDataApi
+      .getSlaBreachReasons()
+      .then((data) => {
+        if (active) setBreachReasons(data);
+      })
+      .catch(() => {
+        // Không chặn luồng chính: modal sẽ báo khi danh sách rỗng
       });
-      setTicket(updated);
-      resetForm(updated);
-      setEditing(false);
-    } catch {
-      setError("Không lưu được. Vui lòng thử lại.");
-    } finally {
-      setSaving(false);
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  /** Ticket đã trễ hạn và chưa từng khai lý do vượt SLA. */
+  const needBreachReason =
+    ticket?.sla_status === "OVERDUE" &&
+    !ticket?.breach_reason &&
+    !ticket?.breach_note;
+
+  const submit = useCallback(
+    async (extra?: Pick<ChatbotTicketUpdatePayload, "breach_reason" | "breach_note">) => {
+      if (!ticket) return;
+
+      try {
+        setSaving(true);
+        setError("");
+
+        const updated = await chatbotTicketApi.update(ticket.id, {
+          status,
+          sla_policy: slaPolicy,
+          priority,
+          owner_user: owner,
+          assigned_unit: unit,
+          handling_branch: branch,
+          send_survey: sendSurvey,
+          handling_solution: solution,
+          ...extra,
+        });
+
+        setTicket(updated);
+        resetForm(updated);
+        setEditing(false);
+        setShowBreachModal(false);
+      } catch (err) {
+        const message = getApiErrorDetail(
+          err,
+          "Không lưu được. Vui lòng thử lại."
+        );
+
+        // Backend chặn vì chưa khai lý do vượt SLA → mở modal cho nhập
+        if (message.includes("vượt SLA")) {
+          setShowBreachModal(true);
+          setError("");
+        } else {
+          setError(message);
+        }
+      } finally {
+        setSaving(false);
+      }
+    },
+    [
+      ticket,
+      status,
+      slaPolicy,
+      priority,
+      owner,
+      unit,
+      branch,
+      sendSurvey,
+      solution,
+      resetForm,
+    ]
+  );
+
+  const save = () => {
+    // Chủ động hỏi lý do trước khi gọi API, thay vì đợi backend từ chối
+    if (needBreachReason && CLOSING_STATUSES.includes(status)) {
+      setShowBreachModal(true);
+      return;
     }
+
+    void submit();
   };
 
   if (loading) {
@@ -287,7 +387,8 @@ export function ChatbotTicketDetailPage({ id }: { id: number }) {
               view={
                 <span
                   className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                    CHATBOT_TICKET_STATUS_PILL[ticket.status]
+                    CHATBOT_TICKET_STATUS_PILL[ticket.status] ??
+                    "bg-slate-100 text-slate-600"
                   }`}
                 >
                   {ticket.status_label || ticket.status}
@@ -528,7 +629,8 @@ export function ChatbotTicketDetailPage({ id }: { id: number }) {
           </div>
         </Section>
 
-        {error && (
+        {/* Lỗi khi KHÔNG ở chế độ sửa (ví dụ tải dữ liệu hỏng) */}
+        {error && !editing && (
           <div className="rounded-lg bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-600">
             {error}
           </div>
@@ -537,28 +639,48 @@ export function ChatbotTicketDetailPage({ id }: { id: number }) {
 
       {/* Thanh Lưu/Hủy dính đáy khi đang sửa */}
       {editing && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-center gap-4 border-t border-slate-200 bg-white/95 px-6 py-3 shadow-[0_-2px_10px_rgba(0,0,0,0.05)] backdrop-blur">
-          <button
-            type="button"
-            disabled={saving}
-            onClick={() => void save()}
-            className="rounded-lg bg-emerald-500 px-8 py-2 text-xs font-semibold text-white transition hover:bg-emerald-600 disabled:opacity-60"
-          >
-            {saving ? "Đang lưu..." : "Lưu"}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setError("");
-              resetForm(ticket);
-              setEditing(false);
-            }}
-            className="flex items-center gap-1 text-xs font-semibold text-rose-500 hover:underline"
-          >
-            <X size={13} />
-            Hủy bỏ
-          </button>
+        <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white/95 shadow-[0_-2px_10px_rgba(0,0,0,0.05)] backdrop-blur">
+          {/* Lỗi hiện ngay cạnh nút Lưu, không để người dùng phải cuộn tìm */}
+          {error && (
+            <div className="border-b border-rose-100 bg-rose-50 px-6 py-2 text-center text-xs font-semibold text-rose-600">
+              {error}
+            </div>
+          )}
+          <div className="flex items-center justify-center gap-4 px-6 py-3">
+            <button
+              type="button"
+              disabled={saving}
+              onClick={save}
+              className="rounded-lg bg-emerald-500 px-8 py-2 text-xs font-semibold text-white transition hover:bg-emerald-600 disabled:opacity-60"
+            >
+              {saving ? "Đang lưu..." : "Lưu"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setError("");
+                resetForm(ticket);
+                setEditing(false);
+              }}
+              className="flex items-center gap-1 text-xs font-semibold text-rose-500 hover:underline"
+            >
+              <X size={13} />
+              Hủy bỏ
+            </button>
+          </div>
         </div>
+      )}
+
+      {/* Modal nhập lý do vượt SLA */}
+      {showBreachModal && (
+        <SlaBreachReasonModal
+          reasons={breachReasons}
+          saving={saving}
+          onClose={() => setShowBreachModal(false)}
+          onSubmit={(reasonId, note) =>
+            void submit({ breach_reason: reasonId, breach_note: note })
+          }
+        />
       )}
 
       {/* Modal lịch sử trò chuyện */}

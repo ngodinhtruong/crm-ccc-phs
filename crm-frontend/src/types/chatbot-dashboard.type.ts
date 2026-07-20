@@ -110,7 +110,10 @@ export type ChatbotOverviewResponse = {
   };
 
   quick_lists: {
+    /** Ticket chatbot đang Mở và chưa ai nhận — 5 dòng mới nhất. */
     latest_ccc_tickets: ChatbotTicketItem[];
+    /** Tổng số ticket chưa tiếp nhận (không giới hạn 5 dòng hiển thị). */
+    pending_ticket_total?: number;
     top_faqs: ChatbotFaqItem[];
   };
 };

@@ -5,7 +5,6 @@ import {
   ChatbotTicketDetail,
   ChatbotTicketListParams,
   ChatbotTicketOptions,
-  ChatbotTicketStatus,
   ChatbotTicketUpdatePayload,
   PaginatedResponse,
 } from "@/types/chatbot-ticket.type";
@@ -39,32 +38,13 @@ export const chatbotTicketApi = {
     return response.data;
   },
 
+  /**
+   * Nhận xử lý ticket đang nằm ở hàng chờ chung.
+   * Backend trả 409 nếu người khác đã nhận trước — đây là cơ chế chống
+   * tranh chấp, nên phải đi qua endpoint này thay vì PATCH owner_user.
+   */
   claim: async (id: number): Promise<ChatbotTicket> => {
     const response = await api.post<ChatbotTicket>(`${BASE}/${id}/claim/`);
-
-    return response.data;
-  },
-
-  changeStatus: async (
-    id: number,
-    status: ChatbotTicketStatus,
-    cancelledReason?: string
-  ): Promise<ChatbotTicket> => {
-    const response = await api.post<ChatbotTicket>(
-      `${BASE}/${id}/change-status/`,
-      cleanParams({ status, cancelled_reason: cancelledReason })
-    );
-
-    return response.data;
-  },
-
-  updateSolution: async (
-    id: number,
-    handlingSolution: string
-  ): Promise<ChatbotTicket> => {
-    const response = await api.patch<ChatbotTicket>(`${BASE}/${id}/`, {
-      handling_solution: handlingSolution,
-    });
 
     return response.data;
   },
