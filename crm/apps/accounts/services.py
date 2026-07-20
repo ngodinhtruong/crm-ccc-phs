@@ -149,16 +149,14 @@ class PermissionService:
         if scope == ScopeType.ALL:
             return True
 
-        if scope == ScopeType.MULTI_BRANCH:
-            return ticket.handling_branch_id in PermissionService.get_user_branch_ids(user)
-
-        if scope == ScopeType.BRANCH:
-            employee = getattr(user, "employee", None)
-
-            if employee is None:
-                return False
-
-            return ticket.handling_branch_id == employee.branch_id
+        # BRANCH và MULTI_BRANCH cùng dựa trên get_user_branch_ids, khớp với
+        # filter_tickets_by_user. Trước đây BRANCH chỉ xét employee.branch nên
+        # user thấy ticket trong danh sách mà thao tác lại bị từ chối.
+        if scope in (ScopeType.BRANCH, ScopeType.MULTI_BRANCH):
+            return (
+                ticket.handling_branch_id
+                in PermissionService.get_user_branch_ids(user)
+            )
 
         if scope == ScopeType.OWN:
             return (
@@ -196,7 +194,9 @@ class PermissionService:
         - Superuser được sửa tất cả
         - Có quyền TICKET_AMEND
         - Chỉ owner được amend
-        - Ticket đã DONE/CLOSED/CANCELLED thì không amend
+        - Ticket đã CLOSED/CANCELLED thì không amend
+        - "Đã xong" VẪN cho sửa, để người xử lý dời mốc hoàn thành và
+          reset đồng hồ tự đóng 1 tiếng
         """
 
         if user is None or not user.is_authenticated:
@@ -211,15 +211,24 @@ class PermissionService:
         if ticket is None:
             return False
 
-        if getattr(ticket, "is_locked_for_amend", False):
-            return False
+        status_code = (
+            ticket.current_status.status_code if ticket.current_status else None
+        )
 
-        # "Đã xong" vẫn cho sửa (để dời mốc hoàn thành); chỉ chặn khi đã đóng/hủy.
-        # Ticket đã đóng chỉ superuser sửa được — đã return True ở trên.
-        if ticket.current_status and ticket.current_status.status_code in [
+        # Ticket đã đóng/hủy: khóa hẳn, chỉ superuser sửa (đã return ở trên)
+        if status_code in [
             TicketStatusCode.CLOSED,
             TicketStatusCode.CANCELLED,
         ]:
+            return False
+
+        # is_locked_for_amend được bật cả khi vào DONE_WAIT_CLOSE. Nếu chặn
+        # theo cờ này thì "Đã xong" không sửa được, trái với rule ở trên và
+        # làm chết luôn logic reset completed_at trong amend_ticket.
+        if (
+            getattr(ticket, "is_locked_for_amend", False)
+            and status_code != TicketStatusCode.DONE_WAIT_CLOSE
+        ):
             return False
 
         return PermissionService.is_ticket_owner(user, ticket)
@@ -289,16 +298,18 @@ class PermissionService:
         if scope == ScopeType.ALL:
             return True
 
-        if scope == ScopeType.MULTI_BRANCH:
-            return call_log.branch_id in PermissionService.get_user_branch_ids(user)
+        # Cùng quy ước với ticket/sa_record: BRANCH và MULTI_BRANCH đều
+        # dựa trên get_user_branch_ids (gồm cả chi nhánh cấp thêm).
+        if scope in (ScopeType.BRANCH, ScopeType.MULTI_BRANCH):
+            return (
+                call_log.branch_id
+                in PermissionService.get_user_branch_ids(user)
+            )
 
         employee = getattr(user, "employee", None)
 
         if employee is None:
             return False
-
-        if scope == ScopeType.BRANCH:
-            return call_log.branch_id == employee.branch_id
 
         if scope == ScopeType.OWN:
             return call_log.employee_id == employee.id
@@ -369,11 +380,11 @@ class PermissionService:
         if scope == ScopeType.ALL:
             return True
 
-        if scope == ScopeType.MULTI_BRANCH:
-            return record.branch_id in PermissionService.get_user_branch_ids(user)
-
-        if scope == ScopeType.BRANCH:
-            return record.branch_id in PermissionService.get_user_branch_ids(user)
+        if scope in (ScopeType.BRANCH, ScopeType.MULTI_BRANCH):
+            return (
+                record.branch_id
+                in PermissionService.get_user_branch_ids(user)
+            )
 
         if scope == ScopeType.OWN:
             return PermissionService.is_sa_record_pic(user, record)

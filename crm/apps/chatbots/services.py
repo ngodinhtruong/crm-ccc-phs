@@ -309,6 +309,7 @@ def relink_ticket_customer(ticket):
     ticket.customer = customer
     ticket.customer_account = account
     ticket.link_status = TicketChatbot.LINK_LINKED
+    ticket.updated_at = timezone.now()
     ticket.save(
         update_fields=[
             "customer",

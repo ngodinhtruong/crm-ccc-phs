@@ -36,6 +36,85 @@ OUTCOME_PENDING = ChatbotSessionSummary.OUTCOME_PENDING
 # Chủ đề chỉ tính trên phiên chatbot thật sự xử lý được hoặc đã chuyển CCC
 TOPIC_OUTCOMES = [OUTCOME_BOT_DONE, OUTCOME_CCC]
 
+# Trạng thái kết thúc: vượt SLA thì phải khai lý do trước khi chuyển sang
+CLOSING_STATUS_CODES = (
+    TicketChatbot.STATUS_DA_XONG,
+    TicketChatbot.STATUS_CHO_DONG,
+    TicketChatbot.STATUS_DA_DONG,
+)
+
+# Các trường theo dõi để ghi lịch sử: nhãn -> cách lấy giá trị hiển thị
+TRACKED_TICKET_FIELDS = {
+    "Tình trạng": lambda t: t.status_label,
+    "Danh mục SLA": lambda t: t.sla_policy.sla_name if t.sla_policy else "",
+    "Mức ưu tiên": lambda t: t.priority.priority_name if t.priority else "",
+    "Giao cho": lambda t: str(t.owner_user) if t.owner_user else "",
+    "Phân công xử lý": lambda t: (
+        t.assigned_unit.unit_name if t.assigned_unit else ""
+    ),
+    "Chi nhánh xử lý": lambda t: (
+        t.handling_branch.branch_name if t.handling_branch else ""
+    ),
+    "Hướng xử lý": lambda t: t.handling_solution or "",
+    "Có gửi khảo sát": lambda t: "Có" if t.send_survey else "Không",
+}
+
+TICKET_DETAIL_RELATIONS = (
+    "customer",
+    "customer_account",
+    "owner_user",
+    "assigned_employee",
+    "assigned_unit",
+    "handling_branch",
+    "sla_policy",
+    "priority",
+    "current_status",
+)
+
+
+def snapshot_tracked_fields(ticket):
+    """Chụp giá trị hiển thị của các trường theo dõi, để so trước/sau."""
+    return {
+        label: getter(ticket) for label, getter in TRACKED_TICKET_FIELDS.items()
+    }
+
+
+def reload_ticket_with_relations(pk):
+    """Nạp lại ticket kèm quan hệ để tên hiển thị trong log/response đúng."""
+    return TicketChatbot.objects.select_related(*TICKET_DETAIL_RELATIONS).get(
+        pk=pk
+    )
+
+
+def write_ticket_activity_logs(ticket, before, after, user):
+    """Ghi một dòng log cho mỗi trường có thay đổi."""
+    from apps.chatbots.models import TicketChatbotActivityLog
+
+    now = timezone.now()
+    logs = []
+
+    for label in TRACKED_TICKET_FIELDS:
+        old = before.get(label, "")
+        new = after.get(label, "")
+
+        if old == new:
+            continue
+
+        logs.append(
+            TicketChatbotActivityLog(
+                ticket=ticket,
+                action_type="AMEND",
+                action_name=f"Sửa {label}",
+                old_value=str(old) if old else "",
+                new_value=str(new) if new else "",
+                created_by_user=user,
+                created_at=now,
+            )
+        )
+
+    if logs:
+        TicketChatbotActivityLog.objects.bulk_create(logs)
+
 
 class StandardResultsSetPagination(PageNumberPagination):
     page_size = 20
@@ -243,10 +322,24 @@ class ChatbotDashboardOverviewAPIView(ChatbotDashboardFilterMixin, APIView):
             summaries.filter(outcome_type__in=TOPIC_OUTCOMES)
         )
 
+        # Ticket chatbot chưa ai xử lý: trạng thái "Mở" VÀ chưa có người nhận.
+        # Hai điều kiện vì dữ liệu có thể lệch — ticket được gán owner qua
+        # PATCH mà trạng thái chưa kịp lên "Tiếp nhận".
+        pending_qs = summaries.filter(
+            outcome_type=OUTCOME_CCC,
+            ticket_chatbot__current_status__status_code=(
+                TicketChatbot.STATUS_CHO_TIEP_NHAN
+            ),
+            ticket_chatbot__owner_user__isnull=True,
+        )
+
+        pending_total = pending_qs.count()
+
         latest_ccc = (
-            summaries.filter(outcome_type=OUTCOME_CCC)
-            .select_related("ticket", "ticket__current_status")
-            .order_by("-started_at", "-id")[:5]
+            pending_qs.select_related(
+                "ticket_chatbot",
+                "ticket_chatbot__current_status",
+            ).order_by("-started_at", "-id")[:5]
         )
 
         return Response(
@@ -282,6 +375,8 @@ class ChatbotDashboardOverviewAPIView(ChatbotDashboardFilterMixin, APIView):
                         latest_ccc,
                         many=True,
                     ).data,
+                    # Tổng số ticket chưa tiếp nhận (không chỉ 5 dòng hiển thị)
+                    "pending_ticket_total": pending_total,
                     "top_faqs": self.get_top_faqs(logs, limit=5),
                 },
             }
@@ -519,58 +614,6 @@ class TicketChatbotDetailAPIView(APIView):
         "priority",
     ]
 
-    # Các trường được theo dõi để ghi lịch sử: (nhãn, cách lấy giá trị hiển thị)
-    TRACKED_FIELDS = {
-        "Tình trạng": lambda t: t.status_label,
-        "Danh mục SLA": lambda t: t.sla_policy.sla_name if t.sla_policy else "",
-        "Mức ưu tiên": lambda t: t.priority.priority_name if t.priority else "",
-        "Giao cho": lambda t: str(t.owner_user) if t.owner_user else "",
-        "Phân công xử lý": lambda t: (
-            t.assigned_unit.unit_name if t.assigned_unit else ""
-        ),
-        "Chi nhánh xử lý": lambda t: (
-            t.handling_branch.branch_name if t.handling_branch else ""
-        ),
-        "Hướng xử lý": lambda t: t.handling_solution or "",
-        "Có gửi khảo sát": lambda t: "Có" if t.send_survey else "Không",
-    }
-
-    def _snapshot(self, ticket):
-        """Chụp giá trị hiển thị của các trường theo dõi, để so trước/sau."""
-        return {
-            label: getter(ticket)
-            for label, getter in self.TRACKED_FIELDS.items()
-        }
-
-    def _write_activity_logs(self, ticket, before, after, user):
-        """Ghi một dòng log cho mỗi trường có thay đổi."""
-        from apps.chatbots.models import TicketChatbotActivityLog
-
-        now = timezone.now()
-        logs = []
-
-        for label in self.TRACKED_FIELDS:
-            old = before.get(label, "")
-            new = after.get(label, "")
-
-            if old == new:
-                continue
-
-            logs.append(
-                TicketChatbotActivityLog(
-                    ticket=ticket,
-                    action_type="AMEND",
-                    action_name=f"Sửa {label}",
-                    old_value=str(old) if old else "",
-                    new_value=str(new) if new else "",
-                    created_by_user=user,
-                    created_at=now,
-                )
-            )
-
-        if logs:
-            TicketChatbotActivityLog.objects.bulk_create(logs)
-
     def patch(self, request, pk):
         """Cập nhật ticket từ trang chi tiết. Ghi lịch sử từng trường đổi."""
         ticket = TicketChatbot.objects.filter(pk=pk).first()
@@ -579,7 +622,7 @@ class TicketChatbotDetailAPIView(APIView):
             return Response({"detail": "Không tìm thấy ticket."}, status=404)
 
         # Chụp trạng thái trước khi sửa, để so ra field nào đổi
-        before = self._snapshot(ticket)
+        before = snapshot_tracked_fields(ticket)
 
         update_fields = []
 
@@ -607,10 +650,7 @@ class TicketChatbotDetailAPIView(APIView):
 
             # Cùng quy tắc với ticket thường: đã vượt SLA thì phải khai lý do
             # trước khi đưa ticket về trạng thái kết thúc.
-            closing = new_code in (
-                TicketChatbot.STATUS_DA_XONG,
-                TicketChatbot.STATUS_CHO_HUY,
-            )
+            closing = new_code in CLOSING_STATUS_CODES
             has_reason = ticket.breach_reason_id or ticket.breach_note
 
             if closing and ticket.is_sla_overdue and not has_reason:
@@ -653,6 +693,8 @@ class TicketChatbotDetailAPIView(APIView):
             update_fields += ["accepted_at", "accepted_by_user"]
 
         if update_fields:
+            # updated_at không auto_now, phải gán tay mới thực sự được ghi
+            ticket.updated_at = timezone.now()
             update_fields.append("updated_at")
             ticket.save(update_fields=update_fields)
 
@@ -661,21 +703,11 @@ class TicketChatbotDetailAPIView(APIView):
             ticket.apply_sla_policy()
 
         # Trả lại có select_related để tên hiển thị đúng
-        ticket = TicketChatbot.objects.select_related(
-            "customer",
-            "customer_account",
-            "owner_user",
-            "assigned_employee",
-            "assigned_unit",
-            "handling_branch",
-            "sla_policy",
-            "priority",
-            "current_status",
-        ).get(pk=ticket.pk)
+        ticket = reload_ticket_with_relations(ticket.pk)
 
         # Ghi lịch sử: so trạng thái sau với trước, mỗi field đổi một dòng log
-        after = self._snapshot(ticket)
-        self._write_activity_logs(ticket, before, after, request.user)
+        after = snapshot_tracked_fields(ticket)
+        write_ticket_activity_logs(ticket, before, after, request.user)
 
         return Response(TicketChatbotSerializer(ticket).data)
 
@@ -731,9 +763,12 @@ class TicketChatbotClaimAPIView(APIView):
                 status=409,
             )
 
+        now = timezone.now()
+
         ticket.owner_user = request.user
         ticket.accepted_by_user = request.user
-        ticket.accepted_at = timezone.now()
+        ticket.accepted_at = now
+        ticket.updated_at = now
         update_fields = [
             "owner_user",
             "accepted_by_user",
@@ -773,18 +808,50 @@ class TicketChatbotChangeStatusAPIView(APIView):
                 status=400,
             )
 
+        before = snapshot_tracked_fields(ticket)
+
+        # Cùng quy tắc với PATCH: đã vượt SLA thì phải khai lý do trước khi
+        # đưa ticket về trạng thái kết thúc. Không có chốt này thì đây là
+        # đường vòng để đóng ticket trễ mà không giải trình.
+        closing = new_code in CLOSING_STATUS_CODES
+        has_reason = ticket.breach_reason_id or ticket.breach_note
+
+        if closing and ticket.is_sla_overdue and not has_reason:
+            return Response(
+                {
+                    "detail": "Ticket đã vượt SLA. "
+                    "Cần nhập lý do vượt SLA trước khi đóng ticket."
+                },
+                status=400,
+            )
+
+        now = timezone.now()
+
         ticket.current_status = status
+        ticket.updated_at = now
         update_fields = ["current_status", "updated_at"]
 
         if new_code == TicketChatbot.STATUS_DA_XONG:
-            ticket.done_at = timezone.now()
-            update_fields.append("done_at")
+            if not ticket.done_at:
+                ticket.done_at = now
+                update_fields.append("done_at")
+
+            # Đóng đúng hạn → chốt ON_TIME
+            if not ticket.is_sla_overdue:
+                ticket.sla_status = TicketChatbot.SLA_ON_TIME
+                update_fields.append("sla_status")
+
         elif new_code == TicketChatbot.STATUS_CHO_HUY:
-            ticket.cancelled_at = timezone.now()
+            ticket.cancelled_at = now
             ticket.cancelled_reason = request.data.get("cancelled_reason", "")
             update_fields += ["cancelled_at", "cancelled_reason"]
 
         ticket.save(update_fields=update_fields)
+
+        # Ghi lịch sử như PATCH, để đổi trạng thái qua đường này vẫn có vết
+        ticket = reload_ticket_with_relations(ticket.pk)
+        after = snapshot_tracked_fields(ticket)
+        write_ticket_activity_logs(ticket, before, after, request.user)
 
         return Response(TicketChatbotSerializer(ticket).data)
 

@@ -32,6 +32,41 @@ from apps.accounts.serializers import (
 
 User = get_user_model()
 
+# Vai trò cấp cao: chỉ superuser hoặc SYSTEM_ADMIN mới được gán
+PRIVILEGED_ROLE_CODES = {"SYSTEM_ADMIN"}
+
+
+def _can_grant_privileged_roles(user):
+    """Người dùng có được phép gán vai trò đặc quyền không."""
+    if user is None or not user.is_authenticated:
+        return False
+
+    if user.is_superuser:
+        return True
+
+    return any(
+        role.role_code in PRIVILEGED_ROLE_CODES
+        for role in PermissionService.get_user_roles(user)
+    )
+
+
+def _privileged_roles_denied_for(user, roles):
+    """
+    Tên các vai trò đặc quyền mà user KHÔNG được phép gán.
+
+    Ngoài SYSTEM_ADMIN, mọi vai trò có scope ALL cũng được coi là đặc quyền
+    vì nó mở toàn bộ dữ liệu hệ thống.
+    """
+    if _can_grant_privileged_roles(user):
+        return []
+
+    return [
+        role.role_name or role.role_code
+        for role in roles
+        if role.role_code in PRIVILEGED_ROLE_CODES
+        or (role.scope_type or "").upper() == "ALL"
+    ]
+
 
 class UserViewSet(viewsets.ModelViewSet):
     permission_classes = [IsSystemManager]
@@ -178,6 +213,7 @@ class UserViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
 
         user = serializer.save()
+        generated_password = getattr(serializer, "_generated_password", None)
 
         user = (
             User.objects.select_related(
@@ -191,10 +227,13 @@ class UserViewSet(viewsets.ModelViewSet):
             .get(id=user.id)
         )
 
-        return Response(
-            UserSerializer(user).data,
-            status=status.HTTP_201_CREATED,
-        )
+        data = UserSerializer(user).data
+
+        # Mật khẩu ngẫu nhiên chỉ trả về đúng lần này, không lưu ở đâu khác
+        if generated_password:
+            data["generated_password"] = generated_password
+
+        return Response(data, status=status.HTTP_201_CREATED)
     @action(detail=True, methods=["post"], url_path="set-roles")
     @transaction.atomic
     def set_roles(self, request, pk=None):
@@ -206,6 +245,23 @@ class UserViewSet(viewsets.ModelViewSet):
         role_ids = serializer.validated_data["role_ids"]
 
         roles = Role.objects.filter(id__in=role_ids)
+
+        # Chặn leo thang đặc quyền: người không phải SYSTEM_ADMIN/superuser
+        # không được gán vai trò quản trị hệ thống hay phạm vi toàn hệ thống
+        # cho bất kỳ ai, kể cả cho chính mình.
+        denied = _privileged_roles_denied_for(request.user, roles)
+
+        if denied:
+            return Response(
+                {
+                    "detail": (
+                        "Bạn không có quyền gán vai trò: "
+                        f"{', '.join(denied)}."
+                    )
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         now = timezone.now()
 
         UserRole.objects.filter(user=user).delete()

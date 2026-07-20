@@ -69,6 +69,43 @@ def filter_tickets_by_user(queryset, user):
     return queryset.none()
 
 
+def filter_companies_by_user(queryset, user):
+    """
+    Lọc công ty theo phạm vi của user.
+
+    Company không có cột branch nên không lọc trực tiếp được như Customer.
+    Quy ước: user thấy công ty nào có ít nhất một khách hàng nằm trong
+    phạm vi của mình, cộng với công ty do chính mình tạo (vừa tạo xong
+    nhưng chưa gắn khách hàng nào thì vẫn phải nhìn thấy).
+    """
+    if not user or not user.is_authenticated:
+        return queryset.none()
+
+    if user.is_superuser:
+        return queryset
+
+    scope = get_user_scope(user)
+
+    if scope == "ALL":
+        return queryset
+
+    if scope not in ["BRANCH", "MULTI_BRANCH", "OWN"]:
+        return queryset.none()
+
+    from apps.customers.models import Customer
+
+    visible_customers = filter_customers_by_user(Customer.objects.all(), user)
+    company_ids = (
+        visible_customers.exclude(company__isnull=True)
+        .values_list("company_id", flat=True)
+        .distinct()
+    )
+
+    return queryset.filter(
+        Q(id__in=company_ids) | Q(created_by_user=user)
+    ).distinct()
+
+
 def filter_customers_by_user(queryset, user):
     if not user or not user.is_authenticated:
         return queryset.none()

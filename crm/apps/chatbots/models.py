@@ -447,6 +447,7 @@ class TicketChatbot(TimeStampedModel):
         self.resolution_due_at = minutes(policy.resolution_time_minutes)
         self.sla_status = self.SLA_PROCESSING
         self.breached_at = None
+        self.updated_at = now
 
         if save:
             self.save(

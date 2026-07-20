@@ -17,6 +17,7 @@ from apps.kpis.models import (
     KpiUserSummary,
     KpiUserTarget,
 )
+from apps.kpis.auto_calculation import get_result_status
 from apps.kpis.services import create_monthly_kpi_period
 
 User = get_user_model()
@@ -774,13 +775,9 @@ class KpiManualScoreSerializer(serializers.Serializer):
                 "target_value": effective_target_value,
                 "score": score,
                 "weight_percent": metric.weight_percent,
-                "result_status": (
-                    KpiUserMetricResult.STATUS_GOOD
-                    if score >= 80
-                    else KpiUserMetricResult.STATUS_WARNING
-                    if score >= 70
-                    else KpiUserMetricResult.STATUS_BAD
-                ),
+                # Dùng chung thang với KPI tự động, nếu không cùng một cột
+                # result_status sẽ mang hai ý nghĩa khác nhau tùy nguồn chấm.
+                "result_status": get_result_status(score),
                 "scored_by_user": request.user if request else None,
                 "scored_at": timezone.now(),
                 "note": note,

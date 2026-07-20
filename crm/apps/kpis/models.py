@@ -348,11 +348,13 @@ class KpiPeriodMetric(TimeStampedModel):
     UNIT_COUNT = "COUNT"
     UNIT_PERCENT = "PERCENT"
     UNIT_VND = "VND"
+    UNIT_SCORE = "SCORE"
 
     TARGET_UNIT_CHOICES = [
         (UNIT_COUNT, "Số lượng"),
         (UNIT_PERCENT, "%"),
         (UNIT_VND, "VND"),
+        (UNIT_SCORE, "Điểm"),
     ]
 
     period = models.ForeignKey(

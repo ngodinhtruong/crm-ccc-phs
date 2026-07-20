@@ -4,6 +4,7 @@ from rest_framework import serializers
 from apps.accounts.models import Permission, Role, RolePermission, UserBranchAccess, UserRole
 from apps.branches.models import Branch, Employee
 from django.utils import timezone
+from django.utils.crypto import get_random_string
 
 
 User = get_user_model()
@@ -51,6 +52,38 @@ class UserSerializer(serializers.ModelSerializer):
             "password",
         ]
         read_only_fields = ["is_superuser"]
+
+    def validate_is_staff(self, value):
+        """
+        is_staff mở cửa vào Django admin, nên chỉ superuser hoặc
+        SYSTEM_ADMIN được đặt. Nếu không, một CS_MANAGER có thể tự cấp
+        cho mình quyền vào admin và vượt qua mọi phân quyền của API.
+        """
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+
+        # Không đổi giá trị thì không cần kiểm tra
+        if self.instance is not None and self.instance.is_staff == value:
+            return value
+
+        if not value:
+            return value
+
+        if user is not None and user.is_superuser:
+            return value
+
+        from apps.accounts.services import PermissionService
+
+        role_codes = {
+            role.role_code for role in PermissionService.get_user_roles(user)
+        }
+
+        if "SYSTEM_ADMIN" in role_codes:
+            return value
+
+        raise serializers.ValidationError(
+            "Bạn không có quyền cấp quyền truy cập trang quản trị."
+        )
 
     def get_employee_name(self, obj):
         return obj.employee.full_name if obj.employee else ""
@@ -465,9 +498,16 @@ class UserCreateWithAccessSerializer(serializers.Serializer):
             employee=employee,
             **validated_data,
         )
-        if not password:
-            password = f"{user.username}123"
-        user.set_password(password)
+
+        if password:
+            user.set_password(password)
+        else:
+            # Không đặt mật khẩu suy ra từ username (kiểu "<username>123"):
+            # ai biết quy ước đặt tên đều đăng nhập được vào tài khoản mới.
+            # Sinh chuỗi ngẫu nhiên và trả về đúng một lần cho người tạo.
+            password = get_random_string(12)
+            user.set_password(password)
+            self._generated_password = password
 
         user.save()
 

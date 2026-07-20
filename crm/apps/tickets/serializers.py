@@ -174,6 +174,9 @@ class TicketReadSerializer(serializers.ModelSerializer):
     current_status_name = serializers.SerializerMethodField()
     status_name = serializers.SerializerMethodField()
 
+    # Khảo sát nằm ở bảng TicketFeedback (OneToOne), không phải cột của Ticket
+    send_survey = serializers.SerializerMethodField()
+
     priority_name = serializers.SerializerMethodField()
     source_name = serializers.SerializerMethodField()
     sla_policy_name = serializers.SerializerMethodField()
@@ -247,6 +250,7 @@ class TicketReadSerializer(serializers.ModelSerializer):
             "request_content",
             "handling_solution",
             "final_response",
+            "send_survey",
 
             "created_at",
             "updated_at",
@@ -309,6 +313,12 @@ class TicketReadSerializer(serializers.ModelSerializer):
 
     def get_status_name(self, obj):
         return obj.current_status.status_name if obj.current_status else None
+
+    def get_send_survey(self, obj):
+        """Đã gửi khảo sát chưa — đọc từ TicketFeedback, mặc định False."""
+        feedback = getattr(obj, "feedback", None)
+
+        return bool(feedback.survey_sent) if feedback else False
 
     def get_priority_name(self, obj):
         return obj.priority.priority_name if obj.priority else None

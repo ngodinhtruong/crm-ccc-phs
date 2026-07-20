@@ -26,7 +26,10 @@ from apps.customers.serializers import (
 from django.db.models import Q
 
 from apps.accounts.api_permissions import HasActionPermission, MasterDataPermission
-from apps.accounts.scopes import filter_customers_by_user
+from apps.accounts.scopes import (
+    filter_companies_by_user,
+    filter_customers_by_user,
+)
 
 class CustomerTypeViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
@@ -53,6 +56,10 @@ class CompanyViewSet(viewsets.ModelViewSet):
             "membership_tier",
             "assigned_employee",
         ).all()
+
+        # Company không có cột branch nên phải lọc gián tiếp qua khách hàng,
+        # nếu không mọi user đều xem được toàn bộ công ty (gồm cả MST, số TK).
+        queryset = filter_companies_by_user(queryset, self.request.user)
 
         params = self.request.query_params
 

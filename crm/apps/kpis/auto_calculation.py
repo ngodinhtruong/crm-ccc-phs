@@ -39,8 +39,10 @@ AUTO_FORMULA_BY_PROFILE_AND_METRIC = {
         "B4_28": "group_conversion_rate",
     },
     SA_SUP_PROFILE_CODE: {
-        "B1_01": "team_call_target_completion_rate",
-        "B1_02": "team_data_quality_rate",
+        # Mã phải khớp defaults.py (B1_17 / B1_18). Trước đây map nhầm sang
+        # B1_01/B1_02 nên toàn bộ KPI tự động của SA_SUP im lặng trả 0.
+        "B1_17": "team_call_target_completion_rate",
+        "B1_18": "team_data_quality_rate",
     },
 }
 

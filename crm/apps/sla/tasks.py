@@ -19,7 +19,7 @@ from django.core.cache import cache
 from django.db.models import Q
 from django.utils import timezone
 
-from apps.common.constants import SlaStatus
+from apps.common.constants import SlaStatus, TicketStatusCode
 from apps.sla.models import (
     SlaEscalationRule,
     TicketAlert,
@@ -27,8 +27,12 @@ from apps.sla.models import (
     TicketSlaTracking,
 )
 
-# Trạng thái coi như ticket đã kết thúc → không quét nữa
-CLOSED_STATUS_CODES = ("CLOSED", "CANCELLED", "DA_XONG", "CHO_HUY")
+# Trạng thái coi như ticket đã kết thúc → không quét nữa.
+# Dùng hằng số thay vì chuỗi rời để không lệch khi đổi mã trạng thái.
+CLOSED_STATUS_CODES = (
+    TicketStatusCode.CLOSED,
+    TicketStatusCode.CANCELLED,
+)
 
 ALERT_SLA_OVERDUE = "SLA_OVERDUE"
 ALERT_SLA_72H = "SLA_72H_OVERDUE"
@@ -235,6 +239,114 @@ def scan_chatbot_tickets():
 # Ticket ở "Đã xong" quá số phút này thì tự đóng
 AUTO_CLOSE_AFTER_MINUTES = 60
 
+# Ghi trong log để phân biệt với thao tác của người dùng thật
+AUTO_CLOSE_NOTE = (
+    f"Hệ thống tự đóng sau {AUTO_CLOSE_AFTER_MINUTES} phút "
+    "kể từ khi ticket ở trạng thái Đã xong."
+)
+
+
+def _close_process_log(ticket, now):
+    """Đóng khoảng thời gian đang mở ở TicketProcessLog và tính số phút."""
+    from apps.tickets.models import TicketProcessLog
+
+    current_log = (
+        TicketProcessLog.objects.filter(ticket=ticket, end_at__isnull=True)
+        .order_by("-start_at", "-id")
+        .first()
+    )
+
+    if current_log is None:
+        return
+
+    current_log.end_at = now
+    update_fields = ["end_at"]
+
+    if current_log.start_at is not None:
+        duration = (now - current_log.start_at).total_seconds()
+        current_log.duration_minutes = int(duration // 60)
+        update_fields.append("duration_minutes")
+
+    current_log.save(update_fields=update_fields)
+
+
+def _write_auto_close_logs(ticket, from_status, to_status, now):
+    """
+    Ghi vết cho ticket thường.
+
+    Auto-close không đi qua TicketService.update_status nên phải tự ghi log,
+    nếu không việc đóng ticket sẽ biến mất khỏi lịch sử.
+    """
+    from apps.common.constants import TicketActionType
+    from apps.tickets.models import TicketActivityLog, TicketUpdateLog
+
+    TicketUpdateLog.objects.create(
+        ticket=ticket,
+        action_type=TicketActionType.CLOSE,
+        from_status=from_status,
+        to_status=to_status,
+        note=AUTO_CLOSE_NOTE,
+        created_by_user=None,
+        created_at=now,
+    )
+
+    TicketActivityLog.objects.create(
+        ticket=ticket,
+        action_type=TicketActionType.CLOSE,
+        action_name="Tự động đóng ticket",
+        old_value=from_status.status_name if from_status else "",
+        new_value=to_status.status_name if to_status else "",
+        created_by_user=None,
+        created_at=now,
+        note=AUTO_CLOSE_NOTE,
+    )
+
+
+def _finalize_sla_tracking(ticket, now):
+    """Chốt mốc closed_at và kết luận SLA trên bảng tracking."""
+    tracking = getattr(ticket, "sla_tracking", None)
+
+    if tracking is None:
+        return
+
+    update_fields = ["updated_at"]
+    tracking.updated_at = now
+
+    if tracking.closed_at is None:
+        tracking.closed_at = now
+        update_fields.append("closed_at")
+
+    if tracking.sla_status != SlaStatus.OVERDUE:
+        overdue = bool(
+            tracking.breached_at
+            or (
+                tracking.resolution_due_at
+                and now > tracking.resolution_due_at
+            )
+        )
+        tracking.sla_status = (
+            SlaStatus.OVERDUE if overdue else SlaStatus.ON_TIME
+        )
+        update_fields.append("sla_status")
+
+    tracking.save(update_fields=update_fields)
+
+
+def _write_chatbot_auto_close_log(ticket, from_label, now):
+    """Ghi vết auto-close cho ticket chatbot."""
+    from apps.chatbots.models import TicketChatbotActivityLog
+
+    TicketChatbotActivityLog.objects.create(
+        ticket=ticket,
+        action_type="UPDATE_STATUS",
+        action_name="Tự động đóng ticket",
+        old_value=from_label or "",
+        new_value=ticket.status_label or "",
+        created_by_user=None,
+        created_at=now,
+        note=AUTO_CLOSE_NOTE,
+    )
+
 
 def auto_close_done_tickets():
     """
@@ -249,19 +361,23 @@ def auto_close_done_tickets():
     threshold = now - timedelta(minutes=AUTO_CLOSE_AFTER_MINUTES)
     result = {"normal_closed": 0, "chatbot_closed": 0}
 
-    closed_status = TicketStatus.objects.filter(status_code="CLOSED").first()
+    closed_status = TicketStatus.objects.filter(
+        status_code=TicketStatusCode.CLOSED
+    ).first()
     if not closed_status:
         return result
 
     # ── Ticket thường: mốc completed_at nằm ở TicketSlaTracking ──
     normal = (
         Ticket.objects.select_related("current_status", "sla_tracking")
-        .filter(current_status__status_code="DONE_WAIT_CLOSE")
+        .filter(current_status__status_code=TicketStatusCode.DONE_WAIT_CLOSE)
         .filter(sla_tracking__completed_at__isnull=False)
         .filter(sla_tracking__completed_at__lt=threshold)
     )
 
     for ticket in normal:
+        from_status = ticket.current_status
+
         ticket.current_status = closed_status
         ticket.closed_at = now
         ticket.is_locked_for_amend = True
@@ -274,19 +390,40 @@ def auto_close_done_tickets():
                 "updated_at",
             ]
         )
+
+        _close_process_log(ticket, now)
+        _write_auto_close_logs(ticket, from_status, closed_status, now)
+        _finalize_sla_tracking(ticket, now)
+
         result["normal_closed"] += 1
 
     # ── Ticket chatbot: mốc done_at nằm ngay trên ticket ──
     chatbot = (
         TicketChatbot.objects.select_related("current_status")
-        .filter(current_status__status_code="DONE_WAIT_CLOSE")
+        .filter(current_status__status_code=TicketStatusCode.DONE_WAIT_CLOSE)
         .filter(done_at__isnull=False, done_at__lt=threshold)
     )
 
     for ticket in chatbot:
+        from_label = ticket.status_label
+
         ticket.current_status = closed_status
+
+        # Chốt kết luận SLA ngay lúc đóng, không để treo None
+        if ticket.sla_status != TicketChatbot.SLA_OVERDUE:
+            ticket.sla_status = (
+                TicketChatbot.SLA_OVERDUE
+                if ticket.is_sla_overdue
+                else TicketChatbot.SLA_ON_TIME
+            )
+
         ticket.updated_at = now
-        ticket.save(update_fields=["current_status", "updated_at"])
+        ticket.save(
+            update_fields=["current_status", "sla_status", "updated_at"]
+        )
+
+        _write_chatbot_auto_close_log(ticket, from_label, now)
+
         result["chatbot_closed"] += 1
 
     return result
