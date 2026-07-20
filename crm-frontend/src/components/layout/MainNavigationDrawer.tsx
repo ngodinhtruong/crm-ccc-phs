@@ -100,11 +100,11 @@ const mainMenuItemsByWorkspace: Record<WorkspaceCode, MainMenuItem[]> = {
       icon: Gauge,
     },
     {
-      title: "KHÁCH HÀNG",
-      href: "/customers",
-      icon: Users,
-      panel: "customers",
+      title: "CHATBOTS",
+      href: "/chatbots/dashboard",
+      icon: BotMessageSquare,
     },
+    
     // {
     //   title: "KHẢO SÁT",
     //   href: "/surveys",
@@ -253,21 +253,21 @@ const panelGroupsByWorkspace: Record<
       {
         title: "CSKH",
         items: [
-          {
-            title: "Dashboard CCC",
-            href: "/tickets/dashboard",
-            icon: Gauge,
-          },
+          // {
+          //   title: "Dashboard CCC",
+          //   href: "/tickets/dashboard",
+          //   icon: Gauge,
+          // },
           {
             title: "Ticket",
             href: "/tickets",
             icon: FileCheck2,
           },
-          {
-            title: "Chatbots",
-            href: "/chatbots/dashboard",
-            icon: BotMessageSquare,
-          },
+          // {
+          //   title: "Chatbots",
+          //   href: "/chatbots/dashboard",
+          //   icon: BotMessageSquare,
+          // },
           // {
           //   title: "Kho kiến thức",
           //   href: "/knowledge-base",
@@ -325,139 +325,139 @@ const panelGroupsByWorkspace: Record<
       },
     ],
 
-  //   reports: [
-  //     {
-  //       title: "BÁO CÁO",
-  //       items: [
-  //         {
-  //           title: "Tất cả các báo cáo",
-  //           href: "/reports",
-  //           icon: BarChart3,
-  //         },
-  //       ],
-  //     },
-  //     {
-  //       title: "Báo cáo khảo sát",
-  //       items: [
-  //         {
-  //           title: "TRẠNG THÁI CUỘC GỌI",
-  //           href: "/reports/call-status",
-  //           icon: FileBarChart,
-  //         },
-  //         {
-  //           title: "TỶ LỆ KẾT NỐI",
-  //           href: "/reports/connect-rate",
-  //           icon: FileBarChart,
-  //         },
-  //         {
-  //           title: "THỜI GIAN ĐÀM THOẠI",
-  //           href: "/reports/talk-time",
-  //           icon: FileBarChart,
-  //         },
-  //         {
-  //           title: "KẾT QUẢ VÀ HIỆU SUẤT ...",
-  //           href: "/reports/performance",
-  //           icon: FileBarChart,
-  //         },
-  //         {
-  //           title: "THỐNG KÊ SỐ LƯỢNG C...",
-  //           href: "/reports/call-count",
-  //           icon: FileBarChart,
-  //         },
-  //       ],
-  //     },
-  //     {
-  //       title: "Báo cáo Ticket",
-  //       items: [
-  //         {
-  //           title: "THỜI GIAN XỬ LÝ TICKET ...",
-  //           href: "/reports/ticket-processing-time",
-  //           icon: FileBarChart,
-  //         },
-  //         {
-  //           title: "THỜI GIAN XỬ LÝ TRUNG...",
-  //           href: "/reports/ticket-average-time",
-  //           icon: FileBarChart,
-  //         },
-  //         {
-  //           title: "THỜI GIAN XỬ LÝ TÁC VỤ...",
-  //           href: "/reports/task-processing-time",
-  //           icon: FileBarChart,
-  //         },
-  //         {
-  //           title: "THỜI GIAN XỬ LÝ TÁC VỤ...",
-  //           href: "/reports/task-average-time",
-  //           icon: FileBarChart,
-  //         },
-  //       ],
-  //     },
-  //   ],
+    //   reports: [
+    //     {
+    //       title: "BÁO CÁO",
+    //       items: [
+    //         {
+    //           title: "Tất cả các báo cáo",
+    //           href: "/reports",
+    //           icon: BarChart3,
+    //         },
+    //       ],
+    //     },
+    //     {
+    //       title: "Báo cáo khảo sát",
+    //       items: [
+    //         {
+    //           title: "TRẠNG THÁI CUỘC GỌI",
+    //           href: "/reports/call-status",
+    //           icon: FileBarChart,
+    //         },
+    //         {
+    //           title: "TỶ LỆ KẾT NỐI",
+    //           href: "/reports/connect-rate",
+    //           icon: FileBarChart,
+    //         },
+    //         {
+    //           title: "THỜI GIAN ĐÀM THOẠI",
+    //           href: "/reports/talk-time",
+    //           icon: FileBarChart,
+    //         },
+    //         {
+    //           title: "KẾT QUẢ VÀ HIỆU SUẤT ...",
+    //           href: "/reports/performance",
+    //           icon: FileBarChart,
+    //         },
+    //         {
+    //           title: "THỐNG KÊ SỐ LƯỢNG C...",
+    //           href: "/reports/call-count",
+    //           icon: FileBarChart,
+    //         },
+    //       ],
+    //     },
+    //     {
+    //       title: "Báo cáo Ticket",
+    //       items: [
+    //         {
+    //           title: "THỜI GIAN XỬ LÝ TICKET ...",
+    //           href: "/reports/ticket-processing-time",
+    //           icon: FileBarChart,
+    //         },
+    //         {
+    //           title: "THỜI GIAN XỬ LÝ TRUNG...",
+    //           href: "/reports/ticket-average-time",
+    //           icon: FileBarChart,
+    //         },
+    //         {
+    //           title: "THỜI GIAN XỬ LÝ TÁC VỤ...",
+    //           href: "/reports/task-processing-time",
+    //           icon: FileBarChart,
+    //         },
+    //         {
+    //           title: "THỜI GIAN XỬ LÝ TÁC VỤ...",
+    //           href: "/reports/task-average-time",
+    //           icon: FileBarChart,
+    //         },
+    //       ],
+    //     },
+    //   ],
 
-  //   utilities: [
-  //     {
-  //       title: "TIỆN ÍCH",
-  //       items: [
-  //         {
-  //           title: "Lịch",
-  //           href: "/utilities/calendar",
-  //           icon: CalendarDays,
-  //         },
-  //         {
-  //           title: "Tài liệu",
-  //           href: "/utilities/documents",
-  //           icon: Folder,
-  //         },
-  //         {
-  //           title: "Thùng rác",
-  //           href: "/utilities/trash",
-  //           icon: Trash2,
-  //         },
-  //         {
-  //           title: "Hộp mail",
-  //           href: "/utilities/mailbox",
-  //           icon: Inbox,
-  //         },
-  //         {
-  //           title: "Báo cáo",
-  //           href: "/utilities/reports",
-  //           icon: FileBarChart,
-  //         },
-  //       ],
-  //     },
-  //   ],
+    //   utilities: [
+    //     {
+    //       title: "TIỆN ÍCH",
+    //       items: [
+    //         {
+    //           title: "Lịch",
+    //           href: "/utilities/calendar",
+    //           icon: CalendarDays,
+    //         },
+    //         {
+    //           title: "Tài liệu",
+    //           href: "/utilities/documents",
+    //           icon: Folder,
+    //         },
+    //         {
+    //           title: "Thùng rác",
+    //           href: "/utilities/trash",
+    //           icon: Trash2,
+    //         },
+    //         {
+    //           title: "Hộp mail",
+    //           href: "/utilities/mailbox",
+    //           icon: Inbox,
+    //         },
+    //         {
+    //           title: "Báo cáo",
+    //           href: "/utilities/reports",
+    //           icon: FileBarChart,
+    //         },
+    //       ],
+    //     },
+    //   ],
 
-  //   settings: [
-  //     {
-  //       title: "CẤU HÌNH",
-  //       items: [
-  //         {
-  //           title: "Tùy chọn cá nhân",
-  //           href: "/settings/profile",
-  //           icon: UserCog,
-  //         },
-  //         {
-  //           title: "Cấu hình Telesales",
-  //           href: "/settings/telesales",
-  //           icon: Headphones,
-  //         },
-  //         {
-  //           title: "Tích hợp mạng xã ...",
-  //           href: "/settings/social-integration",
-  //           icon: Globe,
-  //         },
-  //         {
-  //           title: "Cấu hình phân bổ ...",
-  //           href: "/settings/assignment",
-  //           icon: UsersRound,
-  //         },
-  //         {
-  //           title: "Chuyển đổi Email",
-  //           href: "/settings/email-convert",
-  //           icon: MailCheck,
-  //         },
-  //       ],
-  //     },
-  //   ],
+    //   settings: [
+    //     {
+    //       title: "CẤU HÌNH",
+    //       items: [
+    //         {
+    //           title: "Tùy chọn cá nhân",
+    //           href: "/settings/profile",
+    //           icon: UserCog,
+    //         },
+    //         {
+    //           title: "Cấu hình Telesales",
+    //           href: "/settings/telesales",
+    //           icon: Headphones,
+    //         },
+    //         {
+    //           title: "Tích hợp mạng xã ...",
+    //           href: "/settings/social-integration",
+    //           icon: Globe,
+    //         },
+    //         {
+    //           title: "Cấu hình phân bổ ...",
+    //           href: "/settings/assignment",
+    //           icon: UsersRound,
+    //         },
+    //         {
+    //           title: "Chuyển đổi Email",
+    //           href: "/settings/email-convert",
+    //           icon: MailCheck,
+    //         },
+    //       ],
+    //     },
+    //   ],
   },
 
   SALE_ADMIN: {
@@ -495,7 +495,7 @@ const panelGroupsByWorkspace: Record<
     //         icon: Gauge,
     //         kpiUserOnly: true,
     //       },
-          
+
     //     ],
     //   },
     // ],
@@ -517,7 +517,7 @@ const panelGroupsByWorkspace: Record<
     //     ],
     //   },
     // ],
-    
+
     // sa_system: [
     //   {
     //     title: "HỆ THỐNG SALE ADMIN",
@@ -553,16 +553,6 @@ const panelTitleMap: Record<PanelKey, string> = {
   sa_kpi: "KPI SALE ADMIN",
   sa_import: "IMPORT EXCEL",
   sa_system: "HỆ THỐNG",
-};
-
-const getPanelWidthClass = (activePanel: PanelKey | null) => {
-  if (!activePanel) return "w-0 opacity-0";
-
-  if (activePanel === "reports") {
-    return "w-[640px] opacity-100";
-  }
-
-  return "w-[420px] opacity-100";
 };
 
 const getPanelInnerWidthClass = (activePanel: PanelKey | null) => {
@@ -638,8 +628,8 @@ function isGlobalAdmin(user?: CurrentUser | null) {
 
   return Boolean(
     typedUser.is_superuser ||
-      typedUser.is_global_admin ||
-      roleCodes.includes("SYSTEM_ADMIN")
+    typedUser.is_global_admin ||
+    roleCodes.includes("SYSTEM_ADMIN")
   );
 }
 
@@ -744,12 +734,12 @@ export function MainNavigationDrawer({
   const activeGroups =
     activePanel && activePanelWorkspace
       ? filterPanelGroups(
-          panelGroupsByWorkspace[activePanelWorkspace][activePanel] || [],
-          admin,
-          kpiDashboardUser,
-          canViewCccOnlyMenus,
-          currentUser
-        )
+        panelGroupsByWorkspace[activePanelWorkspace][activePanel] || [],
+        admin,
+        kpiDashboardUser,
+        canViewCccOnlyMenus,
+        currentUser
+      )
       : [];
 
   return (
@@ -768,9 +758,8 @@ export function MainNavigationDrawer({
           setActivePanel(null);
           setActivePanelWorkspace(null);
         }}
-        className={`fixed left-0 top-0 z-50 flex h-screen bg-[#263747] text-white shadow-2xl transition-transform duration-300 ${
-          open ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={`fixed left-0 top-0 z-50 flex h-screen bg-[#263747] text-white shadow-2xl transition-transform duration-300 ${open ? "translate-x-0" : "-translate-x-full"
+          }`}
       >
         <div className="h-screen w-[300px] overflow-y-auto border-r border-white/10 bg-[#263747]">
           <div className="flex h-[56px] items-center justify-between border-b border-white/10 px-4">
@@ -799,11 +788,10 @@ export function MainNavigationDrawer({
                 {availableWorkspaces.map((workspace) => (
                   <span
                     key={workspace}
-                    className={`rounded px-2 py-1 text-[11px] font-bold ${
-                      workspace === activeWorkspace
+                    className={`rounded px-2 py-1 text-[11px] font-bold ${workspace === activeWorkspace
                         ? "bg-[#b9d8e8] text-[#263747]"
                         : "bg-white/10 text-white/70"
-                    }`}
+                      }`}
                   >
                     {WORKSPACE_LABEL[workspace]}
                   </span>
@@ -839,6 +827,34 @@ export function MainNavigationDrawer({
                   </span>
                 </Link>
 
+                <button
+                  type="button"
+                  onPointerEnter={() => {
+                    setActivePanel("customers");
+                    setActivePanelWorkspace("CCC");
+                  }}
+                  onFocus={() => {
+                    setActivePanel("customers");
+                    setActivePanelWorkspace("CCC");
+                  }}
+                  onClick={() => {
+                    setActivePanel("customers");
+                    setActivePanelWorkspace("CCC");
+                  }}
+                  className={`flex h-[40px] w-full items-center gap-4 px-5 text-left transition hover:bg-white/10 ${
+                    activePanel === "customers" && activePanelWorkspace === "CCC"
+                      ? "bg-white/10 text-white"
+                      : "text-white/80"
+                  }`}
+                >
+                  <UsersRound size={27} className="shrink-0 text-white/70" />
+
+                  <span className="flex-1 text-[10px] font-semibold tracking-wide">
+                    KHÁCH HÀNG
+                  </span>
+
+                  <ChevronRight size={24} className="text-white/60" />
+                </button>
                 <Link
                   href="/dashboard"
                   onMouseEnter={() => {
@@ -854,6 +870,8 @@ export function MainNavigationDrawer({
                     DASHBOARD TỔNG HỢP
                   </span>
                 </Link>
+
+
 
 
 
@@ -902,13 +920,12 @@ export function MainNavigationDrawer({
                         <button
                           key={`${workspace}-${item.title}`}
                           type="button"
-                          onMouseEnter={() => {
+                          onPointerEnter={() => {
                             setActivePanel(item.panel!);
                             setActivePanelWorkspace(workspace);
                           }}
-                          className={`flex h-[40px] w-full items-center gap-4 px-5 text-left transition hover:bg-white/10 ${
-                            isActive ? "bg-white/10 text-white" : "text-white/80"
-                          }`}
+                          className={`flex h-[40px] w-full items-center gap-4 px-5 text-left transition hover:bg-white/10 ${isActive ? "bg-white/10 text-white" : "text-white/80"
+                            }`}
                         >
                           <Icon size={27} className="shrink-0 text-white/70" />
 
@@ -946,16 +963,16 @@ export function MainNavigationDrawer({
           </nav>
         </div>
 
-        <div
-          onMouseEnter={() => {
-            if (activePanel) setActivePanel(activePanel);
-          }}
-          className={`h-screen overflow-y-auto bg-[#263747] transition-all duration-300 ${getPanelWidthClass(
-            activePanel
-          )}`}
-        >
-          <div className={`${getPanelInnerWidthClass(activePanel)} px-6 py-6`}>
-            {activePanel && activePanelWorkspace && (
+        {activePanel && activePanelWorkspace && (
+          <div
+            onPointerEnter={() => {
+              // Giữ panel mở khi di chuyển chuột từ menu chính sang panel con.
+            }}
+            className={`h-screen shrink-0 overflow-y-auto overflow-x-hidden bg-[#263747] transition-[width,opacity] duration-200 ${
+              activePanel === "reports" ? "w-[640px]" : "w-[420px]"
+            }`}
+          >
+            <div className="min-w-0 px-6 py-6">
               <>
                 <div className="mb-6 flex items-center justify-between border-b border-white/10 pb-4">
                   <div className="flex min-w-0 items-center gap-3">
@@ -1019,9 +1036,9 @@ export function MainNavigationDrawer({
                   ))}
                 </div>
               </>
-            )}
+            </div>
           </div>
-        </div>
+        )}
       </aside>
     </>
   );

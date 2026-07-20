@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from apps.branches.models import Branch, Employee, ProcessingUnit
 from apps.customers.models import Customer, Company, CustomerAccount
 from apps.sla.models import SlaPolicy, SlaBreachReason
@@ -159,6 +160,8 @@ class TicketReadSerializer(serializers.ModelSerializer):
     classification_name = serializers.SerializerMethodField()
 
     customer_name = serializers.SerializerMethodField()
+    customer_phone = serializers.SerializerMethodField()
+    customer_email = serializers.SerializerMethodField()
     company_name = serializers.SerializerMethodField()
     customer_account_number = serializers.SerializerMethodField()
     display_account_number = serializers.SerializerMethodField()
@@ -187,6 +190,9 @@ class TicketReadSerializer(serializers.ModelSerializer):
     error_type_code = serializers.SerializerMethodField()
     error_type_name = serializers.SerializerMethodField()
 
+    total_duration_minutes = serializers.SerializerMethodField()
+    processing_duration_minutes = serializers.SerializerMethodField()
+
     class Meta:
         model = Ticket
         fields = [
@@ -196,6 +202,8 @@ class TicketReadSerializer(serializers.ModelSerializer):
 
             "customer",
             "customer_name",
+            "customer_phone",
+            "customer_email",
             "company",
             "company_name",
             "customer_account",
@@ -252,8 +260,13 @@ class TicketReadSerializer(serializers.ModelSerializer):
             "final_response",
             "send_survey",
 
+            "total_duration_minutes",
+            "processing_duration_minutes",
+
             "created_at",
             "updated_at",
+            "done_at",
+            "closed_at",
         ]
 
     def get_support_category_name(self, obj):
@@ -265,8 +278,27 @@ class TicketReadSerializer(serializers.ModelSerializer):
     def get_customer_name(self, obj):
         return obj.customer.full_name if obj.customer else None
 
+    def get_customer_phone(self, obj):
+        return obj.customer.phone if obj.customer else None
+
+    def get_customer_email(self, obj):
+        return obj.customer.email if obj.customer else None
+
     def get_company_name(self, obj):
         return obj.company.company_name if obj.company else None
+
+    def get_total_duration_minutes(self, obj):
+        if not obj.created_at:
+            return None
+        end_time = obj.closed_at or obj.done_at or obj.cancelled_at or timezone.now()
+        return round((end_time - obj.created_at).total_seconds() / 60, 1)
+
+    def get_processing_duration_minutes(self, obj):
+        start_time = obj.processing_started_at or obj.accepted_at or obj.created_at
+        if not start_time:
+            return None
+        end_time = obj.closed_at or obj.done_at or obj.cancelled_at or timezone.now()
+        return round((end_time - start_time).total_seconds() / 60, 1)
 
     def get_customer_account_number(self, obj):
         if not obj.customer_account:

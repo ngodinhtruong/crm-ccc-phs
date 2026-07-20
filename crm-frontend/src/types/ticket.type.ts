@@ -107,6 +107,8 @@ export type TicketListItem = {
 
     company_name?: string | null;
     customer_name?: string | null;
+    customer_phone?: string | null;
+    customer_email?: string | null;
     customer_account_number?: string | null;
     raw_account_number?: string | null;
     display_account_number?: string | null;
@@ -131,8 +133,13 @@ export type TicketListItem = {
     handling_solution?: string | null;
     final_response?: string | null;
 
+    total_duration_minutes?: number | null;
+    processing_duration_minutes?: number | null;
+
     created_at?: string | null;
     updated_at?: string | null;
+    done_at?: string | null;
+    closed_at?: string | null;
 };
 
 export type TicketListParams = {
@@ -168,6 +175,7 @@ export type TicketListParams = {
 
     customer_name?: string;
     customer_phone?: string;
+    customer_email?: string;
     customer_account_no?: string;
     raw_account_number?: string;
     account_link_status?: string;

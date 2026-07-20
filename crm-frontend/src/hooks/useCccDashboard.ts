@@ -18,12 +18,30 @@ import {
   TicketSupportCategoryOption,
 } from "@/types/ticket.type";
 
-function getCurrentPeriod() {
+function getCurrentYearStart() {
+  const now = new Date();
+  return `${now.getFullYear()}-01-01`;
+}
+
+function getCurrentYearEnd() {
+  const now = new Date();
+  return `${now.getFullYear()}-12-31`;
+}
+
+function getCurrentMonthStart() {
   const now = new Date();
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, "0");
+  return `${year}-${month}-01`;
+}
 
-  return `${year}-${month}`;
+function getCurrentMonthEnd() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const nextMonth = new Date(year, now.getMonth() + 1, 0); // Last day of month
+  const endDay = String(nextMonth.getDate()).padStart(2, "0");
+  return `${year}-${month}-${endDay}`;
 }
 
 export function useCccDashboard() {
@@ -39,9 +57,9 @@ export function useCccDashboard() {
   const [errorGroups, setErrorGroups] = useState<TicketErrorGroupOption[]>([]);
   const [errorTypes, setErrorTypes] = useState<TicketErrorTypeOption[]>([]);
 
-  const [period, setPeriod] = useState(getCurrentPeriod());
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [period, setPeriod] = useState("");
+  const [dateFrom, setDateFrom] = useState(getCurrentYearStart());
+  const [dateTo, setDateTo] = useState(getCurrentYearEnd());
   const [status, setStatus] = useState("");
   const [category, setCategory] = useState("");
   const [source, setSource] = useState("");
@@ -147,11 +165,9 @@ export function useCccDashboard() {
   };
 
   const clearFilter = () => {
-    const nextPeriod = getCurrentPeriod();
-
-    setPeriod(nextPeriod);
-    setDateFrom("");
-    setDateTo("");
+    setPeriod("");
+    setDateFrom(getCurrentYearStart());
+    setDateTo(getCurrentYearEnd());
     setStatus("");
     setCategory("");
     setSource("");
@@ -162,7 +178,7 @@ export function useCccDashboard() {
     setErrorType("");
     setRelatedSystem("");
 
-    void loadDashboard({ period: nextPeriod, recent_limit: 10 });
+    void loadDashboard({ date_from: getCurrentYearStart(), date_to: getCurrentYearEnd(), recent_limit: 10 });
   };
 
   const reload = () => {
@@ -176,7 +192,7 @@ export function useCccDashboard() {
     }
 
     void loadMasterData();
-    void loadDashboard({ period: getCurrentPeriod(), recent_limit: 10 });
+    void loadDashboard({ date_from: getCurrentYearStart(), date_to: getCurrentYearEnd(), recent_limit: 10 });
 
     // Chỉ load lần đầu khi vào dashboard, không tự reload theo từng ký tự filter.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -207,6 +223,17 @@ export function useCccDashboard() {
       setErrorType("");
     }
   }, [errorGroup, errorType, errorTypes]);
+
+  const setThisMonth = useCallback(() => {
+    const start = getCurrentMonthStart();
+    const end = getCurrentMonthEnd();
+    setPeriod("");
+    setDateFrom(start);
+    setDateTo(end);
+    void loadDashboard(
+      buildParams({ date_from: start, date_to: end, period: "" })
+    );
+  }, [buildParams, loadDashboard]);
 
   return {
     data,
@@ -249,6 +276,7 @@ export function useCccDashboard() {
     search,
     clearFilter,
     reload,
+    setThisMonth,
   };
 }
 

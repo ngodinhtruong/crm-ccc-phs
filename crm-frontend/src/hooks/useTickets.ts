@@ -13,6 +13,8 @@ import {
     TicketErrorTypeOption,
     TicketListItem,
     TicketListParams,
+    TicketPriorityOption,
+    TicketSourceOption,
     TicketStatusOption,
     TicketSupportCategoryOption,
 } from "@/types/ticket.type";
@@ -34,6 +36,8 @@ export function useTickets() {
         TicketClassificationOption[]
     >([]);
     const [statuses, setStatuses] = useState<TicketStatusOption[]>([]);
+    const [sources, setSources] = useState<TicketSourceOption[]>([]);
+    const [priorities, setPriorities] = useState<TicketPriorityOption[]>([]);
 
     const [errorGroups, setErrorGroups] = useState<TicketErrorGroupOption[]>([]);
     const [errorTypes, setErrorTypes] = useState<TicketErrorTypeOption[]>([]);
@@ -47,12 +51,16 @@ export function useTickets() {
         supportCategory: "",
         classification: "",
         currentStatus: "",
+        source: "",
+        priority: "",
         isErrorTicket: "",
         errorGroup: "",
         errorType: "",
         relatedSystem: "",
         companyName: "",
         customerName: "",
+        customerPhone: "",
+        customerEmail: "",
         ownerUserName: "",
         requestContent: "",
         createdFrom: "",
@@ -67,12 +75,16 @@ export function useTickets() {
     const supportCategory = filters.supportCategory;
     const classification = filters.classification;
     const currentStatus = filters.currentStatus;
+    const source = filters.source;
+    const priority = filters.priority;
     const isErrorTicket = filters.isErrorTicket;
     const errorGroup = filters.errorGroup;
     const errorType = filters.errorType;
     const relatedSystem = filters.relatedSystem;
     const companyName = filters.companyName;
     const customerName = filters.customerName;
+    const customerPhone = filters.customerPhone;
+    const customerEmail = filters.customerEmail;
     const ownerUserName = filters.ownerUserName;
     const requestContent = filters.requestContent;
     const createdFrom = filters.createdFrom;
@@ -107,6 +119,14 @@ export function useTickets() {
         setFilters((prev) => ({ ...prev, currentStatus: val }));
     }, []);
 
+    const setSource = useCallback((val: string) => {
+        setFilters((prev) => ({ ...prev, source: val }));
+    }, []);
+
+    const setPriority = useCallback((val: string) => {
+        setFilters((prev) => ({ ...prev, priority: val }));
+    }, []);
+
     const setIsErrorTicket = useCallback((val: string) => {
         setFilters((prev) => ({ ...prev, isErrorTicket: val }));
     }, []);
@@ -129,6 +149,14 @@ export function useTickets() {
 
     const setCustomerName = useCallback((val: string) => {
         setFilters((prev) => ({ ...prev, customerName: val }));
+    }, []);
+
+    const setCustomerPhone = useCallback((val: string) => {
+        setFilters((prev) => ({ ...prev, customerPhone: val }));
+    }, []);
+
+    const setCustomerEmail = useCallback((val: string) => {
+        setFilters((prev) => ({ ...prev, customerEmail: val }));
     }, []);
 
     const setOwnerUserName = useCallback((val: string) => {
@@ -159,6 +187,8 @@ export function useTickets() {
             customer_account_no: filters.accountNumber,
             company_name: filters.companyName,
             customer_name: filters.customerName,
+            customer_phone: filters.customerPhone,
+            customer_email: filters.customerEmail,
             owner_user_name: filters.ownerUserName,
             request_content: filters.requestContent,
             related_system: filters.relatedSystem,
@@ -168,6 +198,8 @@ export function useTickets() {
             filters.accountNumber,
             filters.companyName,
             filters.customerName,
+            filters.customerPhone,
+            filters.customerEmail,
             filters.ownerUserName,
             filters.requestContent,
             filters.relatedSystem,
@@ -203,6 +235,8 @@ export function useTickets() {
             support_category: filters.supportCategory,
             classification: filters.classification,
             current_status: filters.currentStatus,
+            source: filters.source,
+            priority: filters.priority,
             is_error_ticket: filters.isErrorTicket,
             error_group: filters.errorGroup,
             error_type: filters.errorType,
@@ -223,12 +257,16 @@ export function useTickets() {
                 categoryData,
                 classificationData,
                 statusData,
+                sourceData,
+                priorityData,
                 errorGroupData,
                 errorTypeData,
             ] = await Promise.all([
                 ticketService.getSupportCategories(),
                 ticketService.getClassifications(),
                 ticketService.getStatuses(),
+                ticketService.getSources(),
+                ticketService.getPriorities(),
                 ticketService.getErrorGroups(),
                 ticketService.getErrorTypes(),
             ]);
@@ -236,6 +274,8 @@ export function useTickets() {
             setSupportCategories(categoryData);
             setClassifications(classificationData);
             setStatuses(statusData);
+            setSources(sourceData);
+            setPriorities(priorityData);
             setErrorGroups(errorGroupData);
             setErrorTypes(errorTypeData);
         } catch (err) {
@@ -299,12 +339,16 @@ export function useTickets() {
                 support_category: filters.supportCategory,
                 classification: filters.classification,
                 current_status: filters.currentStatus,
+                source: filters.source,
+                priority: filters.priority,
                 is_error_ticket: filters.isErrorTicket,
                 error_group: filters.errorGroup,
                 error_type: filters.errorType,
                 related_system: filters.relatedSystem,
                 company_name: filters.companyName,
                 customer_name: filters.customerName,
+                customer_phone: filters.customerPhone,
+                customer_email: filters.customerEmail,
                 owner_user_name: filters.ownerUserName,
                 request_content: filters.requestContent,
                 created_from: filters.createdFrom,
@@ -323,12 +367,16 @@ export function useTickets() {
             supportCategory: "",
             classification: "",
             currentStatus: "",
+            source: "",
+            priority: "",
             isErrorTicket: "",
             errorGroup: "",
             errorType: "",
             relatedSystem: "",
             companyName: "",
             customerName: "",
+            customerPhone: "",
+            customerEmail: "",
             ownerUserName: "",
             requestContent: "",
             createdFrom: "",
@@ -371,6 +419,8 @@ export function useTickets() {
         filters.supportCategory,
         filters.classification,
         filters.currentStatus,
+        filters.source,
+        filters.priority,
         filters.isErrorTicket,
         filters.errorGroup,
         filters.errorType,
@@ -429,6 +479,8 @@ export function useTickets() {
         classifications,
         filteredClassifications,
         statuses,
+        sources,
+        priorities,
         errorGroups,
         errorTypes,
         filteredErrorTypes,
@@ -454,6 +506,12 @@ export function useTickets() {
         currentStatus,
         setCurrentStatus,
 
+        source,
+        setSource,
+
+        priority,
+        setPriority,
+
         isErrorTicket,
         setIsErrorTicket,
 
@@ -471,6 +529,12 @@ export function useTickets() {
 
         customerName,
         setCustomerName,
+
+        customerPhone,
+        setCustomerPhone,
+
+        customerEmail,
+        setCustomerEmail,
 
         ownerUserName,
         setOwnerUserName,

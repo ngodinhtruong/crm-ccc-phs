@@ -16,6 +16,14 @@ export function formatPercent(value?: number | null) {
   }).format(value || 0)}%`;
 }
 
+export function formatDecimal(value?: number | null, maximumFractionDigits = 2) {
+  if (value === null || value === undefined) return "-";
+
+  return new Intl.NumberFormat("vi-VN", {
+    maximumFractionDigits,
+  }).format(value);
+}
+
 export function formatDate(value?: string | null) {
   if (!value) return "-";
 
@@ -62,6 +70,12 @@ export function formatDuration(minutes?: number | null) {
   return remainingHours ? `${days} ngày ${remainingHours} giờ` : `${days} ngày`;
 }
 
+export function formatDays(value?: number | null) {
+  if (value === null || value === undefined) return "-";
+
+  return `${formatDecimal(value, 3)} ngày`;
+}
+
 export type SimpleChartItem = {
   key: string;
   label: string;
@@ -86,10 +100,31 @@ export function branchLabel(item: CccDashboardBranchChartItem) {
 }
 
 export function rootCauseLabel(item: CccDashboardRootCauseItem) {
-  return (
-    item.name ||
-    item.error_type_name ||
-    item.error_group_name ||
-    "Chưa xác định"
-  );
+  return item.name || item.error_type_name || item.error_group_name || "Chưa xác định";
+}
+
+export function toMonthLabel(value?: string | null) {
+  if (!value) return "-";
+
+  if (value.startsWith("Tháng")) return value;
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return value;
+
+  return `Tháng ${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+export function getMonthLabel(item: {
+  month_label?: string | null;
+  period_label?: string | null;
+  month_str?: string | null;
+  month?: string | null;
+}) {
+  return item.month_label || item.period_label || toMonthLabel(item.month_str || item.month);
+}
+
+export function ensureFiniteNumber(value?: number | null) {
+  if (typeof value !== "number" || Number.isNaN(value)) return 0;
+  return value;
 }

@@ -1,21 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
 import { RefreshCw, SlidersHorizontal, Ticket, X } from "lucide-react";
+import { useState } from "react";
 
 import {
   DateRangeFilter,
   FilterSelect,
-  FilterTextInput,
   SearchInput,
 } from "@/components/common";
 import { useCccDashboard } from "@/hooks/useCccDashboard";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
 import { CccDashboardCards } from "./CccDashboardCards";
 import { CccDashboardCharts } from "./CccDashboardCharts";
-import { CccDashboardTables } from "./CccDashboardTables";
-import { formatDateTime, formatNumber } from "./CccDashboardUtils";
+import { TicketListTable } from "./CccDashboardTables";
+import { formatDate, formatDateTime, formatNumber } from "./CccDashboardUtils";
 
 function LoadingBlock() {
   return (
@@ -70,9 +69,9 @@ function FilterPopover({
     <div className="absolute right-0 top-10 z-[70] w-[min(92vw,960px)] overflow-hidden rounded-md border border-slate-200 bg-white shadow-xl">
       <div className="flex items-start justify-between gap-3 border-b bg-white px-4 py-3">
         <div>
-          <h2 className="text-sm font-semibold text-slate-800">Bộ lọc Dashboard CCC</h2>
+          <h2 className="text-sm font-semibold text-slate-800">Bộ lọc Dashboard Ticket</h2>
           <p className="mt-0.5 text-xs text-slate-500">
-            Lọc dữ liệu theo kỳ, trạng thái, danh mục, kênh tiếp nhận, VIP tier, Linked/Unlinked và lỗi phát sinh.
+            Lọc theo kỳ, trạng thái, danh mục, nguồn, Linked/Unlinked, VIP tier và nhóm lỗi.
           </p>
         </div>
 
@@ -155,7 +154,7 @@ function FilterPopover({
 
           <div className="col-span-12 md:col-span-3">
             <FilterSelect
-              label="Danh mục nghiệp vụ"
+              label="Danh mục"
               value={dashboard.category}
               onChange={dashboard.setCategory}
               options={dashboard.supportCategories.map((item) => ({
@@ -167,31 +166,13 @@ function FilterPopover({
 
           <div className="col-span-12 md:col-span-3">
             <FilterSelect
-              label="Kênh tiếp nhận"
+              label="Nguồn"
               value={dashboard.source}
               onChange={dashboard.setSource}
               options={dashboard.sources.map((item) => ({
                 label: item.source_name,
                 value: String(item.id),
               }))}
-            />
-          </div>
-
-          <div className="col-span-12 md:col-span-3">
-            <FilterTextInput
-              label="VIP tier"
-              value={dashboard.vipTier}
-              onChange={dashboard.setVipTier}
-              placeholder="VD: VIP / 1"
-            />
-          </div>
-
-          <div className="col-span-12 md:col-span-3">
-            <FilterTextInput
-              label="Hệ thống liên quan"
-              value={dashboard.relatedSystem}
-              onChange={dashboard.setRelatedSystem}
-              placeholder="Base/Flex/API"
             />
           </div>
 
@@ -218,10 +199,43 @@ function FilterPopover({
               }))}
             />
           </div>
+
+          <div className="col-span-12 md:col-span-3">
+            <label className="mb-1 block text-xs font-medium text-slate-500">
+              VIP tier
+            </label>
+            <input
+              value={dashboard.vipTier}
+              onChange={(event) => dashboard.setVipTier(event.target.value)}
+              placeholder="Nhập VIP / tier"
+              className="h-9 w-full rounded border border-slate-300 bg-white px-2 text-xs outline-none focus:border-sky-400"
+            />
+          </div>
+
+          <div className="col-span-12 md:col-span-3">
+            <label className="mb-1 block text-xs font-medium text-slate-500">
+              Hệ thống liên quan
+            </label>
+            <input
+              value={dashboard.relatedSystem}
+              onChange={(event) => dashboard.setRelatedSystem(event.target.value)}
+              placeholder="BASE / FLEX / APP / CRM..."
+              className="h-9 w-full rounded border border-slate-300 bg-white px-2 text-xs outline-none focus:border-sky-400"
+            />
+          </div>
         </div>
       </div>
 
-      <div className="flex justify-end gap-2 border-t bg-white px-4 py-3">
+      <div className="flex items-center justify-end gap-2 border-t bg-white px-4 py-3">
+        <button
+          type="button"
+          onClick={dashboard.setThisMonth}
+          disabled={dashboard.loading}
+          className="h-9 rounded border border-slate-300 bg-white px-4 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+        >
+          Tháng này
+        </button>
+
         <button
           type="button"
           onClick={clearFilter}
@@ -253,7 +267,7 @@ function TicketTabSummary({ dashboard }: { dashboard: ReturnType<typeof useCccDa
         href="/tickets"
         className="rounded-md border border-slate-200 bg-white p-4 shadow-sm transition hover:border-sky-200 hover:bg-sky-50"
       >
-        <p className="text-xs font-medium text-slate-500">Danh sách Ticket của tôi</p>
+        <p className="text-xs font-medium text-slate-500">Danh sách Ticket</p>
         <p className="mt-2 text-2xl font-bold text-slate-800">
           {formatNumber(tabs?.all || 0)}
         </p>
@@ -261,7 +275,7 @@ function TicketTabSummary({ dashboard }: { dashboard: ReturnType<typeof useCccDa
       </Link>
 
       <Link
-        href="/tickets"
+        href="/tickets?account_link_status=LINKED"
         className="rounded-md border border-emerald-100 bg-white p-4 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50"
       >
         <p className="text-xs font-medium text-slate-500">Có TK liên kết</p>
@@ -272,14 +286,14 @@ function TicketTabSummary({ dashboard }: { dashboard: ReturnType<typeof useCccDa
       </Link>
 
       <Link
-        href="/tickets"
+        href="/tickets?account_link_status=UNLINKED"
         className="rounded-md border border-amber-100 bg-white p-4 shadow-sm transition hover:border-amber-200 hover:bg-amber-50"
       >
         <p className="text-xs font-medium text-slate-500">Chưa có TK liên kết</p>
         <p className="mt-2 text-2xl font-bold text-amber-700">
           {formatNumber(tabs?.unlinked || 0)}
         </p>
-        <p className="mt-1 text-[11px] text-slate-500">Ticket chưa xác định được khách hàng</p>
+        <p className="mt-1 text-[11px] text-slate-500">Ticket cần đối chiếu tài khoản</p>
       </Link>
     </div>
   );
@@ -292,19 +306,27 @@ function ActiveFilterSummary({
   dashboard: ReturnType<typeof useCccDashboard>;
   activeFilterCount: number;
 }) {
-  const periodLabel = dashboard.dateFrom || dashboard.dateTo
-    ? `${dashboard.dateFrom || "..."} → ${dashboard.dateTo || "..."}`
-    : dashboard.period;
+  const filter = dashboard.data?.filters;
 
   return (
-    <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+    <div className="flex flex-wrap items-center gap-2 text-xs">
+      <span className="rounded-full bg-white px-3 py-1 font-semibold text-slate-600 ring-1 ring-slate-200">
+        Kỳ dữ liệu: {formatDate(filter?.date_from)} - {formatDate(filter?.date_to)}
+      </span>
 
+      <span className="rounded-full bg-white px-3 py-1 font-semibold text-slate-600 ring-1 ring-slate-200">
+        Bộ lọc đang áp dụng: {activeFilterCount}
+      </span>
 
-      {dashboard.accountLinkStatus && (
-        <span className="rounded-full bg-sky-50 px-3 py-1 font-semibold text-sky-700 ring-1 ring-sky-100">
-          {dashboard.accountLinkStatus === "LINKED" ? "Có TK liên kết" : "Chưa có TK liên kết"}
+      {dashboard.data?.report && (
+        <span className="rounded-full bg-emerald-50 px-3 py-1 font-semibold text-emerald-700 ring-1 ring-emerald-100">
+          Báo cáo 5 tháng: {formatDate(dashboard.data.report.range_from)} - {formatDate(dashboard.data.report.range_to)}
         </span>
       )}
+
+      <span className="rounded-full bg-white px-3 py-1 font-semibold text-slate-600 ring-1 ring-slate-200">
+        Cut off: {formatDate(filter?.date_to)}
+      </span>
     </div>
   );
 }
@@ -312,26 +334,21 @@ function ActiveFilterSummary({
 export function CccDashboardPage() {
   const dashboard = useCccDashboard();
   const [filterOpen, setFilterOpen] = useState(false);
-
-  const activeFilterCount = useMemo(() => getActiveFilterCount(dashboard), [
-    dashboard.accountLinkStatus,
-    dashboard.category,
-    dashboard.dateFrom,
-    dashboard.dateTo,
-    dashboard.errorGroup,
-    dashboard.errorType,
-    dashboard.q,
-    dashboard.relatedSystem,
-    dashboard.source,
-    dashboard.status,
-    dashboard.vipTier,
-  ]);
+  const activeFilterCount = getActiveFilterCount(dashboard);
 
   return (
     <DashboardLayout
       breadcrumbs={[
-        { label: "TRANG CHỦ", href: "/tickets/dashboard" },
-        { label: "Dashboard CCC" },
+        {
+          label: "TRANG CHỦ",
+          href: "/",
+        },
+        {
+          label: "CCC",
+        },
+        {
+          label: "Dashboard Ticket",
+        },
       ]}
       rightAction={
         <div className="relative flex items-center gap-2">
@@ -380,11 +397,20 @@ export function CccDashboardPage() {
       }
     >
       <div className="space-y-4">
-        <div className="rounded-md border border-slate-200 bg-gradient-to-r from-sky-50 via-white to-emerald-50 p-5 shadow-sm">
+        <div className="rounded-md border border-slate-200 bg-gradient-to-r from-lime-50 via-white to-sky-50 p-5 shadow-sm">
           <div className="flex flex-col justify-between gap-3 md:flex-row md:items-end">
-              <h1 className="mt-1 text-xl font-bold text-slate-900">
-                CRM Mini · CCC Dashboard
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-[#00713d]">
+                Kết quả xử lý ticket
+              </p>
+              <h1 className="mt-1 text-2xl font-black uppercase tracking-tight text-slate-900">
+                Dashboard Ticket CCC
               </h1>
+              <p className="mt-1 text-xs text-slate-500">
+                Tổng hợp kết quả xử lý, nguồn, danh mục, đơn vị xử lý, SLA và NVCS.
+              </p>
+            </div>
+
             <div className="text-xs text-slate-500">
               Cập nhật: {formatDateTime(dashboard.data?.generated_at)}
             </div>
@@ -401,14 +427,21 @@ export function CccDashboardPage() {
 
         {dashboard.data && (
           <>
-            <CccDashboardCards overview={dashboard.data.overview} />
-            <TicketTabSummary dashboard={dashboard} />
-            <CccDashboardCharts charts={dashboard.data.charts} />
-            <CccDashboardTables
-              recurringIssues={dashboard.data.tables.recurring_issues}
-              auditTrail={dashboard.data.tables.audit_trail}
-              recentTickets={dashboard.data.tables.recent_tickets}
+            <TicketListTable
+              title="Ticket chưa xử lý"
+              description="Danh sách các ticket đang chờ xử lý theo bộ lọc hiện tại."
+              items={dashboard.data.tables.pending_tickets || []}
             />
+            <CccDashboardCards
+              overview={dashboard.data.overview}
+              previousPeriod={dashboard.data.previous_period}
+            />
+
+
+
+            <TicketTabSummary dashboard={dashboard} />
+
+            <CccDashboardCharts charts={dashboard.data.charts} />
           </>
         )}
       </div>
