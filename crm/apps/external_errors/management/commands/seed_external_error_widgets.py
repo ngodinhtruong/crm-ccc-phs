@@ -30,16 +30,16 @@ DEFAULT_WIDGETS = [
         "limit": 12,
     },
     {
-        "title": "Phân bổ loại lỗi",
+        "title": "Phân bổ nhóm lỗi",
         "widget_type": ExternalErrorDashboardWidget.WIDGET_DONUT,
-        "group_by": "error_type",
+        "group_by": "error_group",
         "limit": 10,
     },
     {
-        "title": "Loại lỗi theo từng thiết bị",
+        "title": "Nhóm lỗi theo từng thiết bị",
         "widget_type": ExternalErrorDashboardWidget.WIDGET_STACKED_HORIZONTAL_BAR,
         "group_by": "device",
-        "breakdown_by": "error_type",
+        "breakdown_by": "error_group",
         "limit": 10,
     },
     {

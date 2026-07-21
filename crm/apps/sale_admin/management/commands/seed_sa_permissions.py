@@ -51,16 +51,6 @@ class Command(BaseCommand):
                 "scope_type": "BRANCH",
                 "group_code": "SALE_ADMIN",
             },
-            "SA_MANAGER": {
-                "role_name": "Sale Admin Manager",
-                "scope_type": "MULTI_BRANCH",
-                "group_code": "SALE_ADMIN",
-            },
-            "SA_ADMIN": {
-                "role_name": "Sale Admin Admin",
-                "scope_type": "ALL",
-                "group_code": "SALE_ADMIN",
-            },
             "CCC_STAFF": {
                 "role_name": "CCC Staff",
                 "scope_type": "BRANCH",
@@ -69,11 +59,6 @@ class Command(BaseCommand):
             "CCC_SUPERVISOR": {
                 "role_name": "CCC Supervisor",
                 "scope_type": "BRANCH",
-                "group_code": "CCC",
-            },
-            "CCC_MANAGER": {
-                "role_name": "CCC Manager",
-                "scope_type": "ALL",
                 "group_code": "CCC",
             },
             "SYSTEM_ADMIN": {
@@ -110,31 +95,11 @@ class Command(BaseCommand):
                 "SA_DASHBOARD_VIEW",
                 "CUSTOMER_360_VIEW",
             ],
-            "SA_MANAGER": [
-                "SA_RECORD_VIEW",
-                "SA_RECORD_AUDIT_VIEW",
-                "SA_RECORD_IMPORT",
-                "SA_KPI_VIEW_SELF",
-                "SA_KPI_VIEW_BRANCH",
-                "SA_DASHBOARD_VIEW",
-                "CUSTOMER_360_VIEW",
-            ],
-            "SA_ADMIN": list(permission_map.keys()),
             "CCC_STAFF": [
                 "SA_RECORD_VIEW",
-                "SA_RECORD_AUDIT_VIEW",
-                "SA_KPI_VIEW_BRANCH",
-                "SA_DASHBOARD_VIEW",
                 "CUSTOMER_360_VIEW",
             ],
             "CCC_SUPERVISOR": [
-                "SA_RECORD_VIEW",
-                "SA_RECORD_AUDIT_VIEW",
-                "SA_KPI_VIEW_BRANCH",
-                "SA_DASHBOARD_VIEW",
-                "CUSTOMER_360_VIEW",
-            ],
-            "CCC_MANAGER": [
                 "SA_RECORD_VIEW",
                 "SA_RECORD_AUDIT_VIEW",
                 "SA_KPI_VIEW_BRANCH",
@@ -168,7 +133,6 @@ class Command(BaseCommand):
         legacy_ccc_role_permissions = {
             "CS_STAFF": role_permissions["CCC_STAFF"],
             "CS_SUPERVISOR": role_permissions["CCC_SUPERVISOR"],
-            "CS_MANAGER": role_permissions["CCC_MANAGER"],
         }
 
         for role_code, permission_codes in legacy_ccc_role_permissions.items():

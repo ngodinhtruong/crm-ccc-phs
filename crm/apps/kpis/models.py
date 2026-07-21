@@ -378,7 +378,6 @@ class KpiPeriodMetric(TimeStampedModel):
     metric_code = models.CharField(max_length=50)
     metric_name = models.CharField(max_length=255)
     weight_percent = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0.00"))
-    # work_description = models.TextField(null=True, blank=True)
     measurement_formula = models.TextField()
     target_text = models.TextField(null=True, blank=True)
     target_value = models.DecimalField(max_digits=20, decimal_places=4, null=True, blank=True)

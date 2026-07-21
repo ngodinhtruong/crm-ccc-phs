@@ -174,9 +174,6 @@ DEFAULT_KPI_PERIOD_METRICS = [{'profile_code': 'SA',
   'metric_code': 'A1_01',
   'metric_name': 'Mở Tài Khoản',
   'weight_percent': '7.00',
-  'work_description': 'Mở TK cơ sở & phái sinh: EKYC, form HĐ đúng đầy đủ, kiểm tra '
-                      'CCCD/passport/chữ ký, ghi âm xác nhận, gắn AF/ID, nhập Flex, hướng dẫn KH '
-                      'đăng nhập, lưu trữ HĐ đúng quy trình.',
   'measurement_formula': '(Số HĐ lỗi / Tổng HĐ) × 100%; KSNB hàng tháng; Log Flex; Ghi âm xác nhận',
   'target_text': '0 lỗi HĐ; 0 TK trễ duyệt; 100% lưu trữ đúng',
   'target_value': '100.00',
@@ -187,8 +184,7 @@ DEFAULT_KPI_PERIOD_METRICS = [{'profile_code': 'SA',
   'metric_code': 'A1_02',
   'metric_name': 'Lệnh Giao Dịch',
   'weight_percent': '5.00',
-  'work_description': 'Nhận phiếu lệnh từ KH tại CN/PGD: kiểm tra CCCD, số TK, chứng khoán, tiền, '
-                      'chữ ký, nhập lệnh Flex, duyệt/in phiếu, đối chiếu file tổng và lưu trữ.',
+  
   'measurement_formula': '(Số phiếu lỗi / Tổng phiếu) × 100%; Log Flex; KSNB spot check; File '
                          'phiếu lệnh hàng ngày',
   'target_text': '0 lỗi nhập lệnh; 100% kịp thời',
@@ -200,8 +196,7 @@ DEFAULT_KPI_PERIOD_METRICS = [{'profile_code': 'SA',
   'metric_code': 'A1_03',
   'metric_name': 'Lưu Ký Chứng Khoán',
   'weight_percent': '7.00',
-  'work_description': 'Quyền mua, chuyển nhượng quyền mua, thay đổi thông tin nội bộ/VSDC, chuyển '
-                      'quyền sở hữu, phong tỏa/thừa kế, lưu ký/rút CK, đóng/chuyển TK.',
+  
   'measurement_formula': '(Số hồ sơ đúng SLA / Tổng hồ sơ) × 100%; Base Workflow timestamp; VSDC '
                          'confirmation; KSNB',
   'target_text': '100% đúng SLA; 0 hồ sơ trả lại',
@@ -213,9 +208,8 @@ DEFAULT_KPI_PERIOD_METRICS = [{'profile_code': 'SA',
   'metric_code': 'A1_04',
   'metric_name': 'GD Đăng ký, nộp, chuyển, ứng tiền',
   'weight_percent': '5.00',
-  'work_description': 'Kiểm nộp tiền, chuyển khoản nội/ngoại, ĐKCT/thay đổi ĐKCT, ứng tiền, ứng cổ '
-                      'tức; kiểm tra CCCD, chữ ký, ghi âm, trình LM duyệt, lưu trữ.',
-  'measurement_formula': '(Số GD lỗi / Tổng GD) × 100%; Chứng từ + ghi âm xác nhận; Log '
+ 
+ 'measurement_formula': '(Số GD lỗi / Tổng GD) × 100%; Chứng từ + ghi âm xác nhận; Log '
                          'Flex/Portal; KSNB',
   'target_text': '100% không lỗi',
   'target_value': '100.00',
@@ -226,8 +220,7 @@ DEFAULT_KPI_PERIOD_METRICS = [{'profile_code': 'SA',
   'metric_code': 'A1_05',
   'metric_name': 'Giao dịch Ký Quỹ',
   'weight_percent': '7.00',
-  'work_description': 'Mở TKKQ, cấp hạn mức Flex, quản lý/thống kê TKKQ, trả nợ MR&DP, gia hạn, '
-                      'check room, thông báo nợ hàng ngày, hỗ trợ tính ký quỹ KH VIP.',
+  
   'measurement_formula': '(Số sai sót / Tổng nghiệp vụ ký quỹ) × 100%; Báo cáo nợ hàng ngày; Thống '
                          'kê TKKQ tháng; KSNB',
   'target_text': '0 sai sót số liệu; đúng quy định; kịp thời',
@@ -239,8 +232,6 @@ DEFAULT_KPI_PERIOD_METRICS = [{'profile_code': 'SA',
   'metric_code': 'A1_06',
   'metric_name': 'Các công việc khác',
   'weight_percent': '5.00',
-  'work_description': 'Hỗ trợ nhân viên nghỉ phép, thủ tục cho NVQLTK, chứng từ KSNB, liên hệ tòa '
-                      'nhà, VPP, báo cáo GĐCN, chuyển KH nội bộ, kiểm kê tài sản, sự kiện PHS.',
   'measurement_formula': '(Số việc xong / Tổng việc được giao) × 100%; Xác nhận GĐCN; Biên bản '
                          'KSNB; Base Wework/Base Workflow',
   'target_text': '100% hoàn thành; đúng thời hạn',
@@ -252,7 +243,6 @@ DEFAULT_KPI_PERIOD_METRICS = [{'profile_code': 'SA',
   'metric_code': 'A2_10',
   'metric_name': 'Phối hợp dự án & đề xuất cải tiến',
   'weight_percent': '6.00',
-  'work_description': 'Phối hợp dự án nâng cao chất lượng dịch vụ. Đề xuất cải tiến quy trình.',
   'measurement_formula': '(Task đúng hạn / Tổng task) × 100%; Base Wework; BOM approval',
   'target_text': '100% đúng hạn; ≥1 đề xuất/năm',
   'target_value': '100.00',
@@ -263,7 +253,6 @@ DEFAULT_KPI_PERIOD_METRICS = [{'profile_code': 'SA',
   'metric_code': 'A2_11',
   'metric_name': 'Test công cụ & khảo sát mới',
   'weight_percent': '4.00',
-  'work_description': 'Test link HĐ mới, công cụ mới. Hoàn thành khảo sát đúng hạn.',
   'measurement_formula': '(Test xong / Tổng việc được giao) × 100%; Test reports; Base Wework',
   'target_text': '100% đúng hạn',
   'target_value': '100.00',
@@ -274,7 +263,6 @@ DEFAULT_KPI_PERIOD_METRICS = [{'profile_code': 'SA',
   'metric_code': 'A3_12',
   'metric_name': 'Tuân thủ nội quy & phối hợp team',
   'weight_percent': '3.00',
-  'work_description': 'Chấp hành nội quy. Hỗ trợ đồng nghiệp, giải quyết xung đột.',
   'measurement_formula': 'Số vi phạm = 0; Biên bản; HR & LM review',
   'target_text': '0 vi phạm',
   'target_value': '100.00',
@@ -285,7 +273,6 @@ DEFAULT_KPI_PERIOD_METRICS = [{'profile_code': 'SA',
   'metric_code': 'A3_13',
   'metric_name': 'Tham gia sự kiện công ty',
   'weight_percent': '2.00',
-  'work_description': 'Tham gia đầy đủ sự kiện nội bộ PHS.',
   'measurement_formula': '(Số sự kiện tham gia / Tổng sự kiện) × 100%; Danh sách sự kiện; HR & LM '
                          'xác nhận',
   'target_text': '≥90% sự kiện',
@@ -297,7 +284,6 @@ DEFAULT_KPI_PERIOD_METRICS = [{'profile_code': 'SA',
   'metric_code': 'A4_14',
   'metric_name': 'Kiểm tra kiến thức E-learning',
   'weight_percent': '3.00',
-  'work_description': 'Bài thi nghiệp vụ trên elearning.phs.vn.',
   'measurement_formula': 'Điểm thi / Tổng điểm × 100%; Screenshot kết quả',
   'target_text': '≥80% điểm thi',
   'target_value': '80.00',
@@ -308,7 +294,6 @@ DEFAULT_KPI_PERIOD_METRICS = [{'profile_code': 'SA',
   'metric_code': 'A4_15',
   'metric_name': 'Chứng chỉ hành nghề & đào tạo',
   'weight_percent': '3.00',
-  'work_description': 'Hoàn thành chứng chỉ. Tham gia đào tạo HR & SS.',
   'measurement_formula': '(Số buổi tham gia / Tổng buổi) × 100%; Chứng chỉ; Attendance list',
   'target_text': '100% chứng chỉ; ≥90% đào tạo',
   'target_value': '90.00',
@@ -319,7 +304,6 @@ DEFAULT_KPI_PERIOD_METRICS = [{'profile_code': 'SA',
   'metric_code': 'A4_16',
   'metric_name': 'Cập nhật kiến thức mới & chia sẻ',
   'weight_percent': '3.00',
-  'work_description': 'Nắm quy định mới, sản phẩm mới. Chia sẻ kiến thức nội bộ.',
   'measurement_formula': 'Điểm quiz × 100%; Số đóng góp ghi nhận; Feedback NVQLTK',
   'target_text': '≥85% quiz; ≥1 đóng góp/năm',
   'target_value': '85.00',
@@ -330,8 +314,6 @@ DEFAULT_KPI_PERIOD_METRICS = [{'profile_code': 'SA',
   'metric_code': 'B1_17',
   'metric_name': 'Số KH được gọi / tháng',
   'weight_percent': '8.00',
-  'work_description': 'Gọi KH đã lâu không giao dịch, inactive trên 3-6 tháng. Khoảng 5-10 KH/ngày '
-                      'song song xử lý nghiệp vụ admin.',
   'measurement_formula': 'CRM: Đếm KH outbound; Call log tự động từ CRM; File quản lý KH',
   'target_text': 'Ngày: 5-10 KH; Tuần: 25-50; Tháng: ≥100 KH',
   'target_value': '100.00',
@@ -342,8 +324,6 @@ DEFAULT_KPI_PERIOD_METRICS = [{'profile_code': 'SA',
   'metric_code': 'B1_18',
   'metric_name': 'Tỷ lệ liên lạc được',
   'weight_percent': '4.00',
-  'work_description': 'Tỷ lệ KH nghe máy hoặc phản hồi khi SA gọi. Phản ánh chất lượng data và '
-                      'thời điểm gọi.',
   'measurement_formula': '(Số KH nghe máy / Tổng KH gọi) × 100%; CRM call tracking; Phân tích '
                          'khung giờ hiệu quả',
   'target_text': '≥30%',
@@ -355,8 +335,6 @@ DEFAULT_KPI_PERIOD_METRICS = [{'profile_code': 'SA',
   'metric_code': 'B2_20',
   'metric_name': 'ICP: Cập nhật phân nhóm KH sau mỗi cuộc gọi',
   'weight_percent': '4.00',
-  'work_description': 'Dựa trên phản hồi thực tế, phân KH vào các nhóm ICP trên CRM: rất tiềm '
-                      'năng, tiềm năng, nuôi dưỡng, ảo, không nghe máy.',
   'measurement_formula': 'CRM: (KH phân nhóm + có ghi chú lý do / Tổng KH gọi) × 100%; Leader '
                          'audit hàng tuần để coaching',
   'target_text': '100% KH gọi được phân nhóm trong ngày; 100% có ghi chú lý do theo chuẩn CRM',
@@ -368,8 +346,6 @@ DEFAULT_KPI_PERIOD_METRICS = [{'profile_code': 'SA',
   'metric_code': 'B2_21',
   'metric_name': 'ICP: Chất lượng data KH trên CRM',
   'weight_percent': '4.00',
-  'work_description': 'Data chính xác, không trùng, đủ thông tin bắt buộc: SĐT, email, CCCD, nhóm '
-                      'ICP, trạng thái, lịch sử giao dịch.',
   'measurement_formula': 'CRM: (Record sạch / Tổng record) × 100%; Random sample check hàng tháng; '
                          'Báo cáo data quality từ CRM',
   'target_text': '≥98% data sạch; 0 sai sót nghiêm trọng',
@@ -381,8 +357,6 @@ DEFAULT_KPI_PERIOD_METRICS = [{'profile_code': 'SA',
   'metric_code': 'B3_23',
   'metric_name': 'AAR: Số KH tái kích hoạt / tháng',
   'weight_percent': '6.00',
-  'work_description': 'KH inactive không giao dịch trên 6 tháng được SA gọi và quay lại có ít nhất '
-                      '1 giao dịch mới.',
   'measurement_formula': 'CRM: Đếm KH chuyển inactive → active; AAR = Số KH tái GD / Tổng KH '
                          'inactive được gọi × 100%; Mapping SA gọi → KH có GD mới',
   'target_text': '≥1 KH/6 tháng có ≥1 lệnh giao dịch mới',
@@ -394,8 +368,6 @@ DEFAULT_KPI_PERIOD_METRICS = [{'profile_code': 'SA',
   'metric_code': 'B3_24',
   'metric_name': 'LTV: Phí GD phát sinh từ KH tái kích hoạt',
   'weight_percent': '4.00',
-  'work_description': 'Doanh thu phí giao dịch thực tế từ KH đã tái kích hoạt, chỉ tính phí khi TK '
-                      'KH vẫn ở IB và do SA chăm sóc.',
   'measurement_formula': 'CRM: Tổng phí GD từ KH tái kích hoạt; Báo cáo phí Home/FLEX; Revenue '
                          'report chi nhánh',
   'target_text': '≥10% tổng phí target hoặc theo LM giao',
@@ -407,8 +379,6 @@ DEFAULT_KPI_PERIOD_METRICS = [{'profile_code': 'SA',
   'metric_code': 'B3_25',
   'metric_name': 'Giới thiệu chương trình Referral cho KH',
   'weight_percent': '2.00',
-  'work_description': 'SA chủ động nhắc chương trình Khách mời bạn bè với KH nhóm Tiềm năng/Rất '
-                      'tiềm năng trong mỗi cuộc gọi và ghi nhận vào CRM.',
   'measurement_formula': 'CRM: (Cuộc gọi TP/RTP có note đã giới thiệu referral / Tổng cuộc gọi '
                          'TP/RTP) × 100%; Leader kiểm tra call note hàng tuần',
   'target_text': '≥50% cuộc gọi với KH Tiềm năng & Rất tiềm năng có ghi chú đã giới thiệu Referral',
@@ -420,8 +390,6 @@ DEFAULT_KPI_PERIOD_METRICS = [{'profile_code': 'SA',
   'metric_code': 'B4_26',
   'metric_name': 'Số KH được hỗ trợ chăm sóc thành công',
   'weight_percent': '3.00',
-  'work_description': 'Hướng dẫn, hỗ trợ và chăm sóc khách hàng, giải đáp thắc mắc nghiệp vụ, log '
-                      'đầy đủ vào CRM.',
   'measurement_formula': 'CRM: Số KH được SA liên hệ hỗ trợ trong tháng, có ghi note nội dung',
   'target_text': '100% được hỗ trợ thành công; ≥90% feedback',
   'target_value': '90.00',
@@ -432,8 +400,6 @@ DEFAULT_KPI_PERIOD_METRICS = [{'profile_code': 'SA',
   'metric_code': 'B4_27',
   'metric_name': 'Số KH sử dụng dịch vụ/sản phẩm mới',
   'weight_percent': '2.00',
-  'work_description': 'SA giới thiệu sản phẩm phù hợp ICP từng KH. Chỉ tính KH thực sự đăng '
-                      'ký/kích hoạt sản phẩm sau khi SA giới thiệu.',
   'measurement_formula': 'CRM: Số KH đăng ký sản phẩm mới trong kỳ, có ghi nhận SA là người giới '
                          'thiệu',
   'target_text': '≥1 KH/quý sử dụng sản phẩm mới',
@@ -445,8 +411,6 @@ DEFAULT_KPI_PERIOD_METRICS = [{'profile_code': 'SA',
   'metric_code': 'B4_28',
   'metric_name': 'Tỷ lệ chuyển đổi nhóm KH',
   'weight_percent': '3.00',
-  'work_description': 'KH nhóm Nuôi dưỡng / Không nghe máy được nâng lên nhóm Tiềm năng hoặc Rất '
-                      'tiềm năng dựa trên phản hồi thực tế.',
   'measurement_formula': 'CRM: (Số KH chuyển lên nhóm TP/RTP / Tổng KH nhóm thấp được gọi lại '
                          'trong kỳ) × 100%',
   'target_text': '≥5% tỷ lệ chuyển đổi / quý',
@@ -458,8 +422,6 @@ DEFAULT_KPI_PERIOD_METRICS = [{'profile_code': 'SA',
   'metric_code': 'A1_01',
   'metric_name': 'Quản lý, giám sát NV giao dịch',
   'weight_percent': '5.00',
-  'work_description': 'Kiểm tra và giám sát mọi nghiệp vụ nhân viên hàng ngày. Đào tạo nhân viên '
-                      'nghiệp vụ mới, hỗ trợ xử lý tình huống.',
   'measurement_formula': '0 sai sót do thiếu hướng dẫn; >=90% feedback từ LM; nhật ký giám sát '
                          'KSNB.',
   'target_text': '100% nhân viên được giám sát; 0 sai sót.',
@@ -471,8 +433,6 @@ DEFAULT_KPI_PERIOD_METRICS = [{'profile_code': 'SA',
   'metric_code': 'A1_02',
   'metric_name': 'Giám sát mở TK và lệnh giao dịch',
   'weight_percent': '5.00',
-  'work_description': 'Giám sát nhân viên mở tài khoản EKYC, form, Flex và nhập lệnh. Xử lý các '
-                      'trường hợp phát sinh.',
   'measurement_formula': 'Tỷ lệ lỗi nhân viên dưới quyền; dữ liệu từ KSNB và log Flex.',
   'target_text': '0 lỗi hợp đồng và phiếu lệnh.',
   'target_value': '0.00',
@@ -483,8 +443,6 @@ DEFAULT_KPI_PERIOD_METRICS = [{'profile_code': 'SA',
   'metric_code': 'A1_03',
   'metric_name': 'Giám sát lưu ký, giao dịch tiền và ký quỹ',
   'weight_percent': '5.00',
-  'work_description': 'Giám sát nghiệp vụ VSDC, chuyển tiền, ĐKCT, ký quỹ. Duyệt chứng từ trước '
-                      'khi xử lý.',
   'measurement_formula': 'Tỷ lệ SLA và sai sót nhân viên; dữ liệu từ Base Workflow và VSDC '
                          'confirmation.',
   'target_text': '100% SLA; 0 sai sót ảnh hưởng khách hàng.',
@@ -496,8 +454,7 @@ DEFAULT_KPI_PERIOD_METRICS = [{'profile_code': 'SA',
   'metric_code': 'A1_04',
   'metric_name': 'Hiệu quả quản lý nhân viên',
   'weight_percent': '4.00',
-  'work_description': 'Supervisor chịu trách nhiệm liên đới lỗi nhân viên. Đảm bảo 0 vi phạm '
-                      'nghiêm trọng và nhân viên không tái phạm sau đào tạo.',
+  
   'measurement_formula': 'Tổng lỗi nhân viên / Tổng nhân viên thực hiện; dữ liệu từ biên bản KSNB '
                          'và feedback 360 độ.',
   'target_text': 'Nhân viên có 0 lỗi nghiêm trọng; feedback tích cực >=90%.',
@@ -509,8 +466,6 @@ DEFAULT_KPI_PERIOD_METRICS = [{'profile_code': 'SA',
   'metric_code': 'A1_05',
   'metric_name': 'Công việc vận hành khác',
   'weight_percent': '5.00',
-  'work_description': 'Phân công nhân viên chuẩn bị KSNB, hành chính, báo cáo Giám đốc chi nhánh. '
-                      'Kiểm tra chất lượng trước khi gửi.',
   'measurement_formula': '(Số việc hoàn thành / Tổng việc được giao) × 100%; dữ liệu từ xác nhận '
                          'GĐCN và Base workflow.',
   'target_text': '100% công việc được hoàn thành.',
@@ -522,7 +477,6 @@ DEFAULT_KPI_PERIOD_METRICS = [{'profile_code': 'SA',
   'metric_code': 'A2_08',
   'metric_name': 'Dẫn dắt dự án',
   'weight_percent': '9.00',
-  'work_description': 'Thực hiện dự án nâng cao dịch vụ hoặc vận hành. Báo cáo tiến độ cho BOM.',
   'measurement_formula': '(Task đúng hạn / Tổng task) × 100%; dữ liệu từ Base Wework và BOM '
                          'approval.',
   'target_text': '>=1 dự án/quý; 100% task đúng hạn.',
@@ -534,8 +488,6 @@ DEFAULT_KPI_PERIOD_METRICS = [{'profile_code': 'SA',
   'metric_code': 'A2_09',
   'metric_name': 'Đề xuất cải tiến sản phẩm, dịch vụ và quy trình',
   'weight_percent': '6.00',
-  'work_description': 'Đề xuất cải tiến sản phẩm, công cụ, quy trình. Xây checklist mới và đào tạo '
-                      'nhân viên.',
   'measurement_formula': 'Số đề xuất được duyệt/quý; số quy trình cải tiến; tỷ lệ nhân viên nắm '
                          'được quy trình; kết quả trước/sau cải tiến.',
   'target_text': '>=1 đề xuất sản phẩm/quý; >=1 quy trình cải tiến/quý.',
@@ -547,8 +499,6 @@ DEFAULT_KPI_PERIOD_METRICS = [{'profile_code': 'SA',
   'metric_code': 'A3_11',
   'metric_name': 'Tuân thủ và nêu gương',
   'weight_percent': '4.00',
-  'work_description': 'Nêu gương nội quy, nhắc nhở nhân viên. Đảm bảo 0 vi phạm cá nhân và đội '
-                      'nhóm.',
   'measurement_formula': 'Số vi phạm = 0; dữ liệu từ biên bản HR và LM review.',
   'target_text': '0 vi phạm.',
   'target_value': '0.00',
@@ -559,8 +509,6 @@ DEFAULT_KPI_PERIOD_METRICS = [{'profile_code': 'SA',
   'metric_code': 'A3_12',
   'metric_name': 'Xây dựng đội nhóm và sự kiện',
   'weight_percent': '7.00',
-  'work_description': 'Tạo môi trường tích cực, hỗ trợ nhân viên phát triển. Tham gia và khuyến '
-                      'khích nhân viên tham gia sự kiện.',
   'measurement_formula': 'Feedback 360 độ; kết quả KPI team; (Số sự kiện tham gia / Tổng sự kiện) '
                          '× 100%.',
   'target_text': '>=90% feedback tích cực; team đạt >=90% KPI; >=85% team tham gia sự kiện.',
@@ -572,8 +520,6 @@ DEFAULT_KPI_PERIOD_METRICS = [{'profile_code': 'SA',
   'metric_code': 'A4_13',
   'metric_name': 'Kiểm tra kiến thức và chứng chỉ',
   'weight_percent': '5.00',
-  'work_description': 'Hoàn thành điểm thi E-learning, chứng chỉ và các chương trình đào tạo HR, '
-                      'SS.',
   'measurement_formula': 'Điểm thi / Tổng điểm × 100%; (Số buổi đào tạo tham gia / Tổng buổi đào '
                          'tạo) × 100%.',
   'target_text': '>=80% điểm thi; 100% chứng chỉ; >=90% đào tạo.',
@@ -585,8 +531,6 @@ DEFAULT_KPI_PERIOD_METRICS = [{'profile_code': 'SA',
   'metric_code': 'A4_14',
   'metric_name': 'Cập nhật và lan truyền kiến thức',
   'weight_percent': '5.00',
-  'work_description': 'Nắm quy định mới và truyền đạt cho nhân viên trong 2 ngày. Chia sẻ kiến '
-                      'thức, tài liệu đào tạo.',
   'measurement_formula': 'Kết quả quiz × 100%; thời gian truyền đạt; số buổi chia sẻ và tài liệu; '
                          'feedback nhân viên.',
   'target_text': '>=85% quiz; >=2 buổi chia sẻ/năm; >=1 tài liệu/năm.',
@@ -598,8 +542,6 @@ DEFAULT_KPI_PERIOD_METRICS = [{'profile_code': 'SA',
   'metric_code': 'B1_17',
   'metric_name': 'Số KH được gọi / tháng',
   'weight_percent': '8.00',
-  'work_description': 'Gọi khách hàng đã lâu không giao dịch, inactive trên 3-6 tháng. Khoảng 5-10 '
-                      'khách hàng/ngày song song với xử lý nghiệp vụ admin.',
   'measurement_formula': 'CRM đếm cuộc gọi outbound; call log tự động từ CRM; file quản lý khách '
                          'hàng.',
   'target_text': 'Ngày: 5-10 KH; tuần: 25-50 KH; tháng: >=100 KH.',
@@ -611,8 +553,6 @@ DEFAULT_KPI_PERIOD_METRICS = [{'profile_code': 'SA',
   'metric_code': 'B1_18',
   'metric_name': 'Tỷ lệ liên lạc được',
   'weight_percent': '4.00',
-  'work_description': 'Tỷ lệ khách hàng nghe máy hoặc phản hồi khi SA gọi. Phản ánh chất lượng '
-                      'data và thời điểm gọi.',
   'measurement_formula': '(Số KH nghe máy / Tổng KH gọi) × 100%; dữ liệu từ CRM call tracking và '
                          'phân tích khung giờ hiệu quả.',
   'target_text': '>=30%.',
@@ -624,8 +564,6 @@ DEFAULT_KPI_PERIOD_METRICS = [{'profile_code': 'SA',
   'metric_code': 'B2_20',
   'metric_name': 'ICP: Cập nhật phân nhóm KH sau mỗi cuộc gọi',
   'weight_percent': '4.00',
-  'work_description': 'Dựa trên phản hồi thực tế, phân khách hàng vào nhóm ICP trên CRM: Rất tiềm '
-                      'năng, Tiềm năng, Nuôi dưỡng, Ảo, Không nghe máy.',
   'measurement_formula': 'CRM: (KH phân nhóm + có ghi chú lý do / Tổng KH gọi) × 100%; ghi chú '
                          'đúng định nghĩa nhóm CRM; leader audit hàng tuần để coaching.',
   'target_text': '100% KH gọi được phân nhóm trong ngày; 100% có ghi chú lý do theo chuẩn CRM.',
@@ -637,8 +575,6 @@ DEFAULT_KPI_PERIOD_METRICS = [{'profile_code': 'SA',
   'metric_code': 'B2_21',
   'metric_name': 'ICP: Chất lượng data KH trên CRM',
   'weight_percent': '4.00',
-  'work_description': 'Đảm bảo data chính xác, không trùng, đủ thông tin bắt buộc như SĐT, email, '
-                      'CCCD, nhóm ICP, trạng thái, lịch sử giao dịch.',
   'measurement_formula': 'CRM: (Record sạch / Tổng record) × 100%; random sample check hàng tháng; '
                          'báo cáo data quality từ CRM.',
   'target_text': '>=98% data sạch; 0 sai sót nghiêm trọng.',
@@ -650,9 +586,6 @@ DEFAULT_KPI_PERIOD_METRICS = [{'profile_code': 'SA',
   'metric_code': 'B3_23',
   'metric_name': 'AAR: Số KH tái kích hoạt / tháng',
   'weight_percent': '6.00',
-  'work_description': 'Khách hàng inactive không giao dịch trên 6 tháng được SA gọi và quay lại có '
-                      'ít nhất 1 giao dịch mới. Chỉ tiêu khuyến khích, phụ thuộc thị trường, nhu '
-                      'cầu khách hàng và chất lượng data từng chi nhánh.',
   'measurement_formula': 'CRM đếm KH chuyển inactive sang active; AAR = Số KH tái giao dịch / Tổng '
                          'KH inactive được gọi × 100%; mapping SA gọi với KH có giao dịch mới; xác '
                          'nhận LM/NVQLTK.',
@@ -665,8 +598,7 @@ DEFAULT_KPI_PERIOD_METRICS = [{'profile_code': 'SA',
   'metric_code': 'B3_24',
   'metric_name': 'LTV: Phí GD phát sinh từ KH tái kích hoạt',
   'weight_percent': '4.00',
-  'work_description': 'Doanh thu phí giao dịch thực tế từ khách hàng đã tái kích hoạt. Đo LTV theo '
-                      'giá trị trọn đời khách hàng.',
+  
   'measurement_formula': 'CRM: Tổng phí giao dịch từ KH tái kích hoạt; chỉ tính phí khi tài khoản '
                          'KH vẫn ở IB và do SA chăm sóc; đối chiếu báo cáo phí Home/FLEX và '
                          'revenue report chi nhánh.',
@@ -679,8 +611,6 @@ DEFAULT_KPI_PERIOD_METRICS = [{'profile_code': 'SA',
   'metric_code': 'B3_25',
   'metric_name': 'Giới thiệu chương trình Referral cho KH',
   'weight_percent': '2.00',
-  'work_description': 'SA chủ động nhắc chương trình Khách mời bạn bè với KH nhóm Tiềm năng/Rất '
-                      'tiềm năng trong mỗi cuộc gọi và ghi nhận vào CRM.',
   'measurement_formula': 'CRM: (Cuộc gọi TP/RTP có note đã giới thiệu referral / Tổng cuộc gọi '
                          'TP/RTP) × 100%; leader kiểm tra call note hàng tuần.',
   'target_text': '>=50% cuộc gọi với KH Tiềm năng và Rất tiềm năng có ghi chú đã giới thiệu chương '
@@ -693,8 +623,6 @@ DEFAULT_KPI_PERIOD_METRICS = [{'profile_code': 'SA',
   'metric_code': 'B4_26',
   'metric_name': 'Số KH được hỗ trợ chăm sóc thành công',
   'weight_percent': '3.00',
-  'work_description': 'Hướng dẫn, hỗ trợ, chăm sóc khách hàng và giải đáp thắc mắc nghiệp vụ. Log '
-                      'đầy đủ vào CRM.',
   'measurement_formula': 'CRM: Số KH được SA liên hệ hỗ trợ/tháng có ghi note nội dung.',
   'target_text': '100% khách hàng được hỗ trợ thành công; đánh giá từ cấp quản lý.',
   'target_value': '100.00',
@@ -705,9 +633,7 @@ DEFAULT_KPI_PERIOD_METRICS = [{'profile_code': 'SA',
   'metric_code': 'B4_27',
   'metric_name': 'Số KH sử dụng dịch vụ/sản phẩm mới',
   'weight_percent': '2.00',
-  'work_description': 'SA giới thiệu sản phẩm phù hợp ICP từng khách hàng như phái sinh, margin, '
-                      'sản phẩm mới. Chỉ tính khách hàng thực sự đăng ký/kích hoạt sản phẩm sau '
-                      'khi SA giới thiệu.',
+  
   'measurement_formula': 'CRM: Số KH đăng ký sản phẩm mới trong kỳ, có ghi nhận SA là người giới '
                          'thiệu.',
   'target_text': '>=1 KH/quý sử dụng sản phẩm mới.',
@@ -719,8 +645,6 @@ DEFAULT_KPI_PERIOD_METRICS = [{'profile_code': 'SA',
   'metric_code': 'B4_28',
   'metric_name': 'Tỷ lệ chuyển đổi nhóm KH',
   'weight_percent': '3.00',
-  'work_description': 'Sau quá trình SA tái tiếp cận, KH trong nhóm Nuôi dưỡng/Không nghe máy được '
-                      'nâng lên nhóm Tiềm năng hoặc Rất tiềm năng dựa trên phản hồi thực tế.',
   'measurement_formula': 'CRM: (Số KH chuyển lên nhóm TP/RTP / Tổng KH nhóm thấp được gọi lại '
                          'trong kỳ) × 100%.',
   'target_text': '>=5% tỷ lệ chuyển đổi/quý.',

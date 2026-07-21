@@ -2,6 +2,7 @@ from rest_framework.permissions import BasePermission, SAFE_METHODS
 
 from apps.accounts.services import PermissionService
 
+
 EXTERNAL_ERROR_VIEW = "EXTERNAL_ERROR_VIEW"
 EXTERNAL_ERROR_IMPORT = "EXTERNAL_ERROR_IMPORT"
 EXTERNAL_ERROR_CLASSIFY = "EXTERNAL_ERROR_CLASSIFY"
@@ -9,8 +10,20 @@ EXTERNAL_ERROR_EXPORT = "EXTERNAL_ERROR_EXPORT"
 EXTERNAL_ERROR_DASHBOARD = "EXTERNAL_ERROR_DASHBOARD"
 EXTERNAL_ERROR_MANAGE = "EXTERNAL_ERROR_MANAGE"
 
-ADMIN_ROLE_CODES = {"SYSTEM_ADMIN", "ADMIN", "CS_MANAGER", "CCC_MANAGER"}
-CCC_ROLE_CODES = {"CS_STAFF", "CS_SUPERVISOR", "CS_MANAGER", "CCC_STAFF", "CCC_SUPERVISOR", "CCC_MANAGER"}
+ADMIN_ROLE_CODES = {
+    "SYSTEM_ADMIN",
+    "ADMIN",
+    "CS_MANAGER",
+    "CCC_MANAGER",
+}
+CCC_ROLE_CODES = {
+    "CS_STAFF",
+    "CS_SUPERVISOR",
+    "CS_MANAGER",
+    "CCC_STAFF",
+    "CCC_SUPERVISOR",
+    "CCC_MANAGER",
+}
 
 
 def get_user_role_codes(user):
@@ -66,19 +79,38 @@ def can_manage_external_errors(user):
 
 
 class ExternalErrorPermission(BasePermission):
+    """
+    Hỗ trợ cả ViewSet và APIView.
+
+    APIView khai báo external_error_permission bằng:
+    view, import, classify hoặc manage.
+    """
+
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
             return False
 
+        permission_scope = getattr(
+            view,
+            "external_error_permission",
+            None,
+        )
+
+        if permission_scope == "view":
+            return can_view_external_errors(request.user)
+        if permission_scope == "import":
+            return can_import_external_errors(request.user)
+        if permission_scope == "classify":
+            return can_classify_external_errors(request.user)
+        if permission_scope == "manage":
+            return can_manage_external_errors(request.user)
+
         action = getattr(view, "action", None)
 
-        if action in ["list", "retrieve"] or request.method in SAFE_METHODS:
+        if action in {"list", "retrieve"} or request.method in SAFE_METHODS:
             return can_view_external_errors(request.user)
 
-        if action in ["import_raw"]:
-            return can_import_external_errors(request.user)
-
-        if action in ["classify", "bulk_classify"]:
+        if action in {"classify", "bulk_classify", "confirm"}:
             return can_classify_external_errors(request.user)
 
         return can_manage_external_errors(request.user)

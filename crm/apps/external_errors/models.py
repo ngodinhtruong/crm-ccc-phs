@@ -1,9 +1,60 @@
-from decimal import Decimal
-
 from django.conf import settings
 from django.db import models
 
 from apps.common.models import TimeStampedModel
+
+
+class ExternalErrorGroup(TimeStampedModel):
+    """Nhóm lỗi cấp cao. Một nhóm có nhiều mã lỗi chi tiết."""
+
+    group_code = models.CharField(max_length=50, unique=True, db_index=True)
+    group_name = models.CharField(max_length=255, unique=True)
+    description = models.TextField(null=True, blank=True)
+    sort_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        db_table = "external_error_groups"
+        ordering = ["sort_order", "id"]
+
+    def __str__(self):
+        return f"{self.group_code} - {self.group_name}"
+
+
+class ExternalErrorCode(TimeStampedModel):
+    """Mã lỗi chi tiết. Mỗi mã lỗi chỉ thuộc một nhóm lỗi."""
+
+    group = models.ForeignKey(
+        ExternalErrorGroup,
+        on_delete=models.PROTECT,
+        related_name="error_codes",
+    )
+    error_code = models.CharField(max_length=100, unique=True, db_index=True)
+    error_name = models.CharField(max_length=255)
+    description = models.TextField(null=True, blank=True)
+
+    # Dữ liệu tùy chọn hỗ trợ prompt LLM.
+    keywords = models.JSONField(default=list, blank=True)
+    examples = models.JSONField(default=list, blank=True)
+
+    sort_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        db_table = "external_error_codes"
+        ordering = ["group__sort_order", "sort_order", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["group", "error_name"],
+                name="uniq_external_error_code_name_in_group",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["group", "is_active"]),
+        ]
+
+    def __str__(self):
+        return f"{self.error_code} - {self.error_name}"
 
 
 class ExternalErrorImportBatch(TimeStampedModel):
@@ -31,12 +82,21 @@ class ExternalErrorImportBatch(TimeStampedModel):
 
     batch_code = models.CharField(max_length=50, unique=True)
     file_name = models.CharField(max_length=255, null=True, blank=True)
-    source_type = models.CharField(max_length=20, choices=SOURCE_TYPE_CHOICES, default=SOURCE_EXCEL)
+    source_type = models.CharField(
+        max_length=20,
+        choices=SOURCE_TYPE_CHOICES,
+        default=SOURCE_EXCEL,
+    )
 
     total_rows = models.PositiveIntegerField(default=0)
     classified_rows = models.PositiveIntegerField(default=0)
     failed_rows = models.PositiveIntegerField(default=0)
-    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default=STATUS_IMPORTED, db_index=True)
+    status = models.CharField(
+        max_length=30,
+        choices=STATUS_CHOICES,
+        default=STATUS_IMPORTED,
+        db_index=True,
+    )
 
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -55,26 +115,6 @@ class ExternalErrorImportBatch(TimeStampedModel):
 
 
 class ExternalErrorRecord(TimeStampedModel):
-    ERROR_ORDER = "ORDER"
-    ERROR_LOGIN = "LOGIN"
-    ERROR_DISPLAY = "DISPLAY"
-    ERROR_EKYC_ACCOUNT = "EKYC_ACCOUNT"
-    ERROR_PORTAL_SYSTEM = "PORTAL_SYSTEM"
-    ERROR_TRANSFER_PAYMENT = "TRANSFER_PAYMENT"
-    ERROR_COMPLAINT = "COMPLAINT"
-    ERROR_SPECIAL = "SPECIAL"
-
-    ERROR_TYPE_CHOICES = [
-        (ERROR_ORDER, "Lệnh Đặt"),
-        (ERROR_LOGIN, "Đăng Nhập"),
-        (ERROR_DISPLAY, "Hiển Thị"),
-        (ERROR_EKYC_ACCOUNT, "eKYC / Tài Khoản"),
-        (ERROR_PORTAL_SYSTEM, "Portal / Hệ Thống"),
-        (ERROR_TRANSFER_PAYMENT, "Chuyển Khoản / Thanh Toán"),
-        (ERROR_COMPLAINT, "Khiếu Nại"),
-        (ERROR_SPECIAL, "Đặc Biệt"),
-    ]
-
     STATUS_UNCLASSIFIED = "UNCLASSIFIED"
     STATUS_CLASSIFIED = "CLASSIFIED"
     STATUS_NEED_REVIEW = "NEED_REVIEW"
@@ -97,8 +137,9 @@ class ExternalErrorRecord(TimeStampedModel):
         blank=True,
     )
 
-    received_date = models.DateField(null=True, blank=True, db_index=True)
-    completed_date = models.DateField(null=True, blank=True, db_index=True)
+    # Lưu đầy đủ ngày và giờ để tính thời gian xử lý.
+    received_date = models.DateTimeField(null=True, blank=True, db_index=True)
+    completed_date = models.DateTimeField(null=True, blank=True, db_index=True)
 
     raw_source = models.CharField(max_length=255, null=True, blank=True)
     raw_device = models.CharField(max_length=255, null=True, blank=True)
@@ -107,23 +148,38 @@ class ExternalErrorRecord(TimeStampedModel):
     raw_cause = models.TextField(null=True, blank=True)
     raw_solution = models.TextField(null=True, blank=True)
 
-    clean_source = models.CharField(max_length=255, null=True, blank=True, db_index=True)
-    clean_device = models.CharField(max_length=255, null=True, blank=True, db_index=True)
+    clean_source = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+    clean_device = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        db_index=True,
+    )
     clean_result = models.CharField(max_length=255, null=True, blank=True)
     clean_content = models.TextField(null=True, blank=True)
     clean_cause = models.TextField(null=True, blank=True)
     clean_solution = models.TextField(null=True, blank=True)
 
-    error_type_code = models.CharField(
-        max_length=50,
-        choices=ERROR_TYPE_CHOICES,
+    # Chỉ lưu FK mã lỗi. Nhóm lỗi được suy ra qua error_code.group.
+    error_code = models.ForeignKey(
+        ExternalErrorCode,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="records",
+    )
+
+    normalized_issue = models.CharField(
+        max_length=255,
         null=True,
         blank=True,
         db_index=True,
     )
-    error_type_name = models.CharField(max_length=255, null=True, blank=True)
-
-    normalized_issue = models.CharField(max_length=255, null=True, blank=True, db_index=True)
     classification_confidence = models.DecimalField(
         max_digits=5,
         decimal_places=2,
@@ -161,18 +217,37 @@ class ExternalErrorRecord(TimeStampedModel):
         db_table = "external_error_records"
         ordering = ["-received_date", "-id"]
         indexes = [
-            models.Index(fields=["received_date", "error_type_code"]),
+            models.Index(fields=["received_date", "error_code"]),
             models.Index(fields=["received_date", "clean_device"]),
             models.Index(fields=["received_date", "clean_source"]),
             models.Index(fields=["classification_status", "need_review"]),
         ]
 
     def __str__(self):
-        return f"{self.received_date or '-'} - {self.error_type_name or 'Chưa phân loại'}"
+        code = self.error_code.error_code if self.error_code_id else "Chưa phân loại"
+        return f"{self.received_date or '-'} - {code}"
 
     @property
-    def error_type_label(self):
-        return dict(self.ERROR_TYPE_CHOICES).get(self.error_type_code, self.error_type_name or "-")
+    def error_group(self):
+        if not self.error_code_id:
+            return None
+        return self.error_code.group
+
+    @property
+    def error_group_code(self):
+        return self.error_group.group_code if self.error_group else None
+
+    @property
+    def error_group_name(self):
+        return self.error_group.group_name if self.error_group else None
+
+    @property
+    def error_code_value(self):
+        return self.error_code.error_code if self.error_code_id else None
+
+    @property
+    def error_code_name(self):
+        return self.error_code.error_name if self.error_code_id else None
 
 
 class ExternalErrorClassificationLog(models.Model):
@@ -213,15 +288,12 @@ class ExternalErrorDashboardWidget(TimeStampedModel):
 
     title = models.CharField(max_length=255)
     widget_type = models.CharField(max_length=50, choices=WIDGET_TYPE_CHOICES)
-
     group_by = models.CharField(max_length=50)
     breakdown_by = models.CharField(max_length=50, null=True, blank=True)
-
     metric = models.CharField(max_length=50, default="count")
     sort_by = models.CharField(max_length=50, default="count")
     sort_direction = models.CharField(max_length=10, default="desc")
     limit = models.PositiveIntegerField(default=10)
-
     filters = models.JSONField(default=dict, blank=True)
     is_default = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
