@@ -83,6 +83,7 @@ export function PendingTicketsPanel({
         <table className="w-full min-w-[720px] text-left text-xs">
           <thead>
             <tr className="h-10 border-b bg-slate-50 text-slate-600">
+              <th className="px-3 font-semibold"></th>
               <th className="px-3 font-semibold">Mã ticket</th>
               <th className="px-3 font-semibold">Session</th>
               <th className="px-3 font-semibold">Chủ đề</th>
@@ -108,7 +109,26 @@ export function PendingTicketsPanel({
                 className="h-12 border-b border-slate-100 hover:bg-slate-50"
               >
                 <td className="px-3 font-semibold text-sky-600">
+                  {item.ticket_chatbot_id && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        router.push(
+                          `/tickets/${item.ticket_chatbot_id}`
+                        )
+                      }
+                      className="flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-600 transition hover:bg-white"
+                    >
+                      <Eye size={12} />
+                    </button>
+                  )}
+                </td>
+                <td className="px-3 font-semibold text-sky-600">
                   {item.ticket_chatbot_code || item.ticket_code || "-"}
+                  
+
+                  
+
                 </td>
                 <td className="px-3 font-mono text-[11px] text-slate-600">
                   {shortText(item.session_id, 12)}
@@ -130,20 +150,7 @@ export function PendingTicketsPanel({
                   {formatDateTime(item.started_at)}
                 </td>
                 <td className="px-3">
-                  {item.ticket_chatbot_id && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        router.push(
-                          `/chatbots/tickets/${item.ticket_chatbot_id}`
-                        )
-                      }
-                      className="flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-600 transition hover:bg-white"
-                    >
-                      <Eye size={12} />
-                      Chi tiết
-                    </button>
-                  )}
+                  
                 </td>
               </tr>
             ))}
