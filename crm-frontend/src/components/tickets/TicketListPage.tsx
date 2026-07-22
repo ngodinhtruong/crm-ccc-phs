@@ -151,7 +151,7 @@ export function TicketListPage() {
             </h1>
 
             <p className="mt-0.5 text-xs text-slate-500">
-              Quản lý ticket chatbot, ticket thủ công, ticket lỗi và phân loại Linked/Unlinked theo tài khoản lưu ký.
+              Quản lý ticket nghiệp vụ, ticket thủ công, ticket lỗi và phân loại Linked/Unlinked theo tài khoản lưu ký.
             </p>
           </div>
 

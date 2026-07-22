@@ -205,6 +205,7 @@ class TicketViewSet(
         title = params.get("title")
         classification_method = params.get("classification_method")
         source_ref_id = params.get("source_ref_id")
+        exclude_chatbot = params.get("exclude_chatbot")
 
         customer_name = params.get("customer_name")
         customer_phone = params.get("customer_phone")
@@ -292,6 +293,12 @@ class TicketViewSet(
 
         if source_ref_id:
             queryset = queryset.filter(source_ref_id__icontains=source_ref_id)
+
+        # Chỉ loại đúng các Ticket đã được liên kết từ ChatbotSessionSummary.
+        # Không dùng classification_method=AUTO vì còn có thể có Ticket tự động
+        # từ các nguồn/API khác không phải chatbot.
+        if exclude_chatbot in {"true", "True", "1"}:
+            queryset = queryset.filter(chatbot_sessions__isnull=True)
 
         if customer_name:
             queryset = queryset.filter(customer__full_name__icontains=customer_name)

@@ -229,6 +229,7 @@ export function useTickets() {
             ...debouncedTextFilters,
 
             page: String(pageValue),
+            exclude_chatbot: "true",
 
             classification_method: filters.classificationMethod,
             account_link_status: filters.accountLinkStatus,
@@ -332,6 +333,7 @@ export function useTickets() {
         void loadTickets(
             {
                 page: "1",
+                exclude_chatbot: "true",
                 ticket_code: filters.ticketCode,
                 customer_account_no: filters.accountNumber,
                 classification_method: filters.classificationMethod,
@@ -385,7 +387,7 @@ export function useTickets() {
 
         pagination.resetPage();
 
-        void loadTickets({ page: "1" }, 1);
+        void loadTickets({ page: "1", exclude_chatbot: "true" }, 1);
     }, [pagination, loadTickets]);
 
     const goCreate = useCallback(() => {

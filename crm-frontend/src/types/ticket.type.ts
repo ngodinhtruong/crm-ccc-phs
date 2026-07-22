@@ -151,6 +151,7 @@ export type TicketListParams = {
     title?: string;
     classification_method?: string;
     source_ref_id?: string;
+    exclude_chatbot?: string;
 
     customer?: string;
 
