@@ -1,80 +1,91 @@
 "use client";
-import { getErrorMessage } from "@/utils/error.util";
 
-import { useState } from "react";
+import { ChangeEvent, useState } from "react";
 
 import { externalErrorService } from "@/services/external-error.service";
-import { ExternalErrorRawImportRow } from "@/types/external-error.type";
-
-const sampleRows = JSON.stringify(
-  [
-    {
-      received_date: "01/06/2026",
-      completed_date: "02/06/2026",
-      source: "Khách hàng",
-      device: "Mobile App",
-      result: "Đã xử lý",
-      content: "Không nhận được mã OTP khi mở eKYC",
-      cause: "Lỗi bước xác thực OTP",
-      solution: "Kiểm tra luồng gửi OTP",
-    },
-  ],
-  null,
-  2
-);
+import {
+  ExternalErrorExcelImportResponse,
+} from "@/types/external-error.type";
+import { getErrorMessage } from "@/utils/error.util";
 
 export function useExternalErrorImport() {
-  const [fileName, setFileName] = useState("");
-  const [sourceType, setSourceType] = useState("EXCEL");
-  const [classifyNow, setClassifyNow] = useState(false);
-  const [rawJson, setRawJson] = useState(sampleRows);
+  const [file, setFile] = useState<File | null>(null);
+  const [sheetName, setSheetName] = useState("");
+  const [autoClassify, setAutoClassify] = useState(true);
+  const [result, setResult] =
+    useState<ExternalErrorExcelImportResponse | null>(null);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
-  const importRows = async () => {
+  const selectFile = (event: ChangeEvent<HTMLInputElement>) => {
+    const selected = event.target.files?.[0] || null;
+    setFile(selected);
+    setResult(null);
+    setError("");
+    setNotice("");
+  };
+
+  const clearFile = () => {
+    setFile(null);
+    setResult(null);
+    setError("");
+    setNotice("");
+  };
+
+  const importExcel = async () => {
+    if (!file) {
+      setError("Vui lòng chọn file Excel .xlsx hoặc .xlsm.");
+      return;
+    }
+
+    const lowerName = file.name.toLowerCase();
+    if (!lowerName.endsWith(".xlsx") && !lowerName.endsWith(".xlsm")) {
+      setError("Chỉ hỗ trợ file Excel .xlsx hoặc .xlsm.");
+      return;
+    }
+
     try {
       setLoading(true);
       setError("");
       setNotice("");
+      setResult(null);
 
-      const parsed = JSON.parse(rawJson) as ExternalErrorRawImportRow[];
-      if (!Array.isArray(parsed) || parsed.length === 0) {
-        setError("Dữ liệu import phải là JSON array và có ít nhất một dòng.");
-        return;
-      }
-
-      const batch = await externalErrorService.importRaw({
-        file_name: fileName,
-        source_type: sourceType,
-        classify_now: classifyNow,
-        rows: parsed,
+      const response = await externalErrorService.importExcel({
+        file,
+        sheet_name: sheetName,
+        auto_classify: autoClassify,
       });
 
-      setNotice(`Import thành công batch ${batch.batch_code} với ${batch.total_rows} dòng.`);
+      setResult(response);
+
+      const queuedMessage = response.import_summary.classification_queued
+        ? " Celery đã nhận task phân loại lỗi và nguyên nhân."
+        : "";
+
+      setNotice(
+        `Import thành công ${response.import_summary.imported_rows} dòng vào batch ${response.batch.batch_code}.${queuedMessage}`
+      );
     } catch (err) {
-      if (err instanceof SyntaxError) {
-        setError("JSON không hợp lệ. Kiểm tra dấu ngoặc, dấu phẩy và tên field.");
-      } else {
-        setError(getErrorMessage(err, "Import dữ liệu lỗi thất bại"));
-      }
+      setError(getErrorMessage(err, "Import file Excel thất bại"));
     } finally {
       setLoading(false);
     }
   };
 
   return {
-    fileName,
-    setFileName,
-    sourceType,
-    setSourceType,
-    classifyNow,
-    setClassifyNow,
-    rawJson,
-    setRawJson,
+    file,
+    sheetName,
+    setSheetName,
+    autoClassify,
+    setAutoClassify,
+    result,
     loading,
     error,
     notice,
-    importRows,
+    selectFile,
+    clearFile,
+    importExcel,
   };
 }

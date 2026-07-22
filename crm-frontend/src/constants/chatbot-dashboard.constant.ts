@@ -53,7 +53,6 @@ export const TICKET_STATUS_PILL: Record<string, string> = {
   "Đã xong": "bg-teal-100 text-teal-700",
   "Chờ đóng": "bg-orange-100 text-orange-700",
   "Đã đóng": "bg-emerald-100 text-emerald-700",
-  "Đã hủy": "bg-rose-100 text-rose-700",
 };
 
 export const DEFAULT_TICKET_STATUS_PILL = "bg-slate-100 text-slate-600";

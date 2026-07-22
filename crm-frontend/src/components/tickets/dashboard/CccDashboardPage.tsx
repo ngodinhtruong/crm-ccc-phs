@@ -310,33 +310,55 @@ function ActiveFilterSummary({
 
   return (
     <div className="flex flex-wrap items-center gap-2 text-xs">
-      <span className="rounded-full bg-white px-3 py-1 font-semibold text-slate-600 ring-1 ring-slate-200">
-        Kỳ dữ liệu: {formatDate(filter?.date_from)} - {formatDate(filter?.date_to)}
-      </span>
 
-      <span className="rounded-full bg-white px-3 py-1 font-semibold text-slate-600 ring-1 ring-slate-200">
-        Bộ lọc đang áp dụng: {activeFilterCount}
-      </span>
 
-      {dashboard.data?.report && (
-        <span className="rounded-full bg-emerald-50 px-3 py-1 font-semibold text-emerald-700 ring-1 ring-emerald-100">
-          Báo cáo 5 tháng: {formatDate(dashboard.data.report.range_from)} - {formatDate(dashboard.data.report.range_to)}
-        </span>
-      )}
 
-      <span className="rounded-full bg-white px-3 py-1 font-semibold text-slate-600 ring-1 ring-slate-200">
-        Cut off: {formatDate(filter?.date_to)}
-      </span>
+
     </div>
   );
 }
+const getMonthCount = (
+  rangeFrom?: string | null,
+  rangeTo?: string | null,
+) => {
+  if (!rangeFrom || !rangeTo) {
+    return 0;
+  }
+
+  const from = new Date(rangeFrom);
+  const to = new Date(rangeTo);
+
+  if (
+    Number.isNaN(from.getTime()) ||
+    Number.isNaN(to.getTime()) ||
+    from > to
+  ) {
+    return 0;
+  }
+
+  return (
+    (to.getFullYear() - from.getFullYear()) * 12 +
+    (to.getMonth() - from.getMonth()) +
+    1
+  );
+};
+
+
 
 export function CccDashboardPage() {
   const dashboard = useCccDashboard();
   const [filterOpen, setFilterOpen] = useState(false);
   const activeFilterCount = getActiveFilterCount(dashboard);
+  const report = dashboard.data?.report;
+
+  const reportMonthCount = getMonthCount(
+    report?.range_from,
+    report?.range_to,
+  );
+
 
   return (
+
     <DashboardLayout
       breadcrumbs={[
         {
@@ -364,8 +386,8 @@ export function CccDashboardPage() {
             type="button"
             onClick={() => setFilterOpen((value) => !value)}
             className={`relative flex h-8 items-center gap-1 rounded border px-3 text-xs font-semibold ${filterOpen || activeFilterCount > 0
-                ? "border-[#0097cf] bg-sky-50 text-[#007ead]"
-                : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
+              ? "border-[#0097cf] bg-sky-50 text-[#007ead]"
+              : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
               }`}
           >
             <SlidersHorizontal size={15} />
@@ -397,27 +419,42 @@ export function CccDashboardPage() {
       }
     >
       <div className="space-y-4">
-        <div className="rounded-md border border-slate-200 bg-gradient-to-r from-lime-50 via-white to-sky-50 p-5 shadow-sm">
-          <div className="flex flex-col justify-between gap-3 md:flex-row md:items-end">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wide text-[#00713d]">
-                Kết quả xử lý ticket
-              </p>
-              <h1 className="mt-1 text-2xl font-black uppercase tracking-tight text-slate-900">
+        <div className="rounded-md border border-slate-200 bg-gradient-to-r from-lime-50 via-white to-sky-50 px-4 py-3 shadow-sm">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="min-w-0">
+              <h1 className="text-xl font-black uppercase tracking-tight text-slate-900">
                 Dashboard Ticket CCC
               </h1>
-              <p className="mt-1 text-xs text-slate-500">
-                Tổng hợp kết quả xử lý, nguồn, danh mục, đơn vị xử lý, SLA và NVCS.
-              </p>
+
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                {report && (
+                  <span className="inline-flex items-center rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100">
+                    Báo cáo {reportMonthCount} tháng
+                  </span>
+                )}
+
+                {report && (
+                  <span className="text-xs text-slate-500">
+                    {formatDate(report.range_from)} - {formatDate(report.range_to)}
+                  </span>
+                )}
+
+                <span className="hidden text-slate-300 md:inline">•</span>
+
+                <span className="text-xs text-slate-500">
+                  Cập nhật: {formatDateTime(dashboard.data?.generated_at)}
+                </span>
+              </div>
             </div>
 
-            <div className="text-xs text-slate-500">
-              Cập nhật: {formatDateTime(dashboard.data?.generated_at)}
-            </div>
-          </div>
-
-          <div className="mt-4">
-            <ActiveFilterSummary dashboard={dashboard} activeFilterCount={activeFilterCount} />
+            {activeFilterCount > 0 && (
+              <div className="shrink-0">
+                <ActiveFilterSummary
+                  dashboard={dashboard}
+                  activeFilterCount={activeFilterCount}
+                />
+              </div>
+            )}
           </div>
         </div>
 
@@ -427,15 +464,12 @@ export function CccDashboardPage() {
 
         {dashboard.data && (
           <>
-            <TicketListTable
+            {/* <TicketListTable
               title="Ticket chưa xử lý"
               description="Danh sách các ticket đang chờ xử lý theo bộ lọc hiện tại."
               items={dashboard.data.tables.pending_tickets || []}
-            />
-            <CccDashboardCards
-              overview={dashboard.data.overview}
-              previousPeriod={dashboard.data.previous_period}
-            />
+            /> */}
+
 
 
 

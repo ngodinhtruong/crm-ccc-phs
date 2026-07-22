@@ -1,5 +1,4 @@
 "use client";
-import { getErrorMessage } from "@/utils/error.util";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -7,49 +6,79 @@ import { useDebounce } from "@/hooks/useDebounce";
 import { externalErrorService } from "@/services/external-error.service";
 import {
   ExternalErrorBatch,
+  ExternalErrorCauseGroup,
+  ExternalErrorCode,
+  ExternalErrorGroup,
   ExternalErrorListParams,
   ExternalErrorRecord,
 } from "@/types/external-error.type";
+import { getYearToCurrentDateRange } from "@/utils/date.util";
+import { getErrorMessage } from "@/utils/error.util";
 
 const PAGE_SIZE = 20;
 
 export function useExternalErrors() {
   const [records, setRecords] = useState<ExternalErrorRecord[]>([]);
   const [batches, setBatches] = useState<ExternalErrorBatch[]>([]);
+  const [groups, setGroups] = useState<ExternalErrorGroup[]>([]);
+  const [errorCodes, setErrorCodes] = useState<ExternalErrorCode[]>([]);
+  const [causeGroups, setCauseGroups] = useState<ExternalErrorCauseGroup[]>([]);
+
   const [count, setCount] = useState(0);
   const [page, setPage] = useState(1);
 
   const [q, setQ] = useState("");
   const [dateField, setDateField] = useState("received_date");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [dateFrom, setDateFrom] = useState(
+    () => getYearToCurrentDateRange().dateFrom
+  );
+  const [dateTo, setDateTo] = useState(
+    () => getYearToCurrentDateRange().dateTo
+  );
   const [source, setSource] = useState("");
   const [device, setDevice] = useState("");
-  const [errorType, setErrorType] = useState("");
+  const [errorGroup, setErrorGroup] = useState("");
+  const [errorCode, setErrorCode] = useState("");
   const [issue, setIssue] = useState("");
   const [status, setStatus] = useState("");
   const [batch, setBatch] = useState("");
   const [needReview, setNeedReview] = useState("");
+  const [causeText, setCauseText] = useState("");
+  const [causeGroup, setCauseGroup] = useState("");
+  const [causeStatus, setCauseStatus] = useState("");
+  const [causeNeedReview, setCauseNeedReview] = useState("");
 
   const [loading, setLoading] = useState(true);
-  const [batchLoading, setBatchLoading] = useState(true);
+  const [catalogLoading, setCatalogLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
-  const textFilters = useMemo(
-    () => ({ q, issue }),
-    [q, issue]
+  const debouncedTextFilters = useDebounce(
+    useMemo(
+      () => ({ q, issue, causeText }),
+      [causeText, issue, q]
+    ),
+    500
   );
-  const debouncedTextFilters = useDebounce(textFilters, 500);
 
   const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
   const fromRecord = count === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const toRecord = Math.min(page * PAGE_SIZE, count);
 
+  const availableErrorCodes = useMemo(
+    () =>
+      errorCodes.filter(
+        (item) =>
+          !errorGroup || String(item.group) === errorGroup
+      ),
+    [errorCodes, errorGroup]
+  );
+
   const buildParams = useCallback(
     (pageValue: number): ExternalErrorListParams => ({
       page: String(pageValue),
+      page_size: String(PAGE_SIZE),
       q: debouncedTextFilters.q,
       issue: debouncedTextFilters.issue,
       date_field: dateField,
@@ -57,12 +86,43 @@ export function useExternalErrors() {
       date_to: dateTo,
       source,
       device,
-      error_type: errorType,
+      error_group_code:
+        groups.find((item) => String(item.id) === errorGroup)
+          ?.group_code || "",
+      error_code:
+        errorCodes.find((item) => String(item.id) === errorCode)
+          ?.error_code || "",
       status,
       batch,
       need_review: needReview,
+      cause_text: debouncedTextFilters.causeText,
+      cause_group_code:
+        causeGroups.find((item) => String(item.id) === causeGroup)
+          ?.cause_code || "",
+      cause_status: causeStatus,
+      cause_need_review: causeNeedReview,
     }),
-    [batch, dateField, dateFrom, dateTo, debouncedTextFilters.issue, debouncedTextFilters.q, device, errorType, needReview, source, status]
+    [
+      batch,
+      causeGroup,
+      causeGroups,
+      causeNeedReview,
+      causeStatus,
+      dateField,
+      dateFrom,
+      dateTo,
+      debouncedTextFilters.causeText,
+      debouncedTextFilters.issue,
+      debouncedTextFilters.q,
+      device,
+      errorCode,
+      errorCodes,
+      errorGroup,
+      groups,
+      needReview,
+      source,
+      status,
+    ]
   );
 
   const loadRecords = useCallback(
@@ -70,9 +130,13 @@ export function useExternalErrors() {
       try {
         setLoading(true);
         setError("");
-        const data = await externalErrorService.getRecords(buildParams(pageValue));
-        setRecords(data.results || []);
-        setCount(data.count || 0);
+
+        const response = await externalErrorService.getRecords(
+          buildParams(pageValue)
+        );
+
+        setRecords(response.results || []);
+        setCount(response.count || 0);
       } catch (err) {
         setError(getErrorMessage(err, "Không tải được danh sách lỗi"));
       } finally {
@@ -82,15 +146,29 @@ export function useExternalErrors() {
     [buildParams]
   );
 
-  const loadBatches = useCallback(async () => {
+  const loadCatalogs = useCallback(async () => {
     try {
-      setBatchLoading(true);
-      const data = await externalErrorService.getBatches();
-      setBatches(data || []);
+      setCatalogLoading(true);
+
+      const [batchData, groupData, codeData, causeGroupData] =
+        await Promise.all([
+          externalErrorService.getBatches(),
+          externalErrorService.getGroups(),
+          externalErrorService.getErrorCodes(),
+          externalErrorService.getCauseGroups({ is_active: true }),
+        ]);
+
+      setBatches(batchData);
+      setGroups(groupData);
+      setErrorCodes(codeData);
+      setCauseGroups(causeGroupData);
     } catch {
       setBatches([]);
+      setGroups([]);
+      setErrorCodes([]);
+      setCauseGroups([]);
     } finally {
-      setBatchLoading(false);
+      setCatalogLoading(false);
     }
   }, []);
 
@@ -100,23 +178,30 @@ export function useExternalErrors() {
   };
 
   const clearFilter = () => {
+    const currentYearRange = getYearToCurrentDateRange();
+
     setQ("");
     setDateField("received_date");
-    setDateFrom("");
-    setDateTo("");
+    setDateFrom(currentYearRange.dateFrom);
+    setDateTo(currentYearRange.dateTo);
     setSource("");
     setDevice("");
-    setErrorType("");
+    setErrorGroup("");
+    setErrorCode("");
     setIssue("");
     setStatus("");
     setBatch("");
     setNeedReview("");
+    setCauseText("");
+    setCauseGroup("");
+    setCauseStatus("");
+    setCauseNeedReview("");
     setPage(1);
   };
 
   const reload = () => {
     void loadRecords(page);
-    void loadBatches();
+    void loadCatalogs();
   };
 
   const goPrevious = () => {
@@ -136,8 +221,10 @@ export function useExternalErrors() {
       setActionLoading(true);
       setNotice("");
       setError("");
+
       await externalErrorService.classifyRecord(id, force);
-      setNotice("Đã phân loại lại dòng lỗi.");
+      await externalErrorService.classifyCauseRecord(id, force);
+      setNotice("Đã phân loại lại lỗi và nguyên nhân.");
       await loadRecords(page);
     } catch (err) {
       setError(getErrorMessage(err, "Phân loại lỗi thất bại"));
@@ -146,16 +233,20 @@ export function useExternalErrors() {
     }
   };
 
-  const confirmRecord = async (id: number) => {
+  const confirmRecord = async (
+    id: number,
+    errorCodeId: number
+  ) => {
     try {
       setActionLoading(true);
       setNotice("");
       setError("");
-      await externalErrorService.confirmRecord(id);
-      setNotice("Đã xác nhận phân loại lỗi.");
+
+      await externalErrorService.confirmRecord(id, errorCodeId);
+      setNotice("Đã xác nhận mã lỗi.");
       await loadRecords(page);
     } catch (err) {
-      setError(getErrorMessage(err, "Xác nhận phân loại thất bại"));
+      setError(getErrorMessage(err, "Xác nhận mã lỗi thất bại"));
     } finally {
       setActionLoading(false);
     }
@@ -166,33 +257,63 @@ export function useExternalErrors() {
       setActionLoading(true);
       setNotice("");
       setError("");
-      const stats = await externalErrorService.bulkClassify({ all_matching: true, force });
-      setNotice(`Đã gửi phân loại các dòng đang lọc. Kết quả: ${JSON.stringify(stats)}`);
+
+      const errorStats = await externalErrorService.bulkClassify({
+        all_matching: true,
+        force,
+      });
+      const causeStats = await externalErrorService.bulkClassifyCauses({
+        all_matching: true,
+        force,
+      });
+
+      setNotice(
+        `Đã xử lý ${errorStats.total} dòng lỗi và ${causeStats.total} dòng nguyên nhân. ` +
+          `Lỗi phân loại thất bại: ${errorStats.failed}; nguyên nhân thất bại: ${causeStats.failed}.`
+      );
       await loadRecords(page);
     } catch (err) {
-      setError(getErrorMessage(err, "Phân loại hàng loạt thất bại"));
+      setError(
+        getErrorMessage(err, "Phân loại hàng loạt thất bại")
+      );
     } finally {
       setActionLoading(false);
     }
   };
 
   useEffect(() => {
-    void loadBatches();
-  }, [loadBatches]);
+    void loadCatalogs();
+  }, [loadCatalogs]);
 
   useEffect(() => {
-    void loadRecords(1);
     setPage(1);
-  }, [dateField, dateFrom, dateTo, source, device, errorType, status, batch, needReview, debouncedTextFilters, loadRecords]);
+    void loadRecords(1);
+  }, [loadRecords]);
+
+  useEffect(() => {
+    if (
+      errorCode &&
+      !availableErrorCodes.some(
+        (item) => String(item.id) === errorCode
+      )
+    ) {
+      setErrorCode("");
+    }
+  }, [availableErrorCodes, errorCode]);
 
   return {
     records,
     batches,
+    groups,
+    errorCodes,
+    causeGroups,
+    availableErrorCodes,
     count,
     page,
     totalPages,
     fromRecord,
     toRecord,
+
     q,
     setQ,
     dateField,
@@ -205,8 +326,10 @@ export function useExternalErrors() {
     setSource,
     device,
     setDevice,
-    errorType,
-    setErrorType,
+    errorGroup,
+    setErrorGroup,
+    errorCode,
+    setErrorCode,
     issue,
     setIssue,
     status,
@@ -215,11 +338,21 @@ export function useExternalErrors() {
     setBatch,
     needReview,
     setNeedReview,
+    causeText,
+    setCauseText,
+    causeGroup,
+    setCauseGroup,
+    causeStatus,
+    setCauseStatus,
+    causeNeedReview,
+    setCauseNeedReview,
+
     loading,
-    batchLoading,
+    catalogLoading,
     actionLoading,
     error,
     notice,
+
     search,
     clearFilter,
     reload,

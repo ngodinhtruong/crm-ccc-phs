@@ -325,7 +325,6 @@ export type TicketStatusCode =
     | "DONE_WAIT_CLOSE"
     | "PENDING_CLOSE"
     | "CLOSED"
-    | "CANCELLED";
 
 /** Một dòng lịch sử thay đổi ticket. */
 export type TicketHistoryItem = {

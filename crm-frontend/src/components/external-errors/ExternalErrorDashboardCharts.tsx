@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { memo, useMemo, type ReactNode } from "react";
 import {
   Bar,
   BarChart,
@@ -87,7 +87,7 @@ function HorizontalBarChart({
   title: string;
   description?: string;
 }) {
-  const data = chartData(chart);
+  const data = useMemo(() => chartData(chart), [chart]);
 
   return (
     <ChartCard title={title} description={description}>
@@ -101,7 +101,13 @@ function HorizontalBarChart({
               <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
               <YAxis dataKey="label" type="category" width={120} tick={{ fontSize: 11 }} />
               <Tooltip content={<SimpleTooltip />} />
-              <Bar dataKey="count" name="Số lỗi" radius={[0, 6, 6, 0]} fill="#0097cf" />
+              <Bar
+                dataKey="count"
+                name="Số lỗi"
+                radius={[0, 6, 6, 0]}
+                fill="#0097cf"
+                isAnimationActive={false}
+              />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -119,7 +125,7 @@ function ColumnChart({
   title: string;
   description?: string;
 }) {
-  const data = chartData(chart);
+  const data = useMemo(() => chartData(chart), [chart]);
 
   return (
     <ChartCard title={title} description={description}>
@@ -133,7 +139,13 @@ function ColumnChart({
               <XAxis dataKey="label" angle={-25} textAnchor="end" interval={0} height={60} tick={{ fontSize: 10 }} />
               <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
               <Tooltip content={<SimpleTooltip />} />
-              <Bar dataKey="count" name="Số lỗi" radius={[6, 6, 0, 0]} fill="#0097cf" />
+              <Bar
+                dataKey="count"
+                name="Số lỗi"
+                radius={[6, 6, 0, 0]}
+                fill="#0097cf"
+                isAnimationActive={false}
+              />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -143,7 +155,7 @@ function ColumnChart({
 }
 
 function LineTrendChart({ chart }: { chart?: ExternalErrorChartResponse }) {
-  const data = chartData(chart);
+  const data = useMemo(() => chartData(chart), [chart]);
 
   return (
     <ChartCard title="Xu hướng lỗi theo thời gian" description="Theo tháng/ngày nhận lỗi trong khoảng lọc.">
@@ -157,7 +169,16 @@ function LineTrendChart({ chart }: { chart?: ExternalErrorChartResponse }) {
               <XAxis dataKey="label" tick={{ fontSize: 11 }} />
               <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
               <Tooltip content={<SimpleTooltip />} />
-              <Line type="monotone" dataKey="count" name="Số lỗi" stroke="#0097cf" strokeWidth={3} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+              <Line
+                type="monotone"
+                dataKey="count"
+                name="Số lỗi"
+                stroke="#0097cf"
+                strokeWidth={3}
+                dot={false}
+                activeDot={{ r: 4 }}
+                isAnimationActive={false}
+              />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -175,8 +196,11 @@ function DonutChart({
   title: string;
   description?: string;
 }) {
-  const data = chartData(chart);
-  const total = data.reduce((sum, item) => sum + toChartValue(item.count), 0);
+  const data = useMemo(() => chartData(chart), [chart]);
+  const total = useMemo(
+    () => data.reduce((sum, item) => sum + toChartValue(item.count), 0),
+    [data]
+  );
 
   return (
     <ChartCard title={title} description={description}>
@@ -194,6 +218,7 @@ function DonutChart({
                   innerRadius={62}
                   outerRadius={92}
                   paddingAngle={2}
+                  isAnimationActive={false}
                 >
                   {data.map((_, index) => (
                     <Cell key={`slice-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
@@ -238,8 +263,11 @@ function StackedBarChart({
   description?: string;
   horizontal?: boolean;
 }) {
-  const data = chart?.data || [];
-  const categories = chart?.categories || [];
+  const data = useMemo(() => chart?.data || [], [chart?.data]);
+  const categories = useMemo(
+    () => chart?.categories || [],
+    [chart?.categories]
+  );
 
   return (
     <ChartCard title={title} description={description}>
@@ -275,6 +303,7 @@ function StackedBarChart({
                   stackId="errors"
                   fill={CHART_COLORS[index % CHART_COLORS.length]}
                   radius={index === categories.length - 1 ? [4, 4, 0, 0] : 0}
+                  isAnimationActive={false}
                 />
               ))}
             </BarChart>
@@ -296,12 +325,13 @@ function RecurringIssuesTable({ items }: { items: ExternalErrorRecurringIssue[] 
               <th className="px-3 py-2 text-right font-semibold">Số lần</th>
               <th className="px-3 py-2 font-semibold">Thiết bị liên quan</th>
               <th className="px-3 py-2 font-semibold">Loại lỗi</th>
+              <th className="px-3 py-2 font-semibold">Nhóm nguyên nhân</th>
             </tr>
           </thead>
           <tbody>
             {items.length === 0 && (
               <tr>
-                <td colSpan={4} className="h-24 text-center text-slate-500">Chưa có vấn đề lặp lại.</td>
+                <td colSpan={5} className="h-24 text-center text-slate-500">Chưa có vấn đề lặp lại.</td>
               </tr>
             )}
             {items.map((item, index) => (
@@ -310,6 +340,7 @@ function RecurringIssuesTable({ items }: { items: ExternalErrorRecurringIssue[] 
                 <td className="px-3 py-3 text-right font-bold text-slate-800">{formatNumber(item.count)}</td>
                 <td className="px-3 py-3 text-slate-600">{item.devices?.join(", ") || "-"}</td>
                 <td className="px-3 py-3 text-slate-600">{item.error_types?.join(", ") || "-"}</td>
+                <td className="px-3 py-3 text-slate-600">{item.cause_groups?.join(", ") || "-"}</td>
               </tr>
             ))}
           </tbody>
@@ -319,7 +350,7 @@ function RecurringIssuesTable({ items }: { items: ExternalErrorRecurringIssue[] 
   );
 }
 
-export function ExternalErrorDashboardCharts({
+export const ExternalErrorDashboardCharts = memo(function ExternalErrorDashboardCharts({
   charts,
   recurringIssues,
 }: {
@@ -329,8 +360,9 @@ export function ExternalErrorDashboardCharts({
     byErrorType?: ExternalErrorChartResponse;
     trend?: ExternalErrorChartResponse;
     stackedMonthDevice?: ExternalErrorChartResponse;
-    causeDonut?: ExternalErrorChartResponse;
     stackedDeviceErrorType?: ExternalErrorChartResponse;
+    causeDonut?: ExternalErrorChartResponse;
+    stackedDeviceCause?: ExternalErrorChartResponse;
   };
   recurringIssues: ExternalErrorRecurringIssue[];
 }) {
@@ -375,7 +407,14 @@ export function ExternalErrorDashboardCharts({
         horizontal
       />
 
+      <StackedBarChart
+        chart={charts.stackedDeviceCause}
+        title="Nguyên nhân lỗi theo từng thiết bị"
+        description="Mỗi thiết bị thường phát sinh từ nhóm nguyên nhân nào."
+        horizontal
+      />
+
       <RecurringIssuesTable items={recurringIssues} />
     </div>
   );
-}
+});

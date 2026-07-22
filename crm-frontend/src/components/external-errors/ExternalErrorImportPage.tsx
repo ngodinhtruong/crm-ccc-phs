@@ -1,131 +1,263 @@
 "use client";
 
 import Link from "next/link";
-import { BarChart3, ListChecks, Upload } from "lucide-react";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  FileSpreadsheet,
+  Upload,
+  X,
+} from "lucide-react";
 
-import { FilterSelect } from "@/components/common";
 import { useExternalErrorImport } from "@/hooks/useExternalErrorImport";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
 
 export function ExternalErrorImportPage() {
-  const importer = useExternalErrorImport();
+  const state = useExternalErrorImport();
 
   return (
     <DashboardLayout
       breadcrumbs={[
-        { label: "TRANG CHỦ", href: "/workspace" },
-        { label: "Lỗi bên ngoài" },
-        { label: "Import dữ liệu lỗi" },
+        { label: "TRANG CHỦ", href: "/" },
+        { label: "Lỗi bên ngoài", href: "/external-errors" },
+        { label: "Import Excel" },
       ]}
-      sidebarDefaultExpandedGroupKey="ccc-external-errors"
-      sidebarDefaultActiveChildKey="external-error-import"
       rightAction={
-        <div className="flex items-center gap-2">
-          <Link
-            href="/external-errors/dashboard"
-            className="flex h-8 items-center gap-1 rounded border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-          >
-            <BarChart3 size={15} />
-            Dashboard lỗi
-          </Link>
-
-          <Link
-            href="/external-errors"
-            className="flex h-8 items-center gap-1 rounded border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-          >
-            <ListChecks size={15} />
-            Danh sách lỗi
-          </Link>
-        </div>
+        <Link
+          href="/external-errors"
+          className="flex h-8 items-center gap-1 rounded border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+        >
+          <ArrowLeft size={14} />
+          Quay lại
+        </Link>
       }
     >
-      <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
-        <div className="border-b bg-white px-4 py-3">
-          <h1 className="text-sm font-semibold text-slate-800">Import dữ liệu lỗi bên ngoài</h1>
-          <p className="mt-0.5 text-xs text-slate-500">
-            Nhập dữ liệu thô đã xử lý xong. Backend sẽ clean và phân loại bằng AWS Bedrock nếu bật phân loại ngay.
+      <div className="mx-auto max-w-5xl overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+        <div className="border-b px-4 py-3">
+          <h1 className="text-sm font-semibold text-slate-800">
+            Import lỗi từ Excel
+          </h1>
+          <p className="mt-1 text-xs text-slate-500">
+            Hệ thống đọc 7 cột: Ngày nhận, Ngày hoàn thành, Nguồn,
+            Thiết bị, Kết quả xử lý, Nội dung và Nguyên nhân.
           </p>
         </div>
 
-        {(importer.error || importer.notice) && (
+        {(state.error || state.notice) && (
           <div
             className={`border-b px-4 py-2 text-xs ${
-              importer.error
+              state.error
                 ? "border-red-200 bg-red-50 text-red-600"
                 : "border-emerald-200 bg-emerald-50 text-emerald-700"
             }`}
           >
-            {importer.error || importer.notice}
+            {state.error || state.notice}
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-4 p-4 xl:grid-cols-[360px_1fr]">
-          <div className="rounded-md border border-slate-200 bg-white p-4">
-            <div className="space-y-3">
-              <div>
-                <label className="mb-1 block text-xs font-medium text-slate-500">Tên file / batch</label>
-                <input
-                  value={importer.fileName}
-                  onChange={(event) => importer.setFileName(event.target.value)}
-                  placeholder="VD: errors_2026_06.xlsx"
-                  className="h-9 w-full rounded border border-slate-300 bg-white px-3 text-xs outline-none focus:border-sky-400"
-                />
-              </div>
-
-              <FilterSelect
-                label="Nguồn import"
-                value={importer.sourceType}
-                onChange={importer.setSourceType}
-                placeholder="Chọn nguồn"
-                options={[
-                  { label: "Excel", value: "EXCEL" },
-                  { label: "API", value: "API" },
-                  { label: "Nhập tay", value: "MANUAL" },
-                ]}
-              />
-
-              <label className="flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                <input
-                  type="checkbox"
-                  checked={importer.classifyNow}
-                  onChange={(event) => importer.setClassifyNow(event.target.checked)}
-                />
-                Phân loại ngay bằng LLM sau khi import
+        <div className="grid gap-5 p-5 lg:grid-cols-[1fr_360px]">
+          <div className="space-y-4">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600">
+                File Excel <span className="text-red-500">*</span>
               </label>
 
-              <button
-                type="button"
-                onClick={() => void importer.importRows()}
-                disabled={importer.loading}
-                className="flex h-9 w-full items-center justify-center gap-1 rounded bg-[#0097cf] px-4 text-xs font-semibold text-white hover:bg-[#0089bd] disabled:opacity-50"
-              >
-                <Upload size={15} />
-                {importer.loading ? "Đang import..." : "Import dữ liệu"}
-              </button>
+              <label className="flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-md border-2 border-dashed border-slate-300 bg-slate-50 px-4 text-center hover:border-sky-400 hover:bg-sky-50">
+                <FileSpreadsheet
+                  size={34}
+                  className="text-sky-600"
+                />
+                <span className="mt-2 text-sm font-semibold text-slate-700">
+                  {state.file
+                    ? state.file.name
+                    : "Chọn file .xlsx hoặc .xlsm"}
+                </span>
+                <span className="mt-1 text-xs text-slate-500">
+                  Bấm để chọn file từ máy tính
+                </span>
+                <input
+                  type="file"
+                  accept=".xlsx,.xlsm"
+                  onChange={state.selectFile}
+                  className="hidden"
+                />
+              </label>
 
-              <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
-                Bản này dùng JSON rows để kết nối backend trước. Sau khi ổn, có thể bổ sung đọc Excel trên frontend hoặc upload file thật.
-              </div>
+              {state.file && (
+                <button
+                  type="button"
+                  onClick={state.clearFile}
+                  className="mt-2 inline-flex h-8 items-center gap-1 rounded border border-slate-300 bg-white px-3 text-xs text-slate-600 hover:bg-slate-50"
+                >
+                  <X size={13} />
+                  Bỏ file
+                </button>
+              )}
             </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600">
+                Tên sheet
+              </label>
+              <input
+                value={state.sheetName}
+                onChange={(event) =>
+                  state.setSheetName(event.target.value)
+                }
+                placeholder="Để trống để lấy sheet đầu tiên"
+                className="h-9 w-full rounded border border-slate-300 bg-white px-3 text-xs outline-none focus:border-sky-400"
+              />
+            </div>
+
+            <label className="flex items-start gap-2 rounded-md border border-sky-200 bg-sky-50 p-3 text-xs text-sky-800">
+              <input
+                type="checkbox"
+                checked={state.autoClassify}
+                onChange={(event) =>
+                  state.setAutoClassify(event.target.checked)
+                }
+                className="mt-0.5"
+              />
+              <span>
+                <strong>Tự động phân loại sau khi import.</strong>
+                <br />
+                Sau khi lưu dữ liệu, Celery sẽ phân loại lỗi và nguyên nhân
+                bằng các danh mục Active mới nhất.
+              </span>
+            </label>
+
+            <button
+              type="button"
+              disabled={!state.file || state.loading}
+              onClick={() => void state.importExcel()}
+              className="flex h-10 items-center gap-2 rounded bg-[#0097cf] px-5 text-xs font-semibold text-white hover:bg-[#0089bd] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Upload size={15} />
+              {state.loading
+                ? "Đang import dữ liệu..."
+                : "Import Excel"}
+            </button>
           </div>
 
-          <div className="min-w-0 rounded-md border border-slate-200 bg-white">
-            <div className="border-b px-4 py-3">
-              <h2 className="text-sm font-semibold text-slate-800">Dữ liệu raw JSON</h2>
-              <p className="mt-0.5 text-xs text-slate-500">
-                Field tương ứng: received_date, completed_date, source, device, result, content, cause, solution.
-              </p>
-            </div>
-
-            <textarea
-              value={importer.rawJson}
-              onChange={(event) => importer.setRawJson(event.target.value)}
-              spellCheck={false}
-              className="h-[520px] w-full resize-none border-0 bg-[#0f172a] px-4 py-3 font-mono text-xs leading-5 text-slate-100 outline-none"
-            />
+          <div className="rounded-md border border-slate-200 bg-[#f8fafc] p-4">
+            <h2 className="text-sm font-semibold text-slate-800">
+              Quy tắc dữ liệu
+            </h2>
+            <ul className="mt-3 space-y-2 text-xs leading-5 text-slate-600">
+              <li>• Ngày nhận giữ đầy đủ ngày và giờ.</li>
+              <li>
+                • Ngày hoàn thành chỉ có ngày sẽ được gắn 23:59.
+              </li>
+              <li>
+                • Thiếu ngày hoàn thành nhưng có “Đã khắc phục” sẽ
+                dùng thời điểm import.
+              </li>
+              <li>
+                • Thiếu ngày hoàn thành và chưa khắc phục sẽ bỏ qua.
+              </li>
+              <li>
+                • Cột Nguyên nhân được lưu và clean trước khi Celery phân loại.
+              </li>
+              <li>
+                • Các cột ngoài 7 cột quy định không được import.
+              </li>
+            </ul>
           </div>
         </div>
+
+        {state.result && (
+          <div className="border-t p-5">
+            <div className="rounded-md border border-emerald-200 bg-emerald-50 p-4">
+              <div className="flex items-center gap-2 text-sm font-semibold text-emerald-700">
+                <CheckCircle2 size={17} />
+                Kết quả import
+              </div>
+
+              <div className="mt-3 grid gap-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
+                <ResultMetric
+                  label="Batch"
+                  value={state.result.batch.batch_code}
+                />
+                <ResultMetric
+                  label="Tổng dòng nguồn"
+                  value={String(
+                    state.result.import_summary.source_rows
+                  )}
+                />
+                <ResultMetric
+                  label="Đã import"
+                  value={String(
+                    state.result.import_summary.imported_rows
+                  )}
+                />
+                <ResultMetric
+                  label="Bỏ qua"
+                  value={String(
+                    state.result.import_summary.skipped_rows
+                  )}
+                />
+              </div>
+            </div>
+
+            {state.result.import_summary.skipped_details.length >
+              0 && (
+              <div className="mt-4 overflow-hidden rounded-md border border-amber-200">
+                <div className="bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-700">
+                  Các dòng bị bỏ qua
+                </div>
+                <div className="max-h-64 overflow-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b bg-white">
+                        <th className="px-3 py-2 font-semibold">
+                          Dòng
+                        </th>
+                        <th className="px-3 py-2 font-semibold">
+                          Lý do
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {state.result.import_summary.skipped_details.map(
+                        (item) => (
+                          <tr
+                            key={`${item.row}-${item.reason}`}
+                            className="border-b border-slate-100"
+                          >
+                            <td className="px-3 py-2">
+                              {item.row}
+                            </td>
+                            <td className="px-3 py-2 text-slate-600">
+                              {item.reason}
+                            </td>
+                          </tr>
+                        )
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </DashboardLayout>
+  );
+}
+
+function ResultMetric({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded border border-emerald-200 bg-white p-3">
+      <div className="text-[11px] text-slate-500">{label}</div>
+      <div className="mt-1 break-words font-semibold text-slate-800">
+        {value}
+      </div>
+    </div>
   );
 }

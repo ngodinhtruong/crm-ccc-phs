@@ -1,7 +1,8 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { memo, useState } from "react";
 import { AlertTriangle, ListChecks, RefreshCw, SlidersHorizontal, Upload, X } from "lucide-react";
 
 import {
@@ -13,13 +14,31 @@ import { useExternalErrorDashboard } from "@/hooks/useExternalErrorDashboard";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
 import {
   CLASSIFICATION_STATUS_OPTIONS,
-  EXTERNAL_ERROR_TYPE_OPTIONS,
   formatNumber,
   formatPercent,
 } from "./ExternalErrorUtils";
-import { ExternalErrorDashboardCharts } from "./ExternalErrorDashboardCharts";
 
-function SummaryCard({
+const ExternalErrorDashboardCharts = dynamic(
+  () =>
+    import("./ExternalErrorDashboardCharts").then(
+      (module) => module.ExternalErrorDashboardCharts
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <div
+            key={index}
+            className="h-[340px] animate-pulse rounded-md border border-slate-200 bg-white shadow-sm"
+          />
+        ))}
+      </div>
+    ),
+  }
+);
+
+const SummaryCard = memo(function SummaryCard({
   label,
   value,
   subLabel,
@@ -46,19 +65,29 @@ function SummaryCard({
       {subLabel && <p className="mt-1 text-[11px] opacity-70">{subLabel}</p>}
     </div>
   );
-}
+});
 
-function getActiveFilterCount(dashboard: ReturnType<typeof useExternalErrorDashboard>) {
-  return [
-    dashboard.dateFrom,
-    dashboard.dateTo,
-    dashboard.source,
-    dashboard.device,
-    dashboard.errorType,
-    dashboard.status,
-    dashboard.needReview,
-    dashboard.q,
-  ].filter(Boolean).length;
+function DashboardLoadingSkeleton() {
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 xl:grid-cols-8">
+        {Array.from({ length: 8 }).map((_, index) => (
+          <div
+            key={index}
+            className="h-[112px] animate-pulse rounded-md border border-slate-200 bg-slate-50"
+          />
+        ))}
+      </div>
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <div
+            key={index}
+            className="h-[340px] animate-pulse rounded-md border border-slate-200 bg-white shadow-sm"
+          />
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function FilterPopover({
@@ -69,7 +98,7 @@ function FilterPopover({
   onClose: () => void;
 }) {
   const applyFilter = () => {
-    void dashboard.reload();
+    dashboard.applyFilters();
     onClose();
   };
 
@@ -84,8 +113,13 @@ function FilterPopover({
         <div>
           <h2 className="text-sm font-semibold text-slate-800">Bộ lọc Dashboard lỗi</h2>
           <p className="mt-0.5 text-xs text-slate-500">
-            Lọc theo ngày, nguồn, thiết bị, loại lỗi, trạng thái phân loại và nội dung lỗi.
+            Lọc theo nguồn, thiết bị, nhóm lỗi, nhóm nguyên nhân, trạng thái và nội dung lỗi.
           </p>
+          {dashboard.catalogsLoading && (
+            <p className="mt-1 text-[11px] font-medium text-sky-600">
+              Đang tải danh mục bộ lọc...
+            </p>
+          )}
         </div>
 
         <button
@@ -99,30 +133,6 @@ function FilterPopover({
 
       <div className="max-h-[calc(100vh-160px)] overflow-y-auto bg-[#f8fafc] px-4 py-3">
         <div className="grid grid-cols-12 gap-3">
-          <div className="col-span-12 md:col-span-3">
-            <FilterSelect
-              label="Trường ngày"
-              value={dashboard.dateField}
-              onChange={dashboard.setDateField}
-              options={[
-                { label: "Ngày nhận", value: "received_date" },
-                { label: "Ngày hoàn thành", value: "completed_date" },
-              ]}
-              placeholder="Chọn trường ngày"
-            />
-          </div>
-
-          <div className="col-span-12 grid grid-cols-2 gap-3 md:col-span-5">
-            <DateRangeFilter
-              fromLabel="Từ ngày"
-              toLabel="Đến ngày"
-              fromValue={dashboard.dateFrom}
-              toValue={dashboard.dateTo}
-              onFromChange={dashboard.setDateFrom}
-              onToChange={dashboard.setDateTo}
-            />
-          </div>
-
           <div className="col-span-12 md:col-span-4">
             <label className="mb-1 block text-xs font-medium text-slate-500">Tìm kiếm</label>
             <SearchInput
@@ -137,7 +147,7 @@ function FilterPopover({
               label="Nguồn"
               value={dashboard.source}
               onChange={dashboard.setSource}
-              options={dashboard.sourceOptions}
+              options={dashboard.sourceOptions ?? []}
             />
           </div>
 
@@ -146,16 +156,25 @@ function FilterPopover({
               label="Thiết bị"
               value={dashboard.device}
               onChange={dashboard.setDevice}
-              options={dashboard.deviceOptions}
+              options={dashboard.deviceOptions ?? []}
             />
           </div>
 
           <div className="col-span-12 md:col-span-3">
             <FilterSelect
-              label="Loại lỗi"
+              label="Nhóm lỗi"
               value={dashboard.errorType}
               onChange={dashboard.setErrorType}
-              options={EXTERNAL_ERROR_TYPE_OPTIONS}
+              options={dashboard.errorTypeOptions ?? []}
+            />
+          </div>
+
+          <div className="col-span-12 md:col-span-3">
+            <FilterSelect
+              label="Nhóm nguyên nhân"
+              value={dashboard.causeGroup}
+              onChange={dashboard.setCauseGroup}
+              options={dashboard.causeGroupOptions ?? []}
             />
           </div>
 
@@ -193,7 +212,8 @@ function FilterPopover({
         <button
           type="button"
           onClick={applyFilter}
-          className="h-9 rounded bg-[#0097cf] px-4 text-xs font-semibold text-white hover:bg-[#0089bd]"
+          disabled={!dashboard.hasPendingFilters || dashboard.fetching}
+          className="h-9 rounded bg-[#0097cf] px-4 text-xs font-semibold text-white hover:bg-[#0089bd] disabled:cursor-not-allowed disabled:opacity-50"
         >
           Áp dụng bộ lọc
         </button>
@@ -206,16 +226,7 @@ export function ExternalErrorDashboardPage() {
   const dashboard = useExternalErrorDashboard();
   const [filterOpen, setFilterOpen] = useState(false);
 
-  const activeFilterCount = useMemo(() => getActiveFilterCount(dashboard), [
-    dashboard.dateFrom,
-    dashboard.dateTo,
-    dashboard.source,
-    dashboard.device,
-    dashboard.errorType,
-    dashboard.status,
-    dashboard.needReview,
-    dashboard.q,
-  ]);
+  const activeFilterCount = dashboard.appliedFilterCount;
 
   const summary = dashboard.summary;
 
@@ -248,7 +259,11 @@ export function ExternalErrorDashboardPage() {
 
           <button
             type="button"
-            onClick={() => setFilterOpen((value) => !value)}
+            onClick={() => {
+              const nextOpen = !filterOpen;
+              setFilterOpen(nextOpen);
+              if (nextOpen) void dashboard.ensureCatalogs();
+            }}
             className={`relative flex h-8 items-center gap-1 rounded border px-3 text-xs font-semibold ${filterOpen || activeFilterCount > 0
               ? "border-[#0097cf] bg-sky-50 text-[#007ead]"
               : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
@@ -268,10 +283,10 @@ export function ExternalErrorDashboardPage() {
           <button
             type="button"
             onClick={() => void dashboard.reload()}
-            disabled={dashboard.loading}
+            disabled={dashboard.fetching}
             className="flex h-8 items-center gap-1 rounded bg-[#0097cf] px-3 text-xs font-semibold text-white hover:bg-[#0089bd] disabled:opacity-50"
           >
-            <RefreshCw size={15} className={dashboard.loading ? "animate-spin" : ""} />
+            <RefreshCw size={15} className={dashboard.fetching ? "animate-spin" : ""} />
             Làm mới
           </button>
         </div>
@@ -292,6 +307,59 @@ export function ExternalErrorDashboardPage() {
           </div>
         </div>
 
+        <div className="flex flex-wrap items-end gap-3 rounded-md border border-slate-200 bg-white px-4 py-3 shadow-sm">
+          
+
+          <div className="w-full sm:w-[190px]">
+            <FilterSelect
+              label="Trường thời gian"
+              value={dashboard.dateField}
+              onChange={dashboard.setDateField}
+              options={[
+                { label: "Ngày nhận", value: "received_date" },
+                { label: "Ngày hoàn thành", value: "completed_date" },
+              ]}
+              placeholder="Chọn trường ngày"
+            />
+          </div>
+
+          <div className="grid w-full grid-cols-2 gap-3 sm:w-[380px]">
+            <DateRangeFilter
+              fromLabel="Từ ngày"
+              toLabel="Đến ngày"
+              fromValue={dashboard.dateFrom}
+              toValue={dashboard.dateTo}
+              onFromChange={dashboard.setDateFrom}
+              onToChange={dashboard.setDateTo}
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={dashboard.applyDateRange}
+            disabled={!dashboard.hasPendingDateFilters || dashboard.fetching}
+            className="h-9 rounded bg-[#0097cf] px-3 text-xs font-semibold text-white hover:bg-[#0089bd] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Áp dụng thời gian
+          </button>
+
+          <button
+            type="button"
+            onClick={dashboard.resetDateRange}
+            disabled={dashboard.fetching}
+            className="h-9 rounded border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+          >
+            Từ đầu năm
+          </button>
+        </div>
+
+        {dashboard.fetching && summary && (
+          <div className="flex items-center gap-2 rounded-md border border-sky-100 bg-sky-50 px-3 py-2 text-xs font-medium text-sky-700">
+            <RefreshCw size={13} className="animate-spin" />
+            Đang cập nhật dữ liệu dashboard...
+          </div>
+        )}
+
         {dashboard.error && (
           <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
             {dashboard.error}
@@ -299,17 +367,17 @@ export function ExternalErrorDashboardPage() {
         )}
 
         {dashboard.loading && !summary ? (
-          <div className="rounded-md border border-slate-200 bg-white p-10 text-center text-sm text-slate-500 shadow-sm">
-            Đang tải Dashboard lỗi...
-          </div>
+          <DashboardLoadingSkeleton />
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-6">
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 xl:grid-cols-8">
               <SummaryCard label="Tổng số lỗi" value={formatNumber(summary?.total_errors || 0)} subLabel="Dòng lỗi đã import" />
               <SummaryCard label="Đã phân loại" value={formatNumber(summary?.classified_errors || 0)} subLabel={`${formatPercent(summary?.classification_rate || 0)} dữ liệu`} tone="emerald" />
+              <SummaryCard label="Đã phân loại nguyên nhân" value={formatNumber(summary?.cause_classified_errors || 0)} subLabel={`${formatPercent(summary?.cause_classification_rate || 0)} dữ liệu`} tone="sky" />
               <SummaryCard label="Chưa phân loại" value={formatNumber(summary?.unclassified_errors || 0)} subLabel="Chờ LLM xử lý" tone="amber" />
               <SummaryCard label="Cần kiểm tra" value={formatNumber(summary?.need_review_errors || 0)} subLabel="LLM chưa chắc chắn" tone="rose" />
-              <SummaryCard label="Phân loại lỗi" value={formatNumber(summary?.by_error_type?.length || 0)} subLabel="Nhóm đang phát sinh" tone="violet" />
+              <SummaryCard label="Kiểm tra nguyên nhân" value={formatNumber(summary?.cause_need_review_errors || 0)} subLabel="Nguyên nhân cần xác nhận" tone="amber" />
+              <SummaryCard label="Nhóm lỗi" value={formatNumber(summary?.by_error_type?.length || 0)} subLabel="Nhóm đang phát sinh" tone="violet" />
               <SummaryCard label="Lỗi lặp lại" value={formatNumber(summary?.recurring_issue_count || 0)} subLabel="Normalized issue" tone="slate" />
             </div>
 

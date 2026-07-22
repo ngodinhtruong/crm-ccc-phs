@@ -6,10 +6,7 @@ import axios, {
 
 /**
  * Để rỗng: trình duyệt gọi đường dẫn tương đối (/api/...) tới chính origin
- * đang mở, rồi Next.js chuyển tiếp sang Django (xem next.config.ts).
- *
- * Nhờ vậy mở trang bằng localhost, 127.0.0.1 hay IP LAN đều chạy và không dính
- * CORS. Hardcode 127.0.0.1 sẽ gây Network Error khi truy cập từ máy khác.
+ * đang mở, rồi Next.js chuyển tiếp sang Django.
  */
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -20,9 +17,11 @@ type RetryableAxiosRequestConfig = InternalAxiosRequestConfig & {
 export const api: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: 15000,
-  headers: {
-    "Content-Type": "application/json",
-  },
+
+  // Không đặt Content-Type cố định ở đây.
+  // Axios sẽ tự chọn:
+  // - application/json cho object JSON.
+  // - multipart/form-data kèm boundary cho FormData.
 });
 
 function clearAuthAndRedirect() {
@@ -41,6 +40,16 @@ api.interceptors.request.use(
       if (accessToken) {
         config.headers.Authorization = `Bearer ${accessToken}`;
       }
+    }
+
+    // Xóa Content-Type cũ nếu request gửi FormData.
+    // Trình duyệt phải tự sinh multipart boundary; không được giữ
+    // application/json hoặc tự viết multipart/form-data thủ công.
+    if (
+      typeof FormData !== "undefined" &&
+      config.data instanceof FormData
+    ) {
+      config.headers.delete("Content-Type");
     }
 
     return config;
@@ -64,12 +73,10 @@ api.interceptors.response.use(
 
       if (!refreshToken) {
         clearAuthAndRedirect();
-        return new Promise(() => {});
+        return new Promise(() => { });
       }
 
       try {
-        // Dùng axios trần (không qua instance `api`) để tránh interceptor này
-        // gọi lại chính nó khi refresh cũng trả 401.
         const response = await axios.post(
           `${API_BASE_URL}/api/token/refresh/`,
           { refresh: refreshToken },
@@ -79,16 +86,21 @@ api.interceptors.response.use(
         const newAccessToken = response.data.access;
 
         localStorage.setItem("access_token", newAccessToken);
-
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+
+        // Nếu request gốc là FormData thì tiếp tục để browser tự tạo boundary
+        // khi Axios gửi lại request sau refresh token.
+        if (
+          typeof FormData !== "undefined" &&
+          originalRequest.data instanceof FormData
+        ) {
+          originalRequest.headers.delete("Content-Type");
+        }
 
         return api(originalRequest);
       } catch {
-        // Refresh token cũng hỏng -> phiên hết hạn thật. Xoá token và về trang
-        // đăng nhập. Trả về promise treo để component không kịp render lỗi
-        // "unknown" trong lúc trình duyệt đang chuyển trang.
         clearAuthAndRedirect();
-        return new Promise(() => {});
+        return new Promise(() => { });
       }
     }
 

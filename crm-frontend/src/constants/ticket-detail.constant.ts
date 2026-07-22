@@ -7,7 +7,6 @@ export const TICKET_STATUS_LABELS: Record<TicketStatusCode, string> = {
   DONE_WAIT_CLOSE: "Đã xong",
   PENDING_CLOSE: "Chờ đóng",
   CLOSED: "Đã đóng",
-  CANCELLED: "Đã hủy",
 };
 
 /** Các bước của thanh tiến trình (theo thứ tự vòng đời ticket). */
@@ -27,7 +26,6 @@ export const TICKET_STATUS_PILL: Record<TicketStatusCode, string> = {
   DONE_WAIT_CLOSE: "bg-teal-100 text-teal-700",
   PENDING_CLOSE: "bg-amber-100 text-amber-700",
   CLOSED: "bg-emerald-100 text-emerald-700",
-  CANCELLED: "bg-rose-100 text-rose-700",
 };
 
 /** Danh sách chọn trong modal/inline cập nhật tình trạng. */

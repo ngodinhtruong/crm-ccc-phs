@@ -23,9 +23,15 @@ function getCurrentYearStart() {
   return `${now.getFullYear()}-01-01`;
 }
 
-function getCurrentYearEnd() {
+
+function getCurrentDate() {
   const now = new Date();
-  return `${now.getFullYear()}-12-31`;
+
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
 }
 
 function getCurrentMonthStart() {
@@ -44,7 +50,7 @@ function getCurrentMonthEnd() {
   return `${year}-${month}-${endDay}`;
 }
 
-export function useCccDashboard() {
+export function useCccDashboard(initialStatus: string = "") {
   const router = useRouter();
 
   const [data, setData] = useState<CccDashboardResponse | null>(null);
@@ -59,8 +65,8 @@ export function useCccDashboard() {
 
   const [period, setPeriod] = useState("");
   const [dateFrom, setDateFrom] = useState(getCurrentYearStart());
-  const [dateTo, setDateTo] = useState(getCurrentYearEnd());
-  const [status, setStatus] = useState("");
+  const [dateTo, setDateTo] = useState(getCurrentDate());
+  const [status, setStatus] = useState(initialStatus);
   const [category, setCategory] = useState("");
   const [source, setSource] = useState("");
   const [accountLinkStatus, setAccountLinkStatus] = useState("");
@@ -165,10 +171,13 @@ export function useCccDashboard() {
   };
 
   const clearFilter = () => {
+    const start = getCurrentYearStart();
+    const end = getCurrentDate();
+
     setPeriod("");
-    setDateFrom(getCurrentYearStart());
-    setDateTo(getCurrentYearEnd());
-    setStatus("");
+    setDateFrom(start);
+    setDateTo(end);
+    setStatus(initialStatus);
     setCategory("");
     setSource("");
     setAccountLinkStatus("");
@@ -178,7 +187,13 @@ export function useCccDashboard() {
     setErrorType("");
     setRelatedSystem("");
 
-    void loadDashboard({ date_from: getCurrentYearStart(), date_to: getCurrentYearEnd(), recent_limit: 10 });
+    void loadDashboard({
+      period: "",
+      date_from: start,
+      date_to: end,
+      recent_limit: 10,
+      status: initialStatus,
+    });
   };
 
   const reload = () => {
@@ -191,12 +206,20 @@ export function useCccDashboard() {
       return;
     }
 
-    void loadMasterData();
-    void loadDashboard({ date_from: getCurrentYearStart(), date_to: getCurrentYearEnd(), recent_limit: 10 });
+    const start = getCurrentYearStart();
+    const end = getCurrentDate();
 
-    // Chỉ load lần đầu khi vào dashboard, không tự reload theo từng ký tự filter.
+    void loadMasterData();
+    void loadDashboard({
+      period: "",
+      date_from: start,
+      date_to: end,
+      recent_limit: 10,
+      status: initialStatus,
+    });
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router]);
+  }, [router, initialStatus]);
 
   const reloadRef = useRef(reload);
   useEffect(() => {

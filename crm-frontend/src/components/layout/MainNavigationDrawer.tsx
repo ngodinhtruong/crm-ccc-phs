@@ -104,7 +104,7 @@ const mainMenuItemsByWorkspace: Record<WorkspaceCode, MainMenuItem[]> = {
       href: "/chatbots/dashboard",
       icon: BotMessageSquare,
     },
-    
+
     // {
     //   title: "KHẢO SÁT",
     //   href: "/surveys",
@@ -317,9 +317,22 @@ const panelGroupsByWorkspace: Record<
             icon: ClipboardList,
           },
           {
-            title: "Import lỗi",
+            title: "Thêm lỗi",
+            href: "/external-errors/create",
+            icon: FileCheck2,
+            permissionCode: "EXTERNAL_ERROR_MANAGE",
+          },
+          {
+            title: "Import Excel",
             href: "/external-errors/import",
             icon: FileSpreadsheet,
+            permissionCode: "EXTERNAL_ERROR_IMPORT",
+          },
+          {
+            title: "Nhóm lỗi - Mã lỗi",
+            href: "/external-errors/catalogs",
+            icon: Settings,
+            permissionCode: "EXTERNAL_ERROR_MANAGE",
           },
         ],
       },

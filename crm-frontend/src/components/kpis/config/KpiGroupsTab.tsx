@@ -306,7 +306,7 @@ function SectionBlock({
                       />
                       Active
                     </label>
-                    <StatusBadge active={group.is_active} />
+                    {/* <StatusBadge active={group.is_active} /> */}
                   </td>
 
                   <td className="px-3 font-medium text-slate-700">

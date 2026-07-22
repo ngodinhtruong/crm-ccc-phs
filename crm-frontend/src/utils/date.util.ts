@@ -31,3 +31,54 @@ export function getStartOfWeek(date: Date) {
 
   return cloned;
 }
+export type DateRangeValue = {
+  dateFrom: string;
+  dateTo: string;
+};
+
+export function getCurrentMonthDateRange(
+  referenceDate = new Date()
+): DateRangeValue {
+  const firstDay = new Date(
+    referenceDate.getFullYear(),
+    referenceDate.getMonth(),
+    1
+  );
+  const lastDay = new Date(
+    referenceDate.getFullYear(),
+    referenceDate.getMonth() + 1,
+    0
+  );
+
+  return {
+    dateFrom: formatDateInput(firstDay),
+    dateTo: formatDateInput(lastDay),
+  };
+}
+
+export function getYearToCurrentMonthDateRange(
+  referenceDate = new Date()
+): DateRangeValue {
+  const firstDayOfYear = new Date(referenceDate.getFullYear(), 0, 1);
+  const lastDayOfCurrentMonth = new Date(
+    referenceDate.getFullYear(),
+    referenceDate.getMonth() + 1,
+    0
+  );
+
+  return {
+    dateFrom: formatDateInput(firstDayOfYear),
+    dateTo: formatDateInput(lastDayOfCurrentMonth),
+  };
+}
+
+export function getYearToCurrentDateRange(
+  referenceDate = new Date()
+): DateRangeValue {
+  const firstDayOfYear = new Date(referenceDate.getFullYear(), 0, 1);
+
+  return {
+    dateFrom: formatDateInput(firstDayOfYear),
+    dateTo: formatDateInput(referenceDate),
+  };
+}
