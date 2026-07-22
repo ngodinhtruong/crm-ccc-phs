@@ -64,6 +64,7 @@ class TicketService:
         company=None,
         customer_account=None,
         handling_branch=None,
+        contact_type=None,
         raw_account_number=None,
         assigned_unit=None,
         assigned_employee=None,

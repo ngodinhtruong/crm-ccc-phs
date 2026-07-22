@@ -1,3 +1,5 @@
+import json
+
 from django.conf import settings
 from django.core.management.base import BaseCommand
 from django_celery_beat.models import IntervalSchedule, PeriodicTask
@@ -14,12 +16,14 @@ class Command(BaseCommand):
             period=IntervalSchedule.SECONDS,
         )
 
+        task_kwargs = {"create_tickets": True}
+
         task, created = PeriodicTask.objects.update_or_create(
             name="Sync chatbot Supabase data",
             defaults={
                 "interval": schedule,
                 "task": "apps.chatbots.tasks.sync_chatbot_supabase_task",
-                "kwargs": '{"create_tickets": true}',
+                "kwargs": json.dumps(task_kwargs),
                 "enabled": True,
             },
         )

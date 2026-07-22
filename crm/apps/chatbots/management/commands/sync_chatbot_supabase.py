@@ -53,11 +53,20 @@ class Command(BaseCommand):
     help = "Sync chatbot data from Supabase into CRM"
 
     def add_arguments(self, parser):
-        parser.add_argument(
+        ticket_group = parser.add_mutually_exclusive_group()
+        ticket_group.add_argument(
             "--create-tickets",
+            dest="create_tickets",
             action="store_true",
-            help="Tạo ticket CRM cho các phiên đã có trong cskh_requests",
+            help="Tạo ticket CRM cho các phiên thuộc nhóm Chuyển CCC xử lý.",
         )
+        ticket_group.add_argument(
+            "--no-create-tickets",
+            dest="create_tickets",
+            action="store_false",
+            help="Chỉ đồng bộ dữ liệu chatbot, không tạo ticket CRM.",
+        )
+        parser.set_defaults(create_tickets=True)
         parser.add_argument(
             "--branch-code",
             type=str,
@@ -102,10 +111,16 @@ class Command(BaseCommand):
         if options["create_tickets"]:
             branch_code = options["branch_code"]
 
+            branch_code = branch_code or getattr(
+                settings,
+                "CHATBOT_DEFAULT_BRANCH_CODE",
+                None,
+            )
+
             if branch_code:
                 default_branch = Branch.objects.filter(branch_code=branch_code).first()
             else:
-                default_branch = Branch.objects.first()
+                default_branch = Branch.objects.order_by("id").first()
 
             if not default_branch:
                 raise RuntimeError("Chưa có chi nhánh nào. Hãy tạo Branch trước.")

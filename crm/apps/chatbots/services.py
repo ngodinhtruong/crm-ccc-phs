@@ -1,10 +1,11 @@
 from collections import defaultdict
+from inspect import signature
 
-from django.db.models import Q
+from django.db import transaction
+
 from django.utils import timezone
 
 from apps.chatbots.constants import (
-    UNCATEGORIZED_LABEL,
     category_label,
     is_spam_question,
     normalize_category,
@@ -39,6 +40,10 @@ CHANNEL_TO_SOURCE_CODE = {
 
 FALLBACK_SOURCE_CODE = "CHATBOT"
 
+CONTACT_TYPE_PHONE = "PHONE"
+CONTACT_TYPE_EMAIL = "EMAIL"
+CONTACT_TYPE_ACCOUNT = "ACCOUNT"
+
 EMAIL_CONTACT_HINTS = ("email", "mail")
 PHONE_CONTACT_HINTS = ("phone", "sdt", "điện thoại", "dien thoai", "mobile")
 
@@ -64,20 +69,20 @@ def normalize_contact_type(raw_type, value=None):
     text = str(raw_type or "").strip().lower()
 
     if is_account_contact(text):
-        return TicketContactType.ACCOUNT
+        return CONTACT_TYPE_ACCOUNT
 
     if any(hint in text for hint in EMAIL_CONTACT_HINTS):
-        return TicketContactType.EMAIL
+        return CONTACT_TYPE_EMAIL
 
     if any(hint in text for hint in PHONE_CONTACT_HINTS):
-        return TicketContactType.PHONE
+        return CONTACT_TYPE_PHONE
 
     value = str(value or "").strip()
 
     if not value:
         return None
 
-    return TicketContactType.EMAIL if "@" in value else TicketContactType.PHONE
+    return CONTACT_TYPE_EMAIL if "@" in value else CONTACT_TYPE_PHONE
 
 
 def build_full_conversation(logs):
@@ -305,7 +310,7 @@ def find_customer_by_contact(contact_type, contact_info):
 
     normalized = normalize_contact_type(contact_type, contact_info)
 
-    if normalized == TicketContactType.ACCOUNT:
+    if normalized == CONTACT_TYPE_ACCOUNT:
         account = (
             CustomerAccount.objects.select_related("customer")
             .filter(account_number=contact_info)
@@ -317,10 +322,10 @@ def find_customer_by_contact(contact_type, contact_info):
 
         return None, None
 
-    if normalized == TicketContactType.EMAIL:
-        return Customer.objects.filter(email=contact_info).first(), None
+    if normalized == CONTACT_TYPE_EMAIL:
+        return Customer.objects.filter(email__iexact=contact_info).first(), None
 
-    if normalized == TicketContactType.PHONE:
+    if normalized == CONTACT_TYPE_PHONE:
         return Customer.objects.filter(phone=contact_info).first(), None
 
     return None, None
@@ -352,8 +357,15 @@ def relink_ticket_customer(ticket):
     if ticket.customer_id or ticket.customer_account_id:
         return False
 
+    contact_type = getattr(ticket, "contact_type", None)
+    contact_value = (
+        getattr(ticket, "contact_value", None)
+        or getattr(ticket, "raw_account_number", None)
+    )
+
     customer, account = find_customer_by_contact(
-        ticket.contact_type, ticket.contact_value
+        contact_type,
+        contact_value,
     )
 
     if not customer and not account:
@@ -377,6 +389,78 @@ def relink_ticket_customer(ticket):
     )
 
     return True
+
+
+def build_chatbot_ticket_kwargs(*, summary, default_branch, created_status, policy):
+    """Tạo kwargs tương thích với phiên bản TicketService hiện tại.
+
+    Một số nhánh backend đã có contact_type/contact_value, một số nhánh cũ chỉ
+    có raw_account_number. Kiểm tra signature giúp chatbot tạo ticket được trong
+    cả hai trường hợp, thay vì lỗi unexpected keyword argument.
+    """
+    from apps.tickets.services import TicketService
+
+    customer, customer_account = find_customer_by_contact(
+        summary.contact_type,
+        summary.contact_info,
+    )
+    normalized_contact_type = normalize_contact_type(
+        summary.contact_type,
+        summary.contact_info,
+    )
+
+    title = first_non_empty(
+        summary.reason,
+        summary.last_question,
+        "Yêu cầu từ Chatbot",
+    )
+
+    request_content = "\n".join(
+        [
+            f"Session ID: {summary.session_id}",
+            f"Kênh: {summary.channel or ''}",
+            f"Chủ đề: {category_label(summary.dashboard_category)}",
+            f"Thông tin liên hệ: {summary.contact_info or ''} ({summary.contact_type or ''})",
+            f"Lý do chuyển CCC: {summary.reason or ''}",
+            "",
+            "Nội dung hội thoại:",
+            summary.full_conversation or "",
+        ]
+    )
+
+    kwargs = {
+        "title": title[:255],
+        "customer": customer,
+        "customer_account": customer_account,
+        "handling_branch": default_branch,
+        "current_status": created_status,
+        "source": resolve_ticket_source(summary.channel),
+        "sla_policy": policy,
+        "classification_method": ClassificationMethod.AUTO,
+        "source_ref_id": summary.session_id,
+        "request_content": request_content,
+        "created_by_user": None,
+        "check_permission": False,
+    }
+
+    parameters = signature(TicketService.create_ticket).parameters
+
+    if "contact_type" in parameters:
+        kwargs["contact_type"] = normalized_contact_type
+
+    if "contact_value" in parameters:
+        kwargs["contact_value"] = summary.contact_info or ""
+
+    # Nhánh Ticket cũ chưa có contact_type/contact_value vẫn lưu được số tài
+    # khoản thô để CCC tra cứu sau.
+    if (
+        "raw_account_number" in parameters
+        and normalized_contact_type == CONTACT_TYPE_ACCOUNT
+        and customer_account is None
+    ):
+        kwargs["raw_account_number"] = summary.contact_info or ""
+
+    return kwargs
 
 
 def create_crm_tickets_from_chatbot(default_branch=None):
@@ -427,60 +511,45 @@ def create_crm_tickets_from_chatbot(default_branch=None):
             summary.save(update_fields=["ticket"])
             continue
 
-        customer, customer_account = find_customer_by_contact(
-            summary.contact_type,
-            summary.contact_info,
-        )
+        with transaction.atomic():
+            # Khóa summary để hai worker chạy đồng thời không tạo hai ticket.
+            locked_summary = (
+                ChatbotSessionSummary.objects.select_for_update()
+                .select_related("ticket")
+                .get(pk=summary.pk)
+            )
 
-        title = first_non_empty(
-            summary.reason,
-            summary.last_question,
-            "Yêu cầu từ Chatbot",
-        )
+            if locked_summary.ticket_id:
+                continue
 
-        request_content = "\n".join(
-            [
-                f"Session ID: {summary.session_id}",
-                f"Kênh: {summary.channel or ''}",
-                f"Chủ đề: {category_label(summary.dashboard_category)}",
-                f"Thông tin liên hệ: {summary.contact_info or ''} ({summary.contact_type or ''})",
-                f"Lý do chuyển CCC: {summary.reason or ''}",
-                "",
-                "Nội dung hội thoại:",
-                summary.full_conversation or "",
-            ]
-        )
+            existing_ticket = Ticket.objects.filter(
+                source_ref_id=locked_summary.session_id,
+                classification_method=ClassificationMethod.AUTO,
+            ).first()
 
-        ticket = TicketService.create_ticket(
-            title=title[:255],
-            customer=customer,
-            customer_account=customer_account,
-            handling_branch=default_branch,
-            contact_type=normalize_contact_type(
-                summary.contact_type,
-                summary.contact_info,
-            ),
-            contact_value=summary.contact_info,
-            current_status=created_status,
-            source=resolve_ticket_source(summary.channel),
-            sla_policy=policy,
-            classification_method=ClassificationMethod.AUTO,
-            source_ref_id=summary.session_id,
-            request_content=request_content,
-            # Chatbot không có người tạo → bỏ qua kiểm tra quyền
-            created_by_user=None,
-            check_permission=False,
-        )
+            if existing_ticket:
+                locked_summary.ticket = existing_ticket
+                locked_summary.save(update_fields=["ticket"])
+                continue
+
+            ticket = TicketService.create_ticket(
+                **build_chatbot_ticket_kwargs(
+                    summary=locked_summary,
+                    default_branch=default_branch,
+                    created_status=created_status,
+                    policy=policy,
+                )
+            )
 
         # create_ticket gán owner_user = created_by_user; chatbot phải để trống
         # thì ticket mới nằm ở hàng chờ cho người khác nhận.
-        if ticket.owner_user_id is not None:
-            ticket.owner_user = None
-            ticket.owner_employee = None
-            ticket.save(update_fields=["owner_user", "owner_employee"])
+            if ticket.owner_user_id is not None:
+                ticket.owner_user = None
+                ticket.owner_employee = None
+                ticket.save(update_fields=["owner_user", "owner_employee"])
 
-        summary.ticket = ticket
-        summary.save(update_fields=["ticket"])
-        created += 1
+            locked_summary.ticket = ticket
+            locked_summary.save(update_fields=["ticket"])
+            created += 1
 
     return created
