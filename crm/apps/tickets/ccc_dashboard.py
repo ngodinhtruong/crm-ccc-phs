@@ -1,9 +1,10 @@
 import calendar
 import statistics
 from collections import defaultdict
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta
 
-from django.db.models import Count, Max, Q
+from django.conf import settings
+from django.db.models import Avg, Count, Max, Q
 from django.db.models.functions import TruncDate
 from django.utils import timezone
 from django.utils.dateparse import parse_date
@@ -13,6 +14,12 @@ from rest_framework.views import APIView
 
 from apps.accounts.scopes import filter_tickets_by_user
 from apps.common.constants import SlaStatus, TicketStatusCode
+from apps.tickets.dashboard_cache import (
+    build_ticket_dashboard_cache_key,
+    get_ticket_dashboard_cache,
+    is_dashboard_refresh_requested,
+    set_ticket_dashboard_cache,
+)
 from apps.tickets.models import (
     Ticket,
     TicketAccountLinkStatus,
@@ -23,6 +30,33 @@ from apps.tickets.models import (
 DEFAULT_RECENT_LIMIT = 10
 DEFAULT_TOP_LIMIT = 10
 REPORT_MONTH_COUNT = 5
+MAX_RECENT_LIMIT = 50
+
+PENDING_TICKET_SELECT_RELATED = (
+    "customer",
+    "company",
+    "customer_account",
+    "handling_branch",
+    "assigned_employee",
+    "current_status",
+    "support_category",
+    "source",
+    "error_group",
+    "error_type",
+)
+
+REPORT_TICKET_SELECT_RELATED = (
+    "source",
+    "support_category",
+    "classification",
+    "current_status",
+    "error_group",
+    "error_type",
+    "assigned_unit",
+    "assigned_employee",
+    "owner_user",
+    "sla_tracking",
+)
 
 
 def _safe_int(value, default):
@@ -30,6 +64,10 @@ def _safe_int(value, default):
         return int(value)
     except (TypeError, ValueError):
         return default
+
+
+def _safe_limit(value, default, maximum):
+    return max(1, min(_safe_int(value, default), maximum))
 
 
 def _percent(value, total):
@@ -160,6 +198,19 @@ def _date_range_from_params(params):
     return start_date, end_date
 
 
+def _datetime_range(date_from, date_to):
+    """Return an index-friendly [start, end) datetime range."""
+    start_at = datetime.combine(date_from, time.min)
+    end_at = datetime.combine(date_to + timedelta(days=1), time.min)
+
+    if settings.USE_TZ:
+        current_tz = timezone.get_current_timezone()
+        start_at = timezone.make_aware(start_at, current_tz)
+        end_at = timezone.make_aware(end_at, current_tz)
+
+    return start_at, end_at
+
+
 def _selected_report_months(date_from, date_to):
     first_month = _month_start(date_from)
     last_month = _month_start(date_to)
@@ -177,24 +228,7 @@ def _selected_report_months(date_from, date_to):
 def _base_queryset_without_date(request):
     params = request.query_params
 
-    queryset = Ticket.objects.select_related(
-        "customer",
-        "company",
-        "customer_account",
-        "handling_branch",
-        "assigned_unit",
-        "assigned_employee",
-        "owner_user",
-        "support_category",
-        "classification",
-        "current_status",
-        "priority",
-        "source",
-        "sla_policy",
-        "sla_tracking",
-        "error_group",
-        "error_type",
-    ).all()
+    queryset = Ticket.objects.all()
 
     queryset = filter_tickets_by_user(queryset, request.user)
 
@@ -298,7 +332,11 @@ def _base_queryset_without_date(request):
 
 def _ticket_queryset_for_range(request, start_date, end_date):
     queryset = _base_queryset_without_date(request)
-    return queryset.filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
+    start_at, end_at = _datetime_range(start_date, end_date)
+    return queryset.filter(
+        created_at__gte=start_at,
+        created_at__lt=end_at,
+    )
 
 
 def _base_ticket_queryset(request):
@@ -306,18 +344,47 @@ def _base_ticket_queryset(request):
     return _ticket_queryset_for_range(request, date_from, date_to), date_from, date_to
 
 
+def _memoized_ticket_value(ticket, attribute, builder):
+    if hasattr(ticket, attribute):
+        return getattr(ticket, attribute)
+
+    value = builder()
+    setattr(ticket, attribute, value)
+    return value
+
+
 def _status_code(ticket):
-    return ticket.current_status.status_code if ticket.current_status else ""
+    return _memoized_ticket_value(
+        ticket,
+        "_dashboard_status_code",
+        lambda: ticket.current_status.status_code if ticket.current_status else "",
+    )
 
 
 def _is_cancelled_ticket(ticket):
-    code = (_status_code(ticket) or "").upper()
-    return bool(ticket.cancelled_at or code in CANCELLED_STATUS_CODES)
+    return _memoized_ticket_value(
+        ticket,
+        "_dashboard_is_cancelled",
+        lambda: bool(
+            ticket.cancelled_at
+            or (_status_code(ticket) or "").upper() in CANCELLED_STATUS_CODES
+        ),
+    )
 
 
 def _is_resolved_ticket(ticket):
-    code = (_status_code(ticket) or "").upper()
-    return bool((ticket.closed_at or ticket.done_at or code in RESOLVED_STATUS_CODES) and not _is_cancelled_ticket(ticket))
+    return _memoized_ticket_value(
+        ticket,
+        "_dashboard_is_resolved",
+        lambda: bool(
+            (
+                ticket.closed_at
+                or ticket.done_at
+                or (_status_code(ticket) or "").upper() in RESOLVED_STATUS_CODES
+            )
+            and not _is_cancelled_ticket(ticket)
+        ),
+    )
 
 
 def _text_contains_any(value, keywords):
@@ -326,37 +393,57 @@ def _text_contains_any(value, keywords):
 
 
 def _is_ekyc_ticket(ticket):
-    values = [
-        ticket.title,
-        ticket.request_content,
-        ticket.source_ref_id,
-        ticket.related_system,
-        ticket.support_category.category_name if ticket.support_category else "",
-        ticket.support_category.category_code if ticket.support_category else "",
-        ticket.classification.classification_name if ticket.classification else "",
-        ticket.classification.classification_code if ticket.classification else "",
-        ticket.error_group.group_name if ticket.error_group else "",
-        ticket.error_type.type_name if ticket.error_type else "",
-    ]
-    return _text_contains_any(" ".join(str(v or "") for v in values), ["ekyc", "e-kyc", "e kyc"])
+    def calculate():
+        values = [
+            ticket.title,
+            ticket.request_content,
+            ticket.source_ref_id,
+            ticket.related_system,
+            ticket.support_category.category_name if ticket.support_category else "",
+            ticket.support_category.category_code if ticket.support_category else "",
+            ticket.classification.classification_name if ticket.classification else "",
+            ticket.classification.classification_code if ticket.classification else "",
+            ticket.error_group.group_name if ticket.error_group else "",
+            ticket.error_type.type_name if ticket.error_type else "",
+        ]
+        return _text_contains_any(
+            " ".join(str(value or "") for value in values),
+            ["ekyc", "e-kyc", "e kyc"],
+        )
+
+    return _memoized_ticket_value(ticket, "_dashboard_is_ekyc", calculate)
 
 
 def _is_spam_ticket(ticket):
-    values = [
-        ticket.title,
-        ticket.request_content,
-        ticket.cancelled_reason,
-        ticket.support_category.category_name if ticket.support_category else "",
-        ticket.classification.classification_name if ticket.classification else "",
-        ticket.error_group.group_name if ticket.error_group else "",
-        ticket.error_type.type_name if ticket.error_type else "",
-        _status_code(ticket),
-    ]
-    return _text_contains_any(" ".join(str(v or "") for v in values), ["spam", "rác", "rac"])
+    def calculate():
+        values = [
+            ticket.title,
+            ticket.request_content,
+            ticket.cancelled_reason,
+            ticket.support_category.category_name if ticket.support_category else "",
+            ticket.classification.classification_name if ticket.classification else "",
+            ticket.error_group.group_name if ticket.error_group else "",
+            ticket.error_type.type_name if ticket.error_type else "",
+            _status_code(ticket),
+        ]
+        return _text_contains_any(
+            " ".join(str(value or "") for value in values),
+            ["spam", "rác", "rac"],
+        )
+
+    return _memoized_ticket_value(ticket, "_dashboard_is_spam", calculate)
 
 
 def _is_report_processed_ticket(ticket):
-    return _is_resolved_ticket(ticket) and not _is_ekyc_ticket(ticket) and not _is_spam_ticket(ticket)
+    return _memoized_ticket_value(
+        ticket,
+        "_dashboard_is_report_processed",
+        lambda: (
+            _is_resolved_ticket(ticket)
+            and not _is_ekyc_ticket(ticket)
+            and not _is_spam_ticket(ticket)
+        ),
+    )
 
 
 def _ticket_finish_at(ticket):
@@ -377,19 +464,36 @@ def _duration_minutes(ticket):
 
 
 def _handling_days(ticket, prefer_related=False):
-    end_at = _ticket_finish_at(ticket)
-    if not end_at:
-        return None
+    cache_attribute = (
+        "_dashboard_related_handling_days"
+        if prefer_related
+        else "_dashboard_cs_handling_days"
+    )
 
-    if prefer_related:
-        start_at = ticket.processing_started_at or ticket.accepted_at or ticket.created_at
-    else:
-        start_at = ticket.accepted_at or ticket.processing_started_at or ticket.created_at
+    def calculate():
+        end_at = _ticket_finish_at(ticket)
+        if not end_at:
+            return None
 
-    if not start_at:
-        return None
+        if prefer_related:
+            start_at = (
+                ticket.processing_started_at
+                or ticket.accepted_at
+                or ticket.created_at
+            )
+        else:
+            start_at = (
+                ticket.accepted_at
+                or ticket.processing_started_at
+                or ticket.created_at
+            )
 
-    return round(max((end_at - start_at).total_seconds(), 0) / 86400, 3)
+        if not start_at:
+            return None
+
+        return round(max((end_at - start_at).total_seconds(), 0) / 86400, 3)
+
+    return _memoized_ticket_value(ticket, cache_attribute, calculate)
 
 
 def _average(values):
@@ -398,6 +502,84 @@ def _average(values):
         return None
 
     return round(sum(cleaned) / len(cleaned), 3)
+
+
+def _overview_counts(queryset, now):
+    resolved_filter = (
+        Q(current_status__status_code__in=list(RESOLVED_STATUS_CODES))
+        | Q(closed_at__isnull=False)
+        | Q(done_at__isnull=False)
+    ) & ~Q(current_status__status_code__in=list(CANCELLED_STATUS_CODES))
+
+    cancelled_filter = (
+        Q(current_status__status_code__in=list(CANCELLED_STATUS_CODES))
+        | Q(cancelled_at__isnull=False)
+    )
+
+    return queryset.aggregate(
+        total=Count("id", distinct=True),
+        resolved=Count("id", filter=resolved_filter, distinct=True),
+        cancelled=Count("id", filter=cancelled_filter, distinct=True),
+        pending=Count(
+            "id",
+            filter=~Q(
+                current_status__status_code__in=list(
+                    RESOLVED_STATUS_CODES | CANCELLED_STATUS_CODES
+                )
+            ),
+            distinct=True,
+        ),
+        linked=Count(
+            "id",
+            filter=Q(account_link_status=TicketAccountLinkStatus.LINKED),
+            distinct=True,
+        ),
+        unlinked=Count(
+            "id",
+            filter=Q(account_link_status=TicketAccountLinkStatus.UNLINKED),
+            distinct=True,
+        ),
+        error=Count(
+            "id",
+            filter=Q(error_group__isnull=False) | Q(error_type__isnull=False),
+            distinct=True,
+        ),
+        overdue_sla=Count(
+            "id",
+            filter=(
+                Q(sla_tracking__sla_status=SlaStatus.OVERDUE)
+                | Q(
+                    sla_tracking__resolution_due_at__lt=now,
+                    closed_at__isnull=True,
+                    current_status__status_code__in=list(OPEN_STATUS_CODES),
+                )
+            ),
+            distinct=True,
+        ),
+    )
+
+
+def _resolution_metrics(queryset):
+    values = sorted(_resolution_minutes_list(queryset))
+
+    if not values:
+        return {
+            "average": None,
+            "median": None,
+            "p75": None,
+            "p90": None,
+        }
+
+    count = len(values)
+    p75_index = min(int(count * 0.75), count - 1)
+    p90_index = min(int(count * 0.90), count - 1)
+
+    return {
+        "average": round(sum(values) / count, 2),
+        "median": round(statistics.median(values), 2),
+        "p75": round(values[p75_index], 2),
+        "p90": round(values[p90_index], 2),
+    }
 
 
 def _average_resolution_minutes(queryset):
@@ -445,116 +627,173 @@ def _resolution_percentiles(queryset):
 
 
 def _sla_stats(queryset):
-    """Compute SLA achievement rates."""
+    """Compute SLA achievement rates with one aggregate query."""
     from apps.sla.models import TicketSlaTracking
 
-    tracking = TicketSlaTracking.objects.filter(ticket__in=queryset)
-    total_sla = tracking.count()
-    on_time = tracking.filter(sla_status=SlaStatus.ON_TIME).count()
-    overdue = tracking.filter(sla_status=SlaStatus.OVERDUE).count()
-    processing = tracking.filter(sla_status="PROCESSING").count()
+    stats = TicketSlaTracking.objects.filter(ticket__in=queryset).aggregate(
+        total=Count("id"),
+        on_time=Count("id", filter=Q(sla_status=SlaStatus.ON_TIME)),
+        overdue=Count("id", filter=Q(sla_status=SlaStatus.OVERDUE)),
+        processing=Count("id", filter=Q(sla_status="PROCESSING")),
+    )
+
+    total_sla = stats["total"] or 0
+    on_time = stats["on_time"] or 0
 
     return {
         "total_with_sla": total_sla,
         "on_time": on_time,
-        "overdue": overdue,
-        "processing": processing,
+        "overdue": stats["overdue"] or 0,
+        "processing": stats["processing"] or 0,
         "sla_rate": _percent(on_time, total_sla),
     }
 
 
 def _csat_stats(queryset):
-    """Compute CSAT from TicketFeedback."""
+    """Compute CSAT with one aggregate query."""
     from apps.tickets.models import TicketFeedback
 
-    feedbacks = TicketFeedback.objects.filter(
+    stats = TicketFeedback.objects.filter(
         ticket__in=queryset,
         survey_sent=True,
+    ).aggregate(
+        total_sent=Count("id"),
+        responded=Count(
+            "id",
+            filter=Q(survey_status="RESPONDED"),
+        ),
+        rated=Count(
+            "id",
+            filter=Q(
+                survey_status="RESPONDED",
+                rating_score__isnull=False,
+            ),
+        ),
+        satisfied=Count(
+            "id",
+            filter=Q(
+                survey_status="RESPONDED",
+                rating_score__gte=4,
+            ),
+        ),
+        avg_score=Avg(
+            "rating_score",
+            filter=Q(
+                survey_status="RESPONDED",
+                rating_score__isnull=False,
+            ),
+        ),
     )
-    total_sent = feedbacks.count()
-    responded = feedbacks.filter(survey_status="RESPONDED").count()
-    ratings = list(
-        feedbacks.filter(
-            survey_status="RESPONDED",
-            rating_score__isnull=False,
-        ).values_list("rating_score", flat=True)
-    )
-    avg_score = round(sum(ratings) / len(ratings), 2) if ratings else None
-    satisfied = sum(1 for r in ratings if r >= 4)
-    csat_pct = _percent(satisfied, len(ratings)) if ratings else None
+
+    total_sent = stats["total_sent"] or 0
+    responded = stats["responded"] or 0
+    rated = stats["rated"] or 0
+    satisfied = stats["satisfied"] or 0
+    avg_score = stats["avg_score"]
 
     return {
         "survey_sent": total_sent,
         "survey_responded": responded,
         "response_rate": _percent(responded, total_sent),
-        "avg_score": avg_score,
-        "csat_percentage": csat_pct,
+        "avg_score": round(avg_score, 2) if avg_score is not None else None,
+        "csat_percentage": _percent(satisfied, rated) if rated else None,
     }
 
 
 def _previous_period_overview(request, date_from, date_to):
-    """Calculate overview metrics for the previous period of same length."""
+    """Calculate previous-period overview with one aggregate query."""
     delta = date_to - date_from
     prev_to = date_from - timedelta(days=1)
     prev_from = prev_to - delta
-
     prev_queryset = _ticket_queryset_for_range(request, prev_from, prev_to)
 
-    prev_total = prev_queryset.count()
-    prev_resolved = prev_queryset.filter(
+    resolved_filter = (
         Q(current_status__status_code__in=list(RESOLVED_STATUS_CODES))
         | Q(closed_at__isnull=False)
         | Q(done_at__isnull=False)
-    ).exclude(
-        current_status__status_code__in=list(CANCELLED_STATUS_CODES)
-    ).distinct().count()
-    prev_cancelled = prev_queryset.filter(
-        Q(current_status__status_code__in=list(CANCELLED_STATUS_CODES))
-        | Q(cancelled_at__isnull=False)
-    ).distinct().count()
-    prev_pending = prev_queryset.exclude(
-        current_status__status_code__in=list(RESOLVED_STATUS_CODES | CANCELLED_STATUS_CODES)
-    ).count()
+    ) & ~Q(current_status__status_code__in=list(CANCELLED_STATUS_CODES))
+
+    stats = prev_queryset.aggregate(
+        total=Count("id", distinct=True),
+        resolved=Count("id", filter=resolved_filter, distinct=True),
+        cancelled=Count(
+            "id",
+            filter=(
+                Q(current_status__status_code__in=list(CANCELLED_STATUS_CODES))
+                | Q(cancelled_at__isnull=False)
+            ),
+            distinct=True,
+        ),
+        pending=Count(
+            "id",
+            filter=~Q(
+                current_status__status_code__in=list(
+                    RESOLVED_STATUS_CODES | CANCELLED_STATUS_CODES
+                )
+            ),
+            distinct=True,
+        ),
+    )
 
     return {
         "period_from": prev_from.isoformat(),
         "period_to": prev_to.isoformat(),
-        "total_tickets": prev_total,
-        "resolved_tickets": prev_resolved,
-        "cancelled_tickets": prev_cancelled,
-        "pending_processing": prev_pending,
+        "total_tickets": stats["total"] or 0,
+        "resolved_tickets": stats["resolved"] or 0,
+        "cancelled_tickets": stats["cancelled"] or 0,
+        "pending_processing": stats["pending"] or 0,
     }
 
 
 def _ageing_backlog(queryset):
-    """Group pending tickets by how long they've been open."""
+    """Group pending tickets with one filtered aggregate query."""
     now = timezone.now()
     pending = queryset.exclude(
-        current_status__status_code__in=list(RESOLVED_STATUS_CODES | CANCELLED_STATUS_CODES)
+        current_status__status_code__in=list(
+            RESOLVED_STATUS_CODES | CANCELLED_STATUS_CODES
+        )
     )
 
-    buckets = [
-        {"key": "lt_4h", "label": "< 4 giờ", "min_hours": 0, "max_hours": 4, "count": 0},
-        {"key": "4_8h", "label": "4–8 giờ", "min_hours": 4, "max_hours": 8, "count": 0},
-        {"key": "1_2d", "label": "1–2 ngày", "min_hours": 8, "max_hours": 48, "count": 0},
-        {"key": "3_5d", "label": "3–5 ngày", "min_hours": 48, "max_hours": 120, "count": 0},
-        {"key": "gt_5d", "label": "> 5 ngày", "min_hours": 120, "max_hours": None, "count": 0},
+    h4 = now - timedelta(hours=4)
+    h8 = now - timedelta(hours=8)
+    h48 = now - timedelta(hours=48)
+    h120 = now - timedelta(hours=120)
+
+    stats = pending.aggregate(
+        lt_4h=Count(
+            "id",
+            filter=Q(created_at__gte=h4, created_at__lte=now),
+            distinct=True,
+        ),
+        h4_8=Count(
+            "id",
+            filter=Q(created_at__gte=h8, created_at__lt=h4),
+            distinct=True,
+        ),
+        h8_48=Count(
+            "id",
+            filter=Q(created_at__gte=h48, created_at__lt=h8),
+            distinct=True,
+        ),
+        h48_120=Count(
+            "id",
+            filter=Q(created_at__gte=h120, created_at__lt=h48),
+            distinct=True,
+        ),
+        gt_120=Count(
+            "id",
+            filter=Q(created_at__lt=h120),
+            distinct=True,
+        ),
+    )
+
+    return [
+        {"key": "lt_4h", "label": "< 4 giờ", "count": stats["lt_4h"] or 0},
+        {"key": "4_8h", "label": "4–8 giờ", "count": stats["h4_8"] or 0},
+        {"key": "1_2d", "label": "1–2 ngày", "count": stats["h8_48"] or 0},
+        {"key": "3_5d", "label": "3–5 ngày", "count": stats["h48_120"] or 0},
+        {"key": "gt_5d", "label": "> 5 ngày", "count": stats["gt_120"] or 0},
     ]
-
-    for created_at in pending.values_list("created_at", flat=True):
-        if not created_at:
-            continue
-        hours = (now - created_at).total_seconds() / 3600
-        for bucket in buckets:
-            if bucket["max_hours"] is None:
-                if hours >= bucket["min_hours"]:
-                    bucket["count"] += 1
-                    break
-            elif bucket["min_hours"] <= hours < bucket["max_hours"]:
-                bucket["count"] += 1
-                break
-
-    return [{"key": b["key"], "label": b["label"], "count": b["count"]} for b in buckets]
 
 
 def _group_with_percent(rows, total):
@@ -774,7 +1013,11 @@ def _is_cs_unit(unit):
 
 
 def _is_related_unit_ticket(ticket):
-    return bool(ticket.assigned_unit and not _is_cs_unit(ticket.assigned_unit))
+    return _memoized_ticket_value(
+        ticket,
+        "_dashboard_is_related_unit",
+        lambda: bool(ticket.assigned_unit and not _is_cs_unit(ticket.assigned_unit)),
+    )
 
 
 def _month_bucket_template(months):
@@ -789,17 +1032,19 @@ def _month_bucket_template(months):
     }
 
 
-def _ticket_month_key(ticket):
-    if not ticket.created_at:
-        return None
-    return _month_key(timezone.localdate(ticket.created_at))
-
-
 def _month_from_ticket(ticket):
-    if not ticket.created_at:
-        return None
-    local_date = timezone.localdate(ticket.created_at)
-    return date(local_date.year, local_date.month, 1)
+    def calculate():
+        if not ticket.created_at:
+            return None
+        local_date = timezone.localdate(ticket.created_at)
+        return date(local_date.year, local_date.month, 1)
+
+    return _memoized_ticket_value(ticket, "_dashboard_month", calculate)
+
+
+def _ticket_month_key(ticket):
+    month = _month_from_ticket(ticket)
+    return _month_key(month) if month else None
 
 
 def _build_monthly_processing_report(tickets, months):
@@ -1155,49 +1400,36 @@ class TicketCccDashboardAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        refresh = is_dashboard_refresh_requested(request.query_params)
+        cache_key = build_ticket_dashboard_cache_key(
+            request.user,
+            request.query_params,
+        )
+
+        if not refresh:
+            cached_payload = get_ticket_dashboard_cache(cache_key)
+            if cached_payload is not None:
+                return Response(cached_payload)
+
         queryset, date_from, date_to = _base_ticket_queryset(request)
-        total_tickets = queryset.count()
         now = timezone.now()
-        recent_limit = _safe_int(request.query_params.get("recent_limit"), DEFAULT_RECENT_LIMIT)
+        recent_limit = _safe_limit(
+            request.query_params.get("recent_limit"),
+            DEFAULT_RECENT_LIMIT,
+            MAX_RECENT_LIMIT,
+        )
 
-        resolved_tickets = queryset.filter(
-            Q(current_status__status_code__in=list(RESOLVED_STATUS_CODES))
-            | Q(closed_at__isnull=False)
-            | Q(done_at__isnull=False)
-        ).exclude(
-            current_status__status_code__in=list(CANCELLED_STATUS_CODES)
-        ).distinct().count()
-
-        cancelled_tickets = queryset.filter(
-            Q(current_status__status_code__in=list(CANCELLED_STATUS_CODES))
-            | Q(cancelled_at__isnull=False)
-        ).distinct().count()
-
-        pending_processing = queryset.exclude(
-            current_status__status_code__in=list(RESOLVED_STATUS_CODES | CANCELLED_STATUS_CODES)
-        ).count()
-
-        linked_tickets = queryset.filter(
-            account_link_status=TicketAccountLinkStatus.LINKED,
-        ).count()
-        unlinked_tickets = queryset.filter(
-            account_link_status=TicketAccountLinkStatus.UNLINKED,
-        ).count()
-
-        error_tickets = queryset.filter(
-            Q(error_group__isnull=False) | Q(error_type__isnull=False),
-        ).count()
-
-        overdue_sla = queryset.filter(
-            Q(sla_tracking__sla_status=SlaStatus.OVERDUE)
-            | Q(
-                sla_tracking__resolution_due_at__lt=now,
-                closed_at__isnull=True,
-                current_status__status_code__in=list(OPEN_STATUS_CODES),
-            )
-        ).distinct().count()
-
-        average_resolution_minutes = _average_resolution_minutes(queryset)
+        counts = _overview_counts(queryset, now)
+        total_tickets = counts["total"] or 0
+        resolved_tickets = counts["resolved"] or 0
+        cancelled_tickets = counts["cancelled"] or 0
+        pending_processing = counts["pending"] or 0
+        linked_tickets = counts["linked"] or 0
+        unlinked_tickets = counts["unlinked"] or 0
+        error_tickets = counts["error"] or 0
+        overdue_sla = counts["overdue_sla"] or 0
+        resolution_metrics = _resolution_metrics(queryset)
+        average_resolution_minutes = resolution_metrics["average"]
 
         tickets_by_category = _group_with_percent(
             queryset.values(
@@ -1268,16 +1500,18 @@ class TicketCccDashboardAPIView(APIView):
 
         root_cause_breakdown = _build_root_cause_breakdown(queryset, total_tickets)
 
+        pending_queryset = queryset.exclude(
+            current_status__status_code__in=list(
+                RESOLVED_STATUS_CODES | CANCELLED_STATUS_CODES
+            )
+        ).select_related(*PENDING_TICKET_SELECT_RELATED)
+
         pending_tickets = [
             _ticket_summary(ticket)
-            for ticket in queryset.exclude(
-                current_status__status_code__in=list(RESOLVED_STATUS_CODES | CANCELLED_STATUS_CODES)
-            ).order_by("-created_at", "-id")[:recent_limit]
+            for ticket in pending_queryset.order_by("-created_at", "-id")[:recent_limit]
         ]
 
-
-
-        resolution_pcts = _resolution_percentiles(queryset)
+        resolution_pcts = resolution_metrics
         sla = _sla_stats(queryset)
         csat = _csat_stats(queryset)
         prev_period = _previous_period_overview(request, date_from, date_to)
@@ -1287,7 +1521,11 @@ class TicketCccDashboardAPIView(APIView):
         report_from = report_months[0]
         report_to = _month_end(report_months[-1])
 
-        report_queryset = _ticket_queryset_for_range(request, report_from, report_to)
+        report_queryset = _ticket_queryset_for_range(
+            request,
+            report_from,
+            report_to,
+        ).select_related(*REPORT_TICKET_SELECT_RELATED)
         report_tickets = list(report_queryset)
         current_month_start = _month_start(date_to)
         previous_month_start = _add_months(current_month_start, -1)
@@ -1401,4 +1639,5 @@ class TicketCccDashboardAPIView(APIView):
             "generated_at": timezone.now(),
         }
 
+        set_ticket_dashboard_cache(cache_key, payload)
         return Response(payload)

@@ -409,6 +409,26 @@ class Ticket(TimeStampedModel):
             models.Index(fields=["external_status"]),
             models.Index(fields=["sla_policy"]),
             models.Index(fields=["created_at"]),
+            models.Index(
+                fields=["created_at", "current_status"],
+                name="tkt_created_status_ix",
+            ),
+            models.Index(
+                fields=["created_at", "handling_branch"],
+                name="tkt_created_branch_ix",
+            ),
+            models.Index(
+                fields=["created_at", "source"],
+                name="tkt_created_source_ix",
+            ),
+            models.Index(
+                fields=["created_at", "support_category"],
+                name="tkt_created_category_ix",
+            ),
+            models.Index(
+                fields=["created_at", "account_link_status"],
+                name="tkt_created_link_ix",
+            ),
         ]
 
     def __str__(self):
