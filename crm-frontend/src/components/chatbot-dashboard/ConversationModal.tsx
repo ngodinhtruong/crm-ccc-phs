@@ -17,6 +17,7 @@ export function ConversationModal({
   session: ChatbotTicketItem;
   onClose: () => void;
 }) {
+  const [detailSession, setDetailSession] = useState<ChatbotTicketItem | null>(null);
   const [messages, setMessages] = useState<ChatbotMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -28,12 +29,15 @@ export function ConversationModal({
       try {
         setLoading(true);
         setError("");
+        setDetailSession(null);
+        setMessages([]);
 
         const data = await chatbotDashboardService.getSessionDetail(
           session.session_id
         );
 
         if (active) {
+          setDetailSession(data.session);
           setMessages(data.messages);
         }
       } catch {
@@ -54,13 +58,33 @@ export function ConversationModal({
     };
   }, [session.session_id]);
 
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [onClose]);
+
+  const displaySession = detailSession ?? session;
+
   return (
     <div
       className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4"
       onClick={onClose}
     >
       <div
-        className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+        className="flex h-[90vh] max-h-[900px] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-start justify-between border-b border-slate-100 px-5 py-4">
@@ -72,7 +96,7 @@ export function ConversationModal({
             <div className="mt-1 text-xs text-slate-500">
               Session:{" "}
               <span className="font-mono font-semibold text-slate-700">
-                {session.session_id}
+                {displaySession.session_id}
               </span>
             </div>
           </div>
@@ -89,35 +113,40 @@ export function ConversationModal({
         <div className="grid grid-cols-2 gap-3 border-b border-slate-100 bg-slate-50 px-5 py-3 text-xs md:grid-cols-5">
           <InfoItem
             label="Nhóm xử lý"
-            value={session.outcome_label || session.outcome_type || "-"}
+            value={
+              displaySession.outcome_label || displaySession.outcome_type || "-"
+            }
           />
-          <InfoItem label="Chủ đề" value={session.category_label || "-"} />
+          <InfoItem
+            label="Chủ đề"
+            value={displaySession.category_label || "-"}
+          />
           <InfoItem
             label="Bắt đầu"
-            value={formatDateTime(session.started_at)}
+            value={formatDateTime(displaySession.started_at)}
           />
           <InfoItem
             label="Thông tin KH"
-            value={session.contact_info || "Chưa có"}
+            value={displaySession.contact_info || "Chưa có"}
           />
           <InfoItem
             label="Mã ticket"
-            value={session.ticket_code || "Không tạo ticket"}
+            value={displaySession.ticket_code || "Không tạo ticket"}
           />
         </div>
 
-        {session.reason && (
+        {displaySession.reason && (
           <div className="border-b border-slate-100 bg-amber-50 px-5 py-3">
             <div className="text-[11px] font-semibold uppercase text-amber-700">
               CÂU HỎI CỦA KHÁCH HÀNG
             </div>
-            <div className="mt-1 whitespace-pre-wrap text-xs text-amber-900">
-              {session.reason}
+            <div className="mt-1 max-h-28 overflow-y-auto whitespace-pre-wrap pr-2 text-xs leading-5 text-amber-900">
+              {displaySession.reason}
             </div>
           </div>
         )}
 
-        <div className="space-y-4 overflow-y-auto p-5">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-5">
           {loading && (
             <div className="text-sm text-slate-500">Đang tải hội thoại...</div>
           )}

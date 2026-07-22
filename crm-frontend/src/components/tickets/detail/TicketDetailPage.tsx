@@ -805,7 +805,6 @@ function TicketDetailInner({
               session_id: sessionId,
               ticket_code: ticket.ticket_code,
               contact_info: ticket.contact_value,
-              reason: ticket.request_content,
               outcome_label: "Chuyển CCC xử lý",
               outcome_type: "CCC",
               started_at: ticket.created_at,
