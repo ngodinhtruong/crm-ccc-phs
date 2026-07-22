@@ -21,7 +21,6 @@ from apps.customers.models import Customer, CustomerAccount
 from apps.tickets.models import (
     Ticket,
     TicketAccountLinkStatus,
-    TicketContactType,
     TicketSource,
     TicketStatus,
 )
