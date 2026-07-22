@@ -181,14 +181,13 @@ export function TicketsTab({
                         onClick={(event) => {
                           event.stopPropagation();
                           router.push(
-                            `/chatbots/tickets/${item.ticket_chatbot_id}`
+                            `/tickets/${item.ticket_chatbot_id}`
                           );
                         }}
                         title="Xem chi tiết ticket"
                         className="flex items-center gap-1 rounded-md border border-sky-200 bg-sky-50 px-2 py-1 text-[11px] font-semibold text-sky-700 transition hover:bg-sky-100"
                       >
                         <Eye size={12} />
-                        Chi tiết
                       </button>
                     )}
                   </div>

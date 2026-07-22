@@ -5,14 +5,10 @@ from apps.chatbots.views import (
     ChatbotDashboardOverviewAPIView,
     ChatbotDashboardTicketsAPIView,
     ChatbotSessionDetailAPIView,
-    TicketChatbotChangeStatusAPIView,
-    TicketChatbotClaimAPIView,
-    TicketChatbotDetailAPIView,
-    TicketChatbotHistoryAPIView,
-    TicketChatbotListAPIView,
-    TicketChatbotOptionsAPIView,
 )
 
+# Ticket sinh từ chatbot giờ nằm chung bảng `tickets`, nên dùng luôn API
+# /api/tickets/. Các endpoint ticket-chatbots/... đã bỏ.
 urlpatterns = [
     path(
         "dashboard/overview/",
@@ -33,35 +29,5 @@ urlpatterns = [
         "dashboard/sessions/<str:session_id>/",
         ChatbotSessionDetailAPIView.as_view(),
         name="chatbot-session-detail",
-    ),
-    path(
-        "ticket-chatbots/",
-        TicketChatbotListAPIView.as_view(),
-        name="ticket-chatbot-list",
-    ),
-    path(
-        "ticket-chatbots/options/",
-        TicketChatbotOptionsAPIView.as_view(),
-        name="ticket-chatbot-options",
-    ),
-    path(
-        "ticket-chatbots/<int:pk>/",
-        TicketChatbotDetailAPIView.as_view(),
-        name="ticket-chatbot-detail",
-    ),
-    path(
-        "ticket-chatbots/<int:pk>/history/",
-        TicketChatbotHistoryAPIView.as_view(),
-        name="ticket-chatbot-history",
-    ),
-    path(
-        "ticket-chatbots/<int:pk>/claim/",
-        TicketChatbotClaimAPIView.as_view(),
-        name="ticket-chatbot-claim",
-    ),
-    path(
-        "ticket-chatbots/<int:pk>/change-status/",
-        TicketChatbotChangeStatusAPIView.as_view(),
-        name="ticket-chatbot-change-status",
     ),
 ]

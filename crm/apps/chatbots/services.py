@@ -15,9 +15,70 @@ from apps.chatbots.models import (
     ChatbotCskhRequest,
     ChatbotSessionSummary,
     ChatbotState,
-    TicketChatbot,
 )
+from apps.common.constants import ClassificationMethod, TicketStatusCode
 from apps.customers.models import Customer, CustomerAccount
+from apps.tickets.models import (
+    Ticket,
+    TicketAccountLinkStatus,
+    TicketContactType,
+    TicketSource,
+    TicketStatus,
+)
+
+# channel thô từ Supabase -> source_code trong ticket_sources.
+# Kênh lạ rơi về CHATBOT chung thay vì tạo nguồn mới ngoài tầm kiểm soát.
+CHANNEL_TO_SOURCE_CODE = {
+    "xpro": "XPRO",
+    "x pro": "XPRO",
+    "zalo": "ZALO",
+    "facebook": "FACEBOOK",
+    "fb": "FACEBOOK",
+    "web": "WEB",
+    "app": "APP",
+}
+
+FALLBACK_SOURCE_CODE = "CHATBOT"
+
+EMAIL_CONTACT_HINTS = ("email", "mail")
+PHONE_CONTACT_HINTS = ("phone", "sdt", "điện thoại", "dien thoai", "mobile")
+
+
+def resolve_ticket_source(channel):
+    """Kênh chatbot -> TicketSource. Không tra được thì dùng nguồn CHATBOT chung."""
+    code = CHANNEL_TO_SOURCE_CODE.get(str(channel or "").strip().lower())
+
+    source = TicketSource.objects.filter(source_code=code).first() if code else None
+
+    return source or TicketSource.objects.filter(
+        source_code=FALLBACK_SOURCE_CODE
+    ).first()
+
+
+def normalize_contact_type(raw_type, value=None):
+    """
+    contact_type thô của chatbot -> mã chuẩn PHONE / EMAIL / ACCOUNT.
+
+    Giá trị từ Supabase là chữ tự do nên phải dò từ khoá; không đoán được thì
+    suy từ chính chuỗi khách đưa (có '@' thì là email).
+    """
+    text = str(raw_type or "").strip().lower()
+
+    if is_account_contact(text):
+        return TicketContactType.ACCOUNT
+
+    if any(hint in text for hint in EMAIL_CONTACT_HINTS):
+        return TicketContactType.EMAIL
+
+    if any(hint in text for hint in PHONE_CONTACT_HINTS):
+        return TicketContactType.PHONE
+
+    value = str(value or "").strip()
+
+    if not value:
+        return None
+
+    return TicketContactType.EMAIL if "@" in value else TicketContactType.PHONE
 
 
 def build_full_conversation(logs):
@@ -217,27 +278,6 @@ def rebuild_chatbot_session_summaries(affected_session_ids=None):
     return len(session_ids)
 
 
-def generate_ticket_code():
-    today = timezone.localdate()
-    prefix = f"CB{today.strftime('%Y%m%d')}"
-
-    latest = (
-        TicketChatbot.objects.filter(ticket_code__startswith=prefix)
-        .order_by("-ticket_code")
-        .first()
-    )
-
-    if not latest:
-        return f"{prefix}0001"
-
-    try:
-        last_number = int(latest.ticket_code[len(prefix) :])
-    except ValueError:
-        last_number = 0
-
-    return f"{prefix}{last_number + 1:04d}"
-
-
 def is_account_contact(contact_type):
     """Loại liên hệ có phải là số tài khoản không (dựa trên contact_type)."""
     contact_type = str(contact_type or "").lower()
@@ -251,12 +291,22 @@ def is_account_contact(contact_type):
 
 
 def find_customer_by_contact(contact_type, contact_info):
+    """
+    Tra khách hàng theo ĐÚNG loại thông tin khách đưa.
+
+    Trước đây hàm này luôn chạy `phone=x OR email=x` cho mọi trường hợp, nên
+    một số điện thoại trùng email của người khác sẽ khớp nhầm. Giờ tách theo
+    contact_type: ACCOUNT tra số tài khoản, PHONE tra số điện thoại, EMAIL tra
+    email. Cả ba cột đều unique nên kết quả là duy nhất.
+    """
     contact_info = str(contact_info or "").strip()
 
     if not contact_info:
         return None, None
 
-    if is_account_contact(contact_type):
+    normalized = normalize_contact_type(contact_type, contact_info)
+
+    if normalized == TicketContactType.ACCOUNT:
         account = (
             CustomerAccount.objects.select_related("customer")
             .filter(account_number=contact_info)
@@ -266,11 +316,15 @@ def find_customer_by_contact(contact_type, contact_info):
         if account:
             return account.customer, account
 
-    customer = Customer.objects.filter(
-        Q(phone=contact_info) | Q(email=contact_info)
-    ).first()
+        return None, None
 
-    return customer, None
+    if normalized == TicketContactType.EMAIL:
+        return Customer.objects.filter(email=contact_info).first(), None
+
+    if normalized == TicketContactType.PHONE:
+        return Customer.objects.filter(phone=contact_info).first(), None
+
+    return None, None
 
 
 def get_default_sla_policy():
@@ -291,7 +345,7 @@ def get_default_sla_policy():
 
 def relink_ticket_customer(ticket):
     """
-    Dò lại khách hàng cho một TicketChatbot chưa nối được (link_status=UNLINKED).
+    Dò lại khách hàng cho ticket chưa nối được.
 
     Dùng khi khách hàng được tạo SAU khi ticket đã sinh ra: mở lại ticket thì
     tự nối. Trả về True nếu vừa nối được (đã lưu), False nếu vẫn chưa ra khách.
@@ -300,7 +354,7 @@ def relink_ticket_customer(ticket):
         return False
 
     customer, account = find_customer_by_contact(
-        ticket.contact_type, ticket.contact_info
+        ticket.contact_type, ticket.contact_value
     )
 
     if not customer and not account:
@@ -308,13 +362,17 @@ def relink_ticket_customer(ticket):
 
     ticket.customer = customer
     ticket.customer_account = account
-    ticket.link_status = TicketChatbot.LINK_LINKED
+
+    # account_link_status nói về TK liên kết, nên chỉ LINKED khi có số tài khoản
+    if account is not None:
+        ticket.account_link_status = TicketAccountLinkStatus.LINKED
+
     ticket.updated_at = timezone.now()
     ticket.save(
         update_fields=[
             "customer",
             "customer_account",
-            "link_status",
+            "account_link_status",
             "updated_at",
         ]
     )
@@ -324,49 +382,56 @@ def relink_ticket_customer(ticket):
 
 def create_crm_tickets_from_chatbot(default_branch=None):
     """
-    Tạo TicketChatbot cho các phiên đã xin được thông tin khách (outcome = CCC).
+    Tạo ticket cho các phiên đã xin được thông tin khách (outcome = CCC).
 
-    Ticket sinh ra ở bảng TicketChatbot riêng, gần như mọi cột cho phép null:
-    - Lưu thô số điện thoại / số tài khoản khách cho (contact_info).
-    - Nối mềm khách hàng nếu tra ra, không thì để trống (link_status = UNLINKED).
+    Ticket vào thẳng bảng `tickets` dùng chung với ticket tạo tay:
+    - Nguồn (source) lấy theo kênh chatbot: XPRO / ZALO / FACEBOOK...
+    - classification_method = AUTO để phân biệt với ticket người tạo.
+    - Thông tin khách đưa lưu nguyên ở contact_type + contact_value.
+    - Nối mềm khách hàng nếu tra ra, không thì để trống.
     - Chưa gán người xử lý (owner_user = null) → nằm hàng chờ chung,
-      trạng thái CHO_TIEP_NHAN, ai cũng thấy, tự bấm nhận.
+      trạng thái CREATED, ai cũng thấy, tự bấm nhận.
 
-    default_branch có thể None (khác bảng Ticket chung: ở đây không bắt buộc chi nhánh).
+    default_branch bắt buộc vì Ticket.handling_branch là NOT NULL.
     """
+    from apps.tickets.services import TicketService
+
+    if default_branch is None:
+        raise ValueError(
+            "Thiếu chi nhánh mặc định — Ticket.handling_branch không cho phép trống."
+        )
+
     summaries = ChatbotSessionSummary.objects.filter(
         outcome_type=ChatbotSessionSummary.OUTCOME_CCC,
-        ticket_chatbot__isnull=True,
+        ticket__isnull=True,
     )
 
+    created_status = TicketStatus.objects.filter(
+        status_code=TicketStatusCode.CREATED
+    ).first()
+
+    policy = get_default_sla_policy()
     created = 0
 
     for summary in summaries:
-        # Chống tạo trùng: một phiên chỉ có đúng một TicketChatbot
-        existing_ticket = TicketChatbot.objects.filter(
+        # Chống tạo trùng: một phiên chỉ sinh đúng một ticket.
+        # Tra theo source_ref_id đơn thuần chứ không dựa vào ràng buộc DB —
+        # ràng buộc của Ticket là cặp (source, source_ref_id), nên nếu phiên
+        # đổi kênh thì DB vẫn cho tạo ticket thứ hai cho cùng session.
+        existing_ticket = Ticket.objects.filter(
             source_ref_id=summary.session_id,
+            classification_method=ClassificationMethod.AUTO,
         ).first()
 
         if existing_ticket:
-            summary.ticket_chatbot = existing_ticket
-            summary.save(update_fields=["ticket_chatbot"])
+            summary.ticket = existing_ticket
+            summary.save(update_fields=["ticket"])
             continue
 
-        # Nối mềm khách hàng
         customer, customer_account = find_customer_by_contact(
             summary.contact_type,
             summary.contact_info,
         )
-
-        if customer or customer_account:
-            link_status = TicketChatbot.LINK_LINKED
-        else:
-            link_status = TicketChatbot.LINK_UNLINKED
-
-        # Tách thô SĐT / STK theo loại liên hệ khách khai
-        is_account = is_account_contact(summary.contact_type)
-        account_number = summary.contact_info if is_account else None
-        phone = None if is_account else summary.contact_info
 
         title = first_non_empty(
             summary.reason,
@@ -387,37 +452,36 @@ def create_crm_tickets_from_chatbot(default_branch=None):
             ]
         )
 
-        ticket = TicketChatbot.objects.create(
-            ticket_code=generate_ticket_code(),
+        ticket = TicketService.create_ticket(
             title=title[:255],
-            source_ref_id=summary.session_id,
-            contact_info=summary.contact_info,
-            contact_type=summary.contact_type,
-            phone=phone,
-            account_number=account_number,
             customer=customer,
             customer_account=customer_account,
-            link_status=link_status,
-            dashboard_category=summary.dashboard_category,
-            reason=summary.reason,
-            request_content=request_content,
-            full_conversation=summary.full_conversation,
-            channel=summary.channel,
-            current_status=TicketChatbot.get_status(
-                TicketChatbot.STATUS_CHO_TIEP_NHAN
-            ),
-            owner_user=None,
             handling_branch=default_branch,
+            contact_type=normalize_contact_type(
+                summary.contact_type,
+                summary.contact_info,
+            ),
+            contact_value=summary.contact_info,
+            current_status=created_status,
+            source=resolve_ticket_source(summary.channel),
+            sla_policy=policy,
+            classification_method=ClassificationMethod.AUTO,
+            source_ref_id=summary.session_id,
+            request_content=request_content,
+            # Chatbot không có người tạo → bỏ qua kiểm tra quyền
+            created_by_user=None,
+            check_permission=False,
         )
 
-        # Áp SLA mặc định để đồng hồ bắt đầu đếm ngay từ khi ticket sinh ra
-        policy = get_default_sla_policy()
+        # create_ticket gán owner_user = created_by_user; chatbot phải để trống
+        # thì ticket mới nằm ở hàng chờ cho người khác nhận.
+        if ticket.owner_user_id is not None:
+            ticket.owner_user = None
+            ticket.owner_employee = None
+            ticket.save(update_fields=["owner_user", "owner_employee"])
 
-        if policy:
-            ticket.apply_sla_policy(policy)
-
-        summary.ticket_chatbot = ticket
-        summary.save(update_fields=["ticket_chatbot"])
+        summary.ticket = ticket
+        summary.save(update_fields=["ticket"])
         created += 1
 
     return created

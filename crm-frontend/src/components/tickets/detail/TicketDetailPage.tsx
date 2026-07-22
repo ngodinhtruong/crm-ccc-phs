@@ -2,9 +2,19 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, History, Pencil, X } from "lucide-react";
+import {
+  ArrowLeft,
+  Bot,
+  History,
+  MessageSquareText,
+  Pencil,
+  UserPlus,
+  X,
+} from "lucide-react";
 
 import { ticketApi } from "@/apis/ticket.api";
+import { ConversationModal } from "@/components/chatbot-dashboard/ConversationModal";
+import { chatbotDashboardService } from "@/services/chatbot-dashboard.service";
 import { SlaBreachReasonModal } from "@/components/tickets/detail/SlaBreachReasonModal";
 import { TicketHistoryModal } from "@/components/tickets/detail/TicketHistoryModal";
 import { TicketStatusFlow } from "@/components/tickets/detail/TicketStatusFlow";
@@ -18,8 +28,10 @@ import {
   useTicketEditForm,
 } from "@/hooks/useTicketEditForm";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
+import { ChatbotTicketItem } from "@/types/chatbot-dashboard.type";
 import { TicketDetail, TicketStatusCode } from "@/types/ticket.type";
 import { formatDateTime } from "@/utils/date.util";
+import { getApiErrorDetail } from "@/utils/error.util";
 
 /** Hàng "nhãn : giá trị". Khi editing=true, render input do caller truyền. */
 function Field({
@@ -68,6 +80,12 @@ function Section({
   );
 }
 
+const CONTACT_TYPE_LABELS: Record<string, string> = {
+  PHONE: "Số điện thoại",
+  EMAIL: "Email",
+  ACCOUNT: "Số tài khoản",
+};
+
 const SELECT_CLS =
   "h-8 w-full rounded-lg border border-slate-300 bg-white px-2 text-xs outline-none focus:border-sky-400";
 const INPUT_CLS =
@@ -113,6 +131,9 @@ export function TicketDetailPage({ id }: { id: number }) {
   const [editing, setEditing] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showBreachModal, setShowBreachModal] = useState(false);
+  const [showConversation, setShowConversation] = useState(false);
+  const [claiming, setClaiming] = useState(false);
+  const [claimError, setClaimError] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -159,6 +180,21 @@ export function TicketDetailPage({ id }: { id: number }) {
       setShowHistory={setShowHistory}
       showBreachModal={showBreachModal}
       setShowBreachModal={setShowBreachModal}
+      showConversation={showConversation}
+      setShowConversation={setShowConversation}
+      claiming={claiming}
+      claimError={claimError}
+      onClaim={async () => {
+        try {
+          setClaiming(true);
+          setClaimError("");
+          setTicket(await ticketApi.claimTicket(id));
+        } catch (err) {
+          setClaimError(getApiErrorDetail(err, "Không nhận được ticket."));
+        } finally {
+          setClaiming(false);
+        }
+      }}
       onSaved={setTicket}
       onBack={() => router.push("/tickets")}
     />
@@ -174,6 +210,11 @@ function TicketDetailInner({
   setShowHistory,
   showBreachModal,
   setShowBreachModal,
+  showConversation,
+  setShowConversation,
+  claiming,
+  claimError,
+  onClaim,
   onSaved,
   onBack,
 }: {
@@ -184,11 +225,51 @@ function TicketDetailInner({
   setShowHistory: (v: boolean) => void;
   showBreachModal: boolean;
   setShowBreachModal: (v: boolean) => void;
+  showConversation: boolean;
+  setShowConversation: (v: boolean) => void;
+  claiming: boolean;
+  claimError: string;
+  onClaim: () => void;
   onSaved: (t: TicketDetail) => void;
   onBack: () => void;
 }) {
   const f = useTicketEditForm(ticket);
   const statusCode = (ticket.current_status_code || "") as TicketStatusCode;
+
+  // Ticket sinh từ chatbot: classification_method = AUTO và có id phiên chat gốc.
+  const isChatbotTicket = ticket.classification_method === "AUTO";
+  const sessionId = ticket.source_ref_id || "";
+  const [customerQuestions, setCustomerQuestions] = useState<string[] | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadPreview = async () => {
+      if (!isChatbotTicket || !sessionId) {
+        setCustomerQuestions(null);
+        return;
+      }
+
+      try {
+        const data = await chatbotDashboardService.getSessionDetail(sessionId);
+        if (!active) return;
+        const qs = (data.messages || [])
+          .filter((m) => m.question && m.question.trim())
+          .map((m) => m.question!.trim())
+          .slice(0, 5);
+        setCustomerQuestions(qs.length ? qs : null);
+      } catch {
+        if (active) setCustomerQuestions(null);
+      }
+    };
+
+    void loadPreview();
+
+    return () => {
+      active = false;
+    };
+  }, [isChatbotTicket, sessionId]);
+  const canClaim = isChatbotTicket && !ticket.owner_user_name;
 
   const handleSave = async (breach?: { reason: number; note: string }) => {
     const res = await f.save(breach);
@@ -231,6 +312,12 @@ function TicketDetailInner({
               <span className="font-bold text-sky-600">
                 {ticket.ticket_code}
               </span>
+              {isChatbotTicket && (
+                <span className="ml-3 inline-flex items-center gap-1 rounded bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-700">
+                  <Bot size={11} />
+                  Chatbot
+                </span>
+              )}
               {editing && (
                 <span className="ml-3 rounded bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
                   Đang chỉnh sửa
@@ -239,6 +326,18 @@ function TicketDetailInner({
             </p>
 
             <div className="flex items-center gap-2">
+              {canClaim && (
+                <button
+                  type="button"
+                  disabled={claiming}
+                  onClick={onClaim}
+                  className="flex items-center gap-1.5 rounded-lg bg-[#0097cf] px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-[#0089bd] disabled:opacity-60"
+                >
+                  <UserPlus size={13} />
+                  {claiming ? "Đang nhận..." : "Nhận ticket"}
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={() => setShowHistory(true)}
@@ -261,8 +360,16 @@ function TicketDetailInner({
             </div>
           </div>
 
+          {claimError && (
+            <div className="mx-5 mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">
+              {claimError}
+            </div>
+          )}
+
           <TicketStatusFlow status={statusCode} />
         </div>
+
+        {/* Inline hội thoại chatbot đã được loại bỏ; dùng popup để xem lịch sử */}
 
         {/* Thông tin chung */}
         <Section title="Thông tin chung">
@@ -408,30 +515,45 @@ function TicketDetailInner({
 
         {/* Thông tin mô tả */}
         <Section title="Thông tin mô tả">
+          {/* Hiển thị khối hiển thị CHỈ câu hỏi của khách (không show đáp án) - lấy từ preview messages */}
+          {customerQuestions && customerQuestions.length > 0 && (
+            <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-5 py-3 text-xs text-amber-700">
+              <div className="text-[11px] font-semibold uppercase text-amber-700">
+                CÂU HỎI CỦA KHÁCH HÀNG
+              </div>
+              <div className="mt-1 whitespace-pre-wrap text-xs text-amber-900">
+                {customerQuestions.map((q, i) => (
+                  <div key={i} className={i ? "mt-2" : ""}>
+                    {q}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Đối với ticket sinh từ chatbot, ẩn trường "Nội dung yêu cầu" chi tiết ngoài modal;
+              người xử lý có thể bấm "Xem lịch sử trò chuyện" để xem đầy đủ Q/A */}
+          {!isChatbotTicket && (
+            <Field
+              label="Nội dung yêu cầu"
+              editing={editing}
+              view={<span className="whitespace-pre-wrap">{ticket.request_content}</span>}
+              edit={
+                <textarea
+                  value={f.requestContent}
+                  onChange={(e) => f.setRequestContent(e.target.value)}
+                  rows={3}
+                  className={INPUT_CLS}
+                />
+              }
+            />
+          )}
+
           <Field
-            label="Nội dung yêu cầu"
+            label="phản hồi sau khi liên hệ"
             editing={editing}
             view={
-              <span className="whitespace-pre-wrap">
-                {ticket.request_content}
-              </span>
-            }
-            edit={
-              <textarea
-                value={f.requestContent}
-                onChange={(e) => f.setRequestContent(e.target.value)}
-                rows={3}
-                className={INPUT_CLS}
-              />
-            }
-          />
-          <Field
-            label="Phản hồi cuối"
-            editing={editing}
-            view={
-              <span className="whitespace-pre-wrap">
-                {ticket.final_response}
-              </span>
+              <span className="whitespace-pre-wrap">{ticket.final_response}</span>
             }
             edit={
               <textarea
@@ -443,6 +565,20 @@ function TicketDetailInner({
               />
             }
           />
+
+          {/* Nút mở popup lịch sử hội thoại (hiển thị modal có thể kéo để xem toàn bộ) */}
+          {isChatbotTicket && sessionId && (
+            <div className="mt-3">
+              <button
+                type="button"
+                onClick={() => setShowConversation(true)}
+                className="flex w-fit items-center gap-2 rounded-lg bg-[#0097cf] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#0089bd]"
+              >
+                <MessageSquareText size={14} />
+                Xem lịch sử trò chuyện
+              </button>
+            </div>
+          )}
         </Section>
 
         {/* Giải pháp xử lý */}
@@ -659,6 +795,23 @@ function TicketDetailInner({
             Hủy bỏ
           </button>
         </div>
+      )}
+
+      {showConversation && sessionId && (
+        <ConversationModal
+          session={
+            {
+              id: ticket.id,
+              session_id: sessionId,
+              ticket_code: ticket.ticket_code,
+              contact_info: ticket.contact_value,
+              outcome_label: "Chuyển CCC xử lý",
+              outcome_type: "CCC",
+              started_at: ticket.created_at,
+            } as ChatbotTicketItem
+          }
+          onClose={() => setShowConversation(false)}
+        />
       )}
 
       {showHistory && (
