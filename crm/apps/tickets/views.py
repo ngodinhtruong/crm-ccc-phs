@@ -1,5 +1,6 @@
 from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
@@ -10,6 +11,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.accounts.scopes import filter_tickets_by_user
+from apps.common.constants import TicketStatusCode
 from apps.accounts.api_permissions import MasterDataPermission
 from apps.tickets.serializers import (
     TicketSupportCategorySerializer,
@@ -209,7 +211,7 @@ class TicketViewSet(
         customer_name = params.get("customer_name")
         customer_phone = params.get("customer_phone")
         customer_account_no = params.get("customer_account_no") or params.get("account_number")
-        raw_account_number = params.get("raw_account_number")
+        contact_value = params.get("contact_value")
         account_link_status = params.get("account_link_status")
         company_name = params.get("company_name")
 
@@ -275,7 +277,7 @@ class TicketViewSet(
                 | Q(customer__email__icontains=q)
                 | Q(company__company_name__icontains=q)
                 | Q(customer_account__account_number__icontains=q)
-                | Q(raw_account_number__icontains=q)
+                | Q(contact_value__icontains=q)
                 | Q(owner_user__username__icontains=q)
                 | Q(owner_user__email__icontains=q)
                 | Q(assigned_employee__full_name__icontains=q)
@@ -302,11 +304,11 @@ class TicketViewSet(
         if customer_account_no:
             queryset = queryset.filter(
                 Q(customer_account__account_number__icontains=customer_account_no)
-                | Q(raw_account_number__icontains=customer_account_no)
+                | Q(contact_value__icontains=customer_account_no)
             )
 
-        if raw_account_number:
-            queryset = queryset.filter(raw_account_number__icontains=raw_account_number)
+        if contact_value:
+            queryset = queryset.filter(contact_value__icontains=contact_value)
 
         if account_link_status:
             queryset = queryset.filter(account_link_status=account_link_status)
@@ -494,6 +496,54 @@ class TicketViewSet(
 
         read_serializer = TicketReadSerializer(ticket)
         return Response(read_serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["post"], url_path="claim")
+    def claim(self, request, pk=None):
+        """
+        Tự nhận một ticket đang nằm hàng chờ (chưa ai xử lý).
+
+        Ticket sinh từ chatbot được tạo với owner_user = null nên ai cũng thấy;
+        endpoint riêng thay vì PATCH owner_user để chặn tranh chấp: hai người
+        bấm cùng lúc thì người sau nhận 409 chứ không ghi đè im lặng.
+        """
+        ticket = self.get_object()
+
+        with transaction.atomic():
+            ticket = Ticket.objects.select_for_update().get(pk=ticket.pk)
+
+            if ticket.owner_user_id and ticket.owner_user_id != request.user.id:
+                return Response(
+                    {"detail": "Ticket đã được người khác tiếp nhận."},
+                    status=status.HTTP_409_CONFLICT,
+                )
+
+            try:
+                TicketService.update_status(
+                    ticket=ticket,
+                    to_status_code=TicketStatusCode.ACCEPTED,
+                    updated_by_user=request.user,
+                    note="Tự nhận ticket từ hàng chờ",
+                    check_permission=False,
+                )
+            except Exception as exc:
+                self.handle_service_error(exc)
+
+            ticket.refresh_from_db()
+            ticket.owner_user = request.user
+            ticket.owner_employee = getattr(request.user, "employee", None)
+            ticket.updated_by_user = request.user
+            ticket.updated_at = timezone.now()
+            ticket.save(
+                update_fields=[
+                    "owner_user",
+                    "owner_employee",
+                    "updated_by_user",
+                    "updated_at",
+                ]
+            )
+
+        ticket.refresh_from_db()
+        return Response(TicketReadSerializer(ticket).data, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=["post"], url_path="assign")
     def assign(self, request, pk=None):

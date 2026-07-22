@@ -18,13 +18,40 @@ from apps.customers.models import (
 User = get_user_model()
 
 
+class BlankToNullMixin:
+    """
+    Đổi chuỗi rỗng thành None cho các cột vừa unique vừa cho phép bỏ trống.
+
+    NULL không tham gia so sánh unique nên bỏ trống bao nhiêu dòng cũng được,
+    nhưng '' là một giá trị thật — chỉ MỘT dòng được mang ''. Model để
+    blank=True nên DRF sinh allow_blank=True, client gửi {"phone": ""} sẽ lưu
+    chuỗi rỗng và khách thứ hai làm vậy sẽ vỡ ràng buộc unique. Chuẩn hóa ngay
+    tại đây để mọi đường ghi qua API đều an toàn.
+    """
+
+    BLANK_TO_NULL_FIELDS = ()
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+
+        for name in self.BLANK_TO_NULL_FIELDS:
+            value = attrs.get(name)
+
+            if isinstance(value, str) and not value.strip():
+                attrs[name] = None
+
+        return attrs
+
+
 class CustomerTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomerType
         fields = "__all__"
 
 
-class CompanySerializer(serializers.ModelSerializer):
+class CompanySerializer(BlankToNullMixin, serializers.ModelSerializer):
+    BLANK_TO_NULL_FIELDS = ("company_code", "phone", "email", "account_number")
+
     primary_contact_name = serializers.SerializerMethodField()
     source_name = serializers.SerializerMethodField()
     rating_name = serializers.SerializerMethodField()
@@ -145,7 +172,9 @@ class MembershipTierSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-class CustomerSerializer(serializers.ModelSerializer):
+class CustomerSerializer(BlankToNullMixin, serializers.ModelSerializer):
+    BLANK_TO_NULL_FIELDS = ("customer_code", "phone", "email")
+
     branch_name = serializers.SerializerMethodField()
     customer_type_name = serializers.SerializerMethodField()
     company_name = serializers.SerializerMethodField()

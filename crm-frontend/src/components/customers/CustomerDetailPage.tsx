@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, MapPin, Phone, Tag, User } from "lucide-react";
 
-import { chatbotTicketApi } from "@/apis/chatbot-ticket.api";
 import { customerApi } from "@/apis/customer.api";
 import { ticketApi } from "@/apis/ticket.api";
 import { CustomerTicketsTab } from "@/components/customers/CustomerTicketsTab";
@@ -106,25 +105,20 @@ export function CustomerDetailPage({ id }: { id: number }) {
     void load();
   }, [load]);
 
-  // Đếm ticket để hiện badge trên tab — gồm cả ticket thường lẫn ticket chatbot
+  // Đếm ticket để hiện badge trên tab. Ticket chatbot đã nằm chung bảng
+  // nên chỉ còn một query thay vì cộng hai nguồn như trước.
   useEffect(() => {
     let active = true;
 
-    Promise.all([
-      ticketApi
-        .getTickets({ customer: String(id), page_size: "1" })
-        .catch(() => null),
-      chatbotTicketApi.getList({ customer: id, page_size: 1 }).catch(() => null),
-    ]).then(([crm, bot]) => {
-      if (!active) return;
-
-      if (!crm && !bot) {
-        setTicketCount(null);
-        return;
-      }
-
-      setTicketCount((crm?.count ?? 0) + (bot?.count ?? 0));
-    });
+    ticketApi
+      .getTickets({ customer: String(id), page_size: "1" })
+      .then((crm) => {
+        if (!active) return;
+        setTicketCount(crm?.count ?? 0);
+      })
+      .catch(() => {
+        if (active) setTicketCount(null);
+      });
 
     return () => {
       active = false;

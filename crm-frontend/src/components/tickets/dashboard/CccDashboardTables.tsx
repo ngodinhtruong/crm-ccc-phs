@@ -95,13 +95,18 @@ export function TicketListTable({
             )}
 
             {items.map((item) => (
-              <tr 
-                key={item.id} 
+              <tr
+                key={item.id}
                 onClick={() => router.push(`/tickets/${item.id}`)}
                 className="cursor-pointer border-b border-slate-100 transition-colors hover:bg-sky-50"
               >
                 <td className="px-3 py-3 font-semibold text-sky-600">
-                  {item.ticket_code || `#${item.id}`}
+                  <span>{item.ticket_code || `#${item.id}`}</span>
+                  {item.origin === "CHATBOT" && (
+                    <span className="ml-2 inline-flex rounded-md bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700">
+                      Chatbot
+                    </span>
+                  )}
                 </td>
                 <td className="px-3 py-3 text-slate-600">
                   {item.handling_branch_name || "-"}

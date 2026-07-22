@@ -150,6 +150,20 @@ export const ticketApi = {
         return response.data;
     },
 
+    /**
+     * Tự nhận một ticket đang nằm hàng chờ (chưa ai xử lý).
+     *
+     * Endpoint riêng thay vì PATCH owner_user: hai người bấm cùng lúc thì
+     * người sau nhận 409 chứ không ghi đè im lặng.
+     */
+    claimTicket: async (id: number): Promise<TicketDetail> => {
+        const response = await api.post<TicketDetail>(
+            `/api/tickets/tickets/${id}/claim/`
+        );
+
+        return response.data;
+    },
+
     /** Đánh dấu gửi khảo sát hài lòng cho ticket. */
     sendTicketSurvey: async (id: number, sendSurvey: boolean) => {
         const response = await api.post(`/api/tickets/tickets/${id}/survey/`, {

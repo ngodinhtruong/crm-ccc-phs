@@ -4,8 +4,10 @@ from django.utils import timezone
 from apps.branches.models import Branch, Employee, ProcessingUnit
 from apps.customers.models import Customer, Company, CustomerAccount
 from apps.sla.models import SlaPolicy, SlaBreachReason
+from apps.common.constants import ClassificationMethod
 from apps.tickets.models import (
     Ticket,
+    TicketContactType,
     TicketSupportCategory,
     TicketClassification,
     TicketPriority,
@@ -208,7 +210,8 @@ class TicketReadSerializer(serializers.ModelSerializer):
             "company_name",
             "customer_account",
             "customer_account_number",
-            "raw_account_number",
+            "contact_type",
+            "contact_value",
             "display_account_number",
             "account_link_status",
             "account_link_status_label",
@@ -310,7 +313,7 @@ class TicketReadSerializer(serializers.ModelSerializer):
         )
 
     def get_display_account_number(self, obj):
-        return self.get_customer_account_number(obj) or obj.raw_account_number
+        return self.get_customer_account_number(obj) or obj.contact_value
 
     def get_account_link_status_label(self, obj):
         if obj.account_link_status == TicketAccountLinkStatus.LINKED:
@@ -396,7 +399,13 @@ class TicketCreateSerializer(serializers.Serializer):
         required=False,
         allow_null=True,
     )
-    raw_account_number = serializers.CharField(
+    contact_type = serializers.ChoiceField(
+        choices=TicketContactType.CHOICES,
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    contact_value = serializers.CharField(
         required=False,
         allow_blank=True,
         allow_null=True,
@@ -511,8 +520,49 @@ class TicketCreateSerializer(serializers.Serializer):
             allow_null=True,
         )
 
+    # Ticket do người tạo tay bắt buộc có các thông tin phân loại này. Ticket
+    # sinh từ chatbot thì không — dữ liệu khách cho quá ít, nên cột để null.
+    MANUAL_REQUIRED_FIELDS = {
+        "support_category": "Danh mục hỗ trợ",
+        "classification": "Phân loại",
+        "priority": "Mức độ ưu tiên",
+        "source": "Nguồn ticket",
+    }
+
     def validate(self, attrs):
-        return normalize_ticket_error_fields(attrs)
+        attrs = normalize_ticket_error_fields(attrs)
+
+        # Chặn ở tầng API chứ không chỉ ở form: gọi thẳng endpoint vẫn phải
+        # tuân thủ, nếu không dữ liệu thiếu phân loại sẽ lọt vào báo cáo.
+        if attrs.get("classification_method") != ClassificationMethod.AUTO:
+            missing = [
+                label
+                for field, label in self.MANUAL_REQUIRED_FIELDS.items()
+                if not attrs.get(field)
+            ]
+
+            if missing:
+                raise serializers.ValidationError(
+                    {
+                        field: [f"{label} là bắt buộc với ticket tạo tay."]
+                        for field, label in self.MANUAL_REQUIRED_FIELDS.items()
+                        if label in missing
+                    }
+                )
+
+        contact_value = (attrs.get("contact_value") or "").strip()
+
+        if contact_value and not attrs.get("contact_type"):
+            raise serializers.ValidationError(
+                {
+                    "contact_type": [
+                        "Cần cho biết thông tin khách cung cấp là số điện thoại, "
+                        "email hay số tài khoản."
+                    ]
+                }
+            )
+
+        return attrs
 
 
 class TicketAssignSerializer(serializers.Serializer):
@@ -585,7 +635,7 @@ class TicketAmendSerializer(serializers.Serializer):
         required=False,
         allow_null=True,
     )
-    raw_account_number = serializers.CharField(
+    contact_value = serializers.CharField(
         required=False,
         allow_blank=True,
         allow_null=True,

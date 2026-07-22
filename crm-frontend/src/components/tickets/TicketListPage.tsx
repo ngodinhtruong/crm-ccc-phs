@@ -374,7 +374,7 @@ export function TicketListPage() {
                       <td className="px-3">{item.customer_name || "-"}</td>
 
                       <td className="px-3 font-semibold text-slate-700">
-                        {item.display_account_number || item.customer_account_number || item.raw_account_number || "-"}
+                        {item.display_account_number || item.customer_account_number || item.contact_value || "-"}
                       </td>
 
                       <td className="px-3">{item.customer_phone || "-"}</td>

@@ -50,8 +50,9 @@ export const TICKET_STATUS_PILL: Record<string, string> = {
   Mở: "bg-rose-600 text-white",
   "Tiếp nhận": "bg-sky-100 text-sky-700",
   "Đang xử lý": "bg-violet-100 text-violet-700",
+  "Đã xong (chờ đóng)": "bg-teal-100 text-teal-700",
+  // Nhãn cũ, giữ lại cho DB chưa chạy migration đổi tên
   "Đã xong": "bg-teal-100 text-teal-700",
-  "Chờ đóng": "bg-orange-100 text-orange-700",
   "Đã đóng": "bg-emerald-100 text-emerald-700",
   "Đã hủy": "bg-rose-100 text-rose-700",
 };

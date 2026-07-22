@@ -28,8 +28,21 @@ class TicketService:
     @staticmethod
     def generate_ticket_code(*, branch=None):
         """
-        Rule mã ticket: ngày + tháng + 2 số cuối năm + 3 số thứ tự trong ngày.
-        Ví dụ: 150726001.
+        Rule mã ticket: ngày + tháng + 2 số cuối năm + 4 số thứ tự trong ngày.
+        Ví dụ: 1507260001. Dùng chung cho cả ticket tạo tay lẫn ticket chatbot.
+
+        Trước dùng 3 chữ số nên chặn ở 999 ticket/ngày; gộp thêm luồng chatbot
+        thì trần đó quá thấp, nay nới lên 9999.
+
+        Vẫn duyệt các mã trong ngày để lấy max theo GIÁ TRỊ SỐ, không dùng
+        ORDER BY chuỗi: mã cũ 3 số và mã mới 4 số có thể cùng tồn tại trong một
+        ngày, mà so sánh chuỗi thì "150726999" > "1507260001" — lấy nhầm mã cũ
+        rồi sinh ra mã đã tồn tại. Số ticket mỗi ngày có giới hạn nên chi phí
+        duyệt này chấp nhận được.
+
+        Hai tiến trình chạy song song vẫn có thể sinh trùng (sync chatbot chạy
+        mỗi 60 giây), nên vòng thử lại khi dính IntegrityError trong
+        create_ticket mới là chốt chặn thật.
         """
         today = timezone.localdate()
         prefix = f"{today:%d%m%y}"
@@ -46,7 +59,7 @@ class TicketService:
             if suffix.isdigit():
                 max_sequence = max(max_sequence, int(suffix))
 
-        return f"{prefix}{max_sequence + 1:03d}"
+        return f"{prefix}{max_sequence + 1:04d}"
 
     @staticmethod
     def resolve_account_link_status(*, customer_account):
@@ -64,7 +77,8 @@ class TicketService:
         company=None,
         customer_account=None,
         handling_branch=None,
-        raw_account_number=None,
+        contact_type=None,
+        contact_value=None,
         assigned_unit=None,
         assigned_employee=None,
         owner_user=None,
@@ -117,7 +131,8 @@ class TicketService:
                     customer=customer,
                     company=company,
                     customer_account=customer_account,
-                    raw_account_number=raw_account_number,
+                    contact_type=contact_type,
+                    contact_value=contact_value,
                     account_link_status=account_link_status,
                     handling_branch=handling_branch,
                     assigned_unit=assigned_unit,
@@ -492,6 +507,14 @@ class TicketService:
             raise PermissionDenied("Bạn không có quyền cập nhật trạng thái ticket.")
 
         from_status = ticket.current_status
+
+        # Chặn mã ngoài luồng (vd PENDING_CLOSE đã bỏ nhưng dòng vẫn còn trong
+        # ticket_statuses) — không có chốt này thì API vẫn set được.
+        if to_status_code not in TicketStatusCode.WORKFLOW_CODES:
+            raise ValidationError(
+                f"Trạng thái '{to_status_code}' không hợp lệ."
+            )
+
         to_status = TicketStatus.objects.get(status_code=to_status_code)
 
         if from_status_id := getattr(from_status, "id", None):
@@ -721,7 +744,7 @@ class TicketService:
             "customer",
             "company",
             "customer_account",
-            "raw_account_number",
+            "contact_value",
             "support_category",
             "classification",
             "priority",

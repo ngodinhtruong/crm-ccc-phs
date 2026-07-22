@@ -429,7 +429,7 @@ export function CccDashboardPage() {
           <>
             <TicketListTable
               title="Ticket chưa xử lý"
-              description="Danh sách các ticket đang chờ xử lý theo bộ lọc hiện tại."
+              description="Ticket chưa được tiếp nhận (trạng thái Mở), gồm cả ticket thường và ticket từ chatbot."
               items={dashboard.data.tables.pending_tickets || []}
             />
             <CccDashboardCards

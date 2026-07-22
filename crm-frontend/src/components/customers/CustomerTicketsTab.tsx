@@ -4,11 +4,16 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bot, Headset } from "lucide-react";
 
-import { chatbotTicketApi } from "@/apis/chatbot-ticket.api";
 import { ticketApi } from "@/apis/ticket.api";
 import { formatDateTime } from "@/utils/date.util";
 
-/** Một dòng ticket đã chuẩn hoá — gộp từ 2 nguồn: ticket thường & ticket chatbot. */
+/**
+ * Một dòng ticket đã chuẩn hoá.
+ *
+ * Trước đây phải gọi 2 API rồi tự trộn vì ticket chatbot nằm bảng riêng.
+ * Nay chung một bảng, chỉ còn 1 query; origin suy từ classification_method
+ * (AUTO = chatbot tạo, MANUAL = người tạo).
+ */
 type UnifiedTicket = {
   key: string;
   id: number;
@@ -34,48 +39,23 @@ export function CustomerTicketsTab({ customerId }: { customerId: number }) {
       setLoading(true);
       setError("");
 
-      // Gọi song song 2 nguồn; nguồn nào lỗi thì coi như rỗng, không chặn nguồn kia
-      const [crm, chatbot] = await Promise.all([
-        ticketApi
-          .getTickets({ customer: String(customerId), page_size: "50" })
-          .catch(() => null),
-        chatbotTicketApi
-          .getList({ customer: customerId, page_size: 50 })
-          .catch(() => null),
-      ]);
+      const crm = await ticketApi.getTickets({
+        customer: String(customerId),
+        page_size: "50",
+      });
 
-      if (!crm && !chatbot) {
-        setError("Không tải được danh sách ticket.");
-        setTickets([]);
-        return;
-      }
-
-      const rows: UnifiedTicket[] = [
-        ...(crm?.results ?? []).map((t) => ({
-          key: `crm-${t.id}`,
-          id: t.id,
-          origin: "CRM" as const,
-          ticket_code: t.ticket_code,
-          title: t.title || "",
-          category: t.support_category_name || "",
-          status: t.status_name || "",
-          priority: t.priority_name || "",
-          handler: t.assigned_employee_name || t.owner_user_name || "",
-          created_at: t.created_at,
-        })),
-        ...(chatbot?.results ?? []).map((t) => ({
-          key: `bot-${t.id}`,
-          id: t.id,
-          origin: "CHATBOT" as const,
-          ticket_code: t.ticket_code,
-          title: t.title || "",
-          category: t.dashboard_category || "",
-          status: t.status_label || "",
-          priority: t.priority_name || "",
-          handler: t.owner_username || "",
-          created_at: t.created_at,
-        })),
-      ];
+      const rows: UnifiedTicket[] = (crm?.results ?? []).map((t) => ({
+        key: `t-${t.id}`,
+        id: t.id,
+        origin: t.classification_method === "AUTO" ? "CHATBOT" : "CRM",
+        ticket_code: t.ticket_code,
+        title: t.title || "",
+        category: t.support_category_name || "",
+        status: t.status_name || "",
+        priority: t.priority_name || "",
+        handler: t.assigned_employee_name || t.owner_user_name || "",
+        created_at: t.created_at,
+      }));
 
       // Mới nhất lên đầu
       rows.sort((a, b) =>
@@ -95,11 +75,7 @@ export function CustomerTicketsTab({ customerId }: { customerId: number }) {
   }, [load]);
 
   const openTicket = (t: UnifiedTicket) => {
-    if (t.origin === "CHATBOT") {
-      router.push(`/chatbots/tickets/${t.id}`);
-    } else {
-      router.push(`/tickets?ticket_code=${t.ticket_code}`);
-    }
+    router.push(`/tickets/${t.id}`);
   };
 
   const crmCount = tickets.filter((t) => t.origin === "CRM").length;

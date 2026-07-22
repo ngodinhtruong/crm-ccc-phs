@@ -181,7 +181,7 @@ export function TicketsTab({
                         onClick={(event) => {
                           event.stopPropagation();
                           router.push(
-                            `/chatbots/tickets/${item.ticket_chatbot_id}`
+                            `/tickets/${item.ticket_chatbot_id}`
                           );
                         }}
                         title="Xem chi tiết ticket"

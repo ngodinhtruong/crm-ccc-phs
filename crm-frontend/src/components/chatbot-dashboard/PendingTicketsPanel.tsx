@@ -135,7 +135,7 @@ export function PendingTicketsPanel({
                       type="button"
                       onClick={() =>
                         router.push(
-                          `/chatbots/tickets/${item.ticket_chatbot_id}`
+                          `/tickets/${item.ticket_chatbot_id}`
                         )
                       }
                       className="flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-600 transition hover:bg-white"

@@ -5,23 +5,8 @@ from .models import (
     ChatbotCskhRequest,
     ChatbotSessionSummary,
     ChatbotSyncCursor,
-    TicketChatbot,
 )
 
-
-@admin.register(TicketChatbot)
-class TicketChatbotAdmin(admin.ModelAdmin):
-    list_display = (
-        "ticket_code",
-        "current_status",
-        "link_status",
-        "contact_info",
-        "owner_user",
-        "created_at",
-    )
-    list_filter = ("current_status", "link_status")
-    search_fields = ("ticket_code", "contact_info", "phone", "account_number")
-    raw_id_fields = ("customer", "customer_account", "owner_user", "assigned_employee")
 
 @admin.register(ChatbotSyncCursor)
 class ChatbotSyncCursorAdmin(admin.ModelAdmin):

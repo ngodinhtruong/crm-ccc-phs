@@ -110,7 +110,8 @@ export type TicketListItem = {
     customer_phone?: string | null;
     customer_email?: string | null;
     customer_account_number?: string | null;
-    raw_account_number?: string | null;
+    contact_value?: string | null;
+    contact_type?: string | null;
     display_account_number?: string | null;
     account_link_status?: TicketAccountLinkStatus | string | null;
     account_link_status_label?: string | null;
@@ -177,7 +178,7 @@ export type TicketListParams = {
     customer_phone?: string;
     customer_email?: string;
     customer_account_no?: string;
-    raw_account_number?: string;
+    contact_value?: string;
     account_link_status?: string;
     company_name?: string;
 
@@ -270,7 +271,7 @@ export type TicketCreatePayload = {
     company?: number | null;
     customer?: number | null;
     customer_account?: number | null;
-    raw_account_number?: string;
+    contact_value?: string;
 
     classification_method?: string;
     sla_policy?: number | null;
@@ -290,6 +291,11 @@ export type TicketCreatePayload = {
 export type TicketDetail = TicketListItem & {
     /** Đã gửi khảo sát chưa — backend đọc từ TicketFeedback.survey_sent. */
     send_survey?: boolean;
+    /** Id phiên chat gốc, chỉ có ở ticket sinh từ chatbot. */
+    source_ref_id?: string | null;
+    /** Thông tin khách cung cấp: loại + giá trị thô. */
+    contact_type?: "PHONE" | "EMAIL" | "ACCOUNT" | string | null;
+    contact_value?: string | null;
     is_error_ticket?: boolean;
     error_group_code?: string | null;
     error_type_code?: string | null;
@@ -323,7 +329,6 @@ export type TicketStatusCode =
     | "ACCEPTED"
     | "PROCESSING"
     | "DONE_WAIT_CLOSE"
-    | "PENDING_CLOSE"
     | "CLOSED"
     | "CANCELLED";
 

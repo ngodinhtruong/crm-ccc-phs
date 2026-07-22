@@ -1,13 +1,15 @@
-import { ChatbotTicketDetailPage } from "@/components/chatbot-tickets/ChatbotTicketDetailPage";
+import { redirect } from "next/navigation";
 
-type PageProps = {
-  params: Promise<{
-    id: string;
-  }>;
-};
-
-export default async function Page({ params }: PageProps) {
+/**
+ * Ticket chatbot đã gộp chung bảng với ticket thường nên chỉ còn một trang chi
+ * tiết duy nhất. Giữ route này để các link cũ (email, bookmark) không chết.
+ */
+export default async function ChatbotTicketDetailRedirect({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const { id } = await params;
 
-  return <ChatbotTicketDetailPage id={Number(id)} />;
+  redirect(`/tickets/${id}`);
 }

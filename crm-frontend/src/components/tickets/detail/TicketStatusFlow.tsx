@@ -8,7 +8,7 @@ import { TicketStatusCode } from "@/types/ticket.type";
 
 /**
  * Thanh tiến trình vòng đời ticket:
- * Mới tạo → Đã tiếp nhận → Đang xử lý → Đã xong (Chờ đóng) → Đã đóng
+ * Mở → Tiếp nhận → Đang xử lý → Đã xong (chờ đóng) → Đã đóng
  * Ticket bị hủy nằm ngoài luồng nên hiển thị riêng.
  */
 export function TicketStatusFlow({

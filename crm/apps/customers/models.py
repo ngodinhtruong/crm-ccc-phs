@@ -26,9 +26,11 @@ class Company(TimeStampedModel):
 
     company_name = models.CharField(max_length=255)
 
-    phone = models.CharField(max_length=50, null=True, blank=True)
-    email = models.EmailField(max_length=255, null=True, blank=True)
+    phone = models.CharField(max_length=50, null=True, blank=True, unique=True)
+    email = models.EmailField(max_length=255, null=True, blank=True, unique=True)
     website = models.URLField(max_length=255, null=True, blank=True)
+    # Fax không unique: chi nhánh / công ty mẹ - con dùng chung một số fax là
+    # chuyện bình thường.
     fax = models.CharField(max_length=50, null=True, blank=True)
 
     tax_code = models.CharField(max_length=50, null=True, blank=True)
@@ -109,10 +111,10 @@ class Company(TimeStampedModel):
 
     class Meta:
         db_table = "companies"
+        # phone/email không khai index ở đây: unique=True đã tự tạo unique index,
+        # khai thêm sẽ thành 2 index trùng nhau trên cùng một cột.
         indexes = [
             models.Index(fields=["company_name"]),
-            models.Index(fields=["phone"]),
-            models.Index(fields=["email"]),
             models.Index(fields=["tax_code"]),
             models.Index(fields=["account_number"]),
             models.Index(fields=["status"]),
@@ -178,8 +180,8 @@ class Customer(TimeStampedModel):
     date_of_birth = models.DateField(null=True, blank=True)
     gender = models.CharField(max_length=20, null=True, blank=True)
 
-    phone = models.CharField(max_length=50, null=True, blank=True)
-    email = models.EmailField(max_length=255, null=True, blank=True)
+    phone = models.CharField(max_length=50, null=True, blank=True, unique=True)
+    email = models.EmailField(max_length=255, null=True, blank=True, unique=True)
 
     branch = models.ForeignKey(
         "branches.Branch",
@@ -246,9 +248,9 @@ class Customer(TimeStampedModel):
 
     class Meta:
         db_table = "customers"
+        # phone/email đã có unique index từ unique=True, không khai lại.
         indexes = [
             models.Index(fields=["branch"]),
-            models.Index(fields=["phone"]),
             models.Index(fields=["identity_number"]),
             models.Index(fields=["external_customer_id"]),
         ]

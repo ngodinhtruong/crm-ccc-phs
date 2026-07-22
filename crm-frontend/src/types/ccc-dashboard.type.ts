@@ -370,6 +370,8 @@ export type CccDashboardTicketItem = {
   is_error_ticket?: boolean;
   error_group_name?: string | null;
   error_type_name?: string | null;
+  /** Nguồn của dòng: ticket thường hay ticket sinh từ chatbot. */
+  origin?: "CRM" | "CHATBOT";
 };
 
 export type CccDashboardTables = {

@@ -157,6 +157,27 @@ class TicketAccountLinkStatus:
     ]
 
 
+class TicketContactType:
+    """
+    Loại thông tin định danh khách hàng cung cấp cho ticket.
+
+    Dùng chung cho ticket tạo tay lẫn ticket sinh từ chatbot: khách đưa gì thì
+    lưu nguyên vào contact_value, contact_type cho biết đó là gì để tra đúng cột
+    (số TK → customer_accounts.account_number, SĐT → customers.phone,
+    email → customers.email).
+    """
+
+    PHONE = "PHONE"
+    EMAIL = "EMAIL"
+    ACCOUNT = "ACCOUNT"
+
+    CHOICES = [
+        (PHONE, "Số điện thoại"),
+        (EMAIL, "Email"),
+        (ACCOUNT, "Số tài khoản"),
+    ]
+
+
 class Ticket(TimeStampedModel):
     ticket_code = models.CharField(max_length=50, unique=True)
     title = models.CharField(max_length=255, null=True, blank=True)
@@ -192,9 +213,17 @@ class Ticket(TimeStampedModel):
         db_index=True,
     )
 
-    # Số tài khoản KH do CCC nhập khi chưa khớp được với customer_account.
-    raw_account_number = models.CharField(
-        max_length=50,
+    # Thông tin khách cung cấp, lưu nguyên văn kể cả khi đã tra ra khách hàng —
+    # giữ lại để đối chiếu khi nghi ngờ khớp nhầm.
+    contact_type = models.CharField(
+        max_length=20,
+        choices=TicketContactType.CHOICES,
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+    contact_value = models.CharField(
+        max_length=255,
         null=True,
         blank=True,
         db_index=True,

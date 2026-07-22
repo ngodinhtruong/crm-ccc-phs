@@ -3,7 +3,6 @@ class TicketStatusCode:
     ACCEPTED = "ACCEPTED"            # Tiếp nhận
     PROCESSING = "PROCESSING"       # Đang xử lý
     DONE_WAIT_CLOSE = "DONE_WAIT_CLOSE"  # Đã xong (đếm 1h trước khi tự đóng)
-    PENDING_CLOSE = "PENDING_CLOSE"  # Chờ đóng (bước trung gian)
     CLOSED = "CLOSED"               # Đã đóng (khóa, chỉ admin sửa)
     CANCELLED = "CANCELLED"
 
@@ -12,11 +11,22 @@ class TicketStatusCode:
         CREATED: "Mở",
         ACCEPTED: "Tiếp nhận",
         PROCESSING: "Đang xử lý",
-        DONE_WAIT_CLOSE: "Đã xong",
-        PENDING_CLOSE: "Chờ đóng",
+        DONE_WAIT_CLOSE: "Đã xong (chờ đóng)",
         CLOSED: "Đã đóng",
         CANCELLED: "Đã hủy",
     }
+
+    # Mã hợp lệ khi đổi trạng thái ticket. Bảng ticket_statuses dùng chung và
+    # còn giữ các mã đã ngưng dùng (PENDING_CLOSE), nên phải chốt whitelist ở
+    # đây — nếu không, client gọi thẳng API vẫn set được mã đã bỏ.
+    WORKFLOW_CODES = [
+        CREATED,
+        ACCEPTED,
+        PROCESSING,
+        DONE_WAIT_CLOSE,
+        CLOSED,
+        CANCELLED,
+    ]
 
 
 class TicketActionType:

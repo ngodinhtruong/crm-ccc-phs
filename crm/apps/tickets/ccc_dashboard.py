@@ -12,7 +12,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.scopes import filter_tickets_by_user
-from apps.common.constants import SlaStatus, TicketStatusCode
+from apps.common.constants import (
+    ClassificationMethod,
+    SlaStatus,
+    TicketStatusCode,
+)
 from apps.tickets.models import (
     Ticket,
     TicketAccountLinkStatus,
@@ -74,6 +78,10 @@ OPEN_STATUS_CODES = {
     STATUS_PROCESSING,
     STATUS_DONE_WAIT_CLOSE,
 }
+
+# Nhãn nguồn của một dòng ticket, để frontend hiện badge "Chatbot".
+ORIGIN_CRM = "CRM"
+ORIGIN_CHATBOT = "CHATBOT"
 
 
 def _month_start(value):
@@ -226,7 +234,7 @@ def _base_queryset_without_date(request):
             | Q(customer__email__icontains=q)
             | Q(company__company_name__icontains=q)
             | Q(customer_account__account_number__icontains=q)
-            | Q(raw_account_number__icontains=q)
+            | Q(contact_value__icontains=q)
             | Q(support_category__category_name__icontains=q)
             | Q(classification__classification_name__icontains=q)
             | Q(source__source_name__icontains=q)
@@ -240,7 +248,7 @@ def _base_queryset_without_date(request):
     if account_number:
         queryset = queryset.filter(
             Q(customer_account__account_number__icontains=account_number)
-            | Q(raw_account_number__icontains=account_number)
+            | Q(contact_value__icontains=account_number)
         )
 
     if branch:
@@ -575,7 +583,7 @@ def _ticket_summary(ticket):
         account_number = getattr(ticket.customer_account, "account_number", None)
 
     if not account_number:
-        account_number = ticket.raw_account_number
+        account_number = ticket.contact_value
 
     return {
         "id": ticket.id,
@@ -595,6 +603,13 @@ def _ticket_summary(ticket):
         "is_error_ticket": bool(ticket.error_group_id or ticket.error_type_id),
         "error_group_name": ticket.error_group.group_name if ticket.error_group else None,
         "error_type_name": ticket.error_type.type_name if ticket.error_type else None,
+        # Ticket chatbot giờ cùng bảng, phân biệt bằng cách tạo (AUTO/MANUAL)
+        # để frontend hiện nhãn; đường dẫn chi tiết thì dùng chung /tickets/{id}.
+        "origin": (
+            ORIGIN_CHATBOT
+            if ticket.classification_method == ClassificationMethod.AUTO
+            else ORIGIN_CRM
+        ),
     }
 
 
@@ -1268,14 +1283,14 @@ class TicketCccDashboardAPIView(APIView):
 
         root_cause_breakdown = _build_root_cause_breakdown(queryset, total_tickets)
 
+        # "Ticket chưa xử lý" = chưa ai tiếp nhận (trạng thái Mở). Ticket chatbot
+        # nằm chung bảng nên không phải trộn tay hai nguồn nữa.
         pending_tickets = [
             _ticket_summary(ticket)
-            for ticket in queryset.exclude(
-                current_status__status_code__in=list(RESOLVED_STATUS_CODES | CANCELLED_STATUS_CODES)
+            for ticket in queryset.filter(
+                current_status__status_code=STATUS_CREATED
             ).order_by("-created_at", "-id")[:recent_limit]
         ]
-
-
 
         resolution_pcts = _resolution_percentiles(queryset)
         sla = _sla_stats(queryset)

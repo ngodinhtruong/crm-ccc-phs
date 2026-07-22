@@ -90,7 +90,7 @@ class Command(BaseCommand):
             ("CREATED", "Khởi tạo", 1, False),
             ("ACCEPTED", "Tiếp nhận", 2, False),
             ("PROCESSING", "Đang xử lý", 3, False),
-            ("DONE_WAIT_CLOSE", "Đã xong - chờ đóng", 4, False),
+            ("DONE_WAIT_CLOSE", "Đã xong (chờ đóng)", 4, False),
             ("CLOSED", "Đã đóng", 5, True),
             ("CANCELLED", "Đã hủy", 6, True),
         ]

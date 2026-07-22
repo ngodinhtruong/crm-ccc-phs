@@ -404,7 +404,7 @@ export function useTicketCreate() {
           company: form.company ? Number(form.company) : null,
           customer: form.customer ? Number(form.customer) : null,
           customer_account: form.account ? Number(form.account) : null,
-          raw_account_number: form.account ? undefined : form.accountNumber.trim() || undefined,
+          contact_value: form.account ? undefined : form.accountNumber.trim() || undefined,
           classification_method: "MANUAL",
           sla_policy: form.slaPolicy ? Number(form.slaPolicy) : null,
 
