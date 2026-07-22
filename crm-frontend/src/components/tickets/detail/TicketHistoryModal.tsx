@@ -37,7 +37,7 @@ const FIELD_LABEL: Record<string, string> = {
   error_note: "Ghi chú lỗi",
   request_content: "Nội dung yêu cầu",
   handling_solution: "Hướng xử lý",
-  final_response: "Phản hồi cuối",
+  final_response: "Phản hồi sau liên hệ",
   title: "Tiêu đề",
   account_link_status: "Trạng thái liên kết TK",
 };

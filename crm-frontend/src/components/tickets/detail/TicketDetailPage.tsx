@@ -14,6 +14,7 @@ import {
 
 import { ticketApi } from "@/apis/ticket.api";
 import { ConversationModal } from "@/components/chatbot-dashboard/ConversationModal";
+import { chatbotDashboardService } from "@/services/chatbot-dashboard.service";
 import { SlaBreachReasonModal } from "@/components/tickets/detail/SlaBreachReasonModal";
 import { TicketHistoryModal } from "@/components/tickets/detail/TicketHistoryModal";
 import { TicketStatusFlow } from "@/components/tickets/detail/TicketStatusFlow";
@@ -238,6 +239,36 @@ function TicketDetailInner({
   // Ticket sinh từ chatbot: classification_method = AUTO và có id phiên chat gốc.
   const isChatbotTicket = ticket.classification_method === "AUTO";
   const sessionId = ticket.source_ref_id || "";
+  const [customerQuestions, setCustomerQuestions] = useState<string[] | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadPreview = async () => {
+      if (!isChatbotTicket || !sessionId) {
+        setCustomerQuestions(null);
+        return;
+      }
+
+      try {
+        const data = await chatbotDashboardService.getSessionDetail(sessionId);
+        if (!active) return;
+        const qs = (data.messages || [])
+          .filter((m) => m.question && m.question.trim())
+          .map((m) => m.question!.trim())
+          .slice(0, 5);
+        setCustomerQuestions(qs.length ? qs : null);
+      } catch {
+        if (active) setCustomerQuestions(null);
+      }
+    };
+
+    void loadPreview();
+
+    return () => {
+      active = false;
+    };
+  }, [isChatbotTicket, sessionId]);
   const canClaim = isChatbotTicket && !ticket.owner_user_name;
 
   const handleSave = async (breach?: { reason: number; note: string }) => {
@@ -338,38 +369,7 @@ function TicketDetailInner({
           <TicketStatusFlow status={statusCode} />
         </div>
 
-        {/* Khối chỉ có ở ticket sinh từ chatbot */}
-        {isChatbotTicket && sessionId && (
-          <Section title="Hội thoại với chatbot">
-            <div className="flex flex-col gap-3">
-              <div className="grid grid-cols-1 md:grid-cols-2 md:gap-x-6">
-                <Field label="Phiên chat" editing={false} view={sessionId} />
-                <Field
-                  label="Khách cung cấp"
-                  editing={false}
-                  view={
-                    ticket.contact_value
-                      ? `${ticket.contact_value}${
-                          ticket.contact_type
-                            ? ` (${CONTACT_TYPE_LABELS[ticket.contact_type] ?? ticket.contact_type})`
-                            : ""
-                        }`
-                      : null
-                  }
-                />
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setShowConversation(true)}
-                className="flex w-fit items-center gap-2 rounded-lg bg-[#0097cf] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#0089bd]"
-              >
-                <MessageSquareText size={14} />
-                Xem lịch sử trò chuyện
-              </button>
-            </div>
-          </Section>
-        )}
+        {/* Inline hội thoại chatbot đã được loại bỏ; dùng popup để xem lịch sử */}
 
         {/* Thông tin chung */}
         <Section title="Thông tin chung">
@@ -515,30 +515,45 @@ function TicketDetailInner({
 
         {/* Thông tin mô tả */}
         <Section title="Thông tin mô tả">
+          {/* Hiển thị khối hiển thị CHỈ câu hỏi của khách (không show đáp án) - lấy từ preview messages */}
+          {customerQuestions && customerQuestions.length > 0 && (
+            <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-5 py-3 text-xs text-amber-700">
+              <div className="text-[11px] font-semibold uppercase text-amber-700">
+                CÂU HỎI CỦA KHÁCH HÀNG
+              </div>
+              <div className="mt-1 whitespace-pre-wrap text-xs text-amber-900">
+                {customerQuestions.map((q, i) => (
+                  <div key={i} className={i ? "mt-2" : ""}>
+                    {q}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Đối với ticket sinh từ chatbot, ẩn trường "Nội dung yêu cầu" chi tiết ngoài modal;
+              người xử lý có thể bấm "Xem lịch sử trò chuyện" để xem đầy đủ Q/A */}
+          {!isChatbotTicket && (
+            <Field
+              label="Nội dung yêu cầu"
+              editing={editing}
+              view={<span className="whitespace-pre-wrap">{ticket.request_content}</span>}
+              edit={
+                <textarea
+                  value={f.requestContent}
+                  onChange={(e) => f.setRequestContent(e.target.value)}
+                  rows={3}
+                  className={INPUT_CLS}
+                />
+              }
+            />
+          )}
+
           <Field
-            label="Nội dung yêu cầu"
+            label="phản hồi sau khi liên hệ"
             editing={editing}
             view={
-              <span className="whitespace-pre-wrap">
-                {ticket.request_content}
-              </span>
-            }
-            edit={
-              <textarea
-                value={f.requestContent}
-                onChange={(e) => f.setRequestContent(e.target.value)}
-                rows={3}
-                className={INPUT_CLS}
-              />
-            }
-          />
-          <Field
-            label="Phản hồi cuối"
-            editing={editing}
-            view={
-              <span className="whitespace-pre-wrap">
-                {ticket.final_response}
-              </span>
+              <span className="whitespace-pre-wrap">{ticket.final_response}</span>
             }
             edit={
               <textarea
@@ -550,6 +565,20 @@ function TicketDetailInner({
               />
             }
           />
+
+          {/* Nút mở popup lịch sử hội thoại (hiển thị modal có thể kéo để xem toàn bộ) */}
+          {isChatbotTicket && sessionId && (
+            <div className="mt-3">
+              <button
+                type="button"
+                onClick={() => setShowConversation(true)}
+                className="flex w-fit items-center gap-2 rounded-lg bg-[#0097cf] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#0089bd]"
+              >
+                <MessageSquareText size={14} />
+                Xem lịch sử trò chuyện
+              </button>
+            </div>
+          )}
         </Section>
 
         {/* Giải pháp xử lý */}
