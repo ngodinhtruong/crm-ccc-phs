@@ -4,12 +4,12 @@ import re
 import time
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
-from django.apps import apps
 from django.conf import settings
 from django.db.models import QuerySet
 from django.utils import timezone
 
 from apps.external_errors.models import (
+    ExternalErrorCauseGroup,
     ExternalErrorClassificationLog,
     ExternalErrorRecord,
 )
@@ -40,22 +40,7 @@ REQUIRED_RECORD_FIELDS = {
 
 
 def get_cause_group_model():
-    """
-    Lấy model theo tên để file classifier không phụ thuộc import trực tiếp.
-
-    Sau khi thêm model và migration, model phải có tên:
-    ExternalErrorCauseGroup.
-    """
-    try:
-        return apps.get_model(
-            "external_errors",
-            "ExternalErrorCauseGroup",
-        )
-    except LookupError as exc:
-        raise RuntimeError(
-            "Chưa có model ExternalErrorCauseGroup. "
-            "Hãy thêm model danh mục nguyên nhân và chạy migration."
-        ) from exc
+    return ExternalErrorCauseGroup
 
 
 def validate_record_model_contract():
@@ -188,7 +173,6 @@ QUY TẮC BẮT BUỘC:
 
 SCHEMA:
 {{
-  "clean_cause": "string",
   "cause_code": "string",
   "normalized_cause": "string",
   "confidence": 0,
@@ -385,8 +369,7 @@ def normalize_llm_output(
         need_review = True
 
     clean_cause = str(
-        data.get("clean_cause")
-        or rule_clean_fields.get("clean_cause")
+        rule_clean_fields.get("clean_cause")
         or ""
     ).strip()
 
@@ -542,12 +525,11 @@ def classify_record_cause(
         )
     )
 
-    # Luôn cập nhật clean_cause theo rule trước khi gọi LLM.
-    if not record.clean_cause:
-        record.clean_cause = (
-            rule_clean_fields.get("clean_cause")
-            or ""
-        )
+    # Nguyên nhân sạch do rule-based cleaning quyết định.
+    record.clean_cause = (
+        rule_clean_fields.get("clean_cause")
+        or ""
+    )
 
     input_payload = {
         "record_id": record.id,

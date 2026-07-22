@@ -1,6 +1,7 @@
 from django.contrib import admin
 
 from apps.external_errors.models import (
+    ExternalErrorCauseGroup,
     ExternalErrorClassificationLog,
     ExternalErrorDashboardWidget,
     ExternalErrorImportBatch,
@@ -84,6 +85,31 @@ class ExternalErrorCodeAdmin(admin.ModelAdmin):
     )
 
 
+
+
+@admin.register(ExternalErrorCauseGroup)
+class ExternalErrorCauseGroupAdmin(admin.ModelAdmin):
+    list_display = (
+        "cause_code",
+        "cause_name",
+        "record_count",
+        "is_active",
+        "sort_order",
+    )
+    list_filter = ("is_active",)
+    search_fields = (
+        "cause_code",
+        "cause_name",
+        "description",
+    )
+    ordering = ("sort_order", "id")
+    list_editable = ("is_active", "sort_order")
+
+    @admin.display(description="Số record")
+    def record_count(self, obj):
+        return obj.records.count()
+
+
 @admin.register(ExternalErrorImportBatch)
 class ExternalErrorImportBatchAdmin(admin.ModelAdmin):
     list_display = ["batch_code", "file_name", "source_type", "total_rows", "classified_rows", "failed_rows", "status", "created_at"]
@@ -100,7 +126,9 @@ class ExternalErrorRecordAdmin(admin.ModelAdmin):
         "completed_date",
         "error_group_display",
         "error_code_display",
+        "cause_group_display",
         "classification_status",
+        "cause_classification_status",
         "classification_confidence",
         "need_review",
     )
@@ -110,6 +138,9 @@ class ExternalErrorRecordAdmin(admin.ModelAdmin):
         "need_review",
         "error_code__group",
         "error_code",
+        "cause_group",
+        "cause_classification_status",
+        "cause_need_review",
         "received_date",
         "completed_date",
     )
@@ -118,6 +149,11 @@ class ExternalErrorRecordAdmin(admin.ModelAdmin):
         "raw_content",
         "clean_content",
         "normalized_issue",
+        "normalized_cause",
+        "raw_cause",
+        "clean_cause",
+        "cause_group__cause_code",
+        "cause_group__cause_name",
         "raw_source",
         "raw_device",
         "error_code__error_code",
@@ -136,6 +172,7 @@ class ExternalErrorRecordAdmin(admin.ModelAdmin):
         "batch",
         "error_code",
         "error_code__group",
+        "cause_group",
         "created_by",
         "updated_by",
     )
@@ -168,6 +205,19 @@ class ExternalErrorRecordAdmin(admin.ModelAdmin):
         return (
             f"{obj.error_code.error_code} - "
             f"{obj.error_code.error_name}"
+        )
+
+
+    @admin.display(
+        description="Nguyên nhân",
+        ordering="cause_group__cause_name",
+    )
+    def cause_group_display(self, obj):
+        if not obj.cause_group_id:
+            return "-"
+        return (
+            f"{obj.cause_group.cause_code} - "
+            f"{obj.cause_group.cause_name}"
         )
 
 

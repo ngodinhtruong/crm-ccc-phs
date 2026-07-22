@@ -9,7 +9,12 @@ GROUP_BY_FIELD_MAP = {
     "source": "clean_source",
     "device": "clean_device",
     "result": "clean_result",
-    "cause": "clean_cause",
+    "cause": "cause_group__cause_name",
+    "cause_group": "cause_group__cause_name",
+    "cause_group_code": "cause_group__cause_code",
+    "normalized_cause": "normalized_cause",
+    "cause_status": "cause_classification_status",
+    "cause_text": "clean_cause",
     "solution": "clean_solution",
     "status": "classification_status",
     "issue": "normalized_issue",
@@ -61,7 +66,12 @@ def apply_external_error_filters(queryset, params):
         "device": "clean_device",
         "source": "clean_source",
         "result": "clean_result",
-        "cause": "clean_cause",
+        "cause": "cause_group__cause_code",
+    "cause_group": "cause_group__cause_name",
+    "cause_group_code": "cause_group__cause_code",
+    "normalized_cause": "normalized_cause",
+    "cause_status": "cause_classification_status",
+    "cause_text": "clean_cause",
         "solution": "clean_solution",
         "issue": "normalized_issue",
         "status": "classification_status",
@@ -89,6 +99,12 @@ def apply_external_error_filters(queryset, params):
     elif str(need_review).lower() in {"false", "0", "no"}:
         queryset = queryset.filter(need_review=False)
 
+    cause_need_review = params.get("cause_need_review")
+    if str(cause_need_review).lower() in {"true", "1", "yes"}:
+        queryset = queryset.filter(cause_need_review=True)
+    elif str(cause_need_review).lower() in {"false", "0", "no"}:
+        queryset = queryset.filter(cause_need_review=False)
+
     q = (params.get("q") or "").strip()
     if q:
         queryset = queryset.filter(
@@ -99,6 +115,9 @@ def apply_external_error_filters(queryset, params):
             | Q(clean_cause__icontains=q)
             | Q(clean_solution__icontains=q)
             | Q(normalized_issue__icontains=q)
+            | Q(normalized_cause__icontains=q)
+            | Q(cause_group__cause_code__icontains=q)
+            | Q(cause_group__cause_name__icontains=q)
             | Q(error_code__error_code__icontains=q)
             | Q(error_code__error_name__icontains=q)
             | Q(error_code__group__group_code__icontains=q)
@@ -113,6 +132,7 @@ def base_queryset(params):
         "batch",
         "error_code",
         "error_code__group",
+        "cause_group",
     )
     return apply_external_error_filters(queryset, params)
 
@@ -140,6 +160,20 @@ def build_summary(params):
         classification_status=ExternalErrorRecord.STATUS_FAILED
     ).count()
 
+    cause_classified = queryset.filter(
+        cause_classification_status__in=[
+            ExternalErrorRecord.STATUS_CLASSIFIED,
+            ExternalErrorRecord.STATUS_CONFIRMED,
+            ExternalErrorRecord.STATUS_NEED_REVIEW,
+        ]
+    ).count()
+    cause_need_review = queryset.filter(
+        cause_need_review=True
+    ).count()
+    cause_failed = queryset.filter(
+        cause_classification_status=ExternalErrorRecord.STATUS_FAILED
+    ).count()
+
     by_source = list(group_by(params, "source", limit=10)["data"])
     by_device = list(group_by(params, "device", limit=10)["data"])
     by_error_group = list(
@@ -147,6 +181,9 @@ def build_summary(params):
     )
     by_error_code = list(
         group_by(params, "error_code_name", limit=10)["data"]
+    )
+    by_cause_group = list(
+        group_by(params, "cause_group", limit=20)["data"]
     )
 
     recurring_count = (
@@ -166,6 +203,17 @@ def build_summary(params):
         "failed_errors": failed,
         "recurring_issue_count": recurring_count,
         "classification_rate": safe_percent(classified, total),
+        "cause_classified_errors": cause_classified,
+        "cause_unclassified_errors": max(
+            total - cause_classified - cause_failed,
+            0,
+        ),
+        "cause_need_review_errors": cause_need_review,
+        "cause_failed_errors": cause_failed,
+        "cause_classification_rate": safe_percent(
+            cause_classified,
+            total,
+        ),
         "by_source": by_source,
         "by_device": by_device,
 
@@ -175,6 +223,8 @@ def build_summary(params):
         # Dữ liệu mới.
         "by_error_group": by_error_group,
         "by_error_code": by_error_code,
+        "by_cause": by_cause_group,
+        "by_cause_group": by_cause_group,
     }
 
 

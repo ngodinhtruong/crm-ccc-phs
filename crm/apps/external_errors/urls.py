@@ -2,6 +2,7 @@ from django.urls import path
 from rest_framework.routers import DefaultRouter
 
 from apps.external_errors.views import (
+    ExternalErrorCauseGroupViewSet,
     ExternalErrorCodeViewSet,
     ExternalErrorDashboardChartAPIView,
     ExternalErrorDashboardSummaryAPIView,
@@ -25,6 +26,11 @@ router.register(
     "error-codes",
     ExternalErrorCodeViewSet,
     basename="external-error-codes",
+)
+router.register(
+    "cause-groups",
+    ExternalErrorCauseGroupViewSet,
+    basename="external-error-cause-groups",
 )
 router.register(
     "records",

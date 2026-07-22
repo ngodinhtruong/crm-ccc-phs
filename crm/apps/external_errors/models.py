@@ -1,3 +1,4 @@
+
 from django.conf import settings
 from django.db import models
 
@@ -5,8 +6,6 @@ from apps.common.models import TimeStampedModel
 
 
 class ExternalErrorGroup(TimeStampedModel):
-    """Nhóm lỗi cấp cao. Một nhóm có nhiều mã lỗi chi tiết."""
-
     group_code = models.CharField(max_length=50, unique=True, db_index=True)
     group_name = models.CharField(max_length=255, unique=True)
     description = models.TextField(null=True, blank=True)
@@ -22,8 +21,6 @@ class ExternalErrorGroup(TimeStampedModel):
 
 
 class ExternalErrorCode(TimeStampedModel):
-    """Mã lỗi chi tiết. Mỗi mã lỗi chỉ thuộc một nhóm lỗi."""
-
     group = models.ForeignKey(
         ExternalErrorGroup,
         on_delete=models.PROTECT,
@@ -32,11 +29,8 @@ class ExternalErrorCode(TimeStampedModel):
     error_code = models.CharField(max_length=100, unique=True, db_index=True)
     error_name = models.CharField(max_length=255)
     description = models.TextField(null=True, blank=True)
-
-    # Dữ liệu tùy chọn hỗ trợ prompt LLM.
     keywords = models.JSONField(default=list, blank=True)
     examples = models.JSONField(default=list, blank=True)
-
     sort_order = models.PositiveIntegerField(default=0)
     is_active = models.BooleanField(default=True, db_index=True)
 
@@ -49,12 +43,29 @@ class ExternalErrorCode(TimeStampedModel):
                 name="uniq_external_error_code_name_in_group",
             )
         ]
-        indexes = [
-            models.Index(fields=["group", "is_active"]),
-        ]
+        indexes = [models.Index(fields=["group", "is_active"])]
 
     def __str__(self):
         return f"{self.error_code} - {self.error_name}"
+
+
+class ExternalErrorCauseGroup(TimeStampedModel):
+    """Danh mục nguyên nhân động được đưa vào prompt LLM từ database."""
+
+    cause_code = models.CharField(max_length=50, unique=True, db_index=True)
+    cause_name = models.CharField(max_length=255, unique=True)
+    description = models.TextField(null=True, blank=True)
+    keywords = models.JSONField(default=list, blank=True)
+    examples = models.JSONField(default=list, blank=True)
+    sort_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        db_table = "external_error_cause_groups"
+        ordering = ["sort_order", "id"]
+
+    def __str__(self):
+        return f"{self.cause_code} - {self.cause_name}"
 
 
 class ExternalErrorImportBatch(TimeStampedModel):
@@ -87,7 +98,6 @@ class ExternalErrorImportBatch(TimeStampedModel):
         choices=SOURCE_TYPE_CHOICES,
         default=SOURCE_EXCEL,
     )
-
     total_rows = models.PositiveIntegerField(default=0)
     classified_rows = models.PositiveIntegerField(default=0)
     failed_rows = models.PositiveIntegerField(default=0)
@@ -97,7 +107,6 @@ class ExternalErrorImportBatch(TimeStampedModel):
         default=STATUS_IMPORTED,
         db_index=True,
     )
-
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -137,7 +146,6 @@ class ExternalErrorRecord(TimeStampedModel):
         blank=True,
     )
 
-    # Lưu đầy đủ ngày và giờ để tính thời gian xử lý.
     received_date = models.DateTimeField(null=True, blank=True, db_index=True)
     completed_date = models.DateTimeField(null=True, blank=True, db_index=True)
 
@@ -148,24 +156,13 @@ class ExternalErrorRecord(TimeStampedModel):
     raw_cause = models.TextField(null=True, blank=True)
     raw_solution = models.TextField(null=True, blank=True)
 
-    clean_source = models.CharField(
-        max_length=255,
-        null=True,
-        blank=True,
-        db_index=True,
-    )
-    clean_device = models.CharField(
-        max_length=255,
-        null=True,
-        blank=True,
-        db_index=True,
-    )
+    clean_source = models.CharField(max_length=255, null=True, blank=True, db_index=True)
+    clean_device = models.CharField(max_length=255, null=True, blank=True, db_index=True)
     clean_result = models.CharField(max_length=255, null=True, blank=True)
     clean_content = models.TextField(null=True, blank=True)
     clean_cause = models.TextField(null=True, blank=True)
     clean_solution = models.TextField(null=True, blank=True)
 
-    # Chỉ lưu FK mã lỗi. Nhóm lỗi được suy ra qua error_code.group.
     error_code = models.ForeignKey(
         ExternalErrorCode,
         on_delete=models.SET_NULL,
@@ -173,21 +170,11 @@ class ExternalErrorRecord(TimeStampedModel):
         blank=True,
         related_name="records",
     )
-
-    normalized_issue = models.CharField(
-        max_length=255,
-        null=True,
-        blank=True,
-        db_index=True,
-    )
+    normalized_issue = models.CharField(max_length=255, null=True, blank=True, db_index=True)
     classification_confidence = models.DecimalField(
-        max_digits=5,
-        decimal_places=2,
-        null=True,
-        blank=True,
+        max_digits=5, decimal_places=2, null=True, blank=True
     )
     need_review = models.BooleanField(default=False, db_index=True)
-
     classification_status = models.CharField(
         max_length=30,
         choices=CLASSIFICATION_STATUS_CHOICES,
@@ -197,6 +184,30 @@ class ExternalErrorRecord(TimeStampedModel):
     classification_error = models.TextField(null=True, blank=True)
     llm_model_id = models.CharField(max_length=255, null=True, blank=True)
     classified_at = models.DateTimeField(null=True, blank=True)
+
+    cause_group = models.ForeignKey(
+        ExternalErrorCauseGroup,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="records",
+    )
+    normalized_cause = models.CharField(
+        max_length=255, null=True, blank=True, db_index=True
+    )
+    cause_classification_confidence = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True
+    )
+    cause_need_review = models.BooleanField(default=False, db_index=True)
+    cause_classification_status = models.CharField(
+        max_length=30,
+        choices=CLASSIFICATION_STATUS_CHOICES,
+        default=STATUS_UNCLASSIFIED,
+        db_index=True,
+    )
+    cause_classification_error = models.TextField(null=True, blank=True)
+    cause_llm_model_id = models.CharField(max_length=255, null=True, blank=True)
+    cause_classified_at = models.DateTimeField(null=True, blank=True)
 
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -221,6 +232,14 @@ class ExternalErrorRecord(TimeStampedModel):
             models.Index(fields=["received_date", "clean_device"]),
             models.Index(fields=["received_date", "clean_source"]),
             models.Index(fields=["classification_status", "need_review"]),
+            models.Index(
+                fields=["received_date", "cause_group"],
+                name="ext_err_recv_cause_idx",
+            ),
+            models.Index(
+                fields=["cause_classification_status", "cause_need_review"],
+                name="ext_err_cause_stat_idx",
+            ),
         ]
 
     def __str__(self):
@@ -229,9 +248,7 @@ class ExternalErrorRecord(TimeStampedModel):
 
     @property
     def error_group(self):
-        if not self.error_code_id:
-            return None
-        return self.error_code.group
+        return self.error_code.group if self.error_code_id else None
 
     @property
     def error_group_code(self):
@@ -248,6 +265,14 @@ class ExternalErrorRecord(TimeStampedModel):
     @property
     def error_code_name(self):
         return self.error_code.error_name if self.error_code_id else None
+
+    @property
+    def cause_group_code(self):
+        return self.cause_group.cause_code if self.cause_group_id else None
+
+    @property
+    def cause_group_name(self):
+        return self.cause_group.cause_name if self.cause_group_id else None
 
 
 class ExternalErrorClassificationLog(models.Model):
@@ -297,7 +322,6 @@ class ExternalErrorDashboardWidget(TimeStampedModel):
     filters = models.JSONField(default=dict, blank=True)
     is_default = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
-
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,

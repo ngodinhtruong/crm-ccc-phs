@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.external_errors.models import (
+    ExternalErrorCauseGroup,
     ExternalErrorCode,
     ExternalErrorDashboardWidget,
     ExternalErrorGroup,
@@ -22,7 +23,9 @@ from apps.external_errors.permissions import (
 )
 from apps.external_errors.serializers import (
     ExternalErrorBulkClassifySerializer,
+    ExternalErrorCauseGroupSerializer,
     ExternalErrorCodeSerializer,
+    ExternalErrorConfirmCauseSerializer,
     ExternalErrorConfirmClassificationSerializer,
     ExternalErrorDashboardWidgetSerializer,
     ExternalErrorExcelImportSerializer,
@@ -40,6 +43,10 @@ from apps.external_errors.services.analytics import (
     recurring,
     stacked,
     trend,
+)
+from apps.external_errors.services.bedrock_cause_classifier import (
+    classify_queryset_causes,
+    classify_record_cause,
 )
 from apps.external_errors.services.bedrock_classifier import (
     classify_queryset,
@@ -130,6 +137,38 @@ class ExternalErrorCodeViewSet(viewsets.ModelViewSet):
         instance.save(update_fields=["is_active", "updated_at"])
 
 
+class ExternalErrorCauseGroupViewSet(viewsets.ModelViewSet):
+    serializer_class = ExternalErrorCauseGroupSerializer
+    permission_classes = [IsAuthenticated, ExternalErrorPermission]
+
+    def get_queryset(self):
+        queryset = (
+            ExternalErrorCauseGroup.objects
+            .annotate(record_count=Count("records"))
+            .order_by("sort_order", "id")
+        )
+
+        q = (self.request.query_params.get("q") or "").strip()
+        if q:
+            queryset = queryset.filter(
+                Q(cause_code__icontains=q)
+                | Q(cause_name__icontains=q)
+                | Q(description__icontains=q)
+            )
+
+        is_active = self.request.query_params.get("is_active")
+        if str(is_active).lower() in {"true", "1"}:
+            queryset = queryset.filter(is_active=True)
+        elif str(is_active).lower() in {"false", "0"}:
+            queryset = queryset.filter(is_active=False)
+
+        return queryset
+
+    def perform_destroy(self, instance):
+        instance.is_active = False
+        instance.save(update_fields=["is_active", "updated_at"])
+
+
 class ExternalErrorImportBatchViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = (
         ExternalErrorImportBatch.objects
@@ -148,6 +187,7 @@ class ExternalErrorRecordViewSet(viewsets.ModelViewSet):
             "batch",
             "error_code",
             "error_code__group",
+            "cause_group",
             "created_by",
             "updated_by",
         )
@@ -179,7 +219,11 @@ class ExternalErrorRecordViewSet(viewsets.ModelViewSet):
             try:
                 classify_record(record)
             except Exception:
-                # Classifier đã lưu trạng thái FAILED và classification_error.
+                record.refresh_from_db()
+
+            try:
+                classify_record_cause(record)
+            except Exception:
                 record.refresh_from_db()
 
         output = ExternalErrorRecordSerializer(
@@ -219,6 +263,34 @@ class ExternalErrorRecordViewSet(viewsets.ModelViewSet):
 
         return Response(ExternalErrorRecordSerializer(record).data)
 
+    @action(detail=True, methods=["post"], url_path="classify-cause")
+    def classify_cause(self, request, pk=None):
+        if not can_classify_external_errors(request.user):
+            return Response(
+                {"detail": "Bạn không có quyền phân loại nguyên nhân."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        record = self.get_object()
+        force = str(request.data.get("force", False)).lower() in {
+            "true",
+            "1",
+            "yes",
+        }
+
+        try:
+            classify_record_cause(record, force=force)
+        except Exception as exc:
+            return Response(
+                {
+                    "detail": "Phân loại nguyên nhân thất bại.",
+                    "error": str(exc),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(ExternalErrorRecordSerializer(record).data)
+
     @action(detail=True, methods=["post"], url_path="confirm")
     def confirm(self, request, pk=None):
         serializer = ExternalErrorConfirmClassificationSerializer(
@@ -238,6 +310,37 @@ class ExternalErrorRecordViewSet(viewsets.ModelViewSet):
                 "classification_status",
                 "need_review",
                 "classification_error",
+                "updated_by",
+                "updated_at",
+            ]
+        )
+        return Response(ExternalErrorRecordSerializer(record).data)
+
+    @action(detail=True, methods=["post"], url_path="confirm-cause")
+    def confirm_cause(self, request, pk=None):
+        serializer = ExternalErrorConfirmCauseSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        record = self.get_object()
+        record.cause_group = serializer.validated_data["cause_group"]
+
+        normalized_cause = serializer.validated_data.get("normalized_cause")
+        if normalized_cause is not None:
+            record.normalized_cause = normalized_cause.strip()
+
+        record.cause_classification_status = (
+            ExternalErrorRecord.STATUS_CONFIRMED
+        )
+        record.cause_need_review = False
+        record.cause_classification_error = None
+        record.updated_by = request.user
+        record.save(
+            update_fields=[
+                "cause_group",
+                "normalized_cause",
+                "cause_classification_status",
+                "cause_need_review",
+                "cause_classification_error",
                 "updated_by",
                 "updated_at",
             ]
@@ -289,6 +392,57 @@ class ExternalErrorRecordViewSet(viewsets.ModelViewSet):
         return Response(
             classify_queryset(queryset.order_by("id"), force=force)
         )
+
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="bulk-classify-causes",
+    )
+    def bulk_classify_causes(self, request):
+        if not can_classify_external_errors(request.user):
+            return Response(
+                {"detail": "Bạn không có quyền phân loại nguyên nhân."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        serializer = ExternalErrorBulkClassifySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        ids = serializer.validated_data.get("ids") or []
+        all_matching = serializer.validated_data.get("all_matching", False)
+        force = serializer.validated_data.get("force", False)
+
+        if all_matching:
+            queryset = self.get_queryset()
+        elif ids:
+            queryset = ExternalErrorRecord.objects.filter(
+                id__in=ids
+            ).order_by("id")
+        else:
+            raise ValidationError(
+                {
+                    "ids": (
+                        "Chọn ít nhất một dòng lỗi "
+                        "hoặc bật all_matching."
+                    )
+                }
+            )
+
+        if not force:
+            queryset = queryset.exclude(
+                cause_classification_status__in=[
+                    ExternalErrorRecord.STATUS_CLASSIFIED,
+                    ExternalErrorRecord.STATUS_CONFIRMED,
+                ]
+            )
+
+        return Response(
+            classify_queryset_causes(
+                queryset.order_by("id"),
+                force=force,
+            )
+        )
+
 
 class ExternalErrorExcelImportAPIView(APIView):
     permission_classes = [

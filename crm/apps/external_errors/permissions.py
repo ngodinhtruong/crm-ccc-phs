@@ -110,7 +110,10 @@ class ExternalErrorPermission(BasePermission):
         if action in {"list", "retrieve"} or request.method in SAFE_METHODS:
             return can_view_external_errors(request.user)
 
-        if action in {"classify", "bulk_classify", "confirm"}:
+        if action in {
+            "classify", "bulk_classify", "confirm",
+            "classify_cause", "bulk_classify_causes", "confirm_cause",
+        }:
             return can_classify_external_errors(request.user)
 
         return can_manage_external_errors(request.user)

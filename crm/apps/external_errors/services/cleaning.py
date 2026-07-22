@@ -73,6 +73,41 @@ TECH_DICT = {
 }
 
 
+CAUSE_TECH_DICT = {
+    "software bug": "lỗi phần mềm",
+    "bug": "lỗi phần mềm",
+    "code bug": "lỗi phần mềm",
+    "logic app": "logic ứng dụng",
+    "app logic": "logic ứng dụng",
+    "business logic": "logic nghiệp vụ",
+    "sync data": "đồng bộ dữ liệu",
+    "data sync": "đồng bộ dữ liệu",
+    "sync": "đồng bộ",
+    "database": "cơ sở dữ liệu",
+    "db": "cơ sở dữ liệu",
+    "stale cache": "cache cũ",
+    "cache workstation": "cache máy trạm",
+    "authentication": "xác thực",
+    "auth": "xác thực",
+    "verification": "xác thực",
+    "one time password": "otp",
+    "network": "mạng",
+    "server": "máy chủ",
+    "load balancer": "cân bằng tải",
+    "timeout": "hết thời gian chờ",
+    "ddos": "tấn công ddos",
+    "ssl certificate": "chứng thư ssl",
+    "ssl": "chứng thư ssl",
+    "permission": "phân quyền",
+    "authorization": "phân quyền",
+    "access right": "phân quyền",
+    "business rule": "quy tắc nghiệp vụ",
+    "rule": "quy tắc nghiệp vụ",
+    "customer network": "mạng khách hàng",
+    "customer device": "thiết bị khách hàng",
+}
+
+
 STOP_PHRASES = [
     "xem giúp",
     "check giúp",
@@ -515,6 +550,34 @@ def clean_and_normalize_text(
     return re.sub(r"\s+", " ", text).strip()
 
 
+def clean_cause_text(
+    value: Any,
+    *,
+    stock_tickers: Iterable[str] | None = None,
+) -> str:
+    """
+    Clean riêng trường Nguyên nhân.
+
+    Chỉ chuẩn hóa thuật ngữ và dữ liệu nhạy cảm, không gán nhóm nguyên nhân.
+    Việc phân loại nhóm nguyên nhân do LLM chọn từ danh mục Active trong DB.
+    """
+    text = clean_and_normalize_text(
+        value,
+        stock_tickers=stock_tickers,
+    )
+    if not text:
+        return ""
+
+    text = replace_dictionary(text, CAUSE_TECH_DICT)
+    text = re.sub(
+        r"^(?:nguyên nhân(?: là)?|root cause|cause)\s+",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    )
+    return re.sub(r"\s+", " ", text).strip()
+
+
 def normalize_general_text(value: Any) -> str:
     """Alias tương thích với code cũ."""
     return clean_and_normalize_text(value)
@@ -532,7 +595,7 @@ def build_rule_based_clean_fields(raw_data: dict) -> dict:
         "clean_content": clean_and_normalize_text(
             raw_data.get("raw_content")
         ),
-        "clean_cause": clean_and_normalize_text(
+        "clean_cause": clean_cause_text(
             raw_data.get("raw_cause")
         ),
         "clean_solution": clean_and_normalize_text(

@@ -146,8 +146,6 @@ SCHEMA:
   "clean_device": "string",
   "clean_result": "string",
   "clean_content": "string",
-  "clean_cause": "string",
-  "clean_solution": "string",
   "group_code": "string",
   "error_code": "string",
   "normalized_issue": "string",
@@ -327,13 +325,11 @@ def normalize_llm_output(data, rule_clean_fields, catalog_context):
         ).strip(),
         "clean_content": clean_content,
         "clean_cause": str(
-            data.get("clean_cause")
-            or rule_clean_fields.get("clean_cause")
+            rule_clean_fields.get("clean_cause")
             or ""
         ).strip(),
         "clean_solution": str(
-            data.get("clean_solution")
-            or rule_clean_fields.get("clean_solution")
+            rule_clean_fields.get("clean_solution")
             or ""
         ).strip(),
 
@@ -446,9 +442,10 @@ def classify_record(
         }
     )
 
+    # clean_* do rule-based cleaning quyết định.
+    # LLM phân loại lỗi không được ghi đè clean_cause.
     for field, value in rule_clean_fields.items():
-        if not getattr(record, field):
-            setattr(record, field, value)
+        setattr(record, field, value)
 
     input_payload = {
         "record_id": record.id,
