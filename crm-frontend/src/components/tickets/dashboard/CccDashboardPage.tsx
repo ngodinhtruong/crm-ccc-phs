@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { RefreshCw, SlidersHorizontal, Ticket, X } from "lucide-react";
 import { useCallback, useState } from "react";
+import { TicketListTable } from "@/components/tickets/dashboard/CccDashboardTables";
 
 import {
   DateRangeFilter,
@@ -447,6 +448,8 @@ export function CccDashboardPage() {
               </div>
             </div>
 
+            
+
             {dashboard.fetching && dashboard.data && (
               <span className="inline-flex shrink-0 items-center gap-2 rounded-md bg-sky-50 px-3 py-1.5 text-xs font-medium text-sky-700 ring-1 ring-sky-100">
                 <RefreshCw size={13} className="animate-spin" />
@@ -455,17 +458,28 @@ export function CccDashboardPage() {
             )}
           </div>
         </div>
+        
 
         {dashboard.error && <ErrorBlock message={dashboard.error} />}
+        
 
         {dashboard.loading && !dashboard.data && <LoadingBlock />}
+        
+        {dashboard.data && (
+                      <TicketListTable
+                        title="Ticket chưa xử lý"
+                        description="Danh sách các ticket đang chờ xử lý theo bộ lọc hiện tại."
+                        items={dashboard.data.tables.pending_tickets || []}
+                      />
+                    )}
 
         {dashboard.data && (
           <>
-            <TicketTabSummary dashboard={dashboard} />
+            {/* <TicketTabSummary dashboard={dashboard} /> */}
             <CccDashboardCharts charts={dashboard.data.charts} />
           </>
         )}
+        
       </div>
     </DashboardLayout>
   );
