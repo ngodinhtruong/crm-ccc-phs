@@ -240,6 +240,22 @@ class ExternalErrorRecord(TimeStampedModel):
                 fields=["cause_classification_status", "cause_need_review"],
                 name="ext_err_cause_stat_idx",
             ),
+            models.Index(
+                fields=["received_date", "classification_status"],
+                name="ext_err_recv_stat_idx",
+            ),
+            models.Index(
+                fields=["received_date", "cause_classification_status"],
+                name="ext_err_recv_cstat_idx",
+            ),
+            models.Index(
+                fields=["completed_date", "classification_status"],
+                name="ext_err_done_stat_idx",
+            ),
+            models.Index(
+                fields=["completed_date", "cause_classification_status"],
+                name="ext_err_done_cstat_idx",
+            ),
         ]
 
     def __str__(self):

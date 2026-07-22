@@ -17,6 +17,9 @@ from apps.external_errors.services.cleaning import (
     build_rule_based_clean_fields,
     clean_text,
 )
+from apps.external_errors.services.dashboard_cache import (
+    invalidate_external_error_dashboard_cache,
+)
 
 
 EXCEL_COLUMN_ALIASES = {
@@ -305,6 +308,7 @@ def create_manual_record(
         created_by=created_by,
     )
     record.save()
+    invalidate_external_error_dashboard_cache()
     return record
 
 
@@ -445,6 +449,8 @@ def classify_batch_records(batch, records):
         ]
     )
 
+    invalidate_external_error_dashboard_cache()
+
     return {
         "error_classification": error_stats,
         "cause_classification": cause_stats,
@@ -555,6 +561,9 @@ def import_excel_file(
                 "updated_at",
             ]
         )
+        transaction.on_commit(
+            invalidate_external_error_dashboard_cache
+        )
 
     classification_stats = {
         "error_classification": {
@@ -651,6 +660,9 @@ def import_and_optionally_classify(
                 "failed_rows",
                 "updated_at",
             ]
+        )
+        transaction.on_commit(
+            invalidate_external_error_dashboard_cache
         )
 
     if classify_now and records:

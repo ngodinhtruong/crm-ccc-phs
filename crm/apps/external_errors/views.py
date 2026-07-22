@@ -1,4 +1,5 @@
 from django.db.models import Count, Q
+from django.utils.cache import patch_cache_control, patch_vary_headers
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -38,6 +39,7 @@ from apps.external_errors.serializers import (
 )
 from apps.external_errors.services.analytics import (
     apply_external_error_filters,
+    build_overview,
     build_summary,
     group_by,
     recurring,
@@ -52,6 +54,11 @@ from apps.external_errors.services.bedrock_classifier import (
     classify_queryset,
     classify_record,
 )
+from apps.external_errors.services.dashboard_cache import (
+    get_cached_dashboard_payload,
+    get_dashboard_cache_timeout,
+    invalidate_external_error_dashboard_cache,
+)
 from apps.external_errors.services.importer import (
     create_manual_record,
     import_and_optionally_classify,
@@ -62,7 +69,62 @@ from apps.external_errors.tasks import (
     classify_external_error_batch,
 )
 
-class ExternalErrorGroupViewSet(viewsets.ModelViewSet):
+
+def _is_truthy(value):
+    return str(value or "").strip().lower() in {
+        "true",
+        "1",
+        "yes",
+    }
+
+
+def _cached_dashboard_response(
+    request,
+    endpoint,
+    builder,
+):
+    payload = get_cached_dashboard_payload(
+        endpoint,
+        request.query_params,
+        builder,
+        force_refresh=_is_truthy(
+            request.query_params.get("refresh")
+        ),
+    )
+    response = Response(payload)
+
+    browser_cache_seconds = min(
+        get_dashboard_cache_timeout(),
+        60,
+    )
+    if browser_cache_seconds > 0:
+        patch_cache_control(
+            response,
+            private=True,
+            max_age=browser_cache_seconds,
+        )
+        patch_vary_headers(
+            response,
+            ["Authorization"],
+        )
+
+    return response
+
+
+class DashboardCacheInvalidationMixin:
+    def perform_create(self, serializer):
+        serializer.save()
+        invalidate_external_error_dashboard_cache()
+
+    def perform_update(self, serializer):
+        serializer.save()
+        invalidate_external_error_dashboard_cache()
+
+
+class ExternalErrorGroupViewSet(
+    DashboardCacheInvalidationMixin,
+    viewsets.ModelViewSet,
+):
     serializer_class = ExternalErrorGroupSerializer
     permission_classes = [IsAuthenticated, ExternalErrorPermission]
 
@@ -92,9 +154,13 @@ class ExternalErrorGroupViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         instance.is_active = False
         instance.save(update_fields=["is_active", "updated_at"])
+        invalidate_external_error_dashboard_cache()
 
 
-class ExternalErrorCodeViewSet(viewsets.ModelViewSet):
+class ExternalErrorCodeViewSet(
+    DashboardCacheInvalidationMixin,
+    viewsets.ModelViewSet,
+):
     serializer_class = ExternalErrorCodeSerializer
     permission_classes = [IsAuthenticated, ExternalErrorPermission]
 
@@ -135,9 +201,13 @@ class ExternalErrorCodeViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         instance.is_active = False
         instance.save(update_fields=["is_active", "updated_at"])
+        invalidate_external_error_dashboard_cache()
 
 
-class ExternalErrorCauseGroupViewSet(viewsets.ModelViewSet):
+class ExternalErrorCauseGroupViewSet(
+    DashboardCacheInvalidationMixin,
+    viewsets.ModelViewSet,
+):
     serializer_class = ExternalErrorCauseGroupSerializer
     permission_classes = [IsAuthenticated, ExternalErrorPermission]
 
@@ -167,6 +237,7 @@ class ExternalErrorCauseGroupViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         instance.is_active = False
         instance.save(update_fields=["is_active", "updated_at"])
+        invalidate_external_error_dashboard_cache()
 
 
 class ExternalErrorImportBatchViewSet(viewsets.ReadOnlyModelViewSet):
@@ -226,6 +297,8 @@ class ExternalErrorRecordViewSet(viewsets.ModelViewSet):
             except Exception:
                 record.refresh_from_db()
 
+        invalidate_external_error_dashboard_cache()
+
         output = ExternalErrorRecordSerializer(
             record,
             context=self.get_serializer_context(),
@@ -234,6 +307,11 @@ class ExternalErrorRecordViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         serializer.save(updated_by=self.request.user)
+        invalidate_external_error_dashboard_cache()
+
+    def perform_destroy(self, instance):
+        instance.delete()
+        invalidate_external_error_dashboard_cache()
 
     @action(detail=True, methods=["post"], url_path="classify")
     def classify(self, request, pk=None):
@@ -261,6 +339,7 @@ class ExternalErrorRecordViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        invalidate_external_error_dashboard_cache()
         return Response(ExternalErrorRecordSerializer(record).data)
 
     @action(detail=True, methods=["post"], url_path="classify-cause")
@@ -289,6 +368,7 @@ class ExternalErrorRecordViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        invalidate_external_error_dashboard_cache()
         return Response(ExternalErrorRecordSerializer(record).data)
 
     @action(detail=True, methods=["post"], url_path="confirm")
@@ -314,6 +394,7 @@ class ExternalErrorRecordViewSet(viewsets.ModelViewSet):
                 "updated_at",
             ]
         )
+        invalidate_external_error_dashboard_cache()
         return Response(ExternalErrorRecordSerializer(record).data)
 
     @action(detail=True, methods=["post"], url_path="confirm-cause")
@@ -345,6 +426,7 @@ class ExternalErrorRecordViewSet(viewsets.ModelViewSet):
                 "updated_at",
             ]
         )
+        invalidate_external_error_dashboard_cache()
         return Response(ExternalErrorRecordSerializer(record).data)
 
     @action(detail=False, methods=["post"], url_path="bulk-classify")
@@ -568,7 +650,12 @@ class ExternalErrorDashboardSummaryAPIView(APIView):
                 {"detail": "Bạn không có quyền xem dashboard lỗi."},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        return Response(build_summary(request.query_params))
+
+        return _cached_dashboard_response(
+            request,
+            "summary",
+            lambda: build_summary(request.query_params),
+        )
 
 
 class ExternalErrorDashboardChartAPIView(APIView):
@@ -580,22 +667,29 @@ class ExternalErrorDashboardChartAPIView(APIView):
             request.query_params.get("chart_type") or "BAR"
         ).upper()
 
-        try:
+        def build_chart():
             if chart_type == "LINE":
-                data = trend(request.query_params)
-            elif chart_type in {
+                return trend(request.query_params)
+            if chart_type in {
                 "STACKED_BAR",
                 "STACKED_HORIZONTAL_BAR",
             }:
                 data = stacked(request.query_params)
                 data["chart_type"] = chart_type
-            else:
-                data = group_by(request.query_params)
-                data["chart_type"] = chart_type
+                return data
+
+            data = group_by(request.query_params)
+            data["chart_type"] = chart_type
+            return data
+
+        try:
+            return _cached_dashboard_response(
+                request,
+                "chart",
+                build_chart,
+            )
         except ValueError as exc:
             raise ValidationError({"detail": str(exc)}) from exc
-
-        return Response(data)
 
 
 class ExternalErrorRecurringAPIView(APIView):
@@ -603,7 +697,36 @@ class ExternalErrorRecurringAPIView(APIView):
     external_error_permission = "view"
 
     def get(self, request):
-        return Response(recurring(request.query_params))
+        return _cached_dashboard_response(
+            request,
+            "recurring",
+            lambda: recurring(request.query_params),
+        )
+
+
+class ExternalErrorDashboardOverviewAPIView(APIView):
+    """
+    Endpoint tối ưu cho frontend mới.
+
+    Thay các request summary + 8 chart + recurring bằng một request duy nhất.
+    Các endpoint cũ vẫn giữ nguyên để tương thích frontend hiện tại.
+    """
+
+    permission_classes = [IsAuthenticated, ExternalErrorPermission]
+    external_error_permission = "view"
+
+    def get(self, request):
+        if not can_view_external_errors(request.user):
+            return Response(
+                {"detail": "Bạn không có quyền xem dashboard lỗi."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        return _cached_dashboard_response(
+            request,
+            "overview",
+            lambda: build_overview(request.query_params),
+        )
 
 
 class ExternalErrorDashboardWidgetViewSet(viewsets.ModelViewSet):

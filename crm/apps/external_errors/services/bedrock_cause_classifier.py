@@ -16,6 +16,9 @@ from apps.external_errors.models import (
 from apps.external_errors.services.cleaning import (
     build_rule_based_clean_fields,
 )
+from apps.external_errors.services.dashboard_cache import (
+    invalidate_external_error_dashboard_cache,
+)
 
 
 PROMPT_VERSION = "cause-v1-dynamic-catalog"
@@ -695,5 +698,8 @@ def classify_queryset_causes(
                     "error": str(exc),
                 }
             )
+
+    if stats["total"] > 0:
+        invalidate_external_error_dashboard_cache()
 
     return stats

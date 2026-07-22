@@ -5,6 +5,7 @@ from apps.external_errors.views import (
     ExternalErrorCauseGroupViewSet,
     ExternalErrorCodeViewSet,
     ExternalErrorDashboardChartAPIView,
+    ExternalErrorDashboardOverviewAPIView,
     ExternalErrorDashboardSummaryAPIView,
     ExternalErrorDashboardWidgetViewSet,
     ExternalErrorExcelImportAPIView,
@@ -63,6 +64,11 @@ urlpatterns = [
         "dashboard/summary/",
         ExternalErrorDashboardSummaryAPIView.as_view(),
         name="external-error-dashboard-summary",
+    ),
+    path(
+        "dashboard/overview/",
+        ExternalErrorDashboardOverviewAPIView.as_view(),
+        name="external-error-dashboard-overview",
     ),
     path(
         "dashboard/chart/",

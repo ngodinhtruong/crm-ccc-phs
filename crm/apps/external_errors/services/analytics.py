@@ -1,5 +1,11 @@
-from django.db.models import Count, F, Q
+from collections.abc import Mapping
+from datetime import datetime, time, timedelta
+from typing import Any
+
+from django.conf import settings
+from django.db.models import Count, F, Q, QuerySet
 from django.db.models.functions import TruncDay, TruncMonth, TruncWeek
+from django.utils import timezone
 from django.utils.dateparse import parse_date
 
 from apps.external_errors.models import ExternalErrorRecord
@@ -36,30 +42,77 @@ DATE_FIELD_MAP = {
     "completed_date": "completed_date",
 }
 
+SUCCESS_STATUSES = [
+    ExternalErrorRecord.STATUS_CLASSIFIED,
+    ExternalErrorRecord.STATUS_CONFIRMED,
+    ExternalErrorRecord.STATUS_NEED_REVIEW,
+]
 
-def get_date_param(params, name):
+
+def get_date_param(params: Mapping[str, Any], name: str):
     value = params.get(name)
     if not value:
         return None
-    return parse_date(value)
+    return parse_date(str(value))
 
 
-def apply_external_error_filters(queryset, params):
+def _database_datetime(value: datetime) -> datetime:
+    if not settings.USE_TZ:
+        return value
+    if timezone.is_aware(value):
+        return value
+    return timezone.make_aware(
+        value,
+        timezone.get_current_timezone(),
+    )
+
+
+def _bounded_int(
+    value: Any,
+    *,
+    default: int,
+    minimum: int = 1,
+    maximum: int = 100,
+) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        parsed = default
+    return max(minimum, min(parsed, maximum))
+
+
+def apply_external_error_filters(
+    queryset: QuerySet,
+    params: Mapping[str, Any],
+):
     date_field = params.get("date_field") or "received_date"
-    date_field_name = DATE_FIELD_MAP.get(date_field, "received_date")
+    date_field_name = DATE_FIELD_MAP.get(
+        str(date_field),
+        "received_date",
+    )
 
     date_from = get_date_param(params, "date_from")
     date_to = get_date_param(params, "date_to")
 
-    # received_date/completed_date là DateTimeField. Lọc theo __date để
-    # date_to vẫn bao gồm toàn bộ dữ liệu đến 23:59:59 của ngày được chọn.
+    # Dùng khoảng datetime trực tiếp để PostgreSQL/MySQL có thể tận dụng
+    # index của DateTimeField. date_to dùng cận trên loại trừ của ngày kế tiếp.
     if date_from:
-        queryset = queryset.filter(
-            **{f"{date_field_name}__date__gte": date_from}
+        start_at = _database_datetime(
+            datetime.combine(date_from, time.min)
         )
-    if date_to:
         queryset = queryset.filter(
-            **{f"{date_field_name}__date__lte": date_to}
+            **{f"{date_field_name}__gte": start_at}
+        )
+
+    if date_to:
+        end_at = _database_datetime(
+            datetime.combine(
+                date_to + timedelta(days=1),
+                time.min,
+            )
+        )
+        queryset = queryset.filter(
+            **{f"{date_field_name}__lt": end_at}
         )
 
     filter_map = {
@@ -67,11 +120,11 @@ def apply_external_error_filters(queryset, params):
         "source": "clean_source",
         "result": "clean_result",
         "cause": "cause_group__cause_code",
-    "cause_group": "cause_group__cause_name",
-    "cause_group_code": "cause_group__cause_code",
-    "normalized_cause": "normalized_cause",
-    "cause_status": "cause_classification_status",
-    "cause_text": "clean_cause",
+        "cause_group": "cause_group__cause_name",
+        "cause_group_code": "cause_group__cause_code",
+        "normalized_cause": "normalized_cause",
+        "cause_status": "cause_classification_status",
+        "cause_text": "clean_cause",
         "solution": "clean_solution",
         "issue": "normalized_issue",
         "status": "classification_status",
@@ -90,7 +143,10 @@ def apply_external_error_filters(queryset, params):
 
     for param_name, field_name in filter_map.items():
         value = params.get(param_name)
-        if value is not None and str(value).strip().lower() not in {"", "all"}:
+        if (
+            value is not None
+            and str(value).strip().lower() not in {"", "all"}
+        ):
             queryset = queryset.filter(**{field_name: value})
 
     need_review = params.get("need_review")
@@ -127,66 +183,90 @@ def apply_external_error_filters(queryset, params):
     return queryset
 
 
-def base_queryset(params):
-    queryset = ExternalErrorRecord.objects.select_related(
-        "batch",
-        "error_code",
-        "error_code__group",
-        "cause_group",
+def base_queryset(params: Mapping[str, Any]):
+    # Dashboard chỉ dùng values/aggregate nên không cần select_related.
+    return apply_external_error_filters(
+        ExternalErrorRecord.objects.all(),
+        params,
     )
-    return apply_external_error_filters(queryset, params)
 
 
-def safe_percent(value, total):
+def safe_percent(value: int, total: int):
     if not total:
         return 0
     return round((value / total) * 100, 1)
 
 
-def build_summary(params):
-    queryset = base_queryset(params)
-    total = queryset.count()
+def _group_by_queryset(
+    queryset: QuerySet,
+    group_key: str,
+    *,
+    total: int,
+    limit: int,
+):
+    field_name = GROUP_BY_FIELD_MAP.get(group_key)
+    if not field_name:
+        valid_values = ", ".join(sorted(GROUP_BY_FIELD_MAP))
+        raise ValueError(
+            f"group_by không hợp lệ: {group_key!r}. "
+            f"Giá trị hợp lệ: {valid_values}."
+        )
 
-    classified = queryset.filter(
-        classification_status__in=[
-            ExternalErrorRecord.STATUS_CLASSIFIED,
-            ExternalErrorRecord.STATUS_CONFIRMED,
-            ExternalErrorRecord.STATUS_NEED_REVIEW,
-        ]
-    ).count()
-
-    need_review = queryset.filter(need_review=True).count()
-    failed = queryset.filter(
-        classification_status=ExternalErrorRecord.STATUS_FAILED
-    ).count()
-
-    cause_classified = queryset.filter(
-        cause_classification_status__in=[
-            ExternalErrorRecord.STATUS_CLASSIFIED,
-            ExternalErrorRecord.STATUS_CONFIRMED,
-            ExternalErrorRecord.STATUS_NEED_REVIEW,
-        ]
-    ).count()
-    cause_need_review = queryset.filter(
-        cause_need_review=True
-    ).count()
-    cause_failed = queryset.filter(
-        cause_classification_status=ExternalErrorRecord.STATUS_FAILED
-    ).count()
-
-    by_source = list(group_by(params, "source", limit=10)["data"])
-    by_device = list(group_by(params, "device", limit=10)["data"])
-    by_error_group = list(
-        group_by(params, "error_group", limit=10)["data"]
-    )
-    by_error_code = list(
-        group_by(params, "error_code_name", limit=10)["data"]
-    )
-    by_cause_group = list(
-        group_by(params, "cause_group", limit=20)["data"]
+    rows = (
+        queryset.values(field_name)
+        .annotate(count=Count("id"))
+        .order_by("-count", field_name)[:limit]
     )
 
-    recurring_count = (
+    return [
+        {
+            "label": row[field_name] or "Không xác định",
+            "value": row["count"],
+            "count": row["count"],
+            "percent": safe_percent(row["count"], total),
+        }
+        for row in rows
+    ]
+
+
+def _summary_counts(queryset: QuerySet):
+    return queryset.aggregate(
+        total=Count("id"),
+        classified=Count(
+            "id",
+            filter=Q(classification_status__in=SUCCESS_STATUSES),
+        ),
+        need_review=Count(
+            "id",
+            filter=Q(need_review=True),
+        ),
+        failed=Count(
+            "id",
+            filter=Q(
+                classification_status=ExternalErrorRecord.STATUS_FAILED
+            ),
+        ),
+        cause_classified=Count(
+            "id",
+            filter=Q(cause_classification_status__in=SUCCESS_STATUSES),
+        ),
+        cause_need_review=Count(
+            "id",
+            filter=Q(cause_need_review=True),
+        ),
+        cause_failed=Count(
+            "id",
+            filter=Q(
+                cause_classification_status=(
+                    ExternalErrorRecord.STATUS_FAILED
+                )
+            ),
+        ),
+    )
+
+
+def _recurring_issue_group_count(queryset: QuerySet) -> int:
+    return (
         queryset.exclude(normalized_issue__isnull=True)
         .exclude(normalized_issue="")
         .values("normalized_issue")
@@ -195,20 +275,61 @@ def build_summary(params):
         .count()
     )
 
+
+def _build_summary_from_queryset(queryset: QuerySet):
+    counts = _summary_counts(queryset)
+    total = counts["total"] or 0
+
+    by_source = _group_by_queryset(
+        queryset,
+        "source",
+        total=total,
+        limit=10,
+    )
+    by_device = _group_by_queryset(
+        queryset,
+        "device",
+        total=total,
+        limit=10,
+    )
+    by_error_group = _group_by_queryset(
+        queryset,
+        "error_group",
+        total=total,
+        limit=10,
+    )
+    by_error_code = _group_by_queryset(
+        queryset,
+        "error_code_name",
+        total=total,
+        limit=10,
+    )
+    by_cause_group = _group_by_queryset(
+        queryset,
+        "cause_group",
+        total=total,
+        limit=20,
+    )
+
+    classified = counts["classified"] or 0
+    failed = counts["failed"] or 0
+    cause_classified = counts["cause_classified"] or 0
+    cause_failed = counts["cause_failed"] or 0
+
     return {
         "total_errors": total,
         "classified_errors": classified,
         "unclassified_errors": max(total - classified - failed, 0),
-        "need_review_errors": need_review,
+        "need_review_errors": counts["need_review"] or 0,
         "failed_errors": failed,
-        "recurring_issue_count": recurring_count,
+        "recurring_issue_count": _recurring_issue_group_count(queryset),
         "classification_rate": safe_percent(classified, total),
         "cause_classified_errors": cause_classified,
         "cause_unclassified_errors": max(
             total - cause_classified - cause_failed,
             0,
         ),
-        "cause_need_review_errors": cause_need_review,
+        "cause_need_review_errors": counts["cause_need_review"] or 0,
         "cause_failed_errors": cause_failed,
         "cause_classification_rate": safe_percent(
             cause_classified,
@@ -228,53 +349,47 @@ def build_summary(params):
     }
 
 
-def group_by(params, group_key=None, *, limit=None):
-    group_key = group_key or params.get("group_by") or "device"
-    field_name = GROUP_BY_FIELD_MAP.get(group_key)
+def build_summary(params: Mapping[str, Any]):
+    return _build_summary_from_queryset(base_queryset(params))
 
-    if not field_name:
-        valid_values = ", ".join(sorted(GROUP_BY_FIELD_MAP))
-        raise ValueError(
-            f"group_by không hợp lệ: {group_key!r}. "
-            f"Giá trị hợp lệ: {valid_values}."
-        )
 
+def group_by(
+    params: Mapping[str, Any],
+    group_key=None,
+    *,
+    limit=None,
+):
+    group_key = str(
+        group_key or params.get("group_by") or "device"
+    )
     queryset = base_queryset(params)
     total = queryset.count()
-    limit_value = int(limit or params.get("limit") or 20)
-
-    rows = (
-        queryset.values(field_name)
-        .annotate(count=Count("id"))
-        .order_by("-count", field_name)[:limit_value]
+    limit_value = _bounded_int(
+        limit or params.get("limit"),
+        default=20,
+        maximum=100,
     )
-
-    data = []
-    for row in rows:
-        label = row[field_name] or "Không xác định"
-        count = row["count"]
-        data.append(
-            {
-                "label": label,
-                "value": count,
-                "count": count,
-                "percent": safe_percent(count, total),
-            }
-        )
 
     return {
         "chart_type": params.get("chart_type") or "BAR",
         "group_by": group_key,
         "breakdown_by": None,
         "total": total,
-        "data": data,
+        "data": _group_by_queryset(
+            queryset,
+            group_key,
+            total=total,
+            limit=limit_value,
+        ),
     }
 
 
-def trend(params):
-    queryset = base_queryset(params)
-    interval = params.get("interval") or "month"
-    date_field = params.get("date_field") or "received_date"
+def _trend_queryset(
+    queryset: QuerySet,
+    params: Mapping[str, Any],
+):
+    interval = str(params.get("interval") or "month")
+    date_field = str(params.get("date_field") or "received_date")
     date_field_name = DATE_FIELD_MAP.get(date_field, "received_date")
 
     if interval == "day":
@@ -284,6 +399,7 @@ def trend(params):
         trunc = TruncWeek(date_field_name)
         label_format = "Tuần %W/%Y"
     else:
+        interval = "month"
         trunc = TruncMonth(date_field_name)
         label_format = "T%m/%Y"
 
@@ -319,9 +435,16 @@ def trend(params):
     }
 
 
-def stacked(params):
-    group_key = params.get("group_by") or "month"
-    breakdown_key = params.get("breakdown_by") or "device"
+def trend(params: Mapping[str, Any]):
+    return _trend_queryset(base_queryset(params), params)
+
+
+def _stacked_queryset(
+    queryset: QuerySet,
+    params: Mapping[str, Any],
+):
+    group_key = str(params.get("group_by") or "month")
+    breakdown_key = str(params.get("breakdown_by") or "device")
     breakdown_field = GROUP_BY_FIELD_MAP.get(breakdown_key)
 
     if not breakdown_field:
@@ -331,11 +454,9 @@ def stacked(params):
             f"Giá trị hợp lệ: {valid_values}."
         )
 
-    queryset = base_queryset(params)
-
     if group_key in {"month", "week", "day"}:
         date_field_name = DATE_FIELD_MAP.get(
-            params.get("date_field") or "received_date",
+            str(params.get("date_field") or "received_date"),
             "received_date",
         )
 
@@ -385,13 +506,12 @@ def stacked(params):
         def label_getter(value):
             return value or "Không xác định"
 
-    data_map = {}
-    categories = set()
+    data_map: dict[str, dict[str, Any]] = {}
+    categories: set[str] = set()
 
     for row in rows:
         label = label_getter(row["group_value"])
         category = row.get("breakdown_value")
-
         if category is None:
             category = row.get(breakdown_field)
 
@@ -408,12 +528,32 @@ def stacked(params):
     }
 
 
-def recurring(params):
-    queryset = base_queryset(params)
-    min_count = int(params.get("min_count") or 2)
-    limit = int(params.get("limit") or 20)
+def stacked(params: Mapping[str, Any]):
+    return _stacked_queryset(base_queryset(params), params)
 
-    rows = (
+
+def _append_unique(items: list[Any], value: Any, *, limit: int = 5):
+    if value in (None, "") or value in items or len(items) >= limit:
+        return
+    items.append(value)
+
+
+def _recurring_queryset(
+    queryset: QuerySet,
+    params: Mapping[str, Any],
+):
+    min_count = _bounded_int(
+        params.get("min_count"),
+        default=2,
+        maximum=1_000_000,
+    )
+    limit = _bounded_int(
+        params.get("limit"),
+        default=20,
+        maximum=100,
+    )
+
+    rows = list(
         queryset.exclude(normalized_issue__isnull=True)
         .exclude(normalized_issue="")
         .values("normalized_issue")
@@ -422,73 +562,213 @@ def recurring(params):
         .order_by("-count", "normalized_issue")[:limit]
     )
 
-    data = []
+    if not rows:
+        return {"data": [], "min_count": min_count}
 
+    issues = [row["normalized_issue"] for row in rows]
+    details_by_issue: dict[str, dict[str, Any]] = {
+        issue: {
+            "devices": [],
+            "error_groups": [],
+            "cause_groups": [],
+            "error_codes": [],
+            "error_code_keys": set(),
+        }
+        for issue in issues
+    }
+
+    # Một truy vấn chi tiết cho toàn bộ top issue, thay vì 3-4 truy vấn/issue.
+    detail_rows = (
+        queryset.filter(normalized_issue__in=issues)
+        .order_by()
+        .values(
+            "normalized_issue",
+            "clean_device",
+            "error_code__error_code",
+            "error_code__error_name",
+            "error_code__group__group_code",
+            "error_code__group__group_name",
+            "cause_group__cause_code",
+            "cause_group__cause_name",
+        )
+        .distinct()
+    )
+
+    for detail in detail_rows:
+        issue = detail["normalized_issue"]
+        bucket = details_by_issue.get(issue)
+        if bucket is None:
+            continue
+
+        _append_unique(bucket["devices"], detail["clean_device"])
+        _append_unique(
+            bucket["error_groups"],
+            detail["error_code__group__group_name"],
+        )
+        _append_unique(
+            bucket["cause_groups"],
+            detail["cause_group__cause_name"],
+        )
+
+        error_code = detail["error_code__error_code"]
+        error_name = detail["error_code__error_name"]
+        code_key = (
+            error_code,
+            error_name,
+            detail["error_code__group__group_code"],
+            detail["error_code__group__group_name"],
+        )
+        if (
+            error_code
+            and code_key not in bucket["error_code_keys"]
+            and len(bucket["error_codes"]) < 5
+        ):
+            bucket["error_code_keys"].add(code_key)
+            bucket["error_codes"].append(
+                {
+                    "error_code": error_code,
+                    "error_name": error_name,
+                    "group_code": detail[
+                        "error_code__group__group_code"
+                    ],
+                    "group_name": detail[
+                        "error_code__group__group_name"
+                    ],
+                }
+            )
+
+    data = []
     for row in rows:
         issue = row["normalized_issue"]
-        issue_queryset = queryset.filter(normalized_issue=issue)
-
-        devices = list(
-            issue_queryset.exclude(clean_device__isnull=True)
-            .exclude(clean_device="")
-            .order_by()
-            .values_list("clean_device", flat=True)
-            .distinct()[:5]
-        )
-
-        error_groups = list(
-            issue_queryset.exclude(
-                error_code__group__group_name__isnull=True
-            )
-            .exclude(error_code__group__group_name="")
-            .order_by()
-            .values_list(
-                "error_code__group__group_name",
-                flat=True,
-            )
-            .distinct()[:5]
-        )
-
-        error_codes = list(
-            issue_queryset.exclude(error_code__isnull=True)
-            .order_by()
-            .values(
-                "error_code__error_code",
-                "error_code__error_name",
-                "error_code__group__group_code",
-                "error_code__group__group_name",
-            )
-            .distinct()[:5]
-        )
-
+        bucket = details_by_issue[issue]
         data.append(
             {
                 "normalized_issue": issue,
                 "count": row["count"],
-                "devices": devices,
+                "devices": bucket["devices"],
 
                 # Alias cũ.
-                "error_types": error_groups,
+                "error_types": bucket["error_groups"],
 
                 # Dữ liệu mới.
-                "error_groups": error_groups,
-                "error_codes": [
-                    {
-                        "error_code": item["error_code__error_code"],
-                        "error_name": item["error_code__error_name"],
-                        "group_code": item[
-                            "error_code__group__group_code"
-                        ],
-                        "group_name": item[
-                            "error_code__group__group_name"
-                        ],
-                    }
-                    for item in error_codes
-                ],
+                "error_groups": bucket["error_groups"],
+                "cause_groups": bucket["cause_groups"],
+                "error_codes": bucket["error_codes"],
             }
         )
 
+    return {"data": data, "min_count": min_count}
+
+
+def recurring(params: Mapping[str, Any]):
+    return _recurring_queryset(base_queryset(params), params)
+
+
+def _params_with(
+    params: Mapping[str, Any],
+    **updates: Any,
+) -> dict[str, Any]:
+    if hasattr(params, "dict"):
+        result = params.dict()
+    else:
+        result = dict(params)
+    result.update(updates)
+    return result
+
+
+def _chart_from_summary(
+    summary: dict[str, Any],
+    *,
+    key: str,
+    chart_type: str,
+    group_by_key: str,
+):
     return {
-        "data": data,
-        "min_count": min_count,
+        "chart_type": chart_type,
+        "group_by": group_by_key,
+        "breakdown_by": None,
+        "total": summary["total_errors"],
+        "data": summary[key],
+    }
+
+
+def build_overview(params: Mapping[str, Any]):
+    """
+    Một payload cho toàn bộ dashboard chính.
+
+    Frontend mới có thể thay 10 request summary/chart/recurring bằng một request.
+    Các endpoint cũ vẫn được giữ nguyên để không làm gãy frontend hiện tại.
+    """
+    queryset = base_queryset(params)
+    summary = _build_summary_from_queryset(queryset)
+
+    trend_data = _trend_queryset(
+        queryset,
+        _params_with(params, interval="month"),
+    )
+    stacked_month_device = _stacked_queryset(
+        queryset,
+        _params_with(
+            params,
+            chart_type="STACKED_BAR",
+            group_by="month",
+            breakdown_by="device",
+        ),
+    )
+    stacked_device_error_type = _stacked_queryset(
+        queryset,
+        _params_with(
+            params,
+            chart_type="STACKED_HORIZONTAL_BAR",
+            group_by="device",
+            breakdown_by="error_group",
+        ),
+    )
+    stacked_device_cause = _stacked_queryset(
+        queryset,
+        _params_with(
+            params,
+            chart_type="STACKED_HORIZONTAL_BAR",
+            group_by="device",
+            breakdown_by="cause_group",
+        ),
+    )
+    recurring_data = _recurring_queryset(
+        queryset,
+        _params_with(params, min_count=2, limit=10),
+    )
+
+    return {
+        "summary": summary,
+        "charts": {
+            "by_device": _chart_from_summary(
+                summary,
+                key="by_device",
+                chart_type="BAR",
+                group_by_key="device",
+            ),
+            "by_source": _chart_from_summary(
+                summary,
+                key="by_source",
+                chart_type="DONUT",
+                group_by_key="source",
+            ),
+            "by_error_type": _chart_from_summary(
+                summary,
+                key="by_error_group",
+                chart_type="BAR",
+                group_by_key="error_group",
+            ),
+            "trend": trend_data,
+            "stacked_month_device": stacked_month_device,
+            "stacked_device_error_type": stacked_device_error_type,
+            "cause_donut": _chart_from_summary(
+                summary,
+                key="by_cause_group",
+                chart_type="DONUT",
+                group_by_key="cause_group",
+            ),
+            "stacked_device_cause": stacked_device_cause,
+        },
+        "recurring": recurring_data,
     }

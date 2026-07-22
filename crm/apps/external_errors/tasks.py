@@ -1,7 +1,6 @@
-
 from celery import shared_task
 from django.db import close_old_connections
-from django.db.models import Q
+from django.db.models import Count, Q
 
 from apps.external_errors.models import (
     ExternalErrorImportBatch,
@@ -12,6 +11,9 @@ from apps.external_errors.services.bedrock_cause_classifier import (
 )
 from apps.external_errors.services.bedrock_classifier import (
     classify_queryset,
+)
+from apps.external_errors.services.dashboard_cache import (
+    invalidate_external_error_dashboard_cache,
 )
 
 
@@ -34,20 +36,18 @@ def classify_external_error_batch(self, batch_id: int):
     try:
         batch = ExternalErrorImportBatch.objects.get(pk=batch_id)
 
-        previous_failed_records = (
-            batch.records.filter(
-                Q(
-                    classification_status=ExternalErrorRecord.STATUS_FAILED
-                )
-                | Q(
-                    cause_classification_status=(
-                        ExternalErrorRecord.STATUS_FAILED
-                    )
+        previous_failed_records = batch.records.filter(
+            Q(
+                classification_status=(
+                    ExternalErrorRecord.STATUS_FAILED
                 )
             )
-            .distinct()
-            .count()
-        )
+            | Q(
+                cause_classification_status=(
+                    ExternalErrorRecord.STATUS_FAILED
+                )
+            )
+        ).count()
         import_skipped_rows = max(
             batch.failed_rows - previous_failed_records,
             0,
@@ -76,25 +76,34 @@ def classify_external_error_batch(self, batch_id: int):
             force=False,
         )
 
-        fully_processed = batch.records.filter(
-            classification_status__in=SUCCESS_STATUSES,
-            cause_classification_status__in=SUCCESS_STATUSES,
-        ).count()
-
-        failed_records = (
-            batch.records.filter(
-                Q(
-                    classification_status=ExternalErrorRecord.STATUS_FAILED
-                )
-                | Q(
-                    cause_classification_status=(
-                        ExternalErrorRecord.STATUS_FAILED
+        # Một aggregate thay cho hai COUNT riêng sau khi phân loại.
+        processing_counts = batch.records.aggregate(
+            fully_processed=Count(
+                "id",
+                filter=Q(
+                    classification_status__in=SUCCESS_STATUSES,
+                    cause_classification_status__in=SUCCESS_STATUSES,
+                ),
+            ),
+            failed_records=Count(
+                "id",
+                filter=(
+                    Q(
+                        classification_status=(
+                            ExternalErrorRecord.STATUS_FAILED
+                        )
                     )
-                )
-            )
-            .distinct()
-            .count()
+                    | Q(
+                        cause_classification_status=(
+                            ExternalErrorRecord.STATUS_FAILED
+                        )
+                    )
+                ),
+            ),
         )
+
+        fully_processed = processing_counts["fully_processed"] or 0
+        failed_records = processing_counts["failed_records"] or 0
 
         batch.classified_rows = fully_processed
         batch.failed_rows = import_skipped_rows + failed_records
@@ -112,6 +121,8 @@ def classify_external_error_batch(self, batch_id: int):
             ]
         )
 
+        invalidate_external_error_dashboard_cache()
+
         return {
             "batch_id": batch.id,
             "error_classification": error_stats,
@@ -119,6 +130,9 @@ def classify_external_error_batch(self, batch_id: int):
         }
 
     except ExternalErrorImportBatch.DoesNotExist:
-        return {"batch_id": batch_id, "error": "Batch không tồn tại."}
+        return {
+            "batch_id": batch_id,
+            "error": "Batch không tồn tại.",
+        }
     finally:
         close_old_connections()
