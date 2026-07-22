@@ -22,6 +22,7 @@ export type CccDashboardParams = {
   error_type?: string;
   related_system?: string;
   recent_limit?: number;
+  refresh?: boolean;
 };
 
 export type CccDashboardFilters = {

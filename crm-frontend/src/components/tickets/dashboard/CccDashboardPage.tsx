@@ -1,8 +1,9 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { RefreshCw, SlidersHorizontal, Ticket, X } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
 import {
   DateRangeFilter,
@@ -11,10 +12,23 @@ import {
 } from "@/components/common";
 import { useCccDashboard } from "@/hooks/useCccDashboard";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
-import { CccDashboardCards } from "./CccDashboardCards";
-import { CccDashboardCharts } from "./CccDashboardCharts";
-import { TicketListTable } from "./CccDashboardTables";
-import { formatDate, formatDateTime, formatNumber } from "./CccDashboardUtils";
+import { CccDashboardChartSkeleton } from "./CccDashboardChartSkeleton";
+import {
+  formatDate,
+  formatDateTime,
+  formatNumber,
+} from "./CccDashboardUtils";
+
+const CccDashboardCharts = dynamic(
+  () =>
+    import("./CccDashboardCharts").then(
+      (module) => module.CccDashboardCharts
+    ),
+  {
+    ssr: false,
+    loading: () => <CccDashboardChartSkeleton />,
+  }
+);
 
 function LoadingBlock() {
   return (
@@ -32,22 +46,6 @@ function ErrorBlock({ message }: { message: string }) {
   );
 }
 
-function getActiveFilterCount(dashboard: ReturnType<typeof useCccDashboard>) {
-  return [
-    dashboard.dateFrom,
-    dashboard.dateTo,
-    dashboard.status,
-    dashboard.category,
-    dashboard.source,
-    dashboard.accountLinkStatus,
-    dashboard.vipTier,
-    dashboard.q,
-    dashboard.errorGroup,
-    dashboard.errorType,
-    dashboard.relatedSystem,
-  ].filter(Boolean).length;
-}
-
 function FilterPopover({
   dashboard,
   onClose,
@@ -55,6 +53,8 @@ function FilterPopover({
   dashboard: ReturnType<typeof useCccDashboard>;
   onClose: () => void;
 }) {
+  const busy = dashboard.loading || dashboard.fetching;
+
   const applyFilter = () => {
     dashboard.search();
     onClose();
@@ -69,9 +69,12 @@ function FilterPopover({
     <div className="absolute right-0 top-10 z-[70] w-[min(92vw,960px)] overflow-hidden rounded-md border border-slate-200 bg-white shadow-xl">
       <div className="flex items-start justify-between gap-3 border-b bg-white px-4 py-3">
         <div>
-          <h2 className="text-sm font-semibold text-slate-800">Bộ lọc Dashboard Ticket</h2>
+          <h2 className="text-sm font-semibold text-slate-800">
+            Bộ lọc Dashboard Ticket
+          </h2>
           <p className="mt-0.5 text-xs text-slate-500">
-            Lọc theo kỳ, trạng thái, danh mục, nguồn, Linked/Unlinked, VIP tier và nhóm lỗi.
+            Lọc theo kỳ, trạng thái, danh mục, nguồn, Linked/Unlinked,
+            VIP tier và nhóm lỗi.
           </p>
         </div>
 
@@ -84,6 +87,12 @@ function FilterPopover({
           <X size={15} />
         </button>
       </div>
+
+      {dashboard.masterLoading && (
+        <div className="border-b border-sky-100 bg-sky-50 px-4 py-2 text-xs text-sky-700">
+          Đang tải danh mục bộ lọc...
+        </div>
+      )}
 
       {dashboard.masterError && (
         <div className="border-b border-red-200 bg-red-50 px-4 py-2 text-xs text-red-600">
@@ -218,7 +227,9 @@ function FilterPopover({
             </label>
             <input
               value={dashboard.relatedSystem}
-              onChange={(event) => dashboard.setRelatedSystem(event.target.value)}
+              onChange={(event) =>
+                dashboard.setRelatedSystem(event.target.value)
+              }
               placeholder="BASE / FLEX / APP / CRM..."
               className="h-9 w-full rounded border border-slate-300 bg-white px-2 text-xs outline-none focus:border-sky-400"
             />
@@ -230,7 +241,7 @@ function FilterPopover({
         <button
           type="button"
           onClick={dashboard.setThisMonth}
-          disabled={dashboard.loading}
+          disabled={busy}
           className="h-9 rounded border border-slate-300 bg-white px-4 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
         >
           Tháng này
@@ -239,7 +250,7 @@ function FilterPopover({
         <button
           type="button"
           onClick={clearFilter}
-          disabled={dashboard.loading}
+          disabled={busy}
           className="h-9 rounded border border-slate-300 bg-white px-4 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
         >
           Xóa lọc
@@ -248,7 +259,7 @@ function FilterPopover({
         <button
           type="button"
           onClick={applyFilter}
-          disabled={dashboard.loading}
+          disabled={busy}
           className="h-9 rounded bg-[#0097cf] px-4 text-xs font-semibold text-white hover:bg-[#0089bd] disabled:opacity-50"
         >
           Áp dụng bộ lọc
@@ -258,7 +269,11 @@ function FilterPopover({
   );
 }
 
-function TicketTabSummary({ dashboard }: { dashboard: ReturnType<typeof useCccDashboard> }) {
+function TicketTabSummary({
+  dashboard,
+}: {
+  dashboard: ReturnType<typeof useCccDashboard>;
+}) {
   const tabs = dashboard.data?.my_ticket_tabs;
 
   return (
@@ -271,7 +286,9 @@ function TicketTabSummary({ dashboard }: { dashboard: ReturnType<typeof useCccDa
         <p className="mt-2 text-2xl font-bold text-slate-800">
           {formatNumber(tabs?.all || 0)}
         </p>
-        <p className="mt-1 text-[11px] text-slate-500">Tất cả ticket theo phạm vi quyền</p>
+        <p className="mt-1 text-[11px] text-slate-500">
+          Tất cả ticket theo phạm vi quyền
+        </p>
       </Link>
 
       <Link
@@ -282,48 +299,34 @@ function TicketTabSummary({ dashboard }: { dashboard: ReturnType<typeof useCccDa
         <p className="mt-2 text-2xl font-bold text-emerald-700">
           {formatNumber(tabs?.linked || 0)}
         </p>
-        <p className="mt-1 text-[11px] text-slate-500">Ticket đã xác định tài khoản lưu ký</p>
+        <p className="mt-1 text-[11px] text-slate-500">
+          Ticket đã xác định tài khoản lưu ký
+        </p>
       </Link>
 
       <Link
         href="/tickets?account_link_status=UNLINKED"
         className="rounded-md border border-amber-100 bg-white p-4 shadow-sm transition hover:border-amber-200 hover:bg-amber-50"
       >
-        <p className="text-xs font-medium text-slate-500">Chưa có TK liên kết</p>
+        <p className="text-xs font-medium text-slate-500">
+          Chưa có TK liên kết
+        </p>
         <p className="mt-2 text-2xl font-bold text-amber-700">
           {formatNumber(tabs?.unlinked || 0)}
         </p>
-        <p className="mt-1 text-[11px] text-slate-500">Ticket cần đối chiếu tài khoản</p>
+        <p className="mt-1 text-[11px] text-slate-500">
+          Ticket cần đối chiếu tài khoản
+        </p>
       </Link>
     </div>
   );
 }
 
-function ActiveFilterSummary({
-  dashboard,
-  activeFilterCount,
-}: {
-  dashboard: ReturnType<typeof useCccDashboard>;
-  activeFilterCount: number;
-}) {
-  const filter = dashboard.data?.filters;
-
-  return (
-    <div className="flex flex-wrap items-center gap-2 text-xs">
-
-
-
-
-    </div>
-  );
-}
-const getMonthCount = (
+function getMonthCount(
   rangeFrom?: string | null,
-  rangeTo?: string | null,
-) => {
-  if (!rangeFrom || !rangeTo) {
-    return 0;
-  }
+  rangeTo?: string | null
+) {
+  if (!rangeFrom || !rangeTo) return 0;
 
   const from = new Date(rangeFrom);
   const to = new Date(rangeTo);
@@ -341,36 +344,31 @@ const getMonthCount = (
     (to.getMonth() - from.getMonth()) +
     1
   );
-};
-
-
+}
 
 export function CccDashboardPage() {
   const dashboard = useCccDashboard();
   const [filterOpen, setFilterOpen] = useState(false);
-  const activeFilterCount = getActiveFilterCount(dashboard);
   const report = dashboard.data?.report;
+  const reportMonthCount = getMonthCount(report?.range_from, report?.range_to);
+  const busy = dashboard.loading || dashboard.fetching;
 
-  const reportMonthCount = getMonthCount(
-    report?.range_from,
-    report?.range_to,
-  );
-
+  const toggleFilter = useCallback(() => {
+    setFilterOpen((current) => {
+      const next = !current;
+      if (next) {
+        void dashboard.ensureMasterData();
+      }
+      return next;
+    });
+  }, [dashboard.ensureMasterData]);
 
   return (
-
     <DashboardLayout
       breadcrumbs={[
-        {
-          label: "TRANG CHỦ",
-          href: "/",
-        },
-        {
-          label: "CCC",
-        },
-        {
-          label: "Dashboard Ticket",
-        },
+        { label: "TRANG CHỦ", href: "/" },
+        { label: "CCC" },
+        { label: "Dashboard Ticket" },
       ]}
       rightAction={
         <div className="relative flex items-center gap-2">
@@ -384,17 +382,18 @@ export function CccDashboardPage() {
 
           <button
             type="button"
-            onClick={() => setFilterOpen((value) => !value)}
-            className={`relative flex h-8 items-center gap-1 rounded border px-3 text-xs font-semibold ${filterOpen || activeFilterCount > 0
-              ? "border-[#0097cf] bg-sky-50 text-[#007ead]"
-              : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
-              }`}
+            onClick={toggleFilter}
+            className={`relative flex h-8 items-center gap-1 rounded border px-3 text-xs font-semibold ${
+              filterOpen || dashboard.activeFilterCount > 0
+                ? "border-[#0097cf] bg-sky-50 text-[#007ead]"
+                : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
+            }`}
           >
             <SlidersHorizontal size={15} />
             Bộ lọc
-            {activeFilterCount > 0 && (
+            {dashboard.activeFilterCount > 0 && (
               <span className="ml-1 rounded-full bg-[#0097cf] px-1.5 py-0.5 text-[10px] font-bold text-white">
-                {activeFilterCount}
+                {dashboard.activeFilterCount}
               </span>
             )}
           </button>
@@ -409,10 +408,11 @@ export function CccDashboardPage() {
           <button
             type="button"
             onClick={dashboard.reload}
-            disabled={dashboard.loading}
+            disabled={busy}
             className="flex h-8 items-center gap-1 rounded bg-[#0097cf] px-3 text-xs font-semibold text-white hover:bg-[#0089bd] disabled:opacity-50"
+            title="Bỏ qua cache và tải dữ liệu mới từ backend"
           >
-            <RefreshCw size={15} className={dashboard.loading ? "animate-spin" : ""} />
+            <RefreshCw size={15} className={busy ? "animate-spin" : ""} />
             Làm mới
           </button>
         </div>
@@ -447,13 +447,11 @@ export function CccDashboardPage() {
               </div>
             </div>
 
-            {activeFilterCount > 0 && (
-              <div className="shrink-0">
-                <ActiveFilterSummary
-                  dashboard={dashboard}
-                  activeFilterCount={activeFilterCount}
-                />
-              </div>
+            {dashboard.fetching && dashboard.data && (
+              <span className="inline-flex shrink-0 items-center gap-2 rounded-md bg-sky-50 px-3 py-1.5 text-xs font-medium text-sky-700 ring-1 ring-sky-100">
+                <RefreshCw size={13} className="animate-spin" />
+                Đang cập nhật dữ liệu...
+              </span>
             )}
           </div>
         </div>
@@ -464,17 +462,7 @@ export function CccDashboardPage() {
 
         {dashboard.data && (
           <>
-            {/* <TicketListTable
-              title="Ticket chưa xử lý"
-              description="Danh sách các ticket đang chờ xử lý theo bộ lọc hiện tại."
-              items={dashboard.data.tables.pending_tickets || []}
-            /> */}
-
-
-
-
             <TicketTabSummary dashboard={dashboard} />
-
             <CccDashboardCharts charts={dashboard.data.charts} />
           </>
         )}

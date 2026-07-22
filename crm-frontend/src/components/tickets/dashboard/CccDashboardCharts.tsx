@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { memo, useMemo, type ReactNode } from "react";
 import {
   Bar,
   BarChart,
@@ -17,6 +17,7 @@ import {
 } from "recharts";
 
 import { EmptyState } from "@/components/chatbot-dashboard/EmptyState";
+import { LazyDashboardSection } from "./LazyDashboardSection";
 import {
   CccDashboardCharts as CccCharts,
   CccDashboardMonthlyCategoryItem,
@@ -24,7 +25,6 @@ import {
   CccDashboardReportTimeCategoryItem,
 } from "@/types/ccc-dashboard.type";
 import {
-  formatDate,
   formatDays,
   formatNumber,
   getMonthLabel,
@@ -278,6 +278,7 @@ function SourceAnalysisCharts({ charts }: { charts: CccCharts }) {
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 {processedPivot.months.map((month, index) => (
                   <Bar
+                    isAnimationActive={false}
                     key={month}
                     dataKey={month}
                     name={month}
@@ -301,6 +302,7 @@ function SourceAnalysisCharts({ charts }: { charts: CccCharts }) {
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 {cancelledPivot.months.map((month, index) => (
                   <Bar
+                    isAnimationActive={false}
                     key={month}
                     dataKey={month}
                     name={month}
@@ -353,6 +355,7 @@ function CategoryAnalysisCharts({ charts }: { charts: CccCharts }) {
               <Legend wrapperStyle={{ fontSize: 11 }} />
               {processedPivot.dimensions.map((dimension, index) => (
                 <Bar
+                  isAnimationActive={false}
                   key={dimension}
                   dataKey={dimension}
                   name={dimension}
@@ -379,6 +382,7 @@ function CategoryAnalysisCharts({ charts }: { charts: CccCharts }) {
               <Legend wrapperStyle={{ fontSize: 11 }} />
               {cancelledPivot.dimensions.map((dimension, index) => (
                 <Bar
+                  isAnimationActive={false}
                   key={dimension}
                   dataKey={dimension}
                   name={dimension}
@@ -675,10 +679,14 @@ function EmployeeCharts({ charts }: { charts: CccCharts }) {
 }
 
 function RootCausePie({ charts }: { charts: CccCharts }) {
-  const data = (charts.root_cause_breakdown || []).map((item) => ({
-    name: rootCauseLabel(item),
-    value: item.count || 0,
-  }));
+  const data = useMemo(
+    () =>
+      (charts.root_cause_breakdown || []).map((item) => ({
+        name: rootCauseLabel(item),
+        value: item.count || 0,
+      })),
+    [charts.root_cause_breakdown]
+  );
 
   if (isEmpty(data)) return null;
 
@@ -687,7 +695,14 @@ function RootCausePie({ charts }: { charts: CccCharts }) {
       <div className="h-[280px]">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
-            <Pie data={data} dataKey="value" nameKey="name" outerRadius={95} label>
+            <Pie
+              data={data}
+              dataKey="value"
+              nameKey="name"
+              outerRadius={95}
+              label={data.length <= 6}
+              isAnimationActive={false}
+            >
               {data.map((_, index) => (
                 <Cell key={index} fill={COLORS[index % COLORS.length]} />
               ))}
@@ -701,17 +716,42 @@ function RootCausePie({ charts }: { charts: CccCharts }) {
   );
 }
 
-export function CccDashboardCharts({ charts }: { charts: CccCharts }) {
+export const CccDashboardCharts = memo(function CccDashboardCharts({
+  charts,
+}: {
+  charts: CccCharts;
+}) {
   return (
     <div className="space-y-5">
       <TicketResultCharts charts={charts} />
-      <SourceAnalysisCharts charts={charts} />
-      <CategoryAnalysisCharts charts={charts} />
-      <UnitAnalysisCharts charts={charts} />
-      <TimeAnalysisCharts charts={charts} />
-      <SlaCharts charts={charts} />
-      <EmployeeCharts charts={charts} />
-      <RootCausePie charts={charts} />
+
+      <LazyDashboardSection minHeight={640}>
+        <SourceAnalysisCharts charts={charts} />
+      </LazyDashboardSection>
+
+      <LazyDashboardSection minHeight={760}>
+        <CategoryAnalysisCharts charts={charts} />
+      </LazyDashboardSection>
+
+      <LazyDashboardSection minHeight={660}>
+        <UnitAnalysisCharts charts={charts} />
+      </LazyDashboardSection>
+
+      <LazyDashboardSection minHeight={680}>
+        <TimeAnalysisCharts charts={charts} />
+      </LazyDashboardSection>
+
+      <LazyDashboardSection minHeight={760}>
+        <SlaCharts charts={charts} />
+      </LazyDashboardSection>
+
+      <LazyDashboardSection minHeight={680}>
+        <EmployeeCharts charts={charts} />
+      </LazyDashboardSection>
+
+      <LazyDashboardSection minHeight={320}>
+        <RootCausePie charts={charts} />
+      </LazyDashboardSection>
     </div>
   );
-}
+});
