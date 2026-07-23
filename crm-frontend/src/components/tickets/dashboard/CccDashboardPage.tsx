@@ -384,11 +384,10 @@ export function CccDashboardPage() {
           <button
             type="button"
             onClick={toggleFilter}
-            className={`relative flex h-8 items-center gap-1 rounded border px-3 text-xs font-semibold ${
-              filterOpen || dashboard.activeFilterCount > 0
+            className={`relative flex h-8 items-center gap-1 rounded border px-3 text-xs font-semibold ${filterOpen || dashboard.activeFilterCount > 0
                 ? "border-[#0097cf] bg-sky-50 text-[#007ead]"
                 : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
-            }`}
+              }`}
           >
             <SlidersHorizontal size={15} />
             Bộ lọc
@@ -448,7 +447,7 @@ export function CccDashboardPage() {
               </div>
             </div>
 
-            
+
 
             {dashboard.fetching && dashboard.data && (
               <span className="inline-flex shrink-0 items-center gap-2 rounded-md bg-sky-50 px-3 py-1.5 text-xs font-medium text-sky-700 ring-1 ring-sky-100">
@@ -458,20 +457,21 @@ export function CccDashboardPage() {
             )}
           </div>
         </div>
-        
+
 
         {dashboard.error && <ErrorBlock message={dashboard.error} />}
-        
+
 
         {dashboard.loading && !dashboard.data && <LoadingBlock />}
-        
+
         {dashboard.data && (
-                      <TicketListTable
-                        title="Ticket chưa xử lý"
-                        description="Danh sách các ticket đang chờ xử lý theo bộ lọc hiện tại."
-                        items={dashboard.data.tables.pending_tickets || []}
-                      />
-                    )}
+          <TicketListTable
+            title="Ticket chưa xử lý"
+            description="Danh sách các ticket đang chờ xử lý theo bộ lọc hiện tại."
+            filters={dashboard.appliedParams}
+            refreshKey={dashboard.data.generated_at}
+          />
+        )}
 
         {dashboard.data && (
           <>
@@ -479,7 +479,7 @@ export function CccDashboardPage() {
             <CccDashboardCharts charts={dashboard.data.charts} />
           </>
         )}
-        
+
       </div>
     </DashboardLayout>
   );

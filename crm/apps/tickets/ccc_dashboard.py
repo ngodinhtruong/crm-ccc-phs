@@ -31,6 +31,8 @@ DEFAULT_RECENT_LIMIT = 10
 DEFAULT_TOP_LIMIT = 10
 REPORT_MONTH_COUNT = 5
 MAX_RECENT_LIMIT = 50
+PENDING_PAGE_SIZE_OPTIONS = (5, 10, 20)
+DEFAULT_PENDING_PAGE_SIZE = 10
 
 PENDING_TICKET_SELECT_RELATED = (
     "customer",
@@ -68,6 +70,17 @@ def _safe_int(value, default):
 
 def _safe_limit(value, default, maximum):
     return max(1, min(_safe_int(value, default), maximum))
+
+
+def _safe_pending_page_size(value):
+    page_size = _safe_int(value, DEFAULT_PENDING_PAGE_SIZE)
+    if page_size not in PENDING_PAGE_SIZE_OPTIONS:
+        return DEFAULT_PENDING_PAGE_SIZE
+    return page_size
+
+
+def _safe_page(value):
+    return max(1, _safe_int(value, 1))
 
 
 def _percent(value, total):
@@ -807,6 +820,36 @@ def _group_with_percent(rows, total):
     return result
 
 
+def _pending_ticket_page(queryset, page, page_size):
+    pending_queryset = queryset.exclude(
+        current_status__status_code__in=list(
+            RESOLVED_STATUS_CODES | CANCELLED_STATUS_CODES
+        )
+    ).select_related(*PENDING_TICKET_SELECT_RELATED)
+
+    count = pending_queryset.count()
+    total_pages = (count + page_size - 1) // page_size if count else 0
+    normalized_page = min(page, total_pages) if total_pages else 1
+    offset = (normalized_page - 1) * page_size
+
+    tickets = [
+        _ticket_summary(ticket)
+        for ticket in pending_queryset.order_by("-created_at", "-id")[
+            offset : offset + page_size
+        ]
+    ]
+
+    return {
+        "count": count,
+        "page": normalized_page,
+        "page_size": page_size,
+        "total_pages": total_pages,
+        "from_record": offset + 1 if count else 0,
+        "to_record": min(offset + len(tickets), count),
+        "results": tickets,
+    }
+
+
 def _ticket_summary(ticket):
     account_number = None
 
@@ -1394,6 +1437,23 @@ def _build_employee_report(tickets):
         )
 
     return sorted(result, key=lambda x: x["total"], reverse=True)[:15]
+
+
+class TicketCccDashboardPendingTicketsAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        queryset, date_from, date_to = _base_ticket_queryset(request)
+        page = _safe_page(request.query_params.get("page"))
+        page_size = _safe_pending_page_size(
+            request.query_params.get("page_size")
+        )
+
+        payload = _pending_ticket_page(queryset, page, page_size)
+        payload["date_from"] = date_from.isoformat()
+        payload["date_to"] = date_to.isoformat()
+
+        return Response(payload)
 
 
 class TicketCccDashboardAPIView(APIView):

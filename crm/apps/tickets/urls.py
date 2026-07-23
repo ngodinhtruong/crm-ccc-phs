@@ -2,7 +2,10 @@ from django.urls import path
 from rest_framework.routers import DefaultRouter
 
 from apps.tickets.error_reports import TicketErrorReportAPIView, TicketErrorReportExportAPIView
-from apps.tickets.ccc_dashboard import TicketCccDashboardAPIView
+from apps.tickets.ccc_dashboard import (
+    TicketCccDashboardAPIView,
+    TicketCccDashboardPendingTicketsAPIView,
+)
 
 from apps.tickets.views import (
     TicketViewSet,
@@ -52,6 +55,11 @@ router.register("error-types", TicketErrorTypeViewSet, basename="ticket-error-ty
 
 urlpatterns = router.urls + [
     path("ccc-dashboard/", TicketCccDashboardAPIView.as_view(), name="ticket-ccc-dashboard"),
+    path(
+        "ccc-dashboard/pending-tickets/",
+        TicketCccDashboardPendingTicketsAPIView.as_view(),
+        name="ticket-ccc-dashboard-pending-tickets",
+    ),
     path("error-report/", TicketErrorReportAPIView.as_view(), name="ticket-error-report"),
     path("error-report/export/", TicketErrorReportExportAPIView.as_view(), name="ticket-error-report-export"),
 ]
