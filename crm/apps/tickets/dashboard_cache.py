@@ -3,6 +3,7 @@ import json
 import time
 
 from django.conf import settings
+from django.core.exceptions import EmptyResultSet
 from django.core.cache import cache
 
 
@@ -38,12 +39,51 @@ def _normalized_params(query_params):
     return pairs
 
 
-def build_ticket_dashboard_cache_key(user, query_params):
+def build_queryset_scope_fingerprint(queryset):
+    """
+    Build a non-reversible fingerprint from the effective queryset SQL.
+
+    The permission scope produced by ``filter_tickets_by_user`` is part of the
+    SQL/parameters. Users with the exact same effective scope and filters can
+    therefore share a cache entry without exposing data across different
+    scopes. Building this fingerprint does not execute the queryset.
+    """
+    try:
+        sql, params = queryset.query.sql_with_params()
+        payload = {
+            "sql": sql,
+            "params": [str(value) for value in params],
+        }
+    except EmptyResultSet:
+        payload = {"empty_queryset": True}
+    return hashlib.sha256(
+        json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
+    ).hexdigest()
+
+
+def build_ticket_dashboard_cache_key(
+    user,
+    query_params,
+    *,
+    scope_fingerprint=None,
+    section=None,
+):
     payload = {
-        "user_id": getattr(user, "pk", None),
-        "is_superuser": bool(getattr(user, "is_superuser", False)),
+        "scope": scope_fingerprint,
+        "section": section,
         "params": _normalized_params(query_params),
     }
+
+    # Backward-safe fallback for callers that do not provide an effective
+    # queryset scope. Non-superusers must remain isolated in that case.
+    if not scope_fingerprint:
+        payload.update(
+            {
+                "user_id": getattr(user, "pk", None),
+                "is_superuser": bool(getattr(user, "is_superuser", False)),
+            }
+        )
+
     digest = hashlib.sha256(
         json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
     ).hexdigest()
@@ -54,8 +94,12 @@ def get_ticket_dashboard_cache(cache_key):
     return cache.get(cache_key)
 
 
-def set_ticket_dashboard_cache(cache_key, payload):
-    cache.set(cache_key, payload, timeout=_cache_timeout())
+def set_ticket_dashboard_cache(cache_key, payload, timeout=None):
+    cache.set(
+        cache_key,
+        payload,
+        timeout=_cache_timeout() if timeout is None else timeout,
+    )
 
 
 def invalidate_ticket_dashboard_cache():

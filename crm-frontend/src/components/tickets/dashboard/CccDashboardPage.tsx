@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { RefreshCw, SlidersHorizontal, Ticket, X } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { TicketListTable } from "@/components/tickets/dashboard/CccDashboardTables";
 
 import {
@@ -11,6 +11,7 @@ import {
   FilterSelect,
   SearchInput,
 } from "@/components/common";
+import { ChartViewMode } from "./CccDashboardUtils";
 import { useCccDashboard } from "@/hooks/useCccDashboard";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
 import { CccDashboardChartSkeleton } from "./CccDashboardChartSkeleton";
@@ -350,9 +351,27 @@ function getMonthCount(
 export function CccDashboardPage() {
   const dashboard = useCccDashboard();
   const [filterOpen, setFilterOpen] = useState(false);
+  const [globalViewMode, setGlobalViewMode] = useState<ChartViewMode>("TREND_OVER_TIME");
+  const [globalMonth, setGlobalMonth] = useState<string>("");
+
   const report = dashboard.data?.report;
   const reportMonthCount = getMonthCount(report?.range_from, report?.range_to);
   const busy = dashboard.loading || dashboard.fetching;
+
+  const availableMonths = useMemo(() => {
+    if (!dashboard.data?.charts?.report_monthly_processing) return [];
+    return dashboard.data.charts.report_monthly_processing
+      .map((item) => item.month_label || item.period_label || "")
+      .filter(Boolean);
+  }, [dashboard.data?.charts?.report_monthly_processing]);
+
+  useEffect(() => {
+    if (availableMonths.length > 0) {
+      if (!globalMonth || !availableMonths.includes(globalMonth)) {
+        setGlobalMonth(availableMonths[0]);
+      }
+    }
+  }, [availableMonths, globalMonth]);
 
   const toggleFilter = useCallback(() => {
     setFilterOpen((current) => {
@@ -476,7 +495,10 @@ export function CccDashboardPage() {
         {dashboard.data && (
           <>
             {/* <TicketTabSummary dashboard={dashboard} /> */}
-            <CccDashboardCharts charts={dashboard.data.charts} />
+            <CccDashboardCharts
+              charts={dashboard.data.charts}
+              globalViewMode={globalViewMode}
+            />
           </>
         )}
 

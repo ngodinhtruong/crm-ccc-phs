@@ -1,12 +1,17 @@
 "use client";
 
-import { memo, useMemo, type ReactNode } from "react";
+import { memo, useMemo, useState, useEffect } from "react";
 import {
+  Area,
+  AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
   Cell,
+  ComposedChart,
   Legend,
+  Line,
+  LineChart,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -17,71 +22,102 @@ import {
 } from "recharts";
 
 import { EmptyState } from "@/components/chatbot-dashboard/EmptyState";
+import {
+  ExpandableChartCard as ChartCard,
+} from "@/components/common";
 import { LazyDashboardSection } from "./LazyDashboardSection";
 import {
   CccDashboardCharts as CccCharts,
-  CccDashboardMonthlyCategoryItem,
-  CccDashboardMonthlySourceItem,
   CccDashboardReportTimeCategoryItem,
 } from "@/types/ccc-dashboard.type";
 import {
+  ChartViewMode,
+  aggregateTotalOverall,
   formatDays,
   formatNumber,
   getMonthLabel,
+  pivot100PercentStacked,
   rootCauseLabel,
 } from "./CccDashboardUtils";
 
 const COLORS = [
-  "#00713d",
-  "#0097cf",
-  "#f59e0b",
-  "#ef4444",
-  "#8b5cf6",
-  "#14b8a6",
-  "#84cc16",
-  "#f97316",
-  "#0f766e",
-  "#7c3aed",
-  "#64748b",
-  "#dc2626",
+  "#0097cf", // Primary PHS Sky Blue
+  "#10b981", // Emerald Green
+  "#f59e0b", // Amber / Warm Yellow
+  "#ef4444", // Rose / Red
+  "#8b5cf6", // Purple
+  "#06b6d4", // Cyan
+  "#84cc16", // Lime
+  "#f97316", // Orange
+  "#0f766e", // Teal
+  "#7c3aed", // Violet
+  "#64748b", // Slate
+  "#dc2626", // Dark Red
 ];
 
-function ChartCard({
-  title,
-  description,
-  children,
-  className = "",
-}: {
-  title: string;
-  description?: string;
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <div className={`rounded-md border border-slate-200 bg-white shadow-sm ${className}`}>
-      <div className="border-b px-4 py-3">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-[#00713d]">
-          {title}
-        </h3>
-        {description && <p className="mt-0.5 text-xs text-slate-500">{description}</p>}
-      </div>
+function getDashboardAvailableMonths(charts: CccCharts): string[] {
+  const months = new Set<string>();
 
-      <div className="p-4">{children}</div>
-    </div>
-  );
+  (charts.report_monthly_processing || []).forEach((item) => {
+    const label = getMonthLabel(item);
+    if (label) months.add(label);
+  });
+
+  (charts.report_source || []).forEach((item) => {
+    const label = item.month_label || item.period_label || String(item.month_key || "");
+    if (label) months.add(label);
+  });
+
+  (charts.report_category || []).forEach((item) => {
+    const label = item.month_label || item.period_label || String(item.month_key || "");
+    if (label) months.add(label);
+  });
+
+  (charts.report_unit || []).forEach((item) => {
+    if (item.month_label) months.add(item.month_label);
+  });
+
+  if (charts.report_sla?.monthly) {
+    charts.report_sla.monthly.forEach((item) => {
+      if (item.month_label) months.add(item.month_label);
+    });
+  }
+
+  return Array.from(months);
 }
+
+function isSameMonth(item: any, selectedMonth: string): boolean {
+  if (!selectedMonth) return true;
+  const target = selectedMonth.trim().toLowerCase();
+
+  const candidateLabels = [
+    item.month_label,
+    item.period_label,
+    item.month_key,
+    item.month_str,
+    item.month,
+    getMonthLabel(item),
+  ].filter(Boolean).map((s) => String(s).trim().toLowerCase());
+
+  return candidateLabels.some((lbl) => lbl === target || lbl.includes(target) || target.includes(lbl));
+}
+
+
 
 function ValueTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
 
   return (
-    <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs shadow-lg">
-      <div className="mb-1 font-semibold text-slate-700">{label}</div>
-      <div className="space-y-0.5">
+    <div className="rounded-lg border border-slate-200 bg-white/95 px-3.5 py-2.5 text-xs shadow-xl backdrop-blur-sm">
+      {label && <div className="mb-1.5 font-bold text-slate-800">{label}</div>}
+      <div className="space-y-1">
         {payload.map((item: any, index: number) => (
-          <div key={`${item.dataKey}-${index}`} className="flex items-center justify-between gap-4">
-            <span style={{ color: item.color }}>{item.name}</span>
-            <span className="font-semibold text-slate-800">
+          <div key={`${item.dataKey || item.name}-${index}`} className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color || item.fill }} />
+              <span className="text-slate-600">{item.name}</span>
+            </div>
+            <span className="font-bold text-slate-900">
               {typeof item.value === "number" ? formatNumber(item.value) : item.value}
             </span>
           </div>
@@ -91,17 +127,47 @@ function ValueTooltip({ active, payload, label }: any) {
   );
 }
 
+function PercentTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null;
+
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white/95 px-3.5 py-2.5 text-xs shadow-xl backdrop-blur-sm">
+      {label && <div className="mb-1.5 font-bold text-slate-800">{label}</div>}
+      <div className="space-y-1">
+        {payload.map((item: any, index: number) => {
+          const name = item.name || item.dataKey;
+          const rawVal = item.payload?.[`${name}_raw`];
+          return (
+            <div key={`${name}-${index}`} className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color || item.fill }} />
+                <span className="text-slate-600">{name}</span>
+              </div>
+              <span className="font-bold text-slate-900">
+                {item.value}% {rawVal !== undefined ? `(${formatNumber(rawVal)} ticket)` : ""}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function DaysTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
 
   return (
-    <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs shadow-lg">
-      <div className="mb-1 font-semibold text-slate-700">{label}</div>
-      <div className="space-y-0.5">
+    <div className="rounded-lg border border-slate-200 bg-white/95 px-3.5 py-2.5 text-xs shadow-xl backdrop-blur-sm">
+      {label && <div className="mb-1.5 font-bold text-slate-800">{label}</div>}
+      <div className="space-y-1">
         {payload.map((item: any, index: number) => (
-          <div key={`${item.dataKey}-${index}`} className="flex items-center justify-between gap-4">
-            <span style={{ color: item.color }}>{item.name}</span>
-            <span className="font-semibold text-slate-800">{formatDays(item.value)}</span>
+          <div key={`${item.dataKey || item.name}-${index}`} className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color || item.fill }} />
+              <span className="text-slate-600">{item.name}</span>
+            </div>
+            <span className="font-bold text-slate-900">{formatDays(item.value)}</span>
           </div>
         ))}
       </div>
@@ -113,108 +179,12 @@ function isEmpty(items?: unknown[]) {
   return !items || items.length === 0;
 }
 
-
-
-function TicketResultCharts({ charts }: { charts: CccCharts }) {
-  const data = (charts.report_monthly_processing || []).map((item) => ({
-    ...item,
-    label: getMonthLabel(item),
-    processed: item.processed ?? item.resolved ?? 0,
-    cancelled: item.cancelled ?? 0,
-    total: item.total ?? 0,
-  }));
-
-  if (isEmpty(data)) {
-    return <EmptyState message="Không có dữ liệu kết quả xử lý ticket." />;
-  }
-
-  return (
-    <div className="grid gap-4 xl:grid-cols-2">
-      <ChartCard title="Tổng số ticket">
-        <div className="h-[260px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="label" tick={{ fontSize: 11, fontWeight: 600 }} />
-              <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-              <Tooltip content={<ValueTooltip />} />
-              <Bar isAnimationActive={false} dataKey="total" name="Tổng ticket" fill="#0072bc" radius={[4, 4, 0, 0]}>
-                <LabelList dataKey="total" position="top" style={{ fontSize: 10, fill: '#64748b' }} />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </ChartCard>
-
-      <ChartCard title="Tổng ticket xử lý">
-        <div className="h-[260px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="label" tick={{ fontSize: 11, fontWeight: 600 }} />
-              <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-              <Tooltip content={<ValueTooltip />} />
-              <Bar isAnimationActive={false} dataKey="processed" name="Đã xử lý" fill="#5ca05a" radius={[4, 4, 0, 0]}>
-                <LabelList dataKey="processed" position="top" style={{ fontSize: 10, fill: '#64748b' }} />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </ChartCard>
-
-      <div className="space-y-4">
-        <ChartCard title="Tổng ticket hủy">
-          <div className="h-[150px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data}>
-                <XAxis dataKey="label" tick={{ fontSize: 10, fontWeight: 600 }} />
-                <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
-                <Tooltip content={<ValueTooltip />} />
-                <Bar isAnimationActive={false} dataKey="cancelled" name="Spam / Đã hủy" fill="#df6b32" radius={[4, 4, 0, 0]}>
-                  <LabelList dataKey="cancelled" position="top" style={{ fontSize: 10, fill: '#64748b' }} />
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </ChartCard>
-      </div>
-    </div>
-  );
-}
-
-function getSourceName(item: CccDashboardMonthlySourceItem) {
+function getSourceName(item: any) {
   return item.source_name || item.source__source_name || "Chưa có nguồn";
 }
 
-function getCategoryName(item: CccDashboardMonthlyCategoryItem) {
+function getCategoryName(item: any) {
   return item.category_name || item.support_category__category_name || "Chưa có danh mục";
-}
-
-function pivotByDimension<T>(
-  items: T[],
-  getDimension: (item: T) => string,
-  getMonth: (item: T) => string,
-  getValue: (item: T) => number
-) {
-  const months = Array.from(new Set(items.map(getMonth))).filter(Boolean);
-  const map = new Map<string, Record<string, number | string>>();
-
-  for (const item of items) {
-    const name = getDimension(item);
-    const month = getMonth(item);
-    const value = getValue(item);
-
-    if (!map.has(name)) {
-      map.set(name, { name });
-    }
-
-    map.get(name)![month] = Number(map.get(name)![month] || 0) + value;
-  }
-
-  return {
-    months,
-    rows: Array.from(map.values()),
-  };
 }
 
 function pivotByMonth<T>(
@@ -244,226 +214,788 @@ function pivotByMonth<T>(
   };
 }
 
-function SourceAnalysisCharts({ charts }: { charts: CccCharts }) {
-  const items = charts.report_source || [];
+/* ====================================================================
+ * 1. TỔNG QUAN KẾT QUẢ TICKET
+ * ==================================================================== */
+function TicketResultChartCard({
+  charts,
+  globalViewMode,
+}: {
+  charts: CccCharts;
+  globalViewMode?: ChartViewMode;
+}) {
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
 
-  if (isEmpty(items)) {
-    return <EmptyState message="Không có dữ liệu phân tích theo nguồn." />;
+  const rawData = useMemo(() => {
+    return (charts.report_monthly_processing || []).map((item) => ({
+      ...item,
+      label: getMonthLabel(item),
+      processed: item.processed ?? item.resolved ?? 0,
+      cancelled: item.cancelled ?? 0,
+      total: item.total ?? 0,
+    }));
+  }, [charts.report_monthly_processing]);
+
+  const monthDonutData = useMemo(() => {
+    if (!selectedMonth) return [];
+    const monthItem = rawData.find((d) => isSameMonth(d, selectedMonth));
+    if (!monthItem) return [];
+    return [
+      { name: "Ticket đã xử lý", value: monthItem.processed, color: "#10b981" },
+      { name: "Spam / Đã hủy", value: monthItem.cancelled, color: "#ef4444" },
+    ];
+  }, [rawData, selectedMonth]);
+
+  if (isEmpty(rawData)) {
+    return <EmptyState message="Không có dữ liệu kết quả xử lý ticket." />;
   }
 
-  const processedPivot = pivotByDimension(
-    items,
-    getSourceName,
-    (item) => item.month_label || item.period_label || String(item.month_key || ""),
-    (item) => item.processed ?? item.resolved ?? 0
-  );
+  const totalsSum = rawData.reduce((acc, curr) => acc + curr.total, 0);
+  const processedSum = rawData.reduce((acc, curr) => acc + curr.processed, 0);
+  const cancelledSum = rawData.reduce((acc, curr) => acc + curr.cancelled, 0);
+  const processedRate = totalsSum > 0 ? ((processedSum / totalsSum) * 100).toFixed(1) : "0";
 
-  const cancelledPivot = pivotByDimension(
-    items,
-    getSourceName,
-    (item) => item.month_label || item.period_label || String(item.month_key || ""),
-    (item) => item.cancelled || 0
-  );
+  const handleChartClick = (state: any) => {
+    if (state && state.activeLabel) {
+      setSelectedMonth(state.activeLabel);
+    }
+  };
 
   return (
-    <div className="grid gap-4 xl:grid-cols-2">
-      <ChartCard title="Ticket đã xử lý" description="So sánh ticket đã xử lý theo nguồn và tháng.">
-          <div className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={processedPivot.rows}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="name" tick={{ fontSize: 11, fontWeight: 600 }} />
-                <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                <Tooltip content={<ValueTooltip />} />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-                {processedPivot.months.map((month, index) => (
-                  <Bar
-                    isAnimationActive={false}
-                    key={month}
-                    dataKey={month}
-                    name={month}
-                    fill={COLORS[index % COLORS.length]}
-                    radius={[3, 3, 0, 0]}
-                  />
-                ))}
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </ChartCard>
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="rounded-xl border border-sky-100 bg-gradient-to-br from-sky-50 to-white p-3.5 shadow-sm">
+          <p className="text-[11px] font-medium text-slate-500">Tổng Ticket Tiếp Nhận</p>
+          <p className="mt-1 text-xl font-black text-sky-700">{formatNumber(totalsSum)}</p>
+        </div>
+        <div className="rounded-xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-white p-3.5 shadow-sm">
+          <p className="text-[11px] font-medium text-slate-500">Tổng Ticket Đã Xử Lý</p>
+          <p className="mt-1 text-xl font-black text-emerald-700">{formatNumber(processedSum)}</p>
+        </div>
+        <div className="rounded-xl border border-amber-100 bg-gradient-to-br from-amber-50 to-white p-3.5 shadow-sm">
+          <p className="text-[11px] font-medium text-slate-500">Tỷ Lệ Xử Lý Thành Công</p>
+          <p className="mt-1 text-xl font-black text-amber-700">{processedRate}%</p>
+        </div>
+        <div className="rounded-xl border border-rose-100 bg-gradient-to-br from-rose-50 to-white p-3.5 shadow-sm">
+          <p className="text-[11px] font-medium text-slate-500">Tổng Ticket Hủy / Spam</p>
+          <p className="mt-1 text-xl font-black text-rose-600">{formatNumber(cancelledSum)}</p>
+        </div>
+      </div>
 
-        <ChartCard title="Spam / Đã hủy" description="So sánh ticket spam/hủy theo nguồn và tháng.">
-          <div className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={cancelledPivot.rows}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="name" tick={{ fontSize: 11, fontWeight: 600 }} />
+      <ChartCard
+        title={
+          selectedMonth
+            ? `Kết quả xử lý Ticket - ${selectedMonth}`
+            : "Xu hướng & Kết quả xử lý Ticket"
+        }
+        description={
+          selectedMonth
+            ? "Nhấp đúp hoặc bấm nút 'Quay lại' để xem xu hướng tất cả các tháng"
+            : "Nhấp đúp vào cột tháng bất kỳ để xem biểu đồ Donut chi tiết của tháng đó"
+        }
+        headerRight={
+          selectedMonth ? (
+            <button
+              type="button"
+              onClick={() => setSelectedMonth(null)}
+              className="flex items-center gap-1.5 rounded-md bg-sky-50 px-2.5 py-1 text-xs font-bold text-sky-700 hover:bg-sky-100 ring-1 ring-sky-200 transition-all shadow-2xs"
+            >
+              ← Quay lại các tháng
+            </button>
+          ) : undefined
+        }
+      >
+        <div className="h-[320px]">
+          <ResponsiveContainer width="100%" height="100%">
+            {selectedMonth ? (
+              <PieChart onDoubleClick={() => setSelectedMonth(null)}>
+                <Pie
+                  data={monthDonutData}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={55}
+                  outerRadius={85}
+                  paddingAngle={3}
+                  isAnimationActive={false}
+                  label={({ name, value, percent }) =>
+                    percent && percent >= 0.02 ? `${name}: ${formatNumber(value)} (${(percent * 100).toFixed(1)}%)` : ""
+                  }
+                >
+                  {monthDonutData.map((entry, index) => (
+                    <Cell key={index} fill={entry.color || COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip content={<ValueTooltip />} />
+                <Legend
+                  wrapperStyle={{ fontSize: 11 }}
+                  formatter={(value: string, entry: any) => {
+                    const item = entry.payload;
+                    const total = monthDonutData.reduce((acc, curr) => acc + curr.value, 0);
+                    const pct = total > 0 ? ((item.value / total) * 100).toFixed(1) : "0";
+                    return `${value}: ${formatNumber(item.value)} (${pct}%)`;
+                  }}
+                />
+              </PieChart>
+            ) : (
+              <ComposedChart
+                data={rawData}
+                onDoubleClick={handleChartClick}
+                onClick={handleChartClick}
+                className="cursor-pointer"
+              >
+                <defs>
+                  <linearGradient id="totalGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#0097cf" stopOpacity={0.25} />
+                    <stop offset="95%" stopColor="#0097cf" stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis dataKey="label" tick={{ fontSize: 11, fontWeight: 600 }} />
                 <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
                 <Tooltip content={<ValueTooltip />} />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-                {cancelledPivot.months.map((month, index) => (
-                  <Bar
-                    isAnimationActive={false}
-                    key={month}
-                    dataKey={month}
-                    name={month}
-                    fill={COLORS[index % COLORS.length]}
-                    radius={[3, 3, 0, 0]}
-                  />
-                ))}
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </ChartCard>
+                <Legend wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
+                <Area type="monotone" dataKey="total" name="Tổng ticket tiếp nhận" fill="url(#totalGradient)" stroke="#0097cf" strokeWidth={2} isAnimationActive={false} />
+                <Bar dataKey="processed" name="Đã xử lý" fill="#10b981" radius={[4, 4, 0, 0]} barSize={28} isAnimationActive={false}>
+                  <LabelList dataKey="processed" position="top" style={{ fontSize: 10, fill: '#475569', fontWeight: 600 }} />
+                </Bar>
+                <Line type="monotone" dataKey="cancelled" name="Spam / Đã hủy" stroke="#ef4444" strokeWidth={2.5} dot={{ r: 4, fill: "#ef4444" }} isAnimationActive={false} />
+              </ComposedChart>
+            )}
+          </ResponsiveContainer>
+        </div>
+      </ChartCard>
     </div>
   );
 }
 
-function CategoryAnalysisCharts({ charts }: { charts: CccCharts }) {
-  const items = charts.report_category || [];
-
-  if (isEmpty(items)) {
-    return <EmptyState message="Không có dữ liệu phân tích theo danh mục." />;
-  }
-
-  const processedPivot = pivotByMonth(
-    items,
-    getCategoryName,
-    (item) => item.month_label || item.period_label || String(item.month_key || ""),
-    (item) => item.processed ?? item.resolved ?? 0
-  );
-
-  const cancelledPivot = pivotByMonth(
-    items,
-    getCategoryName,
-    (item) => item.month_label || item.period_label || String(item.month_key || ""),
-    (item) => item.cancelled || 0
-  );
+/* ====================================================================
+ * 2. PHÂN TÍCH THEO NGUỒN TIẾP NHẬN
+ * ==================================================================== */
+function SourceDonutChartCard({ items, globalViewMode }: { items: any[]; globalViewMode?: ChartViewMode }) {
+  const donutData = useMemo(() => {
+    return aggregateTotalOverall(items, getSourceName, (item) => (item.processed ?? item.resolved ?? 0) + (item.cancelled || 0));
+  }, [items]);
 
   return (
-    <div className="grid gap-4 xl:grid-cols-2">
-      <ChartCard
-        title="Ticket đã xử lý theo danh mục"
-        description="Stacked bar theo tháng, trừ ticket khảo sát eKYC/spam."
-      >
-        <div className="h-[360px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={processedPivot.rows}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+    <ChartCard
+      title="Tỷ trọng Ticket theo Nguồn"
+      description="Cơ cấu tổng lượng ticket từ các kênh tiếp nhận"
+      className="xl:col-span-5"
+    >
+      <div className="h-[320px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={donutData}
+              dataKey="value"
+              nameKey="name"
+              cx="50%"
+              cy="50%"
+              innerRadius={55}
+              outerRadius={85}
+              paddingAngle={3}
+              isAnimationActive={false}
+              label={({ name, value, percent }) =>
+                percent && percent >= 0.02 ? `${name}: ${formatNumber(value)} (${(percent * 100).toFixed(1)}%)` : ""
+              }
+            >
+              {donutData.map((_, index) => (
+                <Cell key={index} fill={COLORS[index % COLORS.length]} />
+              ))}
+            </Pie>
+            <Tooltip content={<ValueTooltip />} />
+            <Legend
+              wrapperStyle={{ fontSize: 11 }}
+              formatter={(value: string, entry: any) => {
+                const item = entry.payload;
+                const total = donutData.reduce((acc, curr) => acc + curr.value, 0);
+                const pct = total > 0 ? ((item.value / total) * 100).toFixed(1) : "0";
+                return `${value}: ${formatNumber(item.value)} (${pct}%)`;
+              }}
+            />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+    </ChartCard>
+  );
+}
+
+function SourceTrendChartCard({ items, globalViewMode }: { items: any[]; globalViewMode?: ChartViewMode }) {
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+
+  const percentPivot = useMemo(() => pivot100PercentStacked(items, getSourceName, (i) => i.month_label || i.period_label || String(i.month_key || ""), (i) => i.processed ?? i.resolved ?? 0), [items]);
+
+  const monthDonutData = useMemo(() => {
+    if (!selectedMonth) return [];
+    const filtered = items.filter((i) => isSameMonth(i, selectedMonth));
+    return aggregateTotalOverall(filtered, getSourceName, (item) => (item.processed ?? item.resolved ?? 0));
+  }, [items, selectedMonth]);
+
+  const handleChartClick = (state: any) => {
+    if (state && state.activeLabel) {
+      setSelectedMonth(state.activeLabel);
+    }
+  };
+
+  return (
+    <ChartCard
+      title={
+        selectedMonth
+          ? `Tỷ trọng Nguồn Ticket - ${selectedMonth}`
+          : "Tỷ trọng Ticket đã xử lý theo Nguồn (Miền xếp chồng 100%)"
+      }
+      description={
+        selectedMonth
+          ? "Nhấp đúp hoặc bấm 'Quay lại' để xem xu hướng các tháng"
+          : "Nhấp đúp vào điểm/cột tháng để xem biểu đồ Donut chi tiết của tháng đó"
+      }
+      className="xl:col-span-7"
+      headerRight={
+        selectedMonth ? (
+          <button
+            type="button"
+            onClick={() => setSelectedMonth(null)}
+            className="flex items-center gap-1.5 rounded-md bg-sky-50 px-2.5 py-1 text-xs font-bold text-sky-700 hover:bg-sky-100 ring-1 ring-sky-200 transition-all shadow-2xs"
+          >
+            ← Quay lại các tháng
+          </button>
+        ) : undefined
+      }
+    >
+      <div className="h-[320px]">
+        <ResponsiveContainer width="100%" height="100%">
+          {selectedMonth ? (
+            <PieChart onDoubleClick={() => setSelectedMonth(null)}>
+              <Pie
+                data={monthDonutData}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                innerRadius={55}
+                outerRadius={85}
+                paddingAngle={3}
+                isAnimationActive={false}
+                label={({ name, value, percent }) =>
+                  percent && percent >= 0.02 ? `${name}: ${formatNumber(value)} (${(percent * 100).toFixed(1)}%)` : ""
+                }
+              >
+                {monthDonutData.map((_, index) => (
+                  <Cell key={index} fill={COLORS[index % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip content={<ValueTooltip />} />
+              <Legend
+                wrapperStyle={{ fontSize: 11 }}
+                formatter={(value: string, entry: any) => {
+                  const item = entry.payload;
+                  const total = monthDonutData.reduce((acc, curr) => acc + curr.value, 0);
+                  const pct = total > 0 ? ((item.value / total) * 100).toFixed(1) : "0";
+                  return `${value}: ${formatNumber(item.value)} (${pct}%)`;
+                }}
+              />
+            </PieChart>
+          ) : (
+            <AreaChart
+              data={percentPivot.rows}
+              margin={{ left: 10, right: 20, top: 10, bottom: 10 }}
+              onDoubleClick={handleChartClick}
+              onClick={handleChartClick}
+              className="cursor-pointer"
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis dataKey="month" tick={{ fontSize: 11, fontWeight: 600 }} />
+              <YAxis tickFormatter={(v) => `${v}%`} domain={[0, 100]} tick={{ fontSize: 11 }} />
+              <Tooltip content={<PercentTooltip />} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              {percentPivot.dimensions.map((source, index) => (
+                <Area key={source} type="monotone" dataKey={source} name={source} stackId="1" stroke={COLORS[index % COLORS.length]} fill={COLORS[index % COLORS.length]} isAnimationActive={false} />
+              ))}
+            </AreaChart>
+          )}
+        </ResponsiveContainer>
+      </div>
+    </ChartCard>
+  );
+}
+
+function SourceAnalysisCharts({ charts, globalViewMode }: { charts: CccCharts; globalViewMode?: ChartViewMode }) {
+  const items = charts.report_source || [];
+  if (isEmpty(items)) return <EmptyState message="Không có dữ liệu phân tích theo nguồn." />;
+
+  return (
+    <div className="grid gap-4 xl:grid-cols-12">
+      <SourceDonutChartCard items={items} globalViewMode={globalViewMode} />
+      <SourceTrendChartCard items={items} globalViewMode={globalViewMode} />
+    </div>
+  );
+}
+
+/* ====================================================================
+ * 3. PHÂN TÍCH THEO DANH MỤC
+ * ==================================================================== */
+function CategoryProcessedChartCard({ items, globalViewMode }: { items: any[]; globalViewMode?: ChartViewMode }) {
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+
+  const processedPivot = useMemo(
+    () =>
+      pivotByMonth(
+        items,
+        getCategoryName,
+        (i) => i.month_label || i.period_label || String(i.month_key || ""),
+        (i) => i.processed ?? i.resolved ?? 0
+      ),
+    [items]
+  );
+
+  const monthDonutData = useMemo(() => {
+    if (!selectedMonth) return [];
+    const filtered = items.filter((i) => isSameMonth(i, selectedMonth));
+    return aggregateTotalOverall(filtered, getCategoryName, (item) => item.processed ?? item.resolved ?? 0);
+  }, [items, selectedMonth]);
+
+  const handleChartClick = (state: any) => {
+    if (state && state.activeLabel) {
+      setSelectedMonth(state.activeLabel);
+    }
+  };
+
+  return (
+    <ChartCard
+      title={
+        selectedMonth
+          ? `Tỷ trọng Ticket đã xử lý - ${selectedMonth}`
+          : "Ticket đã xử lý theo Danh mục"
+      }
+      description={
+        selectedMonth
+          ? "Nhấp đúp vào biểu đồ hoặc bấm nút 'Quay lại' để xem tất cả các tháng"
+          : "Nhấp đúp vào cột tháng bất kỳ để xem biểu đồ Donut chi tiết của tháng đó"
+      }
+      headerRight={
+        selectedMonth ? (
+          <button
+            type="button"
+            onClick={() => setSelectedMonth(null)}
+            className="flex items-center gap-1.5 rounded-md bg-sky-50 px-2.5 py-1 text-xs font-bold text-sky-700 hover:bg-sky-100 ring-1 ring-sky-200 transition-all shadow-2xs"
+          >
+            ← Quay lại các tháng
+          </button>
+        ) : undefined
+      }
+    >
+      <div className="h-[340px]">
+        <ResponsiveContainer width="100%" height="100%">
+          {selectedMonth ? (
+            <PieChart onDoubleClick={() => setSelectedMonth(null)}>
+              <Pie
+                data={monthDonutData}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                innerRadius={55}
+                outerRadius={85}
+                paddingAngle={3}
+                isAnimationActive={false}
+                label={({ name, value, percent }) =>
+                  percent && percent >= 0.02 ? `${name}: ${formatNumber(value)} (${(percent * 100).toFixed(1)}%)` : ""
+                }
+              >
+                {monthDonutData.map((_, index) => (
+                  <Cell key={index} fill={COLORS[index % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip content={<ValueTooltip />} />
+              <Legend
+                wrapperStyle={{ fontSize: 11 }}
+                formatter={(value: string, entry: any) => {
+                  const item = entry.payload;
+                  const total = monthDonutData.reduce((acc, curr) => acc + curr.value, 0);
+                  const pct = total > 0 ? ((item.value / total) * 100).toFixed(1) : "0";
+                  return `${value}: ${formatNumber(item.value)} (${pct}%)`;
+                }}
+              />
+            </PieChart>
+          ) : (
+            <BarChart
+              data={processedPivot.rows}
+              onDoubleClick={handleChartClick}
+              onClick={handleChartClick}
+              className="cursor-pointer"
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
               <XAxis dataKey="month" tick={{ fontSize: 11, fontWeight: 600 }} />
               <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
               <Tooltip content={<ValueTooltip />} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               {processedPivot.dimensions.map((dimension, index) => (
-                <Bar
-                  isAnimationActive={false}
-                  key={dimension}
-                  dataKey={dimension}
-                  name={dimension}
-                  stackId="processed"
-                  fill={COLORS[index % COLORS.length]}
-                />
+                <Bar key={dimension} dataKey={dimension} name={dimension} stackId="processed" fill={COLORS[index % COLORS.length]} isAnimationActive={false}>
+                  <LabelList dataKey={dimension} position="center" style={{ fontSize: 9, fill: "#ffffff", fontWeight: 700 }} formatter={(val: any) => (val && Number(val) > 0 ? val : "")} />
+                </Bar>
               ))}
             </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </ChartCard>
+          )}
+        </ResponsiveContainer>
+      </div>
+    </ChartCard>
+  );
+}
 
-      <ChartCard
-        title="Spam / Đã hủy theo danh mục"
-        description="Stacked bar theo danh mục và tháng."
-      >
-        <div className="h-[360px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={cancelledPivot.rows}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+function CategoryCancelledChartCard({ items, globalViewMode }: { items: any[]; globalViewMode?: ChartViewMode }) {
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+
+  const cancelledPivot = useMemo(
+    () =>
+      pivotByMonth(
+        items,
+        getCategoryName,
+        (i) => i.month_label || i.period_label || String(i.month_key || ""),
+        (i) => i.cancelled || 0
+      ),
+    [items]
+  );
+
+  const monthDonutData = useMemo(() => {
+    if (!selectedMonth) return [];
+    const filtered = items.filter((i) => isSameMonth(i, selectedMonth));
+    return aggregateTotalOverall(filtered, getCategoryName, (item) => item.cancelled || 0);
+  }, [items, selectedMonth]);
+
+  const handleChartClick = (state: any) => {
+    if (state && state.activeLabel) {
+      setSelectedMonth(state.activeLabel);
+    }
+  };
+
+  return (
+    <ChartCard
+      title={
+        selectedMonth
+          ? `Tỷ trọng Spam / Đã hủy - ${selectedMonth}`
+          : "Spam / Đã hủy theo Danh mục"
+      }
+      description={
+        selectedMonth
+          ? "Nhấp đúp vào biểu đồ hoặc bấm nút 'Quay lại' để xem tất cả các tháng"
+          : "Nhấp đúp vào cột tháng bất kỳ để xem biểu đồ Donut chi tiết của tháng đó"
+      }
+      headerRight={
+        selectedMonth ? (
+          <button
+            type="button"
+            onClick={() => setSelectedMonth(null)}
+            className="flex items-center gap-1.5 rounded-md bg-sky-50 px-2.5 py-1 text-xs font-bold text-sky-700 hover:bg-sky-100 ring-1 ring-sky-200 transition-all shadow-2xs"
+          >
+            ← Quay lại các tháng
+          </button>
+        ) : undefined
+      }
+    >
+      <div className="h-[340px]">
+        <ResponsiveContainer width="100%" height="100%">
+          {selectedMonth ? (
+            <PieChart onDoubleClick={() => setSelectedMonth(null)}>
+              <Pie
+                data={monthDonutData}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                innerRadius={55}
+                outerRadius={85}
+                paddingAngle={3}
+                isAnimationActive={false}
+                label={({ name, value, percent }) =>
+                  percent && percent >= 0.02 ? `${name}: ${formatNumber(value)} (${(percent * 100).toFixed(1)}%)` : ""
+                }
+              >
+                {monthDonutData.map((_, index) => (
+                  <Cell key={index} fill={COLORS[index % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip content={<ValueTooltip />} />
+              <Legend
+                wrapperStyle={{ fontSize: 11 }}
+                formatter={(value: string, entry: any) => {
+                  const item = entry.payload;
+                  const total = monthDonutData.reduce((acc, curr) => acc + curr.value, 0);
+                  const pct = total > 0 ? ((item.value / total) * 100).toFixed(1) : "0";
+                  return `${value}: ${formatNumber(item.value)} (${pct}%)`;
+                }}
+              />
+            </PieChart>
+          ) : (
+            <BarChart
+              data={cancelledPivot.rows}
+              onDoubleClick={handleChartClick}
+              onClick={handleChartClick}
+              className="cursor-pointer"
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
               <XAxis dataKey="month" tick={{ fontSize: 11, fontWeight: 600 }} />
               <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
               <Tooltip content={<ValueTooltip />} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               {cancelledPivot.dimensions.map((dimension, index) => (
-                <Bar
-                  isAnimationActive={false}
-                  key={dimension}
-                  dataKey={dimension}
-                  name={dimension}
-                  stackId="cancelled"
-                  fill={COLORS[index % COLORS.length]}
-                />
+                <Bar key={dimension} dataKey={dimension} name={dimension} stackId="cancelled" fill={COLORS[index % COLORS.length]} isAnimationActive={false}>
+                  <LabelList dataKey={dimension} position="center" style={{ fontSize: 9, fill: "#ffffff", fontWeight: 700 }} formatter={(val: any) => (val && Number(val) > 0 ? val : "")} />
+                </Bar>
               ))}
             </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </ChartCard>
-    </div>
+          )}
+        </ResponsiveContainer>
+      </div>
+    </ChartCard>
   );
 }
 
-function UnitAnalysisCharts({ charts }: { charts: CccCharts }) {
-  const items = charts.report_unit || [];
-
-  if (isEmpty(items)) {
-    return <EmptyState message="Không có dữ liệu phân tích theo đơn vị xử lý." />;
-  }
+function CategoryAnalysisCharts({ charts, globalViewMode }: { charts: CccCharts; globalViewMode?: ChartViewMode }) {
+  const items = charts.report_category || [];
+  if (isEmpty(items)) return <EmptyState message="Không có dữ liệu phân tích theo danh mục." />;
 
   return (
     <div className="grid gap-4 xl:grid-cols-2">
-      <ChartCard
-        title="Ticket đã xử lý theo đơn vị xử lý"
-        description="Tách ticket do TT.CSKH xử lý và ticket chuyển PBLQ."
-      >
-        <div className="h-[310px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={items}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="month_label" tick={{ fontSize: 11, fontWeight: 600 }} />
-              <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-              <Tooltip content={<ValueTooltip />} />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Bar isAnimationActive={false} dataKey="cs_processed" name="Ticket xử lý bởi TT.CSKH" fill="#5ca05a" radius={[4, 4, 0, 0]}>
-                <LabelList dataKey="cs_processed" position="top" style={{ fontSize: 10, fill: '#64748b' }} />
-              </Bar>
-              <Bar isAnimationActive={false} dataKey="related_processed" name="Ticket chuyển đến PBLQ xử lý" fill="#ff9466" radius={[4, 4, 0, 0]}>
-                <LabelList dataKey="related_processed" position="top" style={{ fontSize: 10, fill: '#64748b' }} />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </ChartCard>
-
-      <ChartCard
-        title="Spam / Đã hủy theo đơn vị xử lý"
-        description="Ticket hủy/spam do CS hoặc PBLQ xử lý."
-      >
-        <div className="h-[310px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={items}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="month_label" tick={{ fontSize: 11, fontWeight: 600 }} />
-              <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-              <Tooltip content={<ValueTooltip />} />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Bar isAnimationActive={false} dataKey="cs_cancelled" name="Ticket xử lý bởi TT.CSKH" fill="#0072bc" radius={[4, 4, 0, 0]}>
-                <LabelList dataKey="cs_cancelled" position="top" style={{ fontSize: 10, fill: '#64748b' }} />
-              </Bar>
-              <Bar isAnimationActive={false} dataKey="related_cancelled" name="Ticket chuyển đến PBLQ xử lý" fill="#ffc84a" radius={[4, 4, 0, 0]}>
-                <LabelList dataKey="related_cancelled" position="top" style={{ fontSize: 10, fill: '#64748b' }} />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </ChartCard>
+      <CategoryProcessedChartCard items={items} globalViewMode={globalViewMode} />
+      <CategoryCancelledChartCard items={items} globalViewMode={globalViewMode} />
     </div>
   );
 }
 
-function TimeChart({
+/* ====================================================================
+ * 4. PHÂN TÍCH ĐƠN VỊ XỬ LÝ
+ * ==================================================================== */
+function UnitProcessedChartCard({ items, globalViewMode }: { items: any[]; globalViewMode?: ChartViewMode }) {
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+
+  const monthDonutData = useMemo(() => {
+    if (!selectedMonth) return [];
+    const item = items.find((i) => isSameMonth(i, selectedMonth));
+    if (!item) return [];
+    return [
+      { name: "TT.CSKH trực tiếp xử lý", value: item.cs_processed || 0, color: "#10b981" },
+      { name: "Chuyển PBLQ phối hợp", value: item.related_processed || 0, color: "#f59e0b" },
+    ];
+  }, [items, selectedMonth]);
+
+  const handleChartClick = (state: any) => {
+    if (state && state.activeLabel) {
+      setSelectedMonth(state.activeLabel);
+    }
+  };
+
+  return (
+    <ChartCard
+      title={
+        selectedMonth
+          ? `Ticket đã xử lý theo Đơn vị - ${selectedMonth}`
+          : "Ticket đã xử lý theo Đơn vị"
+      }
+      description={
+        selectedMonth
+          ? "Nhấp đúp vào biểu đồ hoặc bấm nút 'Quay lại' để xem tất cả các tháng"
+          : "Nhấp đúp vào cột tháng bất kỳ để xem biểu đồ Donut chi tiết của tháng đó"
+      }
+      headerRight={
+        selectedMonth ? (
+          <button
+            type="button"
+            onClick={() => setSelectedMonth(null)}
+            className="flex items-center gap-1.5 rounded-md bg-sky-50 px-2.5 py-1 text-xs font-bold text-sky-700 hover:bg-sky-100 ring-1 ring-sky-200 transition-all shadow-2xs"
+          >
+            ← Quay lại các tháng
+          </button>
+        ) : undefined
+      }
+    >
+      <div className="h-[310px]">
+        <ResponsiveContainer width="100%" height="100%">
+          {selectedMonth ? (
+            <PieChart onDoubleClick={() => setSelectedMonth(null)}>
+              <Pie
+                data={monthDonutData}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                innerRadius={55}
+                outerRadius={85}
+                paddingAngle={3}
+                isAnimationActive={false}
+                label={({ name, value, percent }) =>
+                  percent && percent >= 0.02 ? `${name}: ${formatNumber(value)} (${(percent * 100).toFixed(1)}%)` : ""
+                }
+              >
+                {monthDonutData.map((entry, index) => (
+                  <Cell key={index} fill={entry.color || COLORS[index % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip content={<ValueTooltip />} />
+              <Legend
+                wrapperStyle={{ fontSize: 11 }}
+                formatter={(value: string, entry: any) => {
+                  const item = entry.payload;
+                  const total = monthDonutData.reduce((acc, curr) => acc + curr.value, 0);
+                  const pct = total > 0 ? ((item.value / total) * 100).toFixed(1) : "0";
+                  return `${value}: ${formatNumber(item.value)} (${pct}%)`;
+                }}
+              />
+            </PieChart>
+          ) : (
+            <BarChart
+              data={items}
+              onDoubleClick={handleChartClick}
+              onClick={handleChartClick}
+              className="cursor-pointer"
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis dataKey="month_label" tick={{ fontSize: 11, fontWeight: 600 }} />
+              <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+              <Tooltip content={<ValueTooltip />} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Bar dataKey="cs_processed" name="TT.CSKH trực tiếp xử lý" fill="#10b981" radius={[4, 4, 0, 0]} isAnimationActive={false}>
+                <LabelList dataKey="cs_processed" position="top" style={{ fontSize: 10, fill: '#475569', fontWeight: 600 }} />
+              </Bar>
+              <Bar dataKey="related_processed" name="Chuyển PBLQ phối hợp" fill="#f59e0b" radius={[4, 4, 0, 0]} isAnimationActive={false}>
+                <LabelList dataKey="related_processed" position="top" style={{ fontSize: 10, fill: '#475569', fontWeight: 600 }} />
+              </Bar>
+            </BarChart>
+          )}
+        </ResponsiveContainer>
+      </div>
+    </ChartCard>
+  );
+}
+
+function UnitCancelledChartCard({ items, globalViewMode }: { items: any[]; globalViewMode?: ChartViewMode }) {
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+
+  const monthDonutData = useMemo(() => {
+    if (!selectedMonth) return [];
+    const item = items.find((i) => isSameMonth(i, selectedMonth));
+    if (!item) return [];
+    return [
+      { name: "TT.CSKH ghi nhận", value: item.cs_cancelled || 0, color: "#0097cf" },
+      { name: "PBLQ ghi nhận", value: item.related_cancelled || 0, color: "#ef4444" },
+    ];
+  }, [items, selectedMonth]);
+
+  const handleChartClick = (state: any) => {
+    if (state && state.activeLabel) {
+      setSelectedMonth(state.activeLabel);
+    }
+  };
+
+  return (
+    <ChartCard
+      title={
+        selectedMonth
+          ? `Spam / Hủy theo Đơn vị - ${selectedMonth}`
+          : "Spam / Đã hủy theo Đơn vị xử lý"
+      }
+      description={
+        selectedMonth
+          ? "Nhấp đúp vào biểu đồ hoặc bấm nút 'Quay lại' để xem tất cả các tháng"
+          : "Nhấp đúp vào cột tháng bất kỳ để xem biểu đồ Donut chi tiết của tháng đó"
+      }
+      headerRight={
+        selectedMonth ? (
+          <button
+            type="button"
+            onClick={() => setSelectedMonth(null)}
+            className="flex items-center gap-1.5 rounded-md bg-sky-50 px-2.5 py-1 text-xs font-bold text-sky-700 hover:bg-sky-100 ring-1 ring-sky-200 transition-all shadow-2xs"
+          >
+            ← Quay lại các tháng
+          </button>
+        ) : undefined
+      }
+    >
+      <div className="h-[310px]">
+        <ResponsiveContainer width="100%" height="100%">
+          {selectedMonth ? (
+            <PieChart onDoubleClick={() => setSelectedMonth(null)}>
+              <Pie
+                data={monthDonutData}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                innerRadius={55}
+                outerRadius={85}
+                paddingAngle={3}
+                isAnimationActive={false}
+                label={({ name, value, percent }) =>
+                  percent && percent >= 0.02 ? `${name}: ${formatNumber(value)} (${(percent * 100).toFixed(1)}%)` : ""
+                }
+              >
+                {monthDonutData.map((entry, index) => (
+                  <Cell key={index} fill={entry.color || COLORS[index % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip content={<ValueTooltip />} />
+              <Legend
+                wrapperStyle={{ fontSize: 11 }}
+                formatter={(value: string, entry: any) => {
+                  const item = entry.payload;
+                  const total = monthDonutData.reduce((acc, curr) => acc + curr.value, 0);
+                  const pct = total > 0 ? ((item.value / total) * 100).toFixed(1) : "0";
+                  return `${value}: ${formatNumber(item.value)} (${pct}%)`;
+                }}
+              />
+            </PieChart>
+          ) : (
+            <BarChart
+              data={items}
+              onDoubleClick={handleChartClick}
+              onClick={handleChartClick}
+              className="cursor-pointer"
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis dataKey="month_label" tick={{ fontSize: 11, fontWeight: 600 }} />
+              <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+              <Tooltip content={<ValueTooltip />} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Bar dataKey="cs_cancelled" name="TT.CSKH ghi nhận" fill="#0097cf" radius={[4, 4, 0, 0]} isAnimationActive={false}>
+                <LabelList dataKey="cs_cancelled" position="top" style={{ fontSize: 10, fill: '#475569', fontWeight: 600 }} />
+              </Bar>
+              <Bar dataKey="related_cancelled" name="PBLQ ghi nhận" fill="#ef4444" radius={[4, 4, 0, 0]} isAnimationActive={false}>
+                <LabelList dataKey="related_cancelled" position="top" style={{ fontSize: 10, fill: '#475569', fontWeight: 600 }} />
+              </Bar>
+            </BarChart>
+          )}
+        </ResponsiveContainer>
+      </div>
+    </ChartCard>
+  );
+}
+
+function UnitAnalysisCharts({ charts, globalViewMode }: { charts: CccCharts; globalViewMode?: ChartViewMode }) {
+  const items = charts.report_unit || [];
+  if (isEmpty(items)) return <EmptyState message="Không có dữ liệu phân tích theo đơn vị xử lý." />;
+
+  return (
+    <div className="grid gap-4 xl:grid-cols-2">
+      <UnitProcessedChartCard items={items} globalViewMode={globalViewMode} />
+      <UnitCancelledChartCard items={items} globalViewMode={globalViewMode} />
+    </div>
+  );
+}
+
+/* ====================================================================
+ * 5. THỜI GIAN XỬ LÝ TRUNG BÌNH
+ * ==================================================================== */
+function SingleTimeChartCard({
   title,
   items,
+  globalViewMode,
   currentLabel = "Tháng hiện tại",
   previousLabel = "Tháng trước",
 }: {
   title: string;
   items: CccDashboardReportTimeCategoryItem[];
+  globalViewMode?: ChartViewMode;
   currentLabel?: string;
   previousLabel?: string;
 }) {
@@ -482,20 +1014,224 @@ function TimeChart({
   }));
 
   return (
-    <ChartCard title={title} description="ĐVT: ngày xử lý. Benchmark tham chiếu: 1–3 ngày tùy luồng.">
+    <ChartCard
+      title={title}
+      description="Đơn vị: Ngày hoặc Giờ/Phút nếu < 1 ngày. So sánh xu hướng rút ngắn thời gian xử lý qua 2 kỳ."
+    >
       <div className="h-[320px]">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+          <LineChart data={data} margin={{ left: 10, right: 20 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
             <XAxis dataKey="category_name" tick={{ fontSize: 10, fontWeight: 600 }} />
             <YAxis tick={{ fontSize: 11 }} />
             <Tooltip content={<DaysTooltip />} />
             <Legend wrapperStyle={{ fontSize: 11 }} />
-            <Bar isAnimationActive={false} dataKey="previous_avg_days" name={previousLabel} fill="#7c8f22" radius={[4, 4, 0, 0]}>
-              <LabelList dataKey="previous_avg_days" position="top" style={{ fontSize: 10, fill: '#64748b' }} />
+            <Line type="monotone" dataKey="previous_avg_days" name={previousLabel} stroke="#64748b" strokeDasharray="4 4" strokeWidth={2} dot={{ r: 4 }} isAnimationActive={false} />
+            <Line type="monotone" dataKey="current_avg_days" name={currentLabel} stroke="#f59e0b" strokeWidth={3} dot={{ r: 5, fill: "#f59e0b" }} isAnimationActive={false} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </ChartCard>
+  );
+}
+
+function TimeAnalysisCharts({ charts, globalViewMode }: { charts: CccCharts; globalViewMode?: ChartViewMode }) {
+  const time = charts.report_time;
+
+  return (
+    <div className="grid gap-4 xl:grid-cols-2">
+      <SingleTimeChartCard title="Thời gian trung bình CS xử lý tiếp nhận" items={time?.cs_by_category || []} globalViewMode={globalViewMode} />
+      <SingleTimeChartCard title="Thời gian trung bình phối hợp CS & PBLQ" items={time?.related_by_category || []} globalViewMode={globalViewMode} />
+    </div>
+  );
+}
+
+/* ====================================================================
+ * 6. KẾT QUẢ SLA
+ * ==================================================================== */
+function SlaGaugeChartCard({ monthly, globalViewMode }: { monthly: any[]; globalViewMode?: ChartViewMode }) {
+  const totalSla = monthly.reduce((acc, curr) => acc + (curr.total_sla || 0), 0);
+  const onTimeSla = monthly.reduce((acc, curr) => acc + (curr.on_time || 0), 0);
+  const overdueSla = monthly.reduce((acc, curr) => acc + (curr.overdue || 0), 0);
+  const slaComplianceRate = totalSla > 0 ? ((onTimeSla / totalSla) * 100).toFixed(1) : "0";
+
+  const slaGaugeData = [
+    { name: "Đúng hạn (On-time)", value: onTimeSla, color: "#0097cf" },
+    { name: "Trễ hạn (Overdue)", value: overdueSla, color: "#ef4444" },
+  ];
+
+  return (
+    <ChartCard
+      title="Tỷ lệ Tuân thủ SLA"
+      description="Đánh giá chất lượng cam kết thời gian đáp ứng"
+      headerRight={
+        <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700 ring-1 ring-sky-200">
+          SLA Rate: {slaComplianceRate}%
+        </span>
+      }
+    >
+      {isEmpty(monthly) ? (
+        <EmptyState message="Không có ticket có SLA." />
+      ) : (
+        <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
+          <div className="relative h-[240px] w-full sm:w-1/2">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={slaGaugeData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={85} startAngle={180} endAngle={0} paddingAngle={3} isAnimationActive={false}>
+                  {slaGaugeData.map((entry, index) => (
+                    <Cell key={index} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip content={<ValueTooltip />} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="absolute inset-0 flex flex-col items-center justify-end pb-8">
+              <span className="text-2xl font-black text-slate-800">{slaComplianceRate}%</span>
+              <span className="text-[11px] font-medium text-slate-500">Đạt SLA</span>
+            </div>
+          </div>
+
+          <div className="w-full space-y-2.5 sm:w-1/2">
+            <div className="rounded-lg border border-sky-100 bg-sky-50/50 p-3">
+              <div className="flex items-center justify-between text-xs font-semibold text-sky-800">
+                <span>Không trễ hạn</span>
+                <span>{formatNumber(onTimeSla)} ticket ({totalSla > 0 ? ((onTimeSla / totalSla) * 100).toFixed(1) : 0}%)</span>
+              </div>
+            </div>
+            <div className="rounded-lg border border-rose-100 bg-rose-50/50 p-3">
+              <div className="flex items-center justify-between text-xs font-semibold text-rose-800">
+                <span>Trễ hạn</span>
+                <span>{formatNumber(overdueSla)} ticket ({totalSla > 0 ? ((overdueSla / totalSla) * 100).toFixed(1) : 0}%)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </ChartCard>
+  );
+}
+
+function SlaCategoryOverdueChartCard({ category, globalViewMode }: { category: any[]; globalViewMode?: ChartViewMode }) {
+  return (
+    <ChartCard
+      title="Phân loại Ticket Trễ hạn theo Danh mục"
+      description="Nhận diện các mảng dịch vụ phát sinh quá hạn SLA nhiều nhất"
+    >
+      {isEmpty(category) ? (
+        <EmptyState message="Không phát sinh ticket trễ hạn." />
+      ) : (
+        <div className="h-[260px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={category} layout="vertical" margin={{ left: 10, right: 30 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis type="number" tick={{ fontSize: 11 }} />
+              <YAxis dataKey="category_name" type="category" tick={{ fontSize: 10, fontWeight: 600 }} width={120} />
+              <Tooltip content={<ValueTooltip />} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Bar dataKey="not_overdue" name="Không trễ hạn" fill="#0097cf" stackId="sla" isAnimationActive={false} />
+              <Bar dataKey="overdue" name="Trễ hạn" fill="#ef4444" stackId="sla" radius={[0, 4, 4, 0]} isAnimationActive={false}>
+                <LabelList dataKey="overdue" position="right" style={{ fontSize: 10, fill: '#ef4444', fontWeight: 700 }} formatter={(v: any) => (v && Number(v) > 0 ? v : "")} />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+    </ChartCard>
+  );
+}
+
+function SlaUnitOverdueTableCard({ unitMonth, globalViewMode }: { unitMonth: any[]; globalViewMode?: ChartViewMode }) {
+  return (
+    <ChartCard
+      title="Thống kê Ticket Trễ hạn theo Đơn vị"
+      description="Bảng theo dõi chi tiết số lượng ticket trễ hạn phân bổ theo từng đơn vị xử lý"
+    >
+      {isEmpty(unitMonth) ? (
+        <EmptyState message="Không có tác vụ PBLQ trễ hạn trong khoảng thời gian này." />
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px] text-left text-xs">
+            <thead className="bg-slate-50 text-slate-700">
+              <tr>
+                <th className="px-4 py-2.5 font-bold">Tháng</th>
+                <th className="px-4 py-2.5 font-bold">Đơn vị xử lý</th>
+                <th className="px-4 py-2.5 text-right font-bold">Số ticket trễ hạn</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {unitMonth.map((item, index) => (
+                <tr key={`${item.month_key}-${item.unit_name}-${index}`} className="hover:bg-slate-50/80">
+                  <td className="px-4 py-2.5 font-semibold text-slate-700">{item.month_label}</td>
+                  <td className="px-4 py-2.5 text-slate-600">{item.unit_name}</td>
+                  <td className="px-4 py-2.5 text-right font-bold text-rose-600">{formatNumber(item.overdue)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </ChartCard>
+  );
+}
+
+function SlaCharts({ charts, globalViewMode }: { charts: CccCharts; globalViewMode?: ChartViewMode }) {
+  const sla = charts.report_sla;
+  if (!sla) return <EmptyState message="Không có dữ liệu SLA." />;
+
+  return (
+    <div className="grid gap-4 xl:grid-cols-2">
+      <SlaGaugeChartCard monthly={sla.monthly || []} globalViewMode={globalViewMode} />
+      <SlaCategoryOverdueChartCard category={sla.overdue_by_category || []} globalViewMode={globalViewMode} />
+      <SlaUnitOverdueTableCard unitMonth={sla.overdue_by_unit_month || []} globalViewMode={globalViewMode} />
+    </div>
+  );
+}
+
+function EmployeeRankedChartCard({ itemsSorted, globalViewMode }: { itemsSorted: any[]; globalViewMode?: ChartViewMode }) {
+  const displayData = useMemo(() => {
+    const map = new Map<string, any>();
+    for (const item of itemsSorted) {
+      const name = item.employee_name;
+      if (!map.has(name)) {
+        map.set(name, { employee_name: name, processed: 0, related_processed: 0, cancelled: 0, ekyc: 0, total: 0 });
+      }
+      const existing = map.get(name)!;
+      existing.processed += item.processed || 0;
+      existing.related_processed += item.related_processed || 0;
+      existing.cancelled += item.cancelled || 0;
+      existing.ekyc += item.ekyc || 0;
+      existing.total += item.total || 0;
+    }
+
+    return Array.from(map.values())
+      .sort((a, b) => b.processed - a.processed)
+      .slice(0, 15);
+  }, [itemsSorted]);
+
+  return (
+    <ChartCard
+      title="Xếp hạng Kết quả Xử lý theo NVCS"
+      description="Sắp xếp theo sản lượng ticket đã hoàn tất"
+    >
+      <div className="h-[340px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={displayData} layout="vertical" margin={{ left: 10, right: 30 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+            <XAxis type="number" tick={{ fontSize: 11 }} />
+            <YAxis dataKey="employee_name" type="category" tick={{ fontSize: 11, fontWeight: 600 }} width={110} />
+            <Tooltip content={<ValueTooltip />} />
+            <Legend wrapperStyle={{ fontSize: 11 }} />
+            <Bar dataKey="processed" name="Ticket xử lý" fill="#10b981" stackId="emp" isAnimationActive={false}>
+              <LabelList dataKey="processed" position="center" style={{ fontSize: 9, fill: "#ffffff", fontWeight: 700 }} formatter={(v: any) => (v && Number(v) > 0 ? v : "")} />
             </Bar>
-            <Bar isAnimationActive={false} dataKey="current_avg_days" name={currentLabel} fill="#d97706" radius={[4, 4, 0, 0]}>
-              <LabelList dataKey="current_avg_days" position="top" style={{ fontSize: 10, fill: '#64748b' }} />
+            <Bar dataKey="related_processed" name="Chuyển PBLQ" fill="#f59e0b" stackId="emp" isAnimationActive={false}>
+              <LabelList dataKey="related_processed" position="center" style={{ fontSize: 9, fill: "#ffffff", fontWeight: 700 }} formatter={(v: any) => (v && Number(v) > 0 ? v : "")} />
+            </Bar>
+            <Bar dataKey="cancelled" name="Ticket hủy" fill="#ef4444" stackId="emp" isAnimationActive={false}>
+              <LabelList dataKey="cancelled" position="center" style={{ fontSize: 9, fill: "#ffffff", fontWeight: 700 }} formatter={(v: any) => (v && Number(v) > 0 ? v : "")} />
+            </Bar>
+            <Bar dataKey="ekyc" name="Gọi eKYC" fill="#0097cf" stackId="emp" radius={[0, 4, 4, 0]} isAnimationActive={false}>
+              <LabelList dataKey="ekyc" position="center" style={{ fontSize: 9, fill: "#ffffff", fontWeight: 700 }} formatter={(v: any) => (v && Number(v) > 0 ? v : "")} />
             </Bar>
           </BarChart>
         </ResponsiveContainer>
@@ -504,181 +1240,78 @@ function TimeChart({
   );
 }
 
-function TimeAnalysisCharts({ charts }: { charts: CccCharts }) {
-  const time = charts.report_time;
+function EmployeeTimeChartCard({ itemsSorted, globalViewMode }: { itemsSorted: any[]; globalViewMode?: ChartViewMode }) {
+  const displayData = useMemo(() => {
+    const map = new Map<string, any>();
+    for (const item of itemsSorted) {
+      const name = item.employee_name;
+      if (!map.has(name)) {
+        map.set(name, { employee_name: name, cs_sum: 0, cs_cnt: 0, rel_sum: 0, rel_cnt: 0 });
+      }
+      const existing = map.get(name)!;
+      if (item.avg_cs_days) {
+        existing.cs_sum += item.avg_cs_days;
+        existing.cs_cnt += 1;
+      }
+      if (item.avg_related_days) {
+        existing.rel_sum += item.avg_related_days;
+        existing.rel_cnt += 1;
+      }
+    }
+
+    return Array.from(map.values())
+      .map((row) => ({
+        employee_name: row.employee_name,
+        avg_cs_days: row.cs_cnt > 0 ? Number((row.cs_sum / row.cs_cnt).toFixed(2)) : 0,
+        avg_related_days: row.rel_cnt > 0 ? Number((row.rel_sum / row.rel_cnt).toFixed(2)) : 0,
+      }))
+      .slice(0, 15);
+  }, [itemsSorted]);
+
+  return (
+    <ChartCard
+      title="Thời gian Tiếp nhận & Xử lý trung bình theo NVCS"
+      description="Đơn vị: Ngày hoặc Giờ/Phút nếu < 1 ngày"
+    >
+      <div className="h-[340px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={displayData} layout="vertical" margin={{ left: 10, right: 35 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+            <XAxis type="number" tick={{ fontSize: 11 }} />
+            <YAxis dataKey="employee_name" type="category" tick={{ fontSize: 11, fontWeight: 600 }} width={110} />
+            <Tooltip content={<DaysTooltip />} />
+            <Legend wrapperStyle={{ fontSize: 11 }} />
+            <Bar dataKey="avg_cs_days" name="Thời gian CS xử lý" fill="#8b5cf6" radius={[0, 4, 4, 0]} isAnimationActive={false}>
+              <LabelList dataKey="avg_cs_days" position="right" style={{ fontSize: 10, fill: "#8b5cf6", fontWeight: 700 }} formatter={(v: any) => (v ? formatDays(v) : "")} />
+            </Bar>
+            <Bar dataKey="avg_related_days" name="Thời gian chuyển PBLQ" fill="#06b6d4" radius={[0, 4, 4, 0]} isAnimationActive={false}>
+              <LabelList dataKey="avg_related_days" position="right" style={{ fontSize: 10, fill: "#06b6d4", fontWeight: 700 }} formatter={(v: any) => (v ? formatDays(v) : "")} />
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </ChartCard>
+  );
+}
+
+function EmployeeCharts({ charts, globalViewMode }: { charts: CccCharts; globalViewMode?: ChartViewMode }) {
+  const rawItems = charts.report_employee || [];
+  const itemsSorted = useMemo(() => [...rawItems].sort((a, b) => (b.processed || 0) - (a.processed || 0)), [rawItems]);
+
+  if (isEmpty(itemsSorted)) return <EmptyState message="Không có dữ liệu theo từng NVCS." />;
 
   return (
     <div className="grid gap-4 xl:grid-cols-2">
-      <TimeChart
-        title="Thời gian trung bình CS xử lý ticket tiếp nhận"
-        items={time?.cs_by_category || []}
-      />
-
-      <TimeChart
-        title="Thời gian trung bình CS & PBLQ xử lý ticket"
-        items={time?.related_by_category || []}
-      />
+      <EmployeeRankedChartCard itemsSorted={itemsSorted} globalViewMode={globalViewMode} />
+      <EmployeeTimeChartCard itemsSorted={itemsSorted} globalViewMode={globalViewMode} />
     </div>
   );
 }
 
-function SlaCharts({ charts }: { charts: CccCharts }) {
-  const sla = charts.report_sla;
-
-  if (!sla) {
-    return <EmptyState message="Không có dữ liệu SLA." />;
-  }
-
-  const monthly = sla.monthly || [];
-  const category = sla.overdue_by_category || [];
-  const unitMonth = sla.overdue_by_unit_month || [];
-
-  return (
-    <div className="grid gap-4 xl:grid-cols-2">
-      <ChartCard title="Kết quả ticket có SLA">
-        {isEmpty(monthly) ? (
-          <EmptyState message="Không có ticket có SLA." />
-        ) : (
-          <div className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={monthly}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="month_label" tick={{ fontSize: 11, fontWeight: 600 }} />
-                <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                <Tooltip content={<ValueTooltip />} />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Bar isAnimationActive={false} dataKey="on_time" name="Không trễ hạn" fill="#0097cf" radius={[4, 4, 0, 0]}>
-                  <LabelList dataKey="on_time" position="top" style={{ fontSize: 10, fill: '#64748b' }} />
-                </Bar>
-                <Bar isAnimationActive={false} dataKey="overdue" name="Trễ hạn" fill="#ef4444" radius={[4, 4, 0, 0]}>
-                  <LabelList dataKey="overdue" position="top" style={{ fontSize: 10, fill: '#64748b' }} />
-                </Bar>
-                <Bar isAnimationActive={false} dataKey="processing" name="Đang xử lý" fill="#f59e0b" radius={[4, 4, 0, 0]}>
-                  <LabelList dataKey="processing" position="top" style={{ fontSize: 10, fill: '#64748b' }} />
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-      </ChartCard>
-
-      <ChartCard title="Phân loại ticket trễ hạn">
-        {isEmpty(category) ? (
-          <EmptyState message="Không phát sinh ticket trễ hạn." />
-        ) : (
-          <div className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={category}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="category_name" tick={{ fontSize: 10, fontWeight: 600 }} />
-                <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                <Tooltip content={<ValueTooltip />} />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Bar isAnimationActive={false} dataKey="not_overdue" name="Không trễ hạn" fill="#0097cf" radius={[4, 4, 0, 0]}>
-                  <LabelList dataKey="not_overdue" position="top" style={{ fontSize: 10, fill: '#64748b' }} />
-                </Bar>
-                <Bar isAnimationActive={false} dataKey="overdue" name="Trễ hạn" fill="#ef4444" radius={[4, 4, 0, 0]}>
-                  <LabelList dataKey="overdue" position="top" style={{ fontSize: 10, fill: '#64748b' }} />
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-      </ChartCard>
-
-      <ChartCard
-        title="Chi tiết tác vụ PBLQ trễ hạn"
-        description="Số ticket trễ hạn theo đơn vị xử lý và tháng."
-        className="xl:col-span-2"
-      >
-        {isEmpty(unitMonth) ? (
-          <EmptyState message="Không có tác vụ PBLQ trễ hạn." />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-left text-xs">
-              <thead className="bg-slate-50 text-slate-600">
-                <tr>
-                  <th className="px-3 py-2 font-semibold">Tháng</th>
-                  <th className="px-3 py-2 font-semibold">Đơn vị xử lý</th>
-                  <th className="px-3 py-2 text-right font-semibold">Số ticket trễ hạn</th>
-                </tr>
-              </thead>
-              <tbody>
-                {unitMonth.map((item, index) => (
-                  <tr key={`${item.month_key}-${item.unit_name}-${index}`} className="border-t">
-                    <td className="px-3 py-2 font-medium">{item.month_label}</td>
-                    <td className="px-3 py-2">{item.unit_name}</td>
-                    <td className="px-3 py-2 text-right font-semibold">{formatNumber(item.overdue)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </ChartCard>
-    </div>
-  );
-}
-
-function EmployeeCharts({ charts }: { charts: CccCharts }) {
-  const items = charts.report_employee || [];
-
-  if (isEmpty(items)) {
-    return <EmptyState message="Không có dữ liệu theo từng NVCS." />;
-  }
-
-  return (
-    <div className="grid gap-4 xl:grid-cols-2">
-      <ChartCard title="Kết quả xử lý ticket theo từng NVCS">
-        <div className="h-[320px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={items}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="employee_name" tick={{ fontSize: 11, fontWeight: 600 }} />
-              <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-              <Tooltip content={<ValueTooltip />} />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Bar isAnimationActive={false} dataKey="processed" name="Ticket xử lý" fill="#5ca05a" radius={[4, 4, 0, 0]}>
-                <LabelList dataKey="processed" position="top" style={{ fontSize: 10, fill: '#64748b' }} />
-              </Bar>
-              <Bar isAnimationActive={false} dataKey="related_processed" name="Chuyển PBLQ xử lý" fill="#ffbf00" radius={[4, 4, 0, 0]}>
-                <LabelList dataKey="related_processed" position="top" style={{ fontSize: 10, fill: '#64748b' }} />
-              </Bar>
-              <Bar isAnimationActive={false} dataKey="cancelled" name="Ticket hủy" fill="#f59e0b" radius={[4, 4, 0, 0]}>
-                <LabelList dataKey="cancelled" position="top" style={{ fontSize: 10, fill: '#64748b' }} />
-              </Bar>
-              <Bar isAnimationActive={false} dataKey="ekyc" name="Ticket gọi eKYC" fill="#60a5fa" radius={[4, 4, 0, 0]}>
-                <LabelList dataKey="ekyc" position="top" style={{ fontSize: 10, fill: '#64748b' }} />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </ChartCard>
-
-      <ChartCard title="Thời gian trung bình CS tiếp nhận ticket">
-        <div className="h-[320px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={items}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="employee_name" tick={{ fontSize: 11, fontWeight: 600 }} />
-              <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip content={<DaysTooltip />} />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Bar isAnimationActive={false} dataKey="avg_cs_days" name="Ticket xử lý" fill="#7c8f22" radius={[4, 4, 0, 0]}>
-                <LabelList dataKey="avg_cs_days" position="top" style={{ fontSize: 10, fill: '#64748b' }} />
-              </Bar>
-              <Bar isAnimationActive={false} dataKey="avg_related_days" name="Ticket chuyển PBLQ" fill="#e8b2dc" radius={[4, 4, 0, 0]}>
-                <LabelList dataKey="avg_related_days" position="top" style={{ fontSize: 10, fill: '#64748b' }} />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </ChartCard>
-    </div>
-  );
-}
-
-function RootCausePie({ charts }: { charts: CccCharts }) {
+/* ====================================================================
+ * 8. NHÓM LỖI PHÁT SINH NHIỀU
+ * ==================================================================== */
+function RootCausePieCard({ charts, globalViewMode }: { charts: CccCharts; globalViewMode?: ChartViewMode }) {
   const data = useMemo(
     () =>
       (charts.root_cause_breakdown || []).map((item) => ({
@@ -691,24 +1324,40 @@ function RootCausePie({ charts }: { charts: CccCharts }) {
   if (isEmpty(data)) return null;
 
   return (
-    <ChartCard title="Nhóm lỗi phát sinh nhiều">
-      <div className="h-[280px]">
+    <ChartCard
+      title="Cơ cấu Nhóm lỗi phát sinh phổ biến"
+    >
+      <div className="h-[320px]">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
               data={data}
               dataKey="value"
               nameKey="name"
-              outerRadius={95}
-              label={data.length <= 6}
+              cx="50%"
+              cy="50%"
+              innerRadius={55}
+              outerRadius={85}
+              paddingAngle={2}
               isAnimationActive={false}
+              label={({ name, value, percent }) =>
+                percent && percent >= 0.02 ? `${name}: ${formatNumber(value)} (${(percent * 100).toFixed(1)}%)` : ""
+              }
             >
               {data.map((_, index) => (
                 <Cell key={index} fill={COLORS[index % COLORS.length]} />
               ))}
             </Pie>
             <Tooltip content={<ValueTooltip />} />
-            <Legend wrapperStyle={{ fontSize: 11 }} />
+            <Legend
+              wrapperStyle={{ fontSize: 11 }}
+              formatter={(value: string, entry: any) => {
+                const item = entry.payload;
+                const total = data.reduce((acc, curr) => acc + curr.value, 0);
+                const pct = total > 0 ? ((item.value / total) * 100).toFixed(1) : "0";
+                return `${value}: ${formatNumber(item.value)} (${pct}%)`;
+              }}
+            />
           </PieChart>
         </ResponsiveContainer>
       </div>
@@ -716,41 +1365,46 @@ function RootCausePie({ charts }: { charts: CccCharts }) {
   );
 }
 
+/* ====================================================================
+ * MAIN DASHBOARD CHARTS COMPONENT
+ * ==================================================================== */
 export const CccDashboardCharts = memo(function CccDashboardCharts({
   charts,
+  globalViewMode = "TREND_OVER_TIME",
 }: {
   charts: CccCharts;
+  globalViewMode?: ChartViewMode;
 }) {
   return (
-    <div className="space-y-5">
-      <TicketResultCharts charts={charts} />
+    <div className="space-y-6">
+      <TicketResultChartCard charts={charts} globalViewMode={globalViewMode} />
 
-      <LazyDashboardSection minHeight={640}>
-        <SourceAnalysisCharts charts={charts} />
+      <LazyDashboardSection minHeight={400}>
+        <SourceAnalysisCharts charts={charts} globalViewMode={globalViewMode} />
       </LazyDashboardSection>
 
-      <LazyDashboardSection minHeight={760}>
-        <CategoryAnalysisCharts charts={charts} />
+      <LazyDashboardSection minHeight={420}>
+        <CategoryAnalysisCharts charts={charts} globalViewMode={globalViewMode} />
       </LazyDashboardSection>
 
-      <LazyDashboardSection minHeight={660}>
-        <UnitAnalysisCharts charts={charts} />
+      <LazyDashboardSection minHeight={400}>
+        <UnitAnalysisCharts charts={charts} globalViewMode={globalViewMode} />
       </LazyDashboardSection>
 
-      <LazyDashboardSection minHeight={680}>
-        <TimeAnalysisCharts charts={charts} />
+      <LazyDashboardSection minHeight={400}>
+        <TimeAnalysisCharts charts={charts} globalViewMode={globalViewMode} />
       </LazyDashboardSection>
 
-      <LazyDashboardSection minHeight={760}>
-        <SlaCharts charts={charts} />
+      <LazyDashboardSection minHeight={480}>
+        <SlaCharts charts={charts} globalViewMode={globalViewMode} />
       </LazyDashboardSection>
 
-      <LazyDashboardSection minHeight={680}>
-        <EmployeeCharts charts={charts} />
+      <LazyDashboardSection minHeight={420}>
+        <EmployeeCharts charts={charts} globalViewMode={globalViewMode} />
       </LazyDashboardSection>
 
       <LazyDashboardSection minHeight={320}>
-        <RootCausePie charts={charts} />
+        <RootCausePieCard charts={charts} globalViewMode={globalViewMode} />
       </LazyDashboardSection>
     </div>
   );

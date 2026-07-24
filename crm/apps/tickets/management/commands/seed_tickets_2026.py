@@ -14,7 +14,16 @@ from django.utils import timezone
 
 from apps.accounts.models import Role, User
 from apps.branches.models import Branch, Employee, ProcessingUnit
-from apps.customers.models import Company, Customer, CustomerAccount
+from apps.customers.models import (
+    Company,
+    Customer,
+    CustomerAccount,
+    CustomerRating,
+    CustomerSource,
+    CustomerType,
+    MembershipTier,
+)
+from apps.tickets.dashboard_cache import invalidate_ticket_dashboard_cache
 from apps.tickets.models import (
     Tag,
     Ticket,
@@ -37,7 +46,6 @@ from apps.tickets.models import (
     TicketTag,
     TicketUpdateLog,
 )
-
 
 TICKET_CODE_PREFIX = "CCC-DEMO-2026-"
 SOURCE_REF_PREFIX = "CCC-DEMO-REF-2026-"
@@ -62,234 +70,276 @@ EXTERNAL_STATUS_OPTIONS = [
 ]
 
 COMMENT_OPTIONS = [
-    "Đã liên hệ khách hàng để xác minh thêm thông tin.",
-    "Đã kiểm tra dữ liệu trên hệ thống và chuyển bộ phận liên quan xử lý.",
-    "Khách hàng đã bổ sung ảnh chụp màn hình và thời điểm phát sinh.",
-    "Đã đối chiếu số tài khoản, số điện thoại và lịch sử giao dịch.",
-    "Đang theo dõi kết quả xử lý từ hệ thống nghiệp vụ.",
-    "Đã cập nhật tiến độ cho khách hàng qua kênh tiếp nhận ban đầu.",
+    "Đã liên hệ khách hàng qua điện thoại để làm rõ thông tin chi tiết.",
+    "Đã đối chiếu số tài khoản, thông tin giao dịch và nhật ký hệ thống.",
+    "Khách hàng đã gửi bổ sung ảnh chụp màn hình phát sinh lỗi.",
+    "Đã chuyển yêu cầu cho bộ phận CNTT / Kế toán tra soát nội bộ.",
+    "Đang theo dõi phản hồi kết quả từ hệ thống nghiệp vụ FLEX.",
+    "Đã cập nhật tiến độ xử lý và hẹn thời gian phản hồi cho khách hàng.",
+    "Kiểm tra nhật ký xác thực OTP và đồng bộ trạng thái tài khoản.",
+    "Khách hàng xác nhận hệ thống đã hoạt động bình thường.",
 ]
 
 TRANSFER_REASON_OPTIONS = [
-    "Phân công theo ca trực CCC.",
-    "Phân công theo khối lượng ticket hiện tại.",
-    "Nhân viên phụ trách tiếp nhận yêu cầu từ khách hàng.",
-    "Điều phối nội bộ để bảo đảm thời gian xử lý.",
+    "Phân công tự động theo luồng trực ca CCC.",
+    "Cân bằng tải công việc giữa các nhân viên hỗ trợ.",
+    "Chuyển đơn vị chuyên môn (IT / Kế toán / Nghiệp vụ) xử lý chuyên sâu.",
+    "Nhân viên tiếp nhận ban đầu hết ca trực, điều phối cho nhân viên ca sau.",
+    "Chuyển chi nhánh quản lý tài khoản hỗ trợ trực tiếp khách hàng.",
 ]
 
 CANCEL_REASON_OPTIONS = [
-    "Khách hàng xác nhận không còn nhu cầu hỗ trợ.",
-    "Ticket được tạo trùng với yêu cầu đã tồn tại.",
-    "Không đủ thông tin để xác minh sau nhiều lần liên hệ.",
-    "Khách hàng yêu cầu hủy nội dung hỗ trợ.",
+    "Khách hàng xác nhận sự cố đã tự khôi phục, không cần hỗ trợ thêm.",
+    "Yêu cầu tạo trùng lặp với ticket đã được tiếp nhận trước đó.",
+    "Không thể liên hệ với khách hàng sau 3 lần gọi xác minh.",
+    "Khách hàng chủ động yêu cầu hủy yêu cầu hỗ trợ.",
+]
+
+FIELD_UPDATE_NOTES = [
+    "Cập nhật mức độ ưu tiên và bổ sung nhóm lỗi sau khi đối chiếu thông tin.",
+    "Ghi nhận giải pháp xử lý tạm thời và cập nhật hệ thống liên quan.",
+    "Thay đổi thông tin phân loại ticket dựa trên phản ánh chi tiết của khách hàng.",
+    "Bổ sung ghi chú lỗi nghiệp vụ và điều chỉnh chính sách SLA áp dụng.",
 ]
 
 SCENARIOS = [
     {
         "keywords": ("GIAO_DICH", "LENH", "CHUNG_KHOAN"),
         "titles": [
-            "Kiểm tra trạng thái lệnh đặt",
-            "Lệnh giao dịch chưa cập nhật kết quả",
-            "Không thể sửa hoặc hủy lệnh",
-            "Cần hỗ trợ tra soát lệnh chứng khoán",
+            "Kiểm tra trạng thái lệnh đặt chứng khoán",
+            "Lệnh giao dịch chưa cập nhật kết quả khớp",
+            "Không thể sửa hoặc hủy lệnh trên bảng giá",
+            "Cần hỗ trợ tra soát thời điểm gửi lệnh",
+            "Lệnh điều kiện không kích hoạt tự động",
         ],
         "requests": [
-            "Khách hàng phản ánh lệnh đã gửi nhưng chưa hiển thị trạng thái khớp trên ứng dụng.",
-            "Khách hàng không sửa được giá lệnh và cần kiểm tra trạng thái xử lý.",
-            "Khách hàng yêu cầu tra soát thời điểm ghi nhận lệnh trên hệ thống giao dịch.",
-            "Khách hàng thấy sức mua đã thay đổi nhưng danh sách lệnh chưa cập nhật.",
+            "Khách hàng phản ánh lệnh đặt đã gửi nhưng ứng dụng không hiển thị trạng thái khớp.",
+            "Khách hàng không thực hiện được thao tác sửa giá lệnh và cần kiểm tra nguyên nhân.",
+            "Khách hàng yêu cầu đối chiếu thời gian ghi nhận lệnh trên hệ thống FLEX.",
+            "Sức mua tài khoản thay đổi nhưng danh sách lệnh chưa được cập nhật tương ứng.",
+            "Khách hàng phản ánh lệnh điều kiện Stop-Loss chưa được kích hoạt khi cán mốc giá.",
         ],
         "solutions": [
-            "Đối chiếu lịch sử lệnh trên FLEX và kiểm tra trạng thái trả về từ hệ thống giao dịch.",
-            "Xác minh mã chứng khoán, thời gian đặt lệnh và hướng dẫn khách hàng tải lại dữ liệu.",
-            "Chuyển thông tin cho bộ phận nghiệp vụ kiểm tra luồng xử lý lệnh.",
+            "Đối chiếu nhật ký lệnh trên hệ thống FLEX và kiểm tra kết quả trả về từ Sở.",
+            "Hướng dẫn khách hàng tải lại dữ liệu bảng giá và kiểm tra kết nối mạng.",
+            "Chuyển thông tin cho bộ phận Quản lý giao dịch để tra soát luồng xử lý lệnh.",
+            "Đồng bộ lại trạng thái sức mua và danh sách lệnh trên ứng dụng di động.",
         ],
         "responses": [
-            "Đã kiểm tra và cập nhật lại trạng thái lệnh cho khách hàng.",
-            "Đã hướng dẫn khách hàng thao tác lại sau khi hệ thống đồng bộ.",
-            "Kết quả tra soát đã được phản hồi đến khách hàng.",
+            "Đã kiểm tra và cập nhật đầy đủ trạng thái lệnh cho khách hàng.",
+            "Đã hướng dẫn khách hàng thao tác lại sau khi hệ thống hoàn tất đồng bộ.",
+            "Kết quả tra soát lệnh chi tiết đã được gửi qua email cho khách hàng.",
+            "Lệnh điều kiện đã được khôi phục trạng thái chờ kích hoạt.",
         ],
         "system": "FLEX",
     },
     {
         "keywords": ("DANG_NHAP", "UNG_DUNG", "APP", "MAT_KHAU"),
         "titles": [
-            "Không đăng nhập được ứng dụng",
-            "Tài khoản bị khóa khi đăng nhập",
-            "Không nhận được mã OTP đăng nhập",
-            "Ứng dụng báo sai thông tin xác thực",
+            "Không thể đăng nhập vào ứng dụng giao dịch",
+            "Tài khoản bị khóa do nhập sai mật khẩu",
+            "Không nhận được mã OTP xác thực SMS/Email",
+            "Ứng dụng báo sai thông tin danh tính xác thực",
+            "Lỗi xác thực Biometrics (Vân tay / FaceID)",
         ],
         "requests": [
-            "Khách hàng nhập đúng thông tin nhưng ứng dụng báo không thể đăng nhập.",
-            "Khách hàng không nhận được OTP sau nhiều lần thực hiện.",
-            "Tài khoản bị khóa và khách hàng cần hỗ trợ mở lại quyền truy cập.",
-            "Khách hàng đổi thiết bị và không thể xác thực đăng nhập.",
+            "Khách hàng nhập đúng tài khoản và mật khẩu nhưng ứng dụng báo lỗi kết nối.",
+            "Khách hàng không nhận được mã OTP SMS sau nhiều lần bấm yêu cầu gửi lại.",
+            "Tài khoản bị tạm khóa truy cập và khách hàng cần hỗ trợ mở khóa gấp.",
+            "Khách hàng thay đổi thiết bị di động mới và không thể xác thực bước 2.",
+            "Ứng dụng không nhận diện được sinh trắc học FaceID sau khi cập nhật iOS/Android.",
         ],
         "solutions": [
-            "Kiểm tra trạng thái tài khoản, lịch sử OTP và hướng dẫn khách hàng xác thực lại.",
-            "Đồng bộ lại trạng thái đăng nhập và yêu cầu khách hàng thử lại trên phiên bản mới.",
-            "Chuyển bộ phận kỹ thuật kiểm tra nhật ký đăng nhập trên ứng dụng.",
+            "Kiểm tra trạng thái tài khoản, nhật ký gửi OTP và hướng dẫn xác thực lại.",
+            "Đồng bộ lại session đăng nhập và yêu cầu khách hàng cập nhật phiên bản App mới nhất.",
+            "Chuyển bộ phận Kỹ thuật kiểm tra Gateway SMS và log xác thực thiết bị.",
+            "Mở khóa tài khoản trên hệ thống CRM và gửi lại mật khẩu tạm cho khách hàng.",
         ],
         "responses": [
-            "Khách hàng đã đăng nhập lại thành công.",
-            "Đã mở khóa tài khoản và hướng dẫn khách hàng đổi mật khẩu.",
-            "OTP đã được gửi lại và khách hàng xác nhận nhận thành công.",
+            "Khách hàng đã đăng nhập ứng dụng thành công.",
+            "Tài khoản đã được mở khóa và gửi thông tin hướng dẫn đổi mật khẩu.",
+            "Đã khắc phục luồng OTP SMS, khách hàng xác nhận đã nhận được mã.",
+            "Đã hỗ trợ đăng ký lại sinh trắc học trên thiết bị mới.",
         ],
         "system": "APP",
     },
     {
         "keywords": ("HIEN_THI", "GIAO_DIEN", "DU_LIEU"),
         "titles": [
-            "Dữ liệu tài sản hiển thị chưa chính xác",
-            "Danh mục chứng khoán không cập nhật",
-            "Màn hình ứng dụng hiển thị thiếu thông tin",
-            "Số dư hiển thị chậm so với giao dịch",
+            "Dữ liệu tổng tài sản hiển thị chưa chính xác",
+            "Danh mục chứng khoán không tự động cập nhật",
+            "Giao diện ứng dụng bị lỗi phông chữ / trắng màn hình",
+            "Số dư tiền khả dụng hiển thị chậm so với giao dịch",
+            "Lịch sử quyền chứng khoán hiển thị thiếu thông tin",
         ],
         "requests": [
-            "Khách hàng phản ánh dữ liệu tài sản trên màn hình chưa cập nhật.",
-            "Danh mục chứng khoán hiển thị thiếu mã sau khi giao dịch.",
-            "Số dư tiền và sức mua hiển thị không đồng nhất giữa các màn hình.",
-            "Khách hàng gặp lỗi trắng màn hình khi mở phần thông tin tài khoản.",
+            "Khách hàng phản ánh dữ liệu tổng tài sản trên màn hình trang chủ bị sai lệch.",
+            "Danh mục chứng khoán nắm giữ không hiển thị mã vừa khớp trong phiên.",
+            "Số dư tiền và sức mua không đồng nhất giữa màn hình Đặt lệnh và màn hình Tài sản.",
+            "Khách hàng gặp lỗi màn hình trắng khi mở mục Báo cáo tài sản chi tiết.",
+            "Thông tin cổ tức và quyền mua cổ phiếu chưa hiển thị trong sổ cổ đông.",
         ],
         "solutions": [
-            "Kiểm tra dữ liệu đồng bộ giữa APP, API và FLEX.",
-            "Yêu cầu khách hàng làm mới dữ liệu và thu thập phiên bản ứng dụng.",
-            "Chuyển kỹ thuật kiểm tra cache và luồng lấy dữ liệu.",
+            "Kiểm tra dữ liệu đồng bộ giữa hệ thống APP, API backend và cơ sở dữ liệu FLEX.",
+            "Hướng dẫn khách hàng thao tác Xóa bộ nhớ đệm (Cache) trên ứng dụng.",
+            "Chuyển bộ phận Kỹ thuật kiểm tra API lấy danh mục và sửa lỗi hiển thị.",
+            "Cập nhật lại bảng tính giá trị tài sản thực tế cho tài khoản khách hàng.",
         ],
         "responses": [
-            "Dữ liệu đã được đồng bộ và hiển thị lại bình thường.",
-            "Đã khắc phục lỗi hiển thị trên tài khoản khách hàng.",
-            "Khách hàng xác nhận số liệu đã cập nhật chính xác.",
+            "Dữ liệu tài sản đã được đồng bộ chuẩn xác trên giao diện.",
+            "Đã khắc phục triệt để lỗi hiển thị danh mục chứng khoán.",
+            "Khách hàng xác nhận số dư tiền đã cập nhật chuẩn sau khi làm mới.",
+            "Thông tin quyền chứng khoán đã được bổ sung đầy đủ.",
         ],
         "system": "APP",
     },
     {
         "keywords": ("EKYC", "DINH_DANH", "TAI_KHOAN", "MO_TAI_KHOAN"),
         "titles": [
-            "eKYC không nhận diện giấy tờ",
-            "Thông tin tài khoản cần cập nhật",
-            "Không hoàn tất bước xác thực khuôn mặt",
-            "Yêu cầu kiểm tra hồ sơ mở tài khoản",
+            "eKYC không nhận diện được Căn cước công dân",
+            "Yêu cầu cập nhật thông tin Căn cước gắn chip",
+            "Không hoàn tất bước xác thực khuôn mặt liveness",
+            "Kiểm tra tiến độ duyệt hồ sơ mở tài khoản trực tuyến",
+            "Lỗi liên kết tài khoản ngân hàng chính chủ",
         ],
         "requests": [
-            "Khách hàng không hoàn tất eKYC do ảnh giấy tờ không được nhận diện.",
-            "Thông tin cá nhân trên tài khoản chưa khớp với giấy tờ mới.",
-            "Khách hàng bị dừng tại bước xác thực khuôn mặt.",
-            "Hồ sơ mở tài khoản đã gửi nhưng chưa có kết quả.",
+            "Khách hàng mở tài khoản trực tuyến nhưng không qua được bước chụp CCCD.",
+            "Khách hàng đã đổi sang CCCD gắn chip mới và muốn cập nhật thông tin tài khoản.",
+            "Khách hàng bị báo lỗi ở bước quay video xác thực khuôn mặt eKYC.",
+            "Hồ sơ mở tài khoản đã hoàn tất thông tin nhưng chưa nhận được email kích hoạt.",
+            "Khách hàng không thể thêm tài khoản ngân hàng thụ hưởng vào hệ thống.",
         ],
         "solutions": [
-            "Kiểm tra trạng thái eKYC và hướng dẫn chụp lại giấy tờ đúng tiêu chuẩn.",
-            "Đối chiếu hồ sơ khách hàng và chuyển yêu cầu cập nhật thông tin.",
-            "Kiểm tra nhật ký xác thực và trạng thái duyệt hồ sơ.",
+            "Kiểm tra nhật ký OCR eKYC, hướng dẫn chụp ảnh giấy tờ trong điều kiện đủ sáng.",
+            "Đối chiếu hình ảnh CCCD mới và thực hiện cập nhật thông tin trên hệ thống.",
+            "Kiểm tra dữ liệu đối soát xác thực khuôn mặt và phê duyệt hồ sơ thủ công.",
+            "Kích hoạt tài khoản chứng khoán và gửi thông báo cho khách hàng qua Email/SMS.",
         ],
         "responses": [
-            "Khách hàng đã hoàn tất xác thực eKYC.",
-            "Thông tin tài khoản đã được cập nhật theo hồ sơ hợp lệ.",
-            "Hồ sơ đã được duyệt và phản hồi đến khách hàng.",
+            "Khách hàng đã hoàn tất định danh eKYC và kích hoạt tài khoản thành công.",
+            "Thông tin CCCD mới đã được cập nhật chính xác trên hệ thống.",
+            "Hồ sơ mở tài khoản đã được phê duyệt.",
+            "Tài khoản ngân hàng thụ hưởng đã được liên kết thành công.",
         ],
         "system": "APP",
     },
     {
         "keywords": ("NAP_TIEN", "RUT_TIEN", "CHUYEN_KHOAN", "THANH_TOAN"),
         "titles": [
-            "Nạp tiền chưa ghi nhận vào tài khoản",
-            "Yêu cầu kiểm tra giao dịch rút tiền",
-            "Chuyển khoản chưa cập nhật trạng thái",
-            "Tra soát giao dịch thanh toán",
+            "Nạp tiền vào tài khoản chứng khoán chưa ghi nhận",
+            "Yêu cầu kiểm tra xử lý lệnh rút tiền về ngân hàng",
+            "Chuyển tiền nội bộ giữa các tiểu khoản chậm",
+            "Tra soát giao dịch nạp tiền sai nội dung chuyển khoản",
+            "Lỗi kết nối cổng thanh toán ngân hàng liên kết",
         ],
         "requests": [
-            "Khách hàng đã chuyển tiền nhưng số dư chưa được ghi nhận.",
-            "Lệnh rút tiền đang chờ xử lý lâu hơn dự kiến.",
-            "Khách hàng cần tra soát nội dung chuyển khoản vào tài khoản chứng khoán.",
-            "Trạng thái thanh toán hiển thị chưa hoàn tất dù ngân hàng đã trừ tiền.",
+            "Khách hàng đã chuyển tiền từ ngân hàng nhưng sức mua tài khoản chưa tăng.",
+            "Lệnh rút tiền về tài khoản ngân hàng chính chủ bị treo ở trạng thái Chờ xử lý.",
+            "Chuyển tiền từ tiểu khoản Thường sang tiểu khoản Margin không thành công.",
+            "Khách hàng chuyển tiền nạp nhưng quên ghi số tài khoản chứng khoán trong nội dung.",
+            "Giao dịch chuyển tiền báo thành công ở ngân hàng nhưng CRM chưa ghi nhận.",
         ],
         "solutions": [
-            "Đối chiếu sao kê, nội dung chuyển khoản và trạng thái hạch toán.",
-            "Kiểm tra giao dịch trên FLEX và phối hợp bộ phận kế toán xử lý.",
-            "Xác minh thời gian giao dịch và cập nhật trạng thái cho khách hàng.",
+            "Đối chiếu sổ phụ ngân hàng, kiểm tra điện chuyển tiền và nội dung hạch toán.",
+            "Kiểm tra luồng rút tiền trên FLEX, phối hợp bộ phận Kế toán hoàn tất lệnh.",
+            "Tra soát thông tin định danh người nạp và hạch toán thủ công vào tài khoản.",
+            "Cập nhật trạng thái giao dịch và phản hồi thông tin cho khách hàng.",
         ],
         "responses": [
-            "Khoản tiền đã được ghi nhận vào tài khoản khách hàng.",
-            "Giao dịch rút tiền đã hoàn tất.",
-            "Kết quả tra soát đã được thông báo cho khách hàng.",
+            "Số tiền nạp đã được hạch toán đầy đủ vào tài khoản chứng khoán.",
+            "Giao dịch rút tiền đã hoàn tất, tiền đã về tài khoản ngân hàng của khách hàng.",
+            "Đã xử lý tra soát và hạch toán khoản tiền chuyển sai nội dung.",
+            "Tiểu khoản đã ghi nhận đủ sức mua từ lệnh chuyển tiền nội bộ.",
         ],
         "system": "FLEX",
     },
     {
         "keywords": ("PORTAL", "HE_THONG", "API", "CRM"),
         "titles": [
-            "Portal không tải được dữ liệu",
-            "Lỗi đồng bộ dữ liệu hệ thống",
-            "API trả về trạng thái không thành công",
-            "Yêu cầu kiểm tra kết nối hệ thống",
+            "Portal khách hàng không tải được dữ liệu báo cáo",
+            "Lỗi đồng bộ dữ liệu giữa CRM và hệ thống FLEX",
+            "API tiếp nhận yêu cầu hỗ trợ trả về mã lỗi 500",
+            "Hệ thống báo cáo CCC phản hồi chậm giờ cao điểm",
+            "Không nhận được thông báo Web Push Notification",
         ],
         "requests": [
-            "Người dùng phản ánh portal không hiển thị dữ liệu sau khi đăng nhập.",
-            "Dữ liệu giữa CRM và hệ thống nghiệp vụ chưa đồng bộ.",
-            "API phát sinh lỗi trong quá trình tiếp nhận yêu cầu.",
-            "Hệ thống phản hồi chậm và có lúc mất kết nối.",
+            "Người dùng phản ánh Web Portal không tải được báo cáo sao kê tài khoản.",
+            "Dữ liệu khách hàng trên CRM không cập nhật đồng bộ từ hệ thống lõi.",
+            "API tích hợp đối tác báo lỗi kết nối trong quá trình đẩy dữ liệu ticket.",
+            "Hệ thống ghi nhận thời gian phản hồi chậm khi tra cứu lịch sử xử lý.",
+            "Khách hàng không nhận được thông báo biến động số dư qua ứng dụng.",
         ],
         "solutions": [
-            "Kiểm tra log API, trạng thái dịch vụ và luồng đồng bộ dữ liệu.",
-            "Thực hiện đồng bộ lại bản ghi và theo dõi kết quả.",
-            "Chuyển kỹ thuật kiểm tra kết nối giữa các hệ thống.",
+            "Kiểm tra nhật ký API Gateway, dịch vụ Microservices và luồng Message Queue.",
+            "Thực hiện re-sync dữ liệu bản ghi bị lỗi giữa CRM và FLEX.",
+            "Tối ưu hóa truy vấn cơ sở dữ liệu và xóa bộ nhớ đệm Dashboard.",
+            "Kiểm tra cấu hình Push Notification Service và gửi lại thông báo.",
         ],
         "responses": [
-            "Dữ liệu đã được đồng bộ lại thành công.",
-            "Kết nối hệ thống đã ổn định.",
-            "API đã hoạt động bình thường và yêu cầu được xử lý.",
+            "Dữ liệu báo cáo trên Portal đã được phục hồi và tải bình thường.",
+            "Hệ thống CRM đã hoàn tất đồng bộ dữ liệu chuẩn với FLEX.",
+            "Lỗi API đã được khắc phục, tích hợp hoạt động ổn định.",
+            "Dịch vụ thông báo đã được khôi phục hoàn tất.",
         ],
         "system": "API",
     },
     {
         "keywords": ("KHIEU_NAI", "GOP_Y", "PHAN_ANH"),
         "titles": [
-            "Khách hàng khiếu nại thời gian xử lý",
-            "Góp ý về chất lượng hỗ trợ",
-            "Phản ánh kết quả xử lý chưa phù hợp",
-            "Yêu cầu xem xét lại nội dung phản hồi",
+            "Khách hàng khiếu nại thời gian xử lý ticket kéo dài",
+            "Góp ý cải thiện chất lượng phục vụ của tổng đài",
+            "Phản ánh kết quả xử lý chưa thỏa đáng",
+            "Yêu cầu xem xét lại chính sách phí giao dịch",
+            "Khiếu nại thái độ hỗ trợ của nhân viên tư vấn",
         ],
         "requests": [
-            "Khách hàng phản ánh thời gian xử lý yêu cầu kéo dài.",
-            "Khách hàng chưa đồng ý với kết quả phản hồi trước đó.",
-            "Khách hàng góp ý về quy trình tiếp nhận và cập nhật tiến độ.",
-            "Khách hàng yêu cầu kiểm tra lại lịch sử trao đổi.",
+            "Khách hàng phản ánh yêu cầu hỗ trợ đã gửi 3 ngày nhưng chưa có phản hồi chính thức.",
+            "Khách hàng không đồng ý với kết quả giải quyết sự cố lệnh trước đó.",
+            "Khách hàng góp ý về quy trình liên hệ xác minh thông tin quá phức tạp.",
+            "Khách hàng khiếu nại mức phí tính chưa đúng theo chương trình ưu đãi đã đăng ký.",
+            "Khách hàng yêu cầu Cấp quản lý trực tiếp gọi lại trao đổi về vụ việc.",
         ],
         "solutions": [
-            "Rà soát toàn bộ lịch sử xử lý và trao đổi lại với đơn vị liên quan.",
-            "Xác minh nội dung phản ánh và cập nhật kết quả cho khách hàng.",
-            "Ghi nhận góp ý để cải thiện quy trình phục vụ.",
+            "Rà soát toàn bộ lịch sử xử lý, làm việc với các đơn vị liên quan để đẩy nhanh tiến độ.",
+            "Chuyển Trưởng bộ phận CCC gọi điện trực tiếp trao đổi và giải thích cho khách hàng.",
+            "Đối chiếu biểu phí ưu đãi, thực hiện thoái thu khoản phí chênh lệch nếu có sai sót.",
+            "Ghi nhận góp ý để cải tiến quy trình phục vụ khách hàng tốt hơn.",
         ],
         "responses": [
-            "Đã giải thích kết quả xử lý và khách hàng đồng ý.",
-            "Nội dung khiếu nại đã được rà soát và phản hồi chính thức.",
-            "Góp ý của khách hàng đã được ghi nhận.",
+            "Đã trao đổi trực tiếp, giải thích rõ ràng và khách hàng đã hoàn toàn đồng ý.",
+            "Nội dung khiếu nại đã được xử lý thỏa đáng, thoái thu phí chênh lệch thành công.",
+            "Góp ý của khách hàng đã được chuyển đến Ban Giám đốc ghi nhận.",
+            "Khách hàng xác nhận hài lòng với phương án giải quyết bổ sung.",
         ],
         "system": "CRM",
     },
     {
         "keywords": ("CHAM_SOC", "HO_TRO", "SAN_PHAM", "KIEN_THUC"),
         "titles": [
-            "Tư vấn thông tin sản phẩm",
-            "Hỗ trợ sử dụng dịch vụ",
-            "Khách hàng cần hướng dẫn thao tác",
-            "Yêu cầu cung cấp thông tin tài khoản",
+            "Tư vấn chính sách sản phẩm giao dịch ký quỹ Margin",
+            "Hỗ trợ hướng dẫn đăng ký dịch vụ Trái phiếu / Chứng quyền",
+            "Khách hàng cần cung cấp sao kê tài khoản có xác nhận",
+            "Hướng dẫn thao tác thực hiện quyền mua cổ phiếu phát hành thêm",
+            "Tư vấn nâng hạn mức giao dịch chứng khoán",
         ],
         "requests": [
-            "Khách hàng cần được hướng dẫn sử dụng chức năng trên hệ thống.",
-            "Khách hàng yêu cầu tư vấn thông tin sản phẩm và dịch vụ.",
-            "Khách hàng cần giải thích quy trình thực hiện giao dịch.",
-            "Khách hàng cần hỗ trợ kiểm tra thông tin liên quan đến tài khoản.",
+            "Khách hàng liên hệ tổng đài hỏi về lãi suất Margin và danh mục chứng khoán cho vay.",
+            "Khách hàng cần hướng dẫn thao tác đăng ký mua cổ phiếu phát hành thêm trên App.",
+            "Khách hàng yêu cầu cấp bản sao kê tài khoản giao dịch có dấu đỏ xác nhận.",
+            "Khách hàng cần giải thích điều kiện nâng hạn mức giao dịch trong ngày.",
+            "Khách hàng hỏi về thủ tục chuyển nhượng chứng khoán ngoài hệ thống.",
         ],
         "solutions": [
-            "Tư vấn quy trình và gửi hướng dẫn chi tiết cho khách hàng.",
-            "Giải thích thông tin sản phẩm theo tài liệu hiện hành.",
-            "Hướng dẫn khách hàng thực hiện từng bước trên ứng dụng.",
+            "Tư vấn chi tiết quy định, gửi tài liệu hướng dẫn và danh mục Margin qua Email.",
+            "Hướng dẫn chi tiết từng bước thao tác thực hiện quyền trên ứng dụng di động.",
+            "Xác nhận thông tin, in sao kê và gửi qua đường bưu điện/email cho khách hàng.",
+            "Giải thích quy trình thẩm định nâng hạn mức và gửi biểu mẫu đăng ký.",
         ],
         "responses": [
-            "Khách hàng đã nhận đủ thông tin cần thiết.",
-            "Đã hướng dẫn và khách hàng thao tác thành công.",
-            "Nội dung tư vấn đã được gửi đến khách hàng.",
+            "Khách hàng đã nhận được đầy đủ thông tin tư vấn và tài liệu chi tiết.",
+            "Đã hướng dẫn và khách hàng thực hiện thao tác quyền mua thành công.",
+            "Sao kê tài khoản đã được phát hành và gửi tới khách hàng.",
+            "Khách hàng đã nắm rõ thủ tục và gửi biểu mẫu hoàn tất.",
         ],
         "system": "CRM",
     },
@@ -297,48 +347,72 @@ SCENARIOS = [
 
 DEFAULT_SCENARIO = {
     "titles": [
-        "Yêu cầu hỗ trợ từ khách hàng",
-        "Kiểm tra thông tin dịch vụ",
-        "Hỗ trợ xử lý yêu cầu phát sinh",
-        "Tra soát nội dung khách hàng phản ánh",
+        "Yêu cầu hỗ trợ chung từ khách hàng",
+        "Kiểm tra và xác minh thông tin dịch vụ",
+        "Hỗ trợ giải quyết sự cố kỹ thuật phát sinh",
+        "Tra soát nội dung khách hàng phản ánh qua tổng đài",
     ],
     "requests": [
-        "Khách hàng liên hệ CCC và cần hỗ trợ kiểm tra thông tin.",
-        "Khách hàng phản ánh một nội dung phát sinh trong quá trình sử dụng dịch vụ.",
-        "Khách hàng yêu cầu tra soát và cập nhật kết quả xử lý.",
-        "Khách hàng cần được hướng dẫn thêm về quy trình thực hiện.",
+        "Khách hàng liên hệ Trung tâm Chăm sóc Khách hàng cần hỗ trợ kiểm tra thông tin tài khoản.",
+        "Khách hàng phản ánh vấn đề phát sinh trong quá trình sử dụng dịch vụ chứng khoán.",
+        "Khách hàng yêu cầu kiểm tra tiến độ và cập nhật kết quả xử lý yêu cầu.",
+        "Khách hàng cần nhân viên tư vấn hướng dẫn thêm quy trình giao dịch.",
     ],
     "solutions": [
-        "Tiếp nhận thông tin, xác minh dữ liệu và chuyển đơn vị liên quan xử lý.",
-        "Đối chiếu thông tin trên hệ thống và cập nhật tiến độ cho khách hàng.",
-        "Hướng dẫn khách hàng bổ sung dữ liệu cần thiết.",
+        "Tiếp nhận thông tin, xác minh dữ liệu trên hệ thống và phối hợp xử lý.",
+        "Đối chiếu thông tin chi tiết và cập nhật tiến độ xử lý cho khách hàng.",
+        "Hướng dẫn khách hàng bổ sung giấy tờ / thông tin cần thiết.",
     ],
     "responses": [
-        "Yêu cầu đã được xử lý và phản hồi đến khách hàng.",
-        "Khách hàng đã xác nhận kết quả hỗ trợ.",
-        "Đã hoàn tất nội dung tra soát.",
+        "Yêu cầu hỗ trợ đã được hoàn tất và phản hồi đầy đủ cho khách hàng.",
+        "Khách hàng đã xác nhận kết quả xử lý thành công.",
+        "Đã hoàn thành nội dung tra soát theo yêu cầu.",
     ],
     "system": "CRM",
 }
 
+SAMPLE_CUSTOMER_NAMES = [
+    ("Nguyễn Văn Anh", "MALE"),
+    ("Trần Thị Bích", "FEMALE"),
+    ("Lê Hoàng Cường", "MALE"),
+    ("Phạm Minh Đức", "MALE"),
+    ("Vũ Phương Thảo", "FEMALE"),
+    ("Đặng Quang Huy", "MALE"),
+    ("Bùi Thị Mai", "FEMALE"),
+    ("Phan Thanh Nam", "MALE"),
+    ("Trịnh Quốc Việt", "MALE"),
+    ("Hoàng Kim Oanh", "FEMALE"),
+    ("Đỗ Văn Hùng", "MALE"),
+    ("Nguyễn Thị Phương", "FEMALE"),
+    ("Trần Đức Thắng", "MALE"),
+    ("Lê Minh Tuấn", "MALE"),
+    ("Phạm Ngọc Ánh", "FEMALE"),
+    ("Vũ Hoàng Long", "MALE"),
+    ("Đặng Thu Hà", "FEMALE"),
+    ("Bùi Anh Tuấn", "MALE"),
+    ("Phan Mỹ Linh", "FEMALE"),
+    ("Nghiêm Xuân Trường", "MALE"),
+]
+
 
 class Command(BaseCommand):
     help = (
-        "Tạo dữ liệu ticket CCC mẫu từ đầu năm 2026 đến thời điểm chỉ định. "
-        "Chỉ sử dụng các danh mục, khách hàng và nhân viên đang có trong DB."
+        "Tạo dữ liệu ticket CCC mẫu đa dạng từ 2026-01-01 đến nay. "
+        "Đảm bảo phân công đều cho nhân viên trong bảng Employee, "
+        "gán khách hàng thực tế và tạo lịch sử chỉnh sửa / thời gian xử lý chi tiết."
     )
 
     def add_arguments(self, parser):
         parser.add_argument(
             "--branch-code",
-            default="HO_Q7",
-            help="Mã Hội sở chứa nhân viên CCC. Mặc định: HO_Q7.",
+            default="HS_Q7",
+            help="Mã Hội sở chứa nhân viên CCC. Mặc định: HS_Q7.",
         )
         parser.add_argument(
             "--per-month",
             type=int,
-            default=24,
-            help="Số ticket tạo cho mỗi tháng. Mặc định: 24.",
+            default=35,
+            help="Số ticket tạo cho mỗi tháng. Mặc định: 35.",
         )
         parser.add_argument(
             "--start-date",
@@ -348,15 +422,12 @@ class Command(BaseCommand):
         parser.add_argument(
             "--end-date",
             default=None,
-            help=(
-                "Ngày kết thúc dạng YYYY-MM-DD. "
-                "Mặc định là ngày hiện tại nhưng không vượt quá 2026-07-31."
-            ),
+            help="Ngày kết thúc dạng YYYY-MM-DD. Mặc định là ngày hiện tại.",
         )
         parser.add_argument(
             "--random-seed",
             type=int,
-            default=20260721,
+            default=20260724,
             help="Seed cho bộ sinh số ngẫu nhiên để kết quả ổn định.",
         )
         parser.add_argument(
@@ -381,8 +452,8 @@ class Command(BaseCommand):
         if start_date > end_date:
             raise CommandError("Ngày bắt đầu phải nhỏ hơn hoặc bằng ngày kết thúc.")
 
-        if start_date.year != 2026 or end_date.year != 2026:
-            raise CommandError("Command này chỉ tạo dữ liệu trong năm 2026.")
+        if start_date.year != 2026:
+            raise CommandError("Command này tạo dữ liệu từ đầu năm 2026 đến nay.")
 
         rng = random.Random(options["random_seed"])
 
@@ -397,7 +468,12 @@ class Command(BaseCommand):
             )
 
         branch = self._find_branch(options["branch_code"])
-        employees, users = self._load_ccc_people(branch)
+
+        # Ensure sample customers and customer accounts exist in DB
+        customers, customer_accounts, companies = self._ensure_customer_pool(branch, rng)
+
+        # Load ALL active employees from Employee table
+        employees, users, supervisor_user = self._load_all_people(branch)
 
         categories = list(
             TicketSupportCategory.objects.filter(is_active=True).order_by(
@@ -414,21 +490,10 @@ class Command(BaseCommand):
         )
         sources = list(TicketSource.objects.filter(is_active=True).order_by("id"))
 
-        if not categories:
+        if not categories or not statuses or not priorities or not sources:
             raise CommandError(
-                "Chưa có TicketSupportCategory đang hoạt động. Hãy chạy seed ticket master trước."
-            )
-        if not statuses:
-            raise CommandError(
-                "Chưa có TicketStatus đang hoạt động. Hãy chạy seed ticket master trước."
-            )
-        if not priorities:
-            raise CommandError(
-                "Chưa có TicketPriority đang hoạt động. Hãy chạy seed ticket master trước."
-            )
-        if not sources:
-            raise CommandError(
-                "Chưa có TicketSource đang hoạt động. Hãy chạy seed ticket master trước."
+                "Chưa có đủ danh mục ticket master (Category/Status/Priority/Source). "
+                "Hãy chạy python manage.py seed_ticket_master trước."
             )
 
         classifications = list(
@@ -446,19 +511,6 @@ class Command(BaseCommand):
             .select_related("group")
             .order_by("group__sort_order", "sort_order", "id")
         )
-        customers = list(
-            Customer.objects.filter(status="ACTIVE")
-            .select_related("company", "membership_tier", "branch")
-            .order_by("id")
-        )
-        customer_accounts = list(
-            CustomerAccount.objects.select_related(
-                "customer",
-                "customer__company",
-                "customer__membership_tier",
-            ).order_by("id")
-        )
-        companies = list(Company.objects.filter(status="ACTIVE").order_by("id"))
         tags = list(Tag.objects.filter(is_active=True).order_by("id"))
         units = self._load_processing_units(branch, employees)
         sla_policies = self._load_sla_policies()
@@ -482,13 +534,14 @@ class Command(BaseCommand):
         updated_count = 0
         status_counter: Counter[str] = Counter()
         month_counter: Counter[str] = Counter()
+        employee_counter: Counter[str] = Counter()
+        customer_counter: Counter[str] = Counter()
 
-        supervisor_user = self._find_supervisor_user(users)
         execution_cap = self._execution_cap(end_date)
 
         for index, created_at in enumerate(ticket_datetimes, start=1):
             assigned_employee = employees[(index - 1) % len(employees)]
-            assigned_user = assigned_employee.user_account
+            assigned_user = self._get_employee_user(assigned_employee, supervisor_user or users[0])
             created_by_user = supervisor_user or assigned_user
 
             category = rng.choice(categories)
@@ -561,7 +614,7 @@ class Command(BaseCommand):
                     token in source_code
                     for token in ("API", "CHATBOT", "BOT", "WEBHOOK", "SYSTEM")
                 )
-                or rng.random() < 0.25
+                or rng.random() < 0.30
                 else "MANUAL"
             )
 
@@ -577,11 +630,11 @@ class Command(BaseCommand):
             if error_type and rng.random() < 0.45:
                 title = f"{title} - {error_type.type_name}"
 
-            customer_text = customer.full_name if customer else "khách hàng chưa định danh"
+            customer_text = customer.full_name if customer else "Khách hàng cá nhân"
             request_content = (
                 f"{rng.choice(scenario['requests'])} "
                 f"Người liên hệ: {customer_text}. "
-                f"Mã tham chiếu seed: {index:04d}."
+                f"Mã tra cứu: CCC-{index:04d}."
             )
             handling_solution = (
                 rng.choice(scenario["solutions"])
@@ -599,7 +652,7 @@ class Command(BaseCommand):
 
             external_status = None
             last_synced_at = None
-            if classification_method == "AUTO" or rng.random() < 0.35:
+            if classification_method == "AUTO" or rng.random() < 0.40:
                 external_status = rng.choice(EXTERNAL_STATUS_OPTIONS)
                 last_synced_at = min(
                     timeline_times.get("updated") or created_at,
@@ -616,7 +669,7 @@ class Command(BaseCommand):
                 "customer_account": customer_account,
                 "account_link_status": account_link_status,
                 "raw_account_number": raw_account_number,
-                "handling_branch": branch,
+                "handling_branch": assigned_employee.branch or branch,
                 "assigned_unit": assigned_unit,
                 "assigned_employee": assigned_employee,
                 "owner_user": assigned_user,
@@ -632,9 +685,9 @@ class Command(BaseCommand):
                 "error_group": error_group,
                 "error_type": error_type,
                 "error_note": (
-                    f"Ghi nhận lỗi: {error_type.type_name}."
-                    if error_type
-                    else None
+                    f"Ghi nhận nhóm lỗi: {error_group.group_name} - Loại: {error_type.type_name}."
+                    if error_group and error_type
+                    else (f"Ghi nhận lỗi: {error_type.type_name}." if error_type else None)
                 ),
                 "related_system": related_system,
                 "external_status": external_status,
@@ -692,12 +745,14 @@ class Command(BaseCommand):
                 updated_at=updated_at,
             )
 
+            # Rebuild detailed update, activity & process logs (lịch sử chỉnh sửa & thời gian quản lý)
             self._rebuild_related_data(
                 ticket=ticket,
                 status=status,
                 statuses=statuses,
                 timeline_times=timeline_times,
                 assigned_employee=assigned_employee,
+                all_employees=employees,
                 assigned_user=assigned_user,
                 created_by_user=created_by_user,
                 supervisor_user=supervisor_user,
@@ -714,52 +769,41 @@ class Command(BaseCommand):
 
             status_counter[status.status_code] += 1
             month_counter[created_at.strftime("%Y-%m")] += 1
+            employee_counter[assigned_employee.full_name] += 1
+            if customer:
+                customer_counter[customer.full_name] += 1
+
+        # Invalidate dashboard cache so new data reflects immediately
+        try:
+            invalidate_ticket_dashboard_cache()
+            self.stdout.write(self.style.SUCCESS("Đã xóa cache Dashboard CCC Ticket."))
+        except Exception:
+            pass
 
         self.stdout.write("")
-        self.stdout.write(self.style.SUCCESS("Seed ticket CCC hoàn tất."))
-        self.stdout.write(f"- Hội sở xử lý: {branch.branch_code} - {branch.branch_name}")
-        self.stdout.write(f"- Nhân viên CCC: {len(employees)}")
-        self.stdout.write(f"- Ticket tạo mới: {created_count}")
-        self.stdout.write(f"- Ticket cập nhật: {updated_count}")
-        self.stdout.write(f"- Tổng ticket seed: {len(ticket_datetimes)}")
+        self.stdout.write(self.style.SUCCESS("=== HOÀN TẤT SEED TICKET CCC DỮ LIỆU ĐA DẠNG 2026 ==="))
+        self.stdout.write(f"- Tổng số ticket seed: {len(ticket_datetimes)}")
+        self.stdout.write(f"- Số ticket tạo mới: {created_count}")
+        self.stdout.write(f"- Số ticket cập nhật: {updated_count}")
+        self.stdout.write(f"- Số nhân viên phân công: {len(employees)}")
+        self.stdout.write(f"- Số khách hàng liên kết: {len(customer_counter)}")
         self.stdout.write(
             f"- Khoảng thời gian: {start_date.isoformat()} đến {end_date.isoformat()}"
         )
 
-        self.stdout.write("\nTheo tháng:")
+        self.stdout.write("\nPhân bổ theo tháng:")
         for key in sorted(month_counter):
-            self.stdout.write(f"  {key}: {month_counter[key]}")
+            self.stdout.write(f"  {key}: {month_counter[key]} ticket")
 
-        self.stdout.write("\nTheo trạng thái:")
-        for status in statuses:
+        self.stdout.write("\nPhân bổ theo trạng thái:")
+        for st in statuses:
             self.stdout.write(
-                f"  {status.status_code}: {status_counter[status.status_code]}"
+                f"  {st.status_code} ({st.status_name}): {status_counter[st.status_code]} ticket"
             )
 
-        if not customers:
-            self.stdout.write(
-                self.style.WARNING(
-                    "\nKhông có Customer ACTIVE nên một số ticket không gắn khách hàng."
-                )
-            )
-        if not customer_accounts:
-            self.stdout.write(
-                self.style.WARNING(
-                    "Không có CustomerAccount nên ticket đều ở trạng thái chưa liên kết."
-                )
-            )
-        if not classifications:
-            self.stdout.write(
-                self.style.WARNING(
-                    "Không có TicketClassification ACTIVE nên classification để trống."
-                )
-            )
-        if not sla_policies:
-            self.stdout.write(
-                self.style.WARNING(
-                    "Không tìm thấy SlaPolicy phù hợp nên sla_policy để trống."
-                )
-            )
+        self.stdout.write("\nPhân bổ theo nhân viên tiêu biểu (Top 5):")
+        for emp_name, count in employee_counter.most_common(5):
+            self.stdout.write(f"  - {emp_name}: {count} ticket")
 
     def _parse_date(self, raw_value: str, option_name: str) -> date:
         try:
@@ -768,6 +812,15 @@ class Command(BaseCommand):
             raise CommandError(
                 f"{option_name} phải có định dạng YYYY-MM-DD."
             ) from exc
+
+    def _get_employee_user(self, employee: Employee, fallback: User) -> User:
+        try:
+            user = employee.user_account
+            if user and getattr(user, "is_active", True):
+                return user
+        except Exception:
+            pass
+        return fallback
 
     def _find_branch(self, branch_code: str) -> Branch:
         branch = Branch.objects.filter(
@@ -781,95 +834,126 @@ class Command(BaseCommand):
         branch = (
             Branch.objects.filter(status="ACTIVE")
             .filter(
-                Q(branch_name__icontains="hội sở")
-                | Q(branch_name__icontains="hoi so")
-            )
-            .filter(
-                Q(branch_name__icontains="7")
-                | Q(address__icontains="Quận 7")
-                | Q(address__icontains="Quan 7")
+                Q(branch_code__icontains="HS")
+                | Q(branch_code__icontains="HO")
+                | Q(branch_name__icontains="hội sở")
             )
             .first()
         )
 
         if not branch:
-            raise CommandError(
-                f"Không tìm thấy Hội sở với branch_code={branch_code}. "
-                "Có thể truyền mã khác bằng --branch-code."
-            )
+            branch = Branch.objects.filter(status="ACTIVE").first()
 
-        self.stdout.write(
-            self.style.WARNING(
-                f"Không tìm thấy mã {branch_code}; sử dụng {branch.branch_code}."
-            )
-        )
+        if not branch:
+            raise CommandError("Không tìm thấy Chi nhánh / Hội sở nào đang ACTIVE trong DB.")
+
         return branch
 
-    def _load_ccc_people(
+    def _ensure_customer_pool(
         self,
         branch: Branch,
-    ) -> tuple[list[Employee], list[User]]:
-        employees = list(
-            Employee.objects.filter(
-                branch=branch,
-                status="ACTIVE",
-                user_account__isnull=False,
-            )
-            .filter(
-                Q(department__iexact="CCC")
-                | Q(
-                    user_account__user_roles__role__group_code=Role.GROUP_CCC
+        rng: random.Random,
+    ) -> tuple[list[Customer], list[CustomerAccount], list[Company]]:
+        active_customers = list(
+            Customer.objects.filter(status="ACTIVE")
+            .select_related("company", "membership_tier", "branch")
+            .order_by("id")
+        )
+
+        # If customers count is less than 15, seed sample active customers
+        if len(active_customers) < 15:
+            customer_type = CustomerType.objects.filter(is_active=True).first()
+            membership_tier = MembershipTier.objects.filter(is_active=True).first()
+            customer_source = CustomerSource.objects.filter(is_active=True).first()
+
+            for i, (name, gender) in enumerate(SAMPLE_CUSTOMER_NAMES, start=1):
+                code = f"KH-2026-{i:03d}"
+                acc_num = f"058C{i:06d}"
+                phone = f"090{i:07d}"
+                email = f"khachhang{i}@gmail.com"
+
+                cust, _ = Customer.objects.get_or_create(
+                    customer_code=code,
+                    defaults={
+                        "full_name": name,
+                        "gender": gender,
+                        "phone": phone,
+                        "email": email,
+                        "branch": branch,
+                        "customer_type": customer_type,
+                        "membership_tier": membership_tier,
+                        "source": customer_source,
+                        "status": "ACTIVE",
+                    },
                 )
+
+                CustomerAccount.objects.get_or_create(
+                    account_number=acc_num,
+                    defaults={
+                        "customer": cust,
+                        "opened_at": date(2025, 1, 1),
+                        "account_status": "ACTIVE",
+                        "source_system": "FLEX",
+                    },
+                )
+
+            active_customers = list(
+                Customer.objects.filter(status="ACTIVE")
+                .select_related("company", "membership_tier", "branch")
+                .order_by("id")
             )
-            .select_related("user_account")
-            .distinct()
+
+        customer_accounts = list(
+            CustomerAccount.objects.select_related(
+                "customer",
+                "customer__company",
+                "customer__membership_tier",
+            ).order_by("id")
+        )
+        companies = list(Company.objects.filter(status="ACTIVE").order_by("id"))
+
+        return active_customers, customer_accounts, companies
+
+    def _load_all_people(
+        self,
+        branch: Branch,
+    ) -> tuple[list[Employee], list[User], User | None]:
+        # Load active employees across all branches so assignments are diverse
+        employees = list(
+            Employee.objects.filter(status="ACTIVE")
+            .select_related("user_account", "branch")
             .order_by("employee_code")
         )
 
         if not employees:
-            raise CommandError(
-                f"Không tìm thấy nhân viên CCC có tài khoản tại {branch.branch_code}. "
-                "Hãy chạy seed nhân viên và account trước."
-            )
+            raise CommandError("Không tìm thấy nhân viên nào có status=ACTIVE trong DB.")
 
-        users = [employee.user_account for employee in employees]
+        users = list(User.objects.filter(is_active=True))
+        if not users:
+            raise CommandError("Không tìm thấy User nào có is_active=True trong DB.")
 
-        self.stdout.write(
-            f"Sử dụng nhân viên CCC: "
-            f"{', '.join(employee.employee_code for employee in employees)}"
-        )
-
-        return employees, users
-
-    def _find_supervisor_user(self, users: list[User]) -> User | None:
-        user_ids = [user.pk for user in users]
-        return (
+        supervisor_user = (
             User.objects.filter(
-                pk__in=user_ids,
+                is_active=True,
                 user_roles__role__role_code="CS_SUPERVISOR",
             )
             .distinct()
             .first()
+        ) or users[0]
+
+        self.stdout.write(
+            f"Đã nạp {len(employees)} nhân viên từ bảng Employee và {len(users)} người dùng hệ thống."
         )
+
+        return employees, users, supervisor_user
 
     def _load_processing_units(
         self,
         branch: Branch,
         employees: list[Employee],
     ) -> list[ProcessingUnit]:
-        employee_ids = [employee.pk for employee in employees]
-
         return list(
-            ProcessingUnit.objects.filter(is_active=True)
-            .filter(
-                Q(default_branch=branch)
-                | Q(
-                    members__employee_id__in=employee_ids,
-                    members__is_active=True,
-                )
-            )
-            .distinct()
-            .order_by("id")
+            ProcessingUnit.objects.filter(is_active=True).order_by("id")
         )
 
     def _load_sla_policies(self) -> list[Any]:
@@ -879,10 +963,7 @@ class Command(BaseCommand):
             return []
 
         queryset = model.objects.all()
-        field_names = {
-            field.name
-            for field in model._meta.get_fields()
-        }
+        field_names = {field.name for field in model._meta.get_fields()}
 
         if "is_active" in field_names:
             queryset = queryset.filter(is_active=True)
@@ -902,30 +983,23 @@ class Command(BaseCommand):
             return None
 
         model = policies[0].__class__
-        field_names = {
-            field.name
-            for field in model._meta.get_fields()
-        }
+        field_names = {field.name for field in model._meta.get_fields()}
 
         matched = policies
 
         if "support_category" in field_names:
-            category_matched = [
-                policy
-                for policy in matched
-                if getattr(policy, "support_category_id", None) == category.pk
+            cat_matched = [
+                p for p in matched if getattr(p, "support_category_id", None) == category.pk
             ]
-            if category_matched:
-                matched = category_matched
+            if cat_matched:
+                matched = cat_matched
 
         if "priority" in field_names:
-            priority_matched = [
-                policy
-                for policy in matched
-                if getattr(policy, "priority_id", None) == priority.pk
+            prio_matched = [
+                p for p in matched if getattr(p, "priority_id", None) == priority.pk
             ]
-            if priority_matched:
-                matched = priority_matched
+            if prio_matched:
+                matched = prio_matched
 
         return rng.choice(matched or policies)
 
@@ -946,7 +1020,7 @@ class Command(BaseCommand):
             last_day = calendar.monthrange(year, month)[1]
             month_end = min(end_date, date(year, month, last_day))
 
-            total_days = (month_end - month_start).days
+            total_days = max(0, (month_end - month_start).days)
 
             for _ in range(per_month):
                 selected_date = month_start + timedelta(
@@ -955,7 +1029,7 @@ class Command(BaseCommand):
 
                 max_hour = 20
                 if selected_date == timezone.localdate():
-                    max_hour = max(0, min(20, timezone.localtime().hour - 1))
+                    max_hour = max(8, min(20, timezone.localtime().hour - 1))
 
                 selected_time = time(
                     hour=rng.randint(8, max(8, max_hour)),
@@ -988,13 +1062,7 @@ class Command(BaseCommand):
         statuses: list[TicketStatus],
     ) -> dict[int, TicketStatus]:
         if total < len(statuses):
-            raise CommandError(
-                "Tổng số ticket nhỏ hơn số trạng thái đang có. "
-                "Hãy tăng --per-month để mỗi trạng thái xuất hiện ít nhất một lần."
-            )
-
-        if len(statuses) == 1:
-            return {0: statuses[0]}
+            return {}
 
         positions: dict[int, TicketStatus] = {}
         last_position = total - 1
@@ -1092,7 +1160,7 @@ class Command(BaseCommand):
         ]
         if not matched:
             return None
-        return rng.choice(matched) if rng.random() < 0.88 else None
+        return rng.choice(matched) if rng.random() < 0.90 else None
 
     def _choose_error(
         self,
@@ -1100,11 +1168,11 @@ class Command(BaseCommand):
         error_types: list[TicketErrorType],
         rng: random.Random,
     ) -> tuple[TicketErrorGroup | None, TicketErrorType | None]:
-        if error_types and rng.random() < 0.62:
+        if error_types and rng.random() < 0.70:
             error_type = rng.choice(error_types)
             return error_type.group, error_type
 
-        if error_groups and rng.random() < 0.18:
+        if error_groups and rng.random() < 0.25:
             return rng.choice(error_groups), None
 
         return None, None
@@ -1142,7 +1210,7 @@ class Command(BaseCommand):
         str,
         str | None,
     ]:
-        if customer_accounts and rng.random() < 0.58:
+        if customer_accounts and rng.random() < 0.85:
             customer_account = rng.choice(customer_accounts)
             customer = customer_account.customer
             company = customer.company
@@ -1151,25 +1219,20 @@ class Command(BaseCommand):
                 customer_account,
                 company,
                 TicketAccountLinkStatus.LINKED,
-                None,
+                customer_account.account_number,
             )
 
         customer = (
             rng.choice(customers)
-            if customers and rng.random() < 0.82
+            if customers and rng.random() < 0.90
             else None
         )
 
         company = customer.company if customer else None
-        if company is None and companies and rng.random() < 0.18:
+        if company is None and companies and rng.random() < 0.20:
             company = rng.choice(companies)
 
-        raw_account_number = None
-        if rng.random() < 0.72:
-            raw_account_number = "".join(
-                str(rng.randint(0, 9))
-                for _ in range(10)
-            )
+        raw_account_number = "".join(str(rng.randint(0, 9)) for _ in range(10))
 
         return (
             customer,
@@ -1238,7 +1301,7 @@ class Command(BaseCommand):
             "created": created_at,
             "assigned": self._advance(
                 created_at,
-                rng.randint(5, 90),
+                rng.randint(5, 60),
                 cap,
             ),
             "accepted": None,
@@ -1417,6 +1480,7 @@ class Command(BaseCommand):
         statuses: list[TicketStatus],
         timeline_times: dict[str, datetime | None],
         assigned_employee: Employee,
+        all_employees: list[Employee],
         assigned_user: User,
         created_by_user: User,
         supervisor_user: User | None,
@@ -1441,23 +1505,98 @@ class Command(BaseCommand):
         TicketTag.objects.filter(ticket=ticket).delete()
         TicketFollower.objects.filter(ticket=ticket).delete()
 
-        assignment = TicketAssignment.objects.create(
-            ticket=ticket,
-            from_branch=branch,
-            to_branch=branch,
-            from_unit=None,
-            to_unit=unit,
-            from_employee=None,
-            to_employee=assigned_employee,
-            assigned_by_user=created_by_user,
-            assigned_at=timeline_times["assigned"],
-            unassigned_at=None,
-            is_current=True,
-            transfer_reason=rng.choice(TRANSFER_REASON_OPTIONS),
-            note="Dữ liệu phân công được tạo bởi seed ticket CCC.",
-            created_at=timeline_times["assigned"],
+        # Check if reassignment / transfer occurred mid-way (35% probability)
+        has_reassignment = len(all_employees) > 1 and rng.random() < 0.35
+        initial_employee = (
+            rng.choice([e for e in all_employees if e.pk != assigned_employee.pk])
+            if has_reassignment
+            else assigned_employee
         )
 
+        initial_assign_time = timeline_times["assigned"]
+        transfer_time = (
+            self._advance(initial_assign_time, rng.randint(15, 120), timeline_times.get("updated") or initial_assign_time)
+            if has_reassignment
+            else None
+        )
+
+        # 1. TicketAssignment history
+        if has_reassignment and transfer_time:
+            TicketAssignment.objects.create(
+                ticket=ticket,
+                from_branch=branch,
+                to_branch=initial_employee.branch or branch,
+                from_unit=None,
+                to_unit=unit,
+                from_employee=None,
+                to_employee=initial_employee,
+                assigned_by_user=created_by_user,
+                assigned_at=initial_assign_time,
+                unassigned_at=transfer_time,
+                is_current=False,
+                transfer_reason="Tiếp nhận và phân công ban đầu.",
+                note="Phân công ban đầu cho nhân viên ca trước.",
+                created_at=initial_assign_time,
+            )
+
+            TicketAssignment.objects.create(
+                ticket=ticket,
+                from_branch=initial_employee.branch or branch,
+                to_branch=assigned_employee.branch or branch,
+                from_unit=unit,
+                to_unit=unit,
+                from_employee=initial_employee,
+                to_employee=assigned_employee,
+                assigned_by_user=supervisor_user or assigned_user,
+                assigned_at=transfer_time,
+                unassigned_at=None,
+                is_current=True,
+                transfer_reason=rng.choice(TRANSFER_REASON_OPTIONS),
+                note="Điều phối lại ticket cho nhân viên phụ trách trực tiếp.",
+                created_at=transfer_time,
+            )
+        else:
+            TicketAssignment.objects.create(
+                ticket=ticket,
+                from_branch=branch,
+                to_branch=assigned_employee.branch or branch,
+                from_unit=None,
+                to_unit=unit,
+                from_employee=None,
+                to_employee=assigned_employee,
+                assigned_by_user=created_by_user,
+                assigned_at=initial_assign_time,
+                unassigned_at=None,
+                is_current=True,
+                transfer_reason=rng.choice(TRANSFER_REASON_OPTIONS),
+                note="Phân công trực tiếp cho nhân viên xử lý.",
+                created_at=initial_assign_time,
+            )
+
+        # 2. Activity logs: CREATE & INITIAL ASSIGNMENT
+        TicketActivityLog.objects.create(
+            ticket=ticket,
+            action_type="CREATE",
+            action_name="Tạo mới ticket",
+            old_value=None,
+            new_value=status.status_code,
+            created_by_user=created_by_user,
+            created_at=timeline_times["created"],
+            note="Ticket tiếp nhận qua kênh giao tiếp với khách hàng.",
+        )
+
+        TicketActivityLog.objects.create(
+            ticket=ticket,
+            action_type="ASSIGN_EMPLOYEE",
+            action_name="Phân công nhân viên xử lý",
+            old_value=None,
+            new_value=initial_employee.employee_code,
+            created_by_user=created_by_user,
+            created_at=initial_assign_time,
+            note=f"Phân công cho nhân viên {initial_employee.full_name}.",
+        )
+
+        # 3. Update logs: Initial Assignment
         TicketUpdateLog.objects.create(
             ticket=ticket,
             action_type="ASSIGN_EMPLOYEE",
@@ -1466,40 +1605,52 @@ class Command(BaseCommand):
             from_unit=None,
             to_unit=unit,
             from_branch=branch,
-            to_branch=branch,
+            to_branch=assigned_employee.branch or branch,
             from_employee=None,
-            to_employee=assigned_employee,
+            to_employee=initial_employee,
             old_priority=None,
             new_priority=priority,
             old_sla_policy=None,
             new_sla_policy=sla_policy,
-            note="Phân công ticket cho nhân viên CCC.",
+            note="Ghi nhận phân công nhân viên phụ trách.",
             created_by_user=created_by_user,
-            created_at=timeline_times["assigned"],
+            created_at=initial_assign_time,
         )
 
-        TicketActivityLog.objects.create(
-            ticket=ticket,
-            action_type="CREATE",
-            action_name="Tạo ticket",
-            old_value=None,
-            new_value=status.status_code,
-            created_by_user=created_by_user,
-            created_at=timeline_times["created"],
-            note="Ticket mẫu được tạo từ management command.",
-        )
+        # Log field edit / update info log if reassigned
+        if has_reassignment and transfer_time:
+            TicketUpdateLog.objects.create(
+                ticket=ticket,
+                action_type="TRANSFER_EMPLOYEE",
+                from_status=None,
+                to_status=None,
+                from_unit=unit,
+                to_unit=unit,
+                from_branch=initial_employee.branch or branch,
+                to_branch=assigned_employee.branch or branch,
+                from_employee=initial_employee,
+                to_employee=assigned_employee,
+                old_priority=priority,
+                new_priority=priority,
+                old_sla_policy=sla_policy,
+                new_sla_policy=sla_policy,
+                note=f"Điều chuyển ticket từ {initial_employee.full_name} sang {assigned_employee.full_name}.",
+                created_by_user=supervisor_user or assigned_user,
+                created_at=transfer_time,
+            )
 
-        TicketActivityLog.objects.create(
-            ticket=ticket,
-            action_type="ASSIGN_EMPLOYEE",
-            action_name="Phân công nhân viên",
-            old_value=None,
-            new_value=assigned_employee.employee_code,
-            created_by_user=created_by_user,
-            created_at=timeline_times["assigned"],
-            note=assignment.transfer_reason,
-        )
+            TicketActivityLog.objects.create(
+                ticket=ticket,
+                action_type="TRANSFER_EMPLOYEE",
+                action_name="Điều chuyển nhân viên phụ trách",
+                old_value=initial_employee.employee_code,
+                new_value=assigned_employee.employee_code,
+                created_by_user=supervisor_user or assigned_user,
+                created_at=transfer_time,
+                note="Thay đổi nhân viên theo phân công ca trực.",
+            )
 
+        # 4. Detailed Status Timeline and Process Logs (Thời gian quản lý)
         timeline = self._build_status_timeline(
             current_status=status,
             statuses=statuses,
@@ -1510,15 +1661,13 @@ class Command(BaseCommand):
             end_at = (
                 timeline[item_index + 1][1]
                 if item_index + 1 < len(timeline)
-                else None
+                else (timeline_times.get("updated") or timezone.now())
             )
-            duration_minutes = None
 
-            if end_at:
-                duration_minutes = max(
-                    0,
-                    int((end_at - start_at).total_seconds() // 60),
-                )
+            duration_minutes = max(
+                1,
+                int((end_at - start_at).total_seconds() // 60),
+            )
 
             TicketProcessLog.objects.create(
                 ticket=ticket,
@@ -1528,7 +1677,7 @@ class Command(BaseCommand):
                 start_at=start_at,
                 end_at=end_at,
                 duration_minutes=duration_minutes,
-                note=f"Xử lý ticket ở trạng thái {timeline_status.status_name}.",
+                note=f"Thời gian xử lý ở trạng thái {timeline_status.status_name}.",
                 created_at=start_at,
             )
 
@@ -1550,8 +1699,8 @@ class Command(BaseCommand):
                 to_status=timeline_status,
                 from_unit=unit,
                 to_unit=unit,
-                from_branch=branch,
-                to_branch=branch,
+                from_branch=assigned_employee.branch or branch,
+                to_branch=assigned_employee.branch or branch,
                 from_employee=assigned_employee,
                 to_employee=assigned_employee,
                 old_priority=priority,
@@ -1561,9 +1710,9 @@ class Command(BaseCommand):
                 handling_solution=ticket.handling_solution,
                 send_survey=(
                     self._status_stage(timeline_status) == "closed"
-                    and rng.random() < 0.7
+                    and rng.random() < 0.75
                 ),
-                note=f"Chuyển trạng thái sang {timeline_status.status_name}.",
+                note=f"Cập nhật trạng thái ticket sang {timeline_status.status_name}.",
                 created_by_user=(
                     supervisor_user or assigned_user
                     if action_type in {"CLOSE", "CANCEL"}
@@ -1575,32 +1724,57 @@ class Command(BaseCommand):
             TicketActivityLog.objects.create(
                 ticket=ticket,
                 action_type=action_type,
-                action_name=f"Cập nhật trạng thái: {timeline_status.status_name}",
+                action_name=f"Chuyển trạng thái: {timeline_status.status_name}",
                 old_value=previous_status.status_code,
                 new_value=timeline_status.status_code,
                 created_by_user=assigned_user,
                 created_at=start_at,
-                note="Dữ liệu lịch sử trạng thái được tạo bởi seed.",
+                note=f"Ghi nhận cập nhật tiến độ xử lý sang {timeline_status.status_name}.",
             )
 
-        comment_count = 1 if rng.random() < 0.65 else 2
+        # 5. Field edit log (Simulate editing priority or notes mid-way)
+        if rng.random() < 0.50:
+            edit_time = self._advance(timeline_times["assigned"], rng.randint(20, 180), timeline_times.get("updated") or timeline_times["assigned"])
+            TicketUpdateLog.objects.create(
+                ticket=ticket,
+                action_type="UPDATE_INFO",
+                from_status=status,
+                to_status=status,
+                from_unit=unit,
+                to_unit=unit,
+                from_branch=assigned_employee.branch or branch,
+                to_branch=assigned_employee.branch or branch,
+                from_employee=assigned_employee,
+                to_employee=assigned_employee,
+                old_priority=priority,
+                new_priority=priority,
+                old_sla_policy=sla_policy,
+                new_sla_policy=sla_policy,
+                handling_solution=ticket.handling_solution,
+                note=rng.choice(FIELD_UPDATE_NOTES),
+                created_by_user=assigned_user,
+                created_at=edit_time,
+            )
 
+        # 6. Ticket Comments (1-3 comments per ticket)
+        comment_count = rng.randint(1, 3)
         for comment_index in range(comment_count):
             comment_at = self._advance(
                 timeline_times["assigned"],
-                rng.randint(10, 600) + comment_index,
+                rng.randint(10, 480) + (comment_index * 30),
                 timeline_times.get("updated") or timeline_times["assigned"],
             )
+            comment_user = assigned_user if comment_index % 2 == 0 else (supervisor_user or assigned_user)
             TicketComment.objects.create(
                 ticket=ticket,
                 comment_content=rng.choice(COMMENT_OPTIONS),
-                is_internal=rng.random() < 0.82,
-                created_by_user=assigned_user,
+                is_internal=rng.random() < 0.75,
+                created_by_user=comment_user,
                 created_at=comment_at,
             )
 
+        # 7. Ticket Response
         stage = self._status_stage(status)
-
         if stage in {"done", "pending_close", "closed"}:
             response_at = (
                 timeline_times.get("done")
@@ -1619,7 +1793,8 @@ class Command(BaseCommand):
                 created_at=response_at,
             )
 
-        if rng.random() < 0.24:
+        # 8. Attachments
+        if rng.random() < 0.35:
             uploaded_at = self._advance(
                 timeline_times["assigned"],
                 rng.randint(5, 180),
@@ -1628,9 +1803,9 @@ class Command(BaseCommand):
             extension = rng.choice(["png", "jpg", "pdf"])
             TicketAttachment.objects.create(
                 ticket=ticket,
-                file_name=f"ticket_{ticket.ticket_code.lower()}.{extension}",
+                file_name=f"dinh_kem_{ticket.ticket_code.lower()}.{extension}",
                 file_url=(
-                    f"https://example.invalid/seed-attachments/"
+                    f"https://example.invalid/attachments/"
                     f"{ticket.ticket_code.lower()}.{extension}"
                 ),
                 file_type=(
@@ -1638,18 +1813,19 @@ class Command(BaseCommand):
                     if extension == "pdf"
                     else f"image/{'jpeg' if extension == 'jpg' else 'png'}"
                 ),
-                file_size=rng.randint(25_000, 1_800_000),
+                file_size=rng.randint(35_000, 2_500_000),
                 uploaded_by_user=created_by_user,
                 uploaded_at=uploaded_at,
             )
 
-        if stage == "closed" and rng.random() < 0.68:
+        # 9. Customer Feedback Survey
+        if stage == "closed" and rng.random() < 0.80:
             sent_at = timeline_times.get("closed")
-            responded = rng.random() < 0.78
+            responded = rng.random() < 0.85
             responded_at = (
                 self._advance(
                     sent_at,
-                    rng.randint(30, 1440),
+                    rng.randint(20, 1440),
                     self._execution_cap(sent_at.date()),
                 )
                 if responded and sent_at
@@ -1657,7 +1833,7 @@ class Command(BaseCommand):
             )
             rating_score = rng.choices(
                 [1, 2, 3, 4, 5],
-                weights=[2, 4, 14, 36, 44],
+                weights=[2, 5, 12, 35, 46],
                 k=1,
             )[0] if responded else None
 
@@ -1670,10 +1846,11 @@ class Command(BaseCommand):
                 rating_note=(
                     rng.choice(
                         [
-                            "Hỗ trợ nhanh và rõ ràng.",
-                            "Khách hàng hài lòng với kết quả xử lý.",
-                            "Cần cập nhật tiến độ thường xuyên hơn.",
-                            "Thông tin phản hồi đầy đủ.",
+                            "Nhân viên hỗ trợ rất nhiệt tình, phản hồi nhanh chóng.",
+                            "Khách hàng hoàn toàn hài lòng với kết quả xử lý.",
+                            "Cần rút ngắn hơn nữa thời gian trao đổi ban đầu.",
+                            "Nội dung phản hồi rõ ràng, dễ hiểu.",
+                            "Rất cảm ơn bộ phận CCC đã tra soát kịp thời.",
                         ]
                     )
                     if responded
@@ -1689,7 +1866,8 @@ class Command(BaseCommand):
                 updated_at=responded_at or sent_at or timeline_times["created"],
             )
 
-        if tags and rng.random() < 0.35:
+        # 10. Tags & Followers
+        if tags and rng.random() < 0.45:
             selected_tags = rng.sample(
                 tags,
                 k=min(len(tags), rng.randint(1, 2)),
@@ -1705,11 +1883,9 @@ class Command(BaseCommand):
                 )
 
         follower_candidates = [
-            user
-            for user in all_users
-            if user.pk != assigned_user.pk
+            user for user in all_users if user.pk != assigned_user.pk
         ]
-        if follower_candidates and rng.random() < 0.32:
+        if follower_candidates and rng.random() < 0.40:
             follower = rng.choice(follower_candidates)
             TicketFollower.objects.get_or_create(
                 ticket=ticket,
@@ -1727,10 +1903,7 @@ class Command(BaseCommand):
         created_at: datetime,
         updated_at: datetime,
     ) -> None:
-        field_names = {
-            field.name
-            for field in model._meta.get_fields()
-        }
+        field_names = {field.name for field in model._meta.get_fields()}
         updates = {}
 
         if "created_at" in field_names:

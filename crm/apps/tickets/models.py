@@ -409,25 +409,32 @@ class Ticket(TimeStampedModel):
             models.Index(fields=["external_status"]),
             models.Index(fields=["sla_policy"]),
             models.Index(fields=["created_at"]),
+            # Dashboard filters normally use equality on a dimension first,
+            # followed by a created_at range. Keep the equality column first so
+            # PostgreSQL can narrow the index scan before applying the range.
             models.Index(
-                fields=["created_at", "current_status"],
-                name="tkt_created_status_ix",
+                fields=["current_status", "created_at"],
+                name="tkt_status_created_ix",
             ),
             models.Index(
-                fields=["created_at", "handling_branch"],
-                name="tkt_created_branch_ix",
+                fields=["handling_branch", "created_at"],
+                name="tkt_branch_created_ix",
             ),
             models.Index(
-                fields=["created_at", "source"],
-                name="tkt_created_source_ix",
+                fields=["source", "created_at"],
+                name="tkt_source_created_ix",
             ),
             models.Index(
-                fields=["created_at", "support_category"],
-                name="tkt_created_category_ix",
+                fields=["support_category", "created_at"],
+                name="tkt_category_created_ix",
             ),
             models.Index(
-                fields=["created_at", "account_link_status"],
-                name="tkt_created_link_ix",
+                fields=["account_link_status", "created_at"],
+                name="tkt_link_created_ix",
+            ),
+            models.Index(
+                fields=["assigned_employee", "created_at"],
+                name="tkt_employee_created_ix",
             ),
         ]
 

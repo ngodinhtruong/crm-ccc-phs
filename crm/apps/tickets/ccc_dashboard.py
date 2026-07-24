@@ -15,6 +15,7 @@ from rest_framework.views import APIView
 from apps.accounts.scopes import filter_tickets_by_user
 from apps.common.constants import SlaStatus, TicketStatusCode
 from apps.tickets.dashboard_cache import (
+    build_queryset_scope_fingerprint,
     build_ticket_dashboard_cache_key,
     get_ticket_dashboard_cache,
     is_dashboard_refresh_requested,
@@ -33,6 +34,42 @@ REPORT_MONTH_COUNT = 5
 MAX_RECENT_LIMIT = 50
 PENDING_PAGE_SIZE_OPTIONS = (5, 10, 20)
 DEFAULT_PENDING_PAGE_SIZE = 10
+DEFAULT_MAX_REPORT_MONTHS = 12
+
+REPORT_SECTION_NAMES = frozenset(
+    {
+        "report_monthly",
+        "report_source",
+        "report_category",
+        "report_unit",
+        "report_time",
+        "report_sla",
+        "report_employee",
+        "report_summary",
+    }
+)
+ALL_DASHBOARD_SECTIONS = frozenset(
+    {
+        "overview",
+        "distributions",
+        "trend",
+        "root_cause",
+        "ageing",
+        "pending",
+        *REPORT_SECTION_NAMES,
+    }
+)
+SECTION_ALIASES = {
+    "all": ALL_DASHBOARD_SECTIONS,
+    "core": frozenset(
+        {"overview", "distributions", "trend", "root_cause", "ageing"}
+    ),
+    "charts": frozenset(
+        {"distributions", "trend", "root_cause", "ageing"}
+    ),
+    "reports": REPORT_SECTION_NAMES,
+    "report": REPORT_SECTION_NAMES,
+}
 
 PENDING_TICKET_SELECT_RELATED = (
     "customer",
@@ -60,6 +97,77 @@ REPORT_TICKET_SELECT_RELATED = (
     "sla_tracking",
 )
 
+PENDING_TICKET_ONLY_FIELDS = (
+    "id",
+    "ticket_code",
+    "title",
+    "created_at",
+    "raw_account_number",
+    "account_link_status",
+    "customer_id",
+    "customer__full_name",
+    "company_id",
+    "company__company_name",
+    "customer_account_id",
+    "customer_account__account_number",
+    "handling_branch_id",
+    "handling_branch__branch_name",
+    "assigned_employee_id",
+    "assigned_employee__full_name",
+    "current_status_id",
+    "current_status__status_code",
+    "current_status__status_name",
+    "support_category_id",
+    "support_category__category_name",
+    "source_id",
+    "source__source_name",
+    "error_group_id",
+    "error_group__group_name",
+    "error_type_id",
+    "error_type__type_name",
+)
+
+REPORT_TICKET_ONLY_FIELDS = (
+    "id",
+    "title",
+    "request_content",
+    "source_ref_id",
+    "related_system",
+    "cancelled_reason",
+    "created_at",
+    "accepted_at",
+    "processing_started_at",
+    "done_at",
+    "closed_at",
+    "cancelled_at",
+    "source_id",
+    "source__source_code",
+    "source__source_name",
+    "support_category_id",
+    "support_category__category_code",
+    "support_category__category_name",
+    "classification_id",
+    "classification__classification_code",
+    "classification__classification_name",
+    "current_status_id",
+    "current_status__status_code",
+    "error_group_id",
+    "error_group__group_name",
+    "error_type_id",
+    "error_type__type_name",
+    "assigned_unit_id",
+    "assigned_unit__unit_code",
+    "assigned_unit__unit_name",
+    "assigned_employee_id",
+    "assigned_employee__full_name",
+    "owner_user_id",
+    "owner_user__username",
+    "owner_user__email",
+    "owner_user__first_name",
+    "owner_user__last_name",
+    "sla_tracking__sla_status",
+)
+
 
 def _safe_int(value, default):
     try:
@@ -81,6 +189,42 @@ def _safe_pending_page_size(value):
 
 def _safe_page(value):
     return max(1, _safe_int(value, 1))
+
+
+def _requested_sections(params):
+    raw_values = params.getlist("sections") or params.getlist("section")
+    if not raw_values:
+        return set(ALL_DASHBOARD_SECTIONS)
+
+    requested = set()
+    for raw_value in raw_values:
+        for value in str(raw_value or "").split(","):
+            normalized = value.strip().lower()
+            if not normalized:
+                continue
+            alias_sections = SECTION_ALIASES.get(normalized)
+            if alias_sections is not None:
+                requested.update(alias_sections)
+            elif normalized in ALL_DASHBOARD_SECTIONS:
+                requested.add(normalized)
+
+    return requested or set(ALL_DASHBOARD_SECTIONS)
+
+
+def _has_any_section(sections, candidates):
+    return bool(set(candidates) & set(sections))
+
+
+def _max_report_months():
+    value = _safe_int(
+        getattr(
+            settings,
+            "TICKET_CCC_DASHBOARD_MAX_REPORT_MONTHS",
+            DEFAULT_MAX_REPORT_MONTHS,
+        ),
+        DEFAULT_MAX_REPORT_MONTHS,
+    )
+    return max(1, value)
 
 
 def _percent(value, total):
@@ -223,6 +367,8 @@ def dashboard_date_range_from_params(params):
         elif year > 0:
             start_date = date(year, 1, 1)
             end_date = date(year, 12, 31)
+    if start_date > end_date:
+        start_date, end_date = end_date, start_date
 
     return start_date, end_date
 
@@ -240,7 +386,7 @@ def _datetime_range(date_from, date_to):
     return start_at, end_at
 
 
-def _selected_report_months(date_from, date_to):
+def _selected_report_months(date_from, date_to, max_months=None):
     first_month = _month_start(date_from)
     last_month = _month_start(date_to)
 
@@ -250,6 +396,9 @@ def _selected_report_months(date_from, date_to):
     while current <= last_month:
         months.append(current)
         current = _add_months(current, 1)
+
+    if max_months and len(months) > max_months:
+        months = months[-max_months:]
 
     return months
 
@@ -380,7 +529,28 @@ def _base_queryset_without_date(request):
     if related_system:
         queryset = queryset.filter(related_system__icontains=related_system)
 
-    return queryset.distinct()
+    month_key = params.get("month_key") or params.get("selected_month")
+    if month_key:
+        try:
+            parts = str(month_key).split("-")
+            if len(parts) == 2:
+                year_val = int(parts[0])
+                month_val = int(parts[1])
+                if 1 <= month_val <= 12:
+                    month_start = date(year_val, month_val, 1)
+                    month_end = _month_end(month_start)
+                    start_at, end_at = _datetime_range(month_start, month_end)
+                    queryset = queryset.filter(
+                        created_at__gte=start_at,
+                        created_at__lt=end_at,
+                    )
+        except (TypeError, ValueError):
+            pass
+
+    # Do not force DISTINCT for every dashboard query. The filters above use
+    # foreign-key joins and do not duplicate ticket rows. If the permission
+    # scope itself needs DISTINCT, filter_tickets_by_user can retain it.
+    return queryset
 
 
 def _ticket_queryset_for_range(request, start_date, end_date):
@@ -646,16 +816,23 @@ def _average_resolution_minutes(queryset):
 
 def _resolution_minutes_list(queryset):
     values = []
-
-    for ticket in queryset.filter(
+    rows = queryset.filter(
         Q(current_status__status_code__in=list(RESOLVED_STATUS_CODES))
         | Q(closed_at__isnull=False)
         | Q(done_at__isnull=False)
-    ):
-        duration = _duration_minutes(ticket)
+    ).values_list(
+        "created_at",
+        "closed_at",
+        "done_at",
+        "cancelled_at",
+    )
 
-        if duration is not None:
-            values.append(duration)
+    for created_at, closed_at, done_at, cancelled_at in rows.iterator(
+        chunk_size=2000
+    ):
+        end_at = closed_at or done_at or cancelled_at
+        if created_at and end_at:
+            values.append(int((end_at - created_at).total_seconds() // 60))
 
     return values
 
@@ -865,7 +1042,7 @@ def _pending_ticket_page(queryset, page, page_size):
         current_status__status_code__in=list(
             RESOLVED_STATUS_CODES | CANCELLED_STATUS_CODES
         )
-    ).select_related(*PENDING_TICKET_SELECT_RELATED)
+    ).select_related(*PENDING_TICKET_SELECT_RELATED).only(*PENDING_TICKET_ONLY_FIELDS)
 
     count = pending_queryset.count()
     total_pages = (count + page_size - 1) // page_size if count else 0
@@ -1429,11 +1606,20 @@ def _build_employee_report(tickets):
     grouped = {}
 
     for ticket in tickets:
-        employee = _employee_name(ticket)
+        key = _ticket_month_key(ticket)
+        if key is None:
+            continue
 
-        if employee not in grouped:
-            grouped[employee] = {
+        month = _month_from_ticket(ticket)
+        employee = _employee_name(ticket)
+        item_key = (employee, key)
+
+        if item_key not in grouped:
+            grouped[item_key] = {
                 "employee_name": employee,
+                "month_key": key,
+                "month_label": _month_label(month),
+                "period_label": _period_label(month),
                 "total": 0,
                 "processed": 0,
                 "related_processed": 0,
@@ -1443,16 +1629,20 @@ def _build_employee_report(tickets):
                 "avg_related_days_values": [],
             }
 
-        row = grouped[employee]
+        row = grouped[item_key]
         row["total"] += 1
 
         if _is_report_processed_ticket(ticket):
             if _is_related_unit_ticket(ticket):
                 row["related_processed"] += 1
-                row["avg_related_days_values"].append(_handling_days(ticket, prefer_related=True))
+                days = _handling_days(ticket, prefer_related=True)
+                if days is not None:
+                    row["avg_related_days_values"].append(days)
             else:
                 row["processed"] += 1
-                row["avg_cs_days_values"].append(_handling_days(ticket, prefer_related=False))
+                days = _handling_days(ticket, prefer_related=False)
+                if days is not None:
+                    row["avg_cs_days_values"].append(days)
 
         if _is_cancelled_ticket(ticket) or _is_spam_ticket(ticket):
             row["cancelled"] += 1
@@ -1466,6 +1656,9 @@ def _build_employee_report(tickets):
         result.append(
             {
                 "employee_name": row["employee_name"],
+                "month_key": row["month_key"],
+                "month_label": row["month_label"],
+                "period_label": row["period_label"],
                 "total": row["total"],
                 "processed": row["processed"],
                 "related_processed": row["related_processed"],
@@ -1476,7 +1669,7 @@ def _build_employee_report(tickets):
             }
         )
 
-    return sorted(result, key=lambda x: x["total"], reverse=True)[:15]
+    return sorted(result, key=lambda x: (x["month_key"], x["total"]), reverse=True)
 
 
 class TicketCccDashboardPendingTicketsAPIView(APIView):
@@ -1484,6 +1677,19 @@ class TicketCccDashboardPendingTicketsAPIView(APIView):
 
     def get(self, request):
         queryset, date_from, date_to = _base_ticket_queryset(request)
+        refresh = is_dashboard_refresh_requested(request.query_params)
+        cache_key = build_ticket_dashboard_cache_key(
+            request.user,
+            request.query_params,
+            scope_fingerprint=build_queryset_scope_fingerprint(queryset),
+            section="pending-page",
+        )
+
+        if not refresh:
+            cached_payload = get_ticket_dashboard_cache(cache_key)
+            if cached_payload is not None:
+                return Response(cached_payload)
+
         page = _safe_page(request.query_params.get("page"))
         page_size = _safe_pending_page_size(
             request.query_params.get("page_size")
@@ -1492,7 +1698,9 @@ class TicketCccDashboardPendingTicketsAPIView(APIView):
         payload = _pending_ticket_page(queryset, page, page_size)
         payload["date_from"] = date_from.isoformat()
         payload["date_to"] = date_to.isoformat()
+        payload["generated_at"] = timezone.now()
 
+        set_ticket_dashboard_cache(cache_key, payload)
         return Response(payload)
 
 
@@ -1500,10 +1708,14 @@ class TicketCccDashboardAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        queryset, date_from, date_to = _base_ticket_queryset(request)
+        sections = _requested_sections(request.query_params)
         refresh = is_dashboard_refresh_requested(request.query_params)
         cache_key = build_ticket_dashboard_cache_key(
             request.user,
             request.query_params,
+            scope_fingerprint=build_queryset_scope_fingerprint(queryset),
+            section=",".join(sorted(sections)),
         )
 
         if not refresh:
@@ -1511,7 +1723,6 @@ class TicketCccDashboardAPIView(APIView):
             if cached_payload is not None:
                 return Response(cached_payload)
 
-        queryset, date_from, date_to = _base_ticket_queryset(request)
         now = timezone.now()
         recent_limit = _safe_limit(
             request.query_params.get("recent_limit"),
@@ -1519,141 +1730,55 @@ class TicketCccDashboardAPIView(APIView):
             MAX_RECENT_LIMIT,
         )
 
-        counts = _overview_counts(queryset, now)
-        total_tickets = counts["total"] or 0
-        resolved_tickets = counts["resolved"] or 0
-        cancelled_tickets = counts["cancelled"] or 0
-        pending_processing = counts["pending"] or 0
-        linked_tickets = counts["linked"] or 0
-        unlinked_tickets = counts["unlinked"] or 0
-        error_tickets = counts["error"] or 0
-        overdue_sla = counts["overdue_sla"] or 0
-        resolution_metrics = _resolution_metrics(queryset)
-        average_resolution_minutes = resolution_metrics["average"]
-
-        tickets_by_category = _group_with_percent(
-            queryset.values(
-                "support_category_id",
-                "support_category__category_code",
-                "support_category__category_name",
-            ).annotate(
-                count=Count("id"),
-            ).order_by("-count", "support_category__category_name"),
-            total_tickets,
+        needs_counts = _has_any_section(
+            sections,
+            {"overview", "distributions", "root_cause"},
         )
+        counts = _overview_counts(queryset, now) if needs_counts else {}
+        total_tickets = counts.get("total") or 0
+        resolved_tickets = counts.get("resolved") or 0
+        cancelled_tickets = counts.get("cancelled") or 0
+        pending_processing = counts.get("pending") or 0
+        linked_tickets = counts.get("linked") or 0
+        unlinked_tickets = counts.get("unlinked") or 0
+        error_tickets = counts.get("error") or 0
+        overdue_sla = counts.get("overdue_sla") or 0
 
-        tickets_by_source = _group_with_percent(
-            queryset.values(
-                "source_id",
-                "source__source_code",
-                "source__source_name",
-            ).annotate(
-                count=Count("id"),
-            ).order_by("-count", "source__source_name"),
-            total_tickets,
-        )
+        filters_payload = {
+            "date_from": date_from.isoformat(),
+            "date_to": date_to.isoformat(),
+            "period": request.query_params.get("period"),
+            "status": request.query_params.get("status")
+            or request.query_params.get("current_status"),
+            "category": request.query_params.get("category")
+            or request.query_params.get("support_category"),
+            "source": request.query_params.get("source"),
+            "vip_tier": request.query_params.get("vip_tier")
+            or request.query_params.get("membership_tier"),
+            "account_link_status": request.query_params.get(
+                "account_link_status"
+            ),
+            "q": request.query_params.get("q"),
+        }
 
-        tickets_by_status = _group_with_percent(
-            queryset.values(
-                "current_status_id",
-                "current_status__status_code",
-                "current_status__status_name",
-                "current_status__sort_order",
-            ).annotate(
-                count=Count("id"),
-            ).order_by("current_status__sort_order", "current_status__status_name"),
-            total_tickets,
-        )
+        overview = {}
+        previous_period = None
+        report_payload = {}
+        charts = {}
+        tables = {}
+        my_ticket_tabs = {}
 
-        tickets_by_branch = _group_with_percent(
-            queryset.values(
-                "handling_branch_id",
-                "handling_branch__branch_code",
-                "handling_branch__branch_name",
-            ).annotate(
-                count=Count("id"),
-            ).order_by("-count", "handling_branch__branch_name"),
-            total_tickets,
-        )
-
-        linked_vs_unlinked = [
-            {
-                "key": TicketAccountLinkStatus.LINKED,
-                "label": "Có TK liên kết",
-                "count": linked_tickets,
-                "percentage": _percent(linked_tickets, total_tickets),
-            },
-            {
-                "key": TicketAccountLinkStatus.UNLINKED,
-                "label": "Chưa có TK liên kết",
-                "count": unlinked_tickets,
-                "percentage": _percent(unlinked_tickets, total_tickets),
-            },
-        ]
-
-        trend_by_day = list(
-            queryset.annotate(day=TruncDate("created_at"))
-            .values("day")
-            .annotate(count=Count("id"))
-            .order_by("day")
-        )
-
-        root_cause_breakdown = _build_root_cause_breakdown(queryset, total_tickets)
-
-        pending_queryset = queryset.exclude(
-            current_status__status_code__in=list(
-                RESOLVED_STATUS_CODES | CANCELLED_STATUS_CODES
+        if "overview" in sections:
+            resolution_metrics = _resolution_metrics(queryset)
+            sla = _sla_stats(queryset)
+            csat = _csat_stats(queryset)
+            previous_period = _previous_period_overview(
+                request,
+                date_from,
+                date_to,
             )
-        ).select_related(*PENDING_TICKET_SELECT_RELATED)
 
-        pending_tickets = [
-            _ticket_summary(ticket)
-            for ticket in pending_queryset.order_by("-created_at", "-id")[:recent_limit]
-        ]
-
-        resolution_pcts = resolution_metrics
-        sla = _sla_stats(queryset)
-        csat = _csat_stats(queryset)
-        prev_period = _previous_period_overview(request, date_from, date_to)
-        ageing = _ageing_backlog(queryset)
-
-        report_tickets, report_months, report_from, report_to = build_report_tickets(
-            _base_queryset_without_date(request),
-            date_from,
-            date_to,
-        )
-        current_month_start = _month_start(date_to)
-        previous_month_start = _add_months(current_month_start, -1)
-        current_month_tickets = [ticket for ticket in report_tickets if _month_from_ticket(ticket) == current_month_start]
-        previous_month_tickets = [ticket for ticket in report_tickets if _month_from_ticket(ticket) == previous_month_start]
-
-        report_monthly_processing = build_monthly_processing_report(report_tickets, report_months)
-        report_source = _build_source_report(report_tickets, report_months)
-        report_category = _build_category_report(report_tickets, report_months)
-        report_unit = _build_unit_report(report_tickets, report_months)
-        report_time = _build_time_report(current_month_tickets, previous_month_tickets)
-        report_sla = _build_sla_report(report_tickets, report_months)
-        report_employee = _build_employee_report(current_month_tickets)
-
-        report_total = sum(item["total"] for item in report_monthly_processing)
-        report_processed = sum(item["processed"] for item in report_monthly_processing)
-        report_cancelled = sum(item["cancelled"] for item in report_monthly_processing)
-        report_transferred = sum(item["transferred_to_related_unit"] for item in report_monthly_processing)
-        report_ekyc = sum(item["ekyc"] for item in report_monthly_processing)
-
-        payload = {
-            "filters": {
-                "date_from": date_from.isoformat(),
-                "date_to": date_to.isoformat(),
-                "period": request.query_params.get("period"),
-                "status": request.query_params.get("status") or request.query_params.get("current_status"),
-                "category": request.query_params.get("category") or request.query_params.get("support_category"),
-                "source": request.query_params.get("source"),
-                "vip_tier": request.query_params.get("vip_tier") or request.query_params.get("membership_tier"),
-                "account_link_status": request.query_params.get("account_link_status"),
-                "q": request.query_params.get("q"),
-            },
-            "overview": {
+            overview = {
                 "total_tickets": total_tickets,
                 "resolved_tickets": resolved_tickets,
                 "pending_processing": pending_processing,
@@ -1663,27 +1788,236 @@ class TicketCccDashboardAPIView(APIView):
                 "error_tickets": error_tickets,
                 "recurring_issue_count": 0,
                 "overdue_sla": overdue_sla,
-                "average_resolution_minutes": average_resolution_minutes,
-                "resolution_median_minutes": resolution_pcts["median"],
-                "resolution_p75_minutes": resolution_pcts["p75"],
-                "resolution_p90_minutes": resolution_pcts["p90"],
+                "average_resolution_minutes": resolution_metrics["average"],
+                "resolution_median_minutes": resolution_metrics["median"],
+                "resolution_p75_minutes": resolution_metrics["p75"],
+                "resolution_p90_minutes": resolution_metrics["p90"],
                 "linked_percentage": _percent(linked_tickets, total_tickets),
                 "unlinked_percentage": _percent(unlinked_tickets, total_tickets),
                 "resolved_percentage": _percent(resolved_tickets, total_tickets),
                 "cancelled_percentage": _percent(cancelled_tickets, total_tickets),
                 "sla": sla,
                 "csat": csat,
-                "report_total_tickets": report_total,
-                "report_processed_tickets": report_processed,
-                "report_cancelled_tickets": report_cancelled,
-                "report_transferred_tickets": report_transferred,
-                "report_ekyc_tickets": report_ekyc,
-            },
-            "previous_period": prev_period,
-            "report": {
+                # Report totals are populated below only when a report section
+                # is requested. This keeps sections=overview lightweight.
+                "report_total_tickets": None,
+                "report_processed_tickets": None,
+                "report_cancelled_tickets": None,
+                "report_transferred_tickets": None,
+                "report_ekyc_tickets": None,
+            }
+            my_ticket_tabs = {
+                "all": total_tickets,
+                "linked": linked_tickets,
+                "unlinked": unlinked_tickets,
+            }
+
+        if "distributions" in sections:
+            charts["tickets_by_category"] = _group_with_percent(
+                queryset.values(
+                    "support_category_id",
+                    "support_category__category_code",
+                    "support_category__category_name",
+                )
+                .annotate(count=Count("id"))
+                .order_by("-count", "support_category__category_name"),
+                total_tickets,
+            )
+            charts["tickets_by_source"] = _group_with_percent(
+                queryset.values(
+                    "source_id",
+                    "source__source_code",
+                    "source__source_name",
+                )
+                .annotate(count=Count("id"))
+                .order_by("-count", "source__source_name"),
+                total_tickets,
+            )
+            charts["tickets_by_status"] = _group_with_percent(
+                queryset.values(
+                    "current_status_id",
+                    "current_status__status_code",
+                    "current_status__status_name",
+                    "current_status__sort_order",
+                )
+                .annotate(count=Count("id"))
+                .order_by(
+                    "current_status__sort_order",
+                    "current_status__status_name",
+                ),
+                total_tickets,
+            )
+            charts["tickets_by_branch"] = _group_with_percent(
+                queryset.values(
+                    "handling_branch_id",
+                    "handling_branch__branch_code",
+                    "handling_branch__branch_name",
+                )
+                .annotate(count=Count("id"))
+                .order_by("-count", "handling_branch__branch_name"),
+                total_tickets,
+            )
+            charts["linked_vs_unlinked"] = [
+                {
+                    "key": TicketAccountLinkStatus.LINKED,
+                    "label": "Có TK liên kết",
+                    "count": linked_tickets,
+                    "percentage": _percent(linked_tickets, total_tickets),
+                },
+                {
+                    "key": TicketAccountLinkStatus.UNLINKED,
+                    "label": "Chưa có TK liên kết",
+                    "count": unlinked_tickets,
+                    "percentage": _percent(unlinked_tickets, total_tickets),
+                },
+            ]
+
+        if "trend" in sections:
+            charts["trend_by_day"] = list(
+                queryset.annotate(day=TruncDate("created_at"))
+                .values("day")
+                .annotate(count=Count("id"))
+                .order_by("day")
+            )
+
+        if "root_cause" in sections:
+            charts["root_cause_breakdown"] = _build_root_cause_breakdown(
+                queryset,
+                total_tickets,
+            )
+
+        if "ageing" in sections:
+            charts["ageing_backlog"] = _ageing_backlog(queryset)
+
+        if "pending" in sections:
+            pending_queryset = queryset.exclude(
+                current_status__status_code__in=list(
+                    RESOLVED_STATUS_CODES | CANCELLED_STATUS_CODES
+                )
+            ).select_related(*PENDING_TICKET_SELECT_RELATED).only(
+                *PENDING_TICKET_ONLY_FIELDS
+            )
+            tables["pending_tickets"] = [
+                _ticket_summary(ticket)
+                for ticket in pending_queryset.order_by("-created_at", "-id")[
+                    :recent_limit
+                ]
+            ]
+
+        requested_report_sections = sections & REPORT_SECTION_NAMES
+        if requested_report_sections:
+            max_report_months = _max_report_months()
+            all_requested_months = _selected_report_months(date_from, date_to)
+            report_months = _selected_report_months(
+                date_from,
+                date_to,
+                max_months=max_report_months,
+            )
+            report_from = report_months[0]
+            report_to = _month_end(report_months[-1])
+            report_truncated = len(all_requested_months) > len(report_months)
+
+            report_queryset = _ticket_queryset_for_range(
+                request,
+                report_from,
+                report_to,
+            ).select_related(*REPORT_TICKET_SELECT_RELATED).only(
+                *REPORT_TICKET_ONLY_FIELDS
+            )
+            # iterator() prevents Django from keeping a second internal result
+            # cache in addition to the list required by the report builders.
+            report_tickets = list(
+                report_queryset.iterator(chunk_size=2000)
+            )
+
+            current_month_start = _month_start(date_to)
+            previous_month_start = _add_months(current_month_start, -1)
+            current_month_tickets = []
+            previous_month_tickets = []
+            for ticket in report_tickets:
+                ticket_month = _month_from_ticket(ticket)
+                if ticket_month == current_month_start:
+                    current_month_tickets.append(ticket)
+                elif ticket_month == previous_month_start:
+                    previous_month_tickets.append(ticket)
+
+            report_monthly_processing = None
+            report_total = None
+            report_processed = None
+            report_cancelled = None
+            report_transferred = None
+            report_ekyc = None
+
+            if _has_any_section(
+                requested_report_sections,
+                {"report_monthly", "report_summary"},
+            ):
+                report_monthly_processing = build_monthly_processing_report(
+                    report_tickets,
+                    report_months,
+                )
+                if "report_monthly" in requested_report_sections:
+                    charts["report_monthly_processing"] = (
+                        report_monthly_processing
+                    )
+
+                report_total = sum(
+                    item["total"] for item in report_monthly_processing
+                )
+                report_processed = sum(
+                    item["processed"] for item in report_monthly_processing
+                )
+                report_cancelled = sum(
+                    item["cancelled"] for item in report_monthly_processing
+                )
+                report_transferred = sum(
+                    item["transferred_to_related_unit"]
+                    for item in report_monthly_processing
+                )
+                report_ekyc = sum(
+                    item["ekyc"] for item in report_monthly_processing
+                )
+
+            if "report_source" in requested_report_sections:
+                charts["report_source"] = _build_source_report(
+                    report_tickets,
+                    report_months,
+                )
+            if "report_category" in requested_report_sections:
+                charts["report_category"] = _build_category_report(
+                    report_tickets,
+                    report_months,
+                )
+            if "report_unit" in requested_report_sections:
+                charts["report_unit"] = _build_unit_report(
+                    report_tickets,
+                    report_months,
+                )
+            if "report_time" in requested_report_sections:
+                charts["report_time"] = _build_time_report(
+                    current_month_tickets,
+                    previous_month_tickets,
+                )
+            if "report_sla" in requested_report_sections:
+                charts["report_sla"] = _build_sla_report(
+                    report_tickets,
+                    report_months,
+                )
+            if "report_employee" in requested_report_sections:
+                charts["report_employee"] = _build_employee_report(
+                    report_tickets
+                )
+
+            report_payload = {
                 "cutoff_date": date_to.isoformat(),
                 "range_from": report_from.isoformat(),
                 "range_to": report_to.isoformat(),
+                "requested_range_from": _month_start(date_from).isoformat(),
+                "requested_range_to": _month_end(
+                    _month_start(date_to)
+                ).isoformat(),
+                "range_truncated": report_truncated,
+                "max_months": max_report_months,
                 "month_count": len(report_months),
                 "months": [
                     {
@@ -1704,33 +2038,28 @@ class TicketCccDashboardAPIView(APIView):
                     "note_processed": "Trừ các ticket gọi khảo sát eKYC/spam.",
                     "note_cancelled": "Bao gồm ticket spam / đã hủy.",
                 },
-            },
-            "charts": {
-                "tickets_by_category": tickets_by_category,
-                "tickets_by_source": tickets_by_source,
-                "tickets_by_status": tickets_by_status,
-                "tickets_by_branch": tickets_by_branch,
-                "linked_vs_unlinked": linked_vs_unlinked,
-                "trend_by_day": trend_by_day,
-                "root_cause_breakdown": root_cause_breakdown,
+            }
 
-                "ageing_backlog": ageing,
-                "report_monthly_processing": report_monthly_processing,
-                "report_source": report_source,
-                "report_category": report_category,
-                "report_unit": report_unit,
-                "report_time": report_time,
-                "report_sla": report_sla,
-                "report_employee": report_employee,
-            },
-            "tables": {
-                "pending_tickets": pending_tickets,
-            },
-            "my_ticket_tabs": {
-                "all": total_tickets,
-                "linked": linked_tickets,
-                "unlinked": unlinked_tickets,
-            },
+            if overview and report_total is not None:
+                overview.update(
+                    {
+                        "report_total_tickets": report_total,
+                        "report_processed_tickets": report_processed,
+                        "report_cancelled_tickets": report_cancelled,
+                        "report_transferred_tickets": report_transferred,
+                        "report_ekyc_tickets": report_ekyc,
+                    }
+                )
+
+        payload = {
+            "filters": filters_payload,
+            "loaded_sections": sorted(sections),
+            "overview": overview,
+            "previous_period": previous_period,
+            "report": report_payload,
+            "charts": charts,
+            "tables": tables,
+            "my_ticket_tabs": my_ticket_tabs,
             "generated_at": timezone.now(),
         }
 

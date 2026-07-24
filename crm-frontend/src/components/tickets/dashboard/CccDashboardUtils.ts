@@ -73,7 +73,18 @@ export function formatDuration(minutes?: number | null) {
 export function formatDays(value?: number | null) {
   if (value === null || value === undefined) return "-";
 
-  return `${formatDecimal(value, 3)} ngày`;
+  if (value <= 0) return "0 phút";
+
+  if (value < 1) {
+    const totalMinutes = value * 24 * 60;
+    if (totalMinutes < 60) {
+      return `${Math.round(totalMinutes)} phút`;
+    }
+    const hours = value * 24;
+    return `${hours < 10 ? hours.toFixed(1) : Math.round(hours)} giờ`;
+  }
+
+  return `${formatDecimal(value, 1)} ngày`;
 }
 
 export type SimpleChartItem = {
@@ -127,4 +138,81 @@ export function getMonthLabel(item: {
 export function ensureFiniteNumber(value?: number | null) {
   if (typeof value !== "number" || Number.isNaN(value)) return 0;
   return value;
+}
+
+export type ChartViewMode = "TREND_OVER_TIME" | "TOTAL_OVERALL";
+
+export function pivot100PercentStacked<T>(
+  items: T[],
+  getDimension: (item: T) => string,
+  getMonth: (item: T) => string,
+  getValue: (item: T) => number
+) {
+  const dimensions = Array.from(new Set(items.map(getDimension))).filter(Boolean);
+  const months = Array.from(new Set(items.map(getMonth))).filter(Boolean);
+  const map = new Map<string, Record<string, number>>();
+
+  for (const item of items) {
+    const month = getMonth(item);
+    const dimension = getDimension(item);
+    const value = getValue(item);
+
+    if (!map.has(month)) {
+      map.set(month, {});
+    }
+
+    map.get(month)![dimension] = (map.get(month)![dimension] || 0) + value;
+  }
+
+  const rows: Record<string, number | string>[] = [];
+
+  for (const month of months) {
+    const monthData = map.get(month) || {};
+    let monthTotal = 0;
+    for (const dim of dimensions) {
+      monthTotal += monthData[dim] || 0;
+    }
+
+    const row: Record<string, number | string> = { month };
+    for (const dim of dimensions) {
+      const val = monthData[dim] || 0;
+      row[dim] = monthTotal > 0 ? Number(((val / monthTotal) * 100).toFixed(1)) : 0;
+      row[`${dim}_raw`] = val;
+    }
+    row._total = monthTotal;
+    rows.push(row);
+  }
+
+  return { dimensions, months, rows };
+}
+
+export function aggregateTotalOverall<T>(
+  items: T[],
+  getDimension: (item: T) => string,
+  getValue: (item: T) => number
+) {
+  const map = new Map<string, number>();
+  let grandTotal = 0;
+
+  for (const item of items) {
+    const dim = getDimension(item);
+    const val = getValue(item);
+    map.set(dim, (map.get(dim) || 0) + val);
+    grandTotal += val;
+  }
+
+  return Array.from(map.entries()).map(([name, value]) => ({
+    name,
+    value,
+    percentage: grandTotal > 0 ? Number(((value / grandTotal) * 100).toFixed(1)) : 0,
+  }));
+}
+
+export function filterDataByMonth<T>(
+  items: T[],
+  getMonth: (item: T) => string,
+  targetMonth?: string
+) {
+  if (!targetMonth) return items;
+  return items.filter((item) => getMonth(item) === targetMonth);
 }
