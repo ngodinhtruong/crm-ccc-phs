@@ -37,3 +37,4 @@ crm/db.sqlite3
 crm/.venv/
 crm-frontend/.next/
 crm-frontend/node_modules/
+tree.txt

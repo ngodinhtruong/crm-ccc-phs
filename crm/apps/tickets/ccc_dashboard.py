@@ -154,7 +154,7 @@ def _period_label(value):
     return f"{value.month:02d}/{value.year}"
 
 
-def _date_range_from_params(params):
+def dashboard_date_range_from_params(params):
     """
     Dashboard CCC mặc định lấy tháng hiện tại.
     Hỗ trợ:
@@ -190,11 +190,13 @@ def _date_range_from_params(params):
 
     date_from = (
         params.get("date_from")
+        or params.get("start_date")
         or params.get("created_from")
         or params.get("from")
     )
     date_to = (
         params.get("date_to")
+        or params.get("end_date")
         or params.get("created_to")
         or params.get("to")
     )
@@ -207,6 +209,20 @@ def _date_range_from_params(params):
 
     if parsed_to:
         end_date = parsed_to
+
+    # Dashboard chatbot dùng bộ lọc year/month thay cho period. Chỉ áp dụng
+    # khi người dùng không truyền khoảng ngày cụ thể, để quy tắc ưu tiên
+    # start_date/end_date vẫn giống filter_summaries().
+    if not parsed_from and not parsed_to and not period:
+        year = _safe_int(params.get("year"), 0)
+        month = _safe_int(params.get("month"), 0)
+
+        if year > 0 and 1 <= month <= 12:
+            start_date = date(year, month, 1)
+            end_date = _month_end(start_date)
+        elif year > 0:
+            start_date = date(year, 1, 1)
+            end_date = date(year, 12, 31)
 
     return start_date, end_date
 
@@ -236,6 +252,30 @@ def _selected_report_months(date_from, date_to):
         current = _add_months(current, 1)
 
     return months
+
+
+def build_report_tickets(queryset, date_from, date_to):
+    """
+    Chuẩn hóa danh sách ticket dùng cho báo cáo tháng.
+
+    Hàm này được dùng chung bởi dashboard ticket và dashboard chatbot để
+    bảo đảm cùng một quy tắc khoảng thời gian, timezone và select_related.
+    """
+    report_months = _selected_report_months(date_from, date_to)
+    report_from = report_months[0]
+    report_to = _month_end(report_months[-1])
+    start_at, end_at = _datetime_range(report_from, report_to)
+
+    report_queryset = (
+        queryset.filter(
+            created_at__gte=start_at,
+            created_at__lt=end_at,
+        )
+        .select_related(*REPORT_TICKET_SELECT_RELATED)
+        .distinct()
+    )
+
+    return list(report_queryset), report_months, report_from, report_to
 
 
 def _base_queryset_without_date(request):
@@ -353,7 +393,7 @@ def _ticket_queryset_for_range(request, start_date, end_date):
 
 
 def _base_ticket_queryset(request):
-    date_from, date_to = _date_range_from_params(request.query_params)
+    date_from, date_to = dashboard_date_range_from_params(request.query_params)
     return _ticket_queryset_for_range(request, date_from, date_to), date_from, date_to
 
 
@@ -1090,7 +1130,7 @@ def _ticket_month_key(ticket):
     return _month_key(month) if month else None
 
 
-def _build_monthly_processing_report(tickets, months):
+def build_monthly_processing_report(tickets, months):
     month_rows = _month_bucket_template(months)
 
     for row in month_rows.values():
@@ -1577,22 +1617,17 @@ class TicketCccDashboardAPIView(APIView):
         prev_period = _previous_period_overview(request, date_from, date_to)
         ageing = _ageing_backlog(queryset)
 
-        report_months = _selected_report_months(date_from, date_to)
-        report_from = report_months[0]
-        report_to = _month_end(report_months[-1])
-
-        report_queryset = _ticket_queryset_for_range(
-            request,
-            report_from,
-            report_to,
-        ).select_related(*REPORT_TICKET_SELECT_RELATED)
-        report_tickets = list(report_queryset)
+        report_tickets, report_months, report_from, report_to = build_report_tickets(
+            _base_queryset_without_date(request),
+            date_from,
+            date_to,
+        )
         current_month_start = _month_start(date_to)
         previous_month_start = _add_months(current_month_start, -1)
         current_month_tickets = [ticket for ticket in report_tickets if _month_from_ticket(ticket) == current_month_start]
         previous_month_tickets = [ticket for ticket in report_tickets if _month_from_ticket(ticket) == previous_month_start]
 
-        report_monthly_processing = _build_monthly_processing_report(report_tickets, report_months)
+        report_monthly_processing = build_monthly_processing_report(report_tickets, report_months)
         report_source = _build_source_report(report_tickets, report_months)
         report_category = _build_category_report(report_tickets, report_months)
         report_unit = _build_unit_report(report_tickets, report_months)

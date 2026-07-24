@@ -1,4 +1,5 @@
 from django.db.models import Count, F, Max, Q, Sum
+from django.db.models.functions import ExtractHour, TruncDate, TruncMonth
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from rest_framework import generics
@@ -133,6 +134,166 @@ def group_by_category(summaries):
     return grouped
 
 
+def group_by_month(summaries):
+    """Đếm ticket chatbot đã sinh thật theo tháng (dựa trên ended_at/request time)."""
+    rows = (
+        summaries.filter(
+            outcome_type=OUTCOME_CCC,
+            ticket__isnull=False,
+            ended_at__isnull=False,
+        )
+        .annotate(month=TruncMonth("ended_at"))
+        .values("month")
+        .annotate(count=Count("id"))
+        .order_by("month")
+    )
+
+    grouped = []
+
+    for row in rows:
+        month_value = row["month"]
+
+        if not month_value:
+            continue
+
+        grouped.append(
+            {
+                "month": month_value.date().isoformat(),
+                "month_key": month_value.strftime("%Y-%m"),
+                "month_label": month_value.strftime("%m/%Y"),
+                "count": row["count"],
+            }
+        )
+
+    return grouped
+
+
+def group_by_day(summaries):
+    """Đếm ticket chatbot đã sinh thật theo ngày (dựa trên ended_at/request time)."""
+    rows = (
+        summaries.filter(
+            outcome_type=OUTCOME_CCC,
+            ticket__isnull=False,
+            ended_at__isnull=False,
+        )
+        .annotate(day=TruncDate("ended_at"))
+        .values("day")
+        .annotate(count=Count("id"))
+        .order_by("day")
+    )
+
+    grouped = []
+
+    for row in rows:
+        day_value = row["day"]
+
+        if not day_value:
+            continue
+
+        grouped.append(
+            {
+                "key": day_value.isoformat(),
+                "label": day_value.strftime("%d/%m"),
+                "count": row["count"],
+            }
+        )
+
+    return grouped
+
+
+def group_by_hour(summaries):
+    """Đếm ticket chatbot đã sinh thật theo giờ sinh request/ticket (0-23)."""
+    rows = (
+        summaries.filter(
+            outcome_type=OUTCOME_CCC,
+            ticket__isnull=False,
+            ended_at__isnull=False,
+        )
+        .annotate(hour=ExtractHour("ended_at"))
+        .values("hour")
+        .annotate(count=Count("id"))
+        .order_by("hour")
+    )
+
+    counts = {
+        row["hour"]: row["count"]
+        for row in rows
+        if row["hour"] is not None
+    }
+
+    grouped = []
+
+    for hour in range(24):
+        grouped.append(
+            {
+                "key": f"{hour:02d}",
+                "label": f"{hour:02d}h",
+                "count": counts.get(hour, 0),
+            }
+        )
+
+    if not any(item["count"] for item in grouped):
+        return []
+
+    return grouped
+
+
+def group_by_channel(summaries):
+    """Đếm ticket chatbot đã sinh thật theo kênh ghi nhận của phiên."""
+    rows = (
+        summaries.filter(outcome_type=OUTCOME_CCC, ticket__isnull=False)
+        .values("channel")
+        .annotate(count=Count("id"))
+        .order_by("-count", "channel")
+    )
+
+    grouped = []
+
+    for row in rows:
+        grouped.append(
+            {
+                "name": row["channel"] or UNCATEGORIZED_LABEL,
+                "value": row["count"],
+            }
+        )
+
+    return grouped
+
+
+def group_by_ticket_status(summaries):
+    """Đếm ticket chatbot đã sinh thật theo trạng thái CRM hiện tại."""
+    rows = (
+        summaries.filter(outcome_type=OUTCOME_CCC, ticket__isnull=False)
+        .values(
+            "ticket__current_status__status_code",
+            "ticket__current_status__status_name",
+            "ticket__current_status__sort_order",
+        )
+        .annotate(value=Count("id"))
+        .order_by("ticket__current_status__sort_order", "ticket__current_status__status_name")
+    )
+
+    grouped = []
+
+    for row in rows:
+        status_code = row["ticket__current_status__status_code"]
+        status_name = row["ticket__current_status__status_name"]
+
+        grouped.append(
+            {
+                "name": (
+                    status_name
+                    or TicketStatusCode.LABELS.get(status_code)
+                    or "Chưa có trạng thái"
+                ),
+                "value": row["value"],
+            }
+        )
+
+    return grouped
+
+
+
 class ChatbotDashboardOverviewAPIView(ChatbotDashboardFilterMixin, APIView):
     permission_classes = [IsAuthenticated]
 
@@ -245,6 +406,12 @@ class ChatbotDashboardOverviewAPIView(ChatbotDashboardFilterMixin, APIView):
             summaries.filter(outcome_type__in=TOPIC_OUTCOMES)
         )
 
+        monthly_chatbot_tickets = group_by_month(summaries)
+        daily_chatbot_tickets = group_by_day(summaries)
+        hourly_chatbot_tickets = group_by_hour(summaries)
+        channel_distribution = group_by_channel(summaries)
+        ticket_status_distribution = group_by_ticket_status(summaries)
+
         # Ticket chatbot chưa ai xử lý: trạng thái "Mở" VÀ chưa có người nhận.
         # Hai điều kiện vì dữ liệu có thể lệch — ticket được gán owner qua
         # PATCH mà trạng thái chưa kịp lên "Tiếp nhận".
@@ -290,6 +457,11 @@ class ChatbotDashboardOverviewAPIView(ChatbotDashboardFilterMixin, APIView):
                     "process_classification": process_classification,
                     "ccc_issue_pie": ccc_issue_pie,
                     "topic_bar": topic_bar,
+                    "monthly_chatbot_tickets": monthly_chatbot_tickets,
+                    "daily_chatbot_tickets": daily_chatbot_tickets,
+                    "hourly_chatbot_tickets": hourly_chatbot_tickets,
+                    "channel_distribution": channel_distribution,
+                    "ticket_status_distribution": ticket_status_distribution,
                 },
                 "quick_lists": {
                     "latest_ccc_tickets": ChatbotSessionSummarySerializer(

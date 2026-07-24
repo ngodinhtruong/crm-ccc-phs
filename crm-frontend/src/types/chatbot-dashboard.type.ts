@@ -92,6 +92,19 @@ export type ChatbotFaqItem = {
   latest_at?: string | null;
 };
 
+export type ChatbotMonthlyTicketItem = {
+  month: string;
+  month_key: string;
+  month_label: string;
+  count: number;
+};
+
+export type ChatbotSeriesItem = {
+  key: string;
+  label: string;
+  count: number;
+};
+
 export type ChatbotOverviewResponse = {
   filters?: ChatbotDashboardFilters;
 
@@ -107,6 +120,11 @@ export type ChatbotOverviewResponse = {
     process_classification: ProcessChartItem[];
     ccc_issue_pie: ChartItem[];
     topic_bar: ChartItem[];
+    monthly_chatbot_tickets: ChatbotMonthlyTicketItem[];
+    daily_chatbot_tickets: ChatbotSeriesItem[];
+    hourly_chatbot_tickets: ChatbotSeriesItem[];
+    channel_distribution: ChartItem[];
+    ticket_status_distribution: ChartItem[];
   };
 
   quick_lists: {

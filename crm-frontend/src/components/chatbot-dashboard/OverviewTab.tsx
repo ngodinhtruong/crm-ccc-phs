@@ -1,8 +1,22 @@
-import { BarChart3, Layers3, ListOrdered } from "lucide-react";
+import {
+  BarChart3,
+  CalendarDays,
+  Clock,
+  Layers3,
+  ListChecks,
+  ListOrdered,
+  PieChart,
+} from "lucide-react";
 
 import { AnalyticsPanel } from "@/components/chatbot-dashboard/charts/AnalyticsPanel";
 import { CategoryRankBars } from "@/components/chatbot-dashboard/charts/CategoryRankBars";
 import { MetricBars } from "@/components/chatbot-dashboard/charts/MetricBars";
+import { MonthlyTicketChart } from "@/components/chatbot-dashboard/charts/MonthlyTicketChart";
+import {
+  DailyTicketChart,
+  DistributionDonutChart,
+  HourlyTicketChart,
+} from "@/components/chatbot-dashboard/charts/ChatbotDashboardInsights";
 import { TopicRankingList } from "@/components/chatbot-dashboard/charts/TopicRankingList";
 import {
   ChatbotFaqItem,
@@ -72,6 +86,68 @@ export function OverviewTab({
                   dashboard_category: item.name,
                 })
               }
+            />
+          </AnalyticsPanel>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+        <div className="xl:col-span-12">
+          <AnalyticsPanel
+            title="Ticket chatbot theo tháng"
+            description="Số ticket/request chatbot sinh trong từng tháng của kỳ lọc"
+            icon={<CalendarDays size={18} />}
+          >
+            <MonthlyTicketChart data={charts.monthly_chatbot_tickets} />
+          </AnalyticsPanel>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+        <div className="xl:col-span-7">
+          <AnalyticsPanel
+            title="Ticket chatbot theo ngày"
+            description="Xu hướng ticket/request chatbot sinh theo từng ngày"
+            icon={<BarChart3 size={18} />}
+          >
+            <DailyTicketChart data={charts.daily_chatbot_tickets} />
+          </AnalyticsPanel>
+        </div>
+
+        <div className="xl:col-span-5">
+          <AnalyticsPanel
+            title="Ticket chatbot theo giờ"
+            description="Khung giờ nào chatbot sinh request/ticket nhiều nhất"
+            icon={<Clock size={18} />}
+          >
+            <HourlyTicketChart data={charts.hourly_chatbot_tickets} />
+          </AnalyticsPanel>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+        <div className="xl:col-span-6">
+          <AnalyticsPanel
+            title="Ticket chatbot theo kênh"
+            description="Kênh nào tạo ra ticket chatbot nhiều nhất"
+            icon={<PieChart size={18} />}
+          >
+            <DistributionDonutChart
+              data={charts.channel_distribution}
+              emptyMessage="Không có dữ liệu ticket chatbot theo kênh."
+            />
+          </AnalyticsPanel>
+        </div>
+
+        <div className="xl:col-span-6">
+          <AnalyticsPanel
+            title="Trạng thái ticket chatbot"
+            description="Ticket từ chatbot đang nằm ở trạng thái CRM nào"
+            icon={<ListChecks size={18} />}
+          >
+            <DistributionDonutChart
+              data={charts.ticket_status_distribution}
+              emptyMessage="Không có dữ liệu trạng thái ticket chatbot."
             />
           </AnalyticsPanel>
         </div>
