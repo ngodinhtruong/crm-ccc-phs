@@ -1,5 +1,3 @@
 # crm-ccc-phs
-# crm-ccc-phs
-# crm-ccc-phscr
-# crm-ccc-phs
-********** mini crm
+
+Mini CRM project for customer, ticket, and chatbot workflows.
