@@ -203,24 +203,57 @@ def rebuild_chatbot_session_summaries(affected_session_ids=None):
 
     logs_by_session = defaultdict(list)
 
-    for log in ChatbotChatLog.objects.filter(session_id__in=session_ids).order_by(
-        "external_created_at", "id"
-    ):
+    log_queryset = ChatbotChatLog.objects.filter(
+        session_id__in=session_ids
+    ).only(
+        "id",
+        "session_id",
+        "user_id",
+        "channel",
+        "question",
+        "answer",
+        "questionType",
+        "category",
+        "external_created_at",
+    ).order_by("external_created_at", "id")
+
+    for log in log_queryset.iterator(chunk_size=2000):
         logs_by_session[log.session_id].append(log)
 
     # Giữ bản ghi mới nhất của mỗi session
     latest_state_by_session = {}
 
-    for state in ChatbotState.objects.filter(session_id__in=session_ids).order_by(
-        "external_created_at", "id"
-    ):
+    state_queryset = ChatbotState.objects.filter(
+        session_id__in=session_ids
+    ).only(
+        "id",
+        "session_id",
+        "user_id",
+        "channel",
+        "step",
+        "reason",
+        "external_created_at",
+    ).order_by("external_created_at", "id")
+
+    for state in state_queryset.iterator(chunk_size=2000):
         latest_state_by_session[state.session_id] = state
 
     latest_request_by_session = {}
 
-    for request in ChatbotCskhRequest.objects.filter(
+    request_queryset = ChatbotCskhRequest.objects.filter(
         session_id__in=session_ids
-    ).order_by("external_created_at", "id"):
+    ).only(
+        "id",
+        "session_id",
+        "user_id",
+        "channel",
+        "contact_info",
+        "contact_type",
+        "reason",
+        "external_created_at",
+    ).order_by("external_created_at", "id")
+
+    for request in request_queryset.iterator(chunk_size=2000):
         latest_request_by_session[request.session_id] = request
 
     for session_id in session_ids:
@@ -279,7 +312,13 @@ def rebuild_chatbot_session_summaries(affected_session_ids=None):
             },
         )
 
-    return len(session_ids)
+    updated_count = len(session_ids)
+
+    # Dashboard cache theo section phải được làm mới sau khi bảng summary đổi.
+    from apps.chatbots.dashboard.cache import bump_chatbot_dashboard_cache_version
+
+    transaction.on_commit(bump_chatbot_dashboard_cache_version)
+    return updated_count
 
 
 def is_account_contact(contact_type):

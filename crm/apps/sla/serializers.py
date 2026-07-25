@@ -13,11 +13,11 @@ class SlaPolicySerializer(serializers.ModelSerializer):
     assigned_to_user_name = serializers.SerializerMethodField()
     created_by_user_name = serializers.SerializerMethodField()
     support_category_name = serializers.CharField(
-        source="support_category.support_category",
+        source="support_category.category_name",
         read_only=True,
     )
-    processing_unit_name = serializers.CharField(
-        source="processing_unit.unit_name",
+    organization_unit_name = serializers.CharField(
+        source="organization_unit.unit_name",
         read_only=True,
     )
 

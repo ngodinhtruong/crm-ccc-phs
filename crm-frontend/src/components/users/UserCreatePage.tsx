@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, Loader2, UserPlus } from "lucide-react";
 
 import { useUserCreate } from "@/hooks/useUserCreate";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
@@ -25,7 +25,7 @@ export function UserCreatePage() {
           href: "/accounts/users",
         },
         {
-          label: "Thêm user",
+          label: "Thêm người dùng",
         },
       ]}
       sidebarDefaultExpandedGroupKey="user-management"
@@ -36,7 +36,8 @@ export function UserCreatePage() {
           <button
             type="button"
             onClick={create.cancel}
-            className="flex h-8 items-center gap-1 rounded border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+            disabled={create.submitting}
+            className="flex h-8 items-center gap-1 rounded border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <ArrowLeft size={15} />
             Quay lại
@@ -45,11 +46,15 @@ export function UserCreatePage() {
           <button
             type="button"
             onClick={create.submit}
-            disabled={create.submitting}
+            disabled={create.submitting || create.loadingMaster}
             className="flex h-8 items-center gap-1 rounded bg-[#0097cf] px-3 text-xs font-semibold text-white hover:bg-[#0089bd] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <Save size={15} />
-            {create.submitting ? "Đang lưu..." : "Lưu user"}
+            {create.submitting ? (
+              <Loader2 className="animate-spin" size={15} />
+            ) : (
+              <UserPlus size={15} />
+            )}
+            {create.submitting ? "Đang tạo..." : "Tạo người dùng"}
           </button>
         </div>
       }

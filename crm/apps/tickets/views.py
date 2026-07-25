@@ -182,7 +182,7 @@ class TicketViewSet(
             "company",
             "customer_account",
             "handling_branch",
-            "assigned_unit",
+            "handling_unit",
             "assigned_employee",
             "owner_user",
             "support_category",
@@ -215,7 +215,7 @@ class TicketViewSet(
         company_name = params.get("company_name")
 
         handling_branch = params.get("handling_branch") or params.get("branch")
-        assigned_unit = params.get("assigned_unit")
+        handling_unit = params.get("handling_unit") or params.get("assigned_unit")
         assigned_employee = params.get("assigned_employee")
         owner_user = params.get("owner_user")
 
@@ -253,7 +253,7 @@ class TicketViewSet(
         sla_policy_name = params.get("sla_policy_name")
 
         handling_branch_name = params.get("handling_branch_name")
-        assigned_unit_name = params.get("assigned_unit_name")
+        handling_unit_name = params.get("handling_unit_name") or params.get("assigned_unit_name")
         assigned_employee_name = params.get("assigned_employee_name")
         owner_user_name = params.get("owner_user_name")
 
@@ -330,8 +330,8 @@ class TicketViewSet(
         if handling_branch:
             queryset = queryset.filter(handling_branch_id=handling_branch)
 
-        if assigned_unit:
-            queryset = queryset.filter(assigned_unit_id=assigned_unit)
+        if handling_unit:
+            queryset = queryset.filter(handling_unit_id=handling_unit)
 
         if assigned_employee:
             queryset = queryset.filter(assigned_employee_id=assigned_employee)
@@ -443,9 +443,9 @@ class TicketViewSet(
                 handling_branch__branch_name__icontains=handling_branch_name
             )
 
-        if assigned_unit_name:
+        if handling_unit_name:
             queryset = queryset.filter(
-                assigned_unit__unit_name__icontains=assigned_unit_name
+                handling_unit__unit_name__icontains=handling_unit_name
             )
 
         if assigned_employee_name:

@@ -55,14 +55,15 @@ export function UserTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[1450px] border-collapse text-left text-xs">
+      <table className="w-full min-w-[1580px] border-collapse text-left text-xs">
         <thead>
           <tr className="h-10 border-b bg-white text-slate-700">
             <th className="sticky left-0 z-20 w-[110px] bg-white px-3 font-semibold">
               Thao tác
             </th>
             <th className="w-[160px] px-3 font-semibold">Chi nhánh</th>
-            <th className="w-[170px] px-3 font-semibold">Phòng ban</th>
+            <th className="w-[190px] px-3 font-semibold">Đơn vị tổ chức</th>
+            <th className="w-[150px] px-3 font-semibold">Trách nhiệm</th>
             <th className="w-[190px] px-3 font-semibold">Họ và tên</th>
             <th className="w-[140px] px-3 font-semibold">Tên</th>
             <th className="w-[160px] px-3 font-semibold">Tên truy cập</th>
@@ -91,9 +92,11 @@ export function UserTable({
               <ColumnTextFilter
                 value={userState.department}
                 onChange={userState.setDepartment}
-                placeholder="Phòng ban"
+                placeholder="Đơn vị tổ chức"
               />
             </th>
+
+            <th className="px-2 py-2" />
 
             <th className="px-2 py-2">
               <ColumnTextFilter
@@ -183,7 +186,7 @@ export function UserTable({
               !userState.error &&
               users.length === 0
             }
-            colSpan={11}
+            colSpan={12}
             emptyText="Không có dữ liệu người dùng."
           />
 
@@ -228,7 +231,13 @@ export function UserTable({
 
                   <td className="px-3">{user.branch_name || "Hội sở"}</td>
 
-                  <td className="px-3">{user.department || "-"}</td>
+                  <td className="px-3">
+                    {user.primary_organization_unit_name || user.department || "-"}
+                  </td>
+
+                  <td className="px-3">
+                    {user.primary_membership_responsibility_label || "-"}
+                  </td>
 
                   <td className="px-3">
                     <span className="font-semibold text-sky-600">

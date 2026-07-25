@@ -3,7 +3,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.accounts.models import Role, User, UserBranchAccess, UserRole
-from apps.branches.models import Branch, Employee
+from apps.branches.models import Branch, Employee, OrganizationUnit, EmployeeOrganizationMembership
 
 
 BRANCH_EMPLOYEE_DATA = {
@@ -65,10 +65,10 @@ BRANCH_EMPLOYEE_DATA = {
             "full_name": "Lê Minh Châu",
             "email": "q1.sa.supervisor@phs.vn",
             "phone": "0901000006",
-            "department": "CCC",
+            "department": "SALE_ADMIN",
             "position": "Giám sát Chi nhánh Q1",
             "username": "q1.sa.supervisor",
-            "role_code": "CS_SUPERVISOR",
+            "role_code": "SA_SUPERVISOR",
         },
     ],
     "CN_Q3": [
@@ -97,10 +97,10 @@ BRANCH_EMPLOYEE_DATA = {
             "full_name": "Hoàng Gia Huy",
             "email": "q3.sa.supervisor@phs.vn",
             "phone": "0901000009",
-            "department": "CCC",
+            "department": "SALE_ADMIN",
             "position": "Giám sát Chi nhánh Q3",
             "username": "q3.sa.supervisor",
-            "role_code": "CS_SUPERVISOR",
+            "role_code": "SA_SUPERVISOR",
         },
     ],
     "CN_TB": [
@@ -129,10 +129,10 @@ BRANCH_EMPLOYEE_DATA = {
             "full_name": "Đặng Đức Khang",
             "email": "tanbinh.sa.supervisor@phs.vn",
             "phone": "0901000012",
-            "department": "CCC",
+            "department": "SALE_ADMIN",
             "position": "Giám sát Chi nhánh Tân Bình",
             "username": "tanbinh.sa.supervisor",
-            "role_code": "CS_SUPERVISOR",
+            "role_code": "SA_SUPERVISOR",
         },
     ],
     "CN_TX": [
@@ -161,10 +161,10 @@ BRANCH_EMPLOYEE_DATA = {
             "full_name": "Phan Quốc Minh",
             "email": "thanhxuan.sa.supervisor@phs.vn",
             "phone": "0901000015",
-            "department": "CCC",
+            "department": "SALE_ADMIN",
             "position": "Giám sát Chi nhánh Thanh Xuân",
             "username": "thanhxuan.sa.supervisor",
-            "role_code": "CS_SUPERVISOR",
+            "role_code": "SA_SUPERVISOR",
         },
     ],
     "CN_HN": [
@@ -193,10 +193,10 @@ BRANCH_EMPLOYEE_DATA = {
             "full_name": "Trịnh Hoàng Nam",
             "email": "hanoi.sa.supervisor@phs.vn",
             "phone": "0901000018",
-            "department": "CCC",
+            "department": "SALE_ADMIN",
             "position": "Giám sát Chi nhánh Hà Nội",
             "username": "hanoi.sa.supervisor",
-            "role_code": "CS_SUPERVISOR",
+            "role_code": "SA_SUPERVISOR",
         },
     ],
     "CN_HP": [
@@ -225,10 +225,10 @@ BRANCH_EMPLOYEE_DATA = {
             "full_name": "Vũ Thành Phong",
             "email": "haiphong.sa.supervisor@phs.vn",
             "phone": "0901000021",
-            "department": "CCC",
+            "department": "SALE_ADMIN",
             "position": "Giám sát Chi nhánh Hải Phòng",
             "username": "haiphong.sa.supervisor",
-            "role_code": "CS_SUPERVISOR",
+            "role_code": "SA_SUPERVISOR",
         },
     ],
 }
@@ -267,7 +267,6 @@ class Command(BaseCommand):
                         "email": item["email"],
                         "phone": item["phone"],
                         "branch": branch,
-                        "department": item["department"],
                         "position": item["position"],
                         "status": "ACTIVE",
                     },
@@ -275,6 +274,31 @@ class Command(BaseCommand):
 
                 if employee_created:
                     employee_created_count += 1
+
+                unit_code = f"{item['department']}_{branch.branch_code}"
+                unit = OrganizationUnit.objects.filter(unit_code=unit_code).first()
+                if unit is None:
+                    unit = OrganizationUnit.objects.filter(unit_code=item["department"]).first()
+                if unit is None:
+                    raise RuntimeError(f"Chưa seed organization unit {unit_code}")
+
+                EmployeeOrganizationMembership.objects.filter(
+                    employee=employee,
+                    is_active=True,
+                    is_primary=True,
+                ).exclude(organization_unit=unit).update(is_primary=False)
+
+                EmployeeOrganizationMembership.objects.update_or_create(
+                    employee=employee,
+                    organization_unit=unit,
+                    defaults={
+                        "responsibility": "SUPERVISOR" if "SUP" in item["employee_code"] else "STAFF",
+                        "is_primary": True,
+                        "is_active": True,
+                        "joined_at": timezone.now(),
+                        "left_at": None,
+                    },
+                )
 
                 user, user_created = User.objects.update_or_create(
                     username=item["username"],
@@ -296,15 +320,23 @@ class Command(BaseCommand):
 
                 role = roles[item["role_code"]]
 
-                # Mỗi tài khoản mẫu giữ vai trò được khai báo.
-                UserRole.objects.filter(user=user).exclude(role=role).delete()
-
-                UserRole.objects.get_or_create(
+                # Mỗi tài khoản mẫu giữ đúng một role assignment và luôn
+                # cập nhật lại scope khi command được chạy lại.
+                UserRole.objects.filter(user=user).delete()
+                UserRole.objects.create(
                     user=user,
                     role=role,
-                    defaults={
-                        "created_at": timezone.now(),
-                    },
+                    scope_type=role.default_scope_type,
+                    branch=branch if role.default_scope_type == "BRANCH" else None,
+                    organization_unit=(
+                        unit if role.default_scope_type == "ORGANIZATION_UNIT" else None
+                    ),
+                    include_descendants=(
+                        role.default_scope_type == "ORGANIZATION_UNIT"
+                    ),
+                    is_active=True,
+                    created_at=timezone.now(),
+                    updated_at=timezone.now(),
                 )
 
                 # Gán quyền truy cập chi nhánh.
@@ -316,7 +348,9 @@ class Command(BaseCommand):
                     user=user,
                     branch=branch,
                     defaults={
+                        "is_active": True,
                         "created_at": timezone.now(),
+                        "updated_at": timezone.now(),
                     },
                 )
 
@@ -354,7 +388,7 @@ class Command(BaseCommand):
             {
                 "role_code": "CS_SUPERVISOR",
                 "role_name": "Giám sát chăm sóc khách hàng",
-                "scope_type": "BRANCH",
+                "scope_type": "ORGANIZATION_UNIT",
                 "group_code": Role.GROUP_CCC,
             },
             {
@@ -378,7 +412,8 @@ class Command(BaseCommand):
                 role_code=item["role_code"],
                 defaults={
                     "role_name": item["role_name"],
-                    "scope_type": item["scope_type"],
+                    "default_scope_type": item["scope_type"],
+                    "is_active": True,
                     "group_code": item["group_code"],
                 },
             )

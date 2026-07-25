@@ -1,21 +1,79 @@
+from django.db.models import Q
+from django.utils import timezone
+
 from apps.accounts.models import RolePermission, UserBranchAccess, UserRole
-from apps.branches.models import ProcessingUnitMember
+from apps.branches.models import EmployeeOrganizationMembership, OrganizationUnit
 from apps.common.constants import PermissionCode, RoleCode, ScopeType, TicketStatusCode
 
+
 class PermissionService:
+    SCOPE_PRIORITY = {
+        ScopeType.OWN: 10,
+        ScopeType.ORGANIZATION_UNIT: 20,
+        ScopeType.BRANCH: 30,
+        ScopeType.MULTI_BRANCH: 40,
+        ScopeType.ALL: 50,
+    }
+
     @staticmethod
-    def get_user_roles(user):
+    def get_user_role_assignments(user, permission_code=None):
+        if user is None or not user.is_authenticated:
+            return UserRole.objects.none()
+
+        now = timezone.now()
+        queryset = (
+            UserRole.objects.select_related(
+                "role",
+                "branch",
+                "organization_unit",
+                "organization_unit__branch",
+                "organization_unit__parent",
+            )
+            .filter(
+                user=user,
+                is_active=True,
+                role__is_active=True,
+            )
+            .filter(Q(valid_from__isnull=True) | Q(valid_from__lte=now))
+            .filter(Q(valid_to__isnull=True) | Q(valid_to__gte=now))
+        )
+
+        if permission_code:
+            queryset = queryset.filter(
+                role__role_permissions__permission__permission_code=permission_code,
+                role__role_permissions__permission__is_active=True,
+            )
+
+        return queryset.distinct()
+
+    @staticmethod
+    def get_user_roles(user, permission_code=None):
         if user is None or not user.is_authenticated:
             return []
 
-        return [
-            user_role.role
-            for user_role in UserRole.objects.select_related("role").filter(user=user)
-        ]
+        seen = set()
+        result = []
+
+        for assignment in PermissionService.get_user_role_assignments(
+            user,
+            permission_code=permission_code,
+        ):
+            if assignment.role_id in seen:
+                continue
+            seen.add(assignment.role_id)
+            result.append(assignment.role)
+
+        return result
 
     @staticmethod
-    def get_user_role_codes(user):
-        return [role.role_code for role in PermissionService.get_user_roles(user)]
+    def get_user_role_codes(user, permission_code=None):
+        return [
+            role.role_code
+            for role in PermissionService.get_user_roles(
+                user,
+                permission_code=permission_code,
+            )
+        ]
 
     @staticmethod
     def has_role(user, role_code):
@@ -29,65 +87,132 @@ class PermissionService:
         if user.is_superuser:
             return True
 
-        role_ids = UserRole.objects.filter(
-            user=user,
-        ).values_list("role_id", flat=True)
-
-        return RolePermission.objects.filter(
-            role_id__in=role_ids,
-            permission__permission_code=permission_code,
-            permission__is_active=True,
+        return PermissionService.get_user_role_assignments(
+            user,
+            permission_code=permission_code,
         ).exists()
 
     @staticmethod
-    def get_highest_scope(user):
-        """
-        Ưu tiên scope:
-        ALL > MULTI_BRANCH > BRANCH > OWN
-        """
-
+    def get_highest_scope(user, permission_code=None):
         if user is None or not user.is_authenticated:
             return None
 
         if user.is_superuser:
             return ScopeType.ALL
 
-        roles = PermissionService.get_user_roles(user)
-        scopes = {role.scope_type for role in roles}
+        assignments = PermissionService.get_user_role_assignments(
+            user,
+            permission_code=permission_code,
+        )
+        scopes = [assignment.scope_type for assignment in assignments]
 
-        if ScopeType.ALL in scopes:
-            return ScopeType.ALL
+        if not scopes:
+            return None
 
-        if ScopeType.MULTI_BRANCH in scopes:
-            return ScopeType.MULTI_BRANCH
-
-        if ScopeType.BRANCH in scopes:
-            return ScopeType.BRANCH
-
-        if ScopeType.OWN in scopes:
-            return ScopeType.OWN
-
-        return None
+        return max(
+            scopes,
+            key=lambda value: PermissionService.SCOPE_PRIORITY.get(value, 0),
+        )
 
     @staticmethod
-    def get_user_branch_ids(user):
+    def get_user_branch_ids(user, permission_code=None):
         if user is None or not user.is_authenticated:
             return set()
 
         branch_ids = set()
-
         employee = getattr(user, "employee", None)
 
         if employee is not None and employee.branch_id:
             branch_ids.add(employee.branch_id)
 
-        extra_branch_ids = UserBranchAccess.objects.filter(
-            user=user,
-        ).values_list("branch_id", flat=True)
+        branch_ids.update(
+            UserBranchAccess.objects.filter(
+                user=user,
+                is_active=True,
+            ).values_list("branch_id", flat=True)
+        )
 
-        branch_ids.update(extra_branch_ids)
+        assignments = PermissionService.get_user_role_assignments(
+            user,
+            permission_code=permission_code,
+        )
+
+        for assignment in assignments:
+            if assignment.branch_id:
+                branch_ids.add(assignment.branch_id)
+            if (
+                assignment.organization_unit_id
+                and assignment.organization_unit.branch_id
+            ):
+                branch_ids.add(assignment.organization_unit.branch_id)
 
         return branch_ids
+
+    @staticmethod
+    def get_employee_organization_unit_ids(employee, *, include_ancestors=False):
+        if employee is None:
+            return set()
+
+        units = list(
+            OrganizationUnit.objects.filter(
+                employee_memberships__employee=employee,
+                employee_memberships__is_active=True,
+                is_active=True,
+            ).select_related("parent")
+        )
+        ids = {unit.id for unit in units}
+
+        if include_ancestors:
+            for unit in units:
+                ids.update(unit.get_ancestor_ids())
+
+        return ids
+
+    @staticmethod
+    def get_user_organization_unit_ids(
+        user,
+        permission_code=None,
+        *,
+        include_descendants=True,
+        include_memberships=True,
+    ):
+        if user is None or not user.is_authenticated:
+            return set()
+
+        unit_ids = set()
+
+        if include_memberships:
+            unit_ids.update(
+                PermissionService.get_employee_organization_unit_ids(
+                    getattr(user, "employee", None),
+                )
+            )
+
+        for assignment in PermissionService.get_user_role_assignments(
+            user,
+            permission_code=permission_code,
+        ):
+            unit = assignment.organization_unit
+
+            if unit is None:
+                continue
+
+            unit_ids.add(unit.id)
+
+            if include_descendants and assignment.include_descendants:
+                unit_ids.update(unit.get_descendant_ids(include_self=False))
+
+        return unit_ids
+
+    @staticmethod
+    def _organization_unit_scope_matches(assignment, target_unit):
+        if target_unit is None or assignment.organization_unit_id is None:
+            return False
+
+        return assignment.organization_unit.contains(
+            target_unit,
+            include_descendants=assignment.include_descendants,
+        )
 
     @staticmethod
     def is_ticket_owner(user, ticket):
@@ -98,11 +223,7 @@ class PermissionService:
             return True
 
         employee = getattr(user, "employee", None)
-
-        if employee is not None and ticket.owner_employee_id == employee.id:
-            return True
-
-        return False
+        return bool(employee and ticket.owner_employee_id == employee.id)
 
     @staticmethod
     def is_ticket_assignee(user, ticket):
@@ -110,67 +231,77 @@ class PermissionService:
             return False
 
         employee = getattr(user, "employee", None)
-
-        if employee is None:
-            return False
-
-        return ticket.assigned_employee_id == employee.id
+        return bool(employee and ticket.assigned_employee_id == employee.id)
 
     @staticmethod
-    def is_related_dept_member_for_ticket(user, ticket):
-        """
-        User thuộc phòng ban xử lý của ticket thì được xem/cập nhật task/status liên quan.
-        """
-
-        if user is None or ticket is None:
+    def is_related_organization_unit_member_for_ticket(user, ticket):
+        if user is None or ticket is None or ticket.handling_unit_id is None:
             return False
 
         employee = getattr(user, "employee", None)
 
-        if employee is None or ticket.assigned_unit_id is None:
+        if employee is None:
             return False
 
-        return ProcessingUnitMember.objects.filter(
-            processing_unit_id=ticket.assigned_unit_id,
+        return EmployeeOrganizationMembership.objects.filter(
+            organization_unit_id=ticket.handling_unit_id,
             employee_id=employee.id,
             is_active=True,
         ).exists()
 
+    # Alias cũ để các module chưa chuyển tên vẫn chạy.
+    is_related_dept_member_for_ticket = is_related_organization_unit_member_for_ticket
+
     @staticmethod
-    def can_access_ticket_by_scope(user, ticket):
+    def can_access_ticket_by_scope(user, ticket, permission_code=None):
         if user is None or ticket is None:
             return False
 
         if user.is_superuser:
             return True
 
-        scope = PermissionService.get_highest_scope(user)
+        assignments = PermissionService.get_user_role_assignments(
+            user,
+            permission_code=permission_code,
+        )
 
-        if scope == ScopeType.ALL:
-            return True
+        for assignment in assignments:
+            if assignment.scope_type == ScopeType.ALL:
+                return True
 
-        # BRANCH và MULTI_BRANCH cùng dựa trên get_user_branch_ids, khớp với
-        # filter_tickets_by_user. Trước đây BRANCH chỉ xét employee.branch nên
-        # user thấy ticket trong danh sách mà thao tác lại bị từ chối.
-        if scope in (ScopeType.BRANCH, ScopeType.MULTI_BRANCH):
-            return (
-                ticket.handling_branch_id
-                in PermissionService.get_user_branch_ids(user)
-            )
+            if assignment.scope_type == ScopeType.OWN:
+                if (
+                    PermissionService.is_ticket_owner(user, ticket)
+                    or PermissionService.is_ticket_assignee(user, ticket)
+                ):
+                    return True
 
-        if scope == ScopeType.OWN:
-            return (
-                PermissionService.is_ticket_owner(user, ticket)
-                or PermissionService.is_ticket_assignee(user, ticket)
-            )
+            elif assignment.scope_type == ScopeType.ORGANIZATION_UNIT:
+                if PermissionService._organization_unit_scope_matches(
+                    assignment,
+                    ticket.handling_unit,
+                ):
+                    return True
+
+            elif assignment.scope_type == ScopeType.BRANCH:
+                if ticket.handling_branch_id == assignment.branch_id:
+                    return True
+
+            elif assignment.scope_type == ScopeType.MULTI_BRANCH:
+                if ticket.handling_branch_id in PermissionService.get_user_branch_ids(
+                    user,
+                    permission_code=permission_code,
+                ):
+                    return True
 
         return False
 
     @staticmethod
     def can_view_ticket(user, ticket):
-        return (
-            PermissionService.has_permission(user, PermissionCode.TICKET_VIEW)
-            and PermissionService.can_access_ticket_by_scope(user, ticket)
+        return PermissionService.can_access_ticket_by_scope(
+            user,
+            ticket,
+            permission_code=PermissionCode.TICKET_VIEW,
         )
 
     @staticmethod
@@ -185,20 +316,14 @@ class PermissionService:
         if ticket is None:
             return True
 
-        return PermissionService.can_access_ticket_by_scope(user, ticket)
+        return PermissionService.can_access_ticket_by_scope(
+            user,
+            ticket,
+            permission_code=PermissionCode.TICKET_ASSIGN,
+        )
 
     @staticmethod
     def can_amend_ticket(user, ticket):
-        """
-        Rule đã chốt:
-        - Superuser được sửa tất cả
-        - Có quyền TICKET_AMEND
-        - Chỉ owner được amend
-        - Ticket đã CLOSED/CANCELLED thì không amend
-        - "Đã xong" VẪN cho sửa, để người xử lý dời mốc hoàn thành và
-          reset đồng hồ tự đóng 1 tiếng
-        """
-
         if user is None or not user.is_authenticated:
             return False
 
@@ -215,16 +340,9 @@ class PermissionService:
             ticket.current_status.status_code if ticket.current_status else None
         )
 
-        # Ticket đã đóng/hủy: khóa hẳn, chỉ superuser sửa (đã return ở trên)
-        if status_code in [
-            TicketStatusCode.CLOSED,
-            TicketStatusCode.CANCELLED,
-        ]:
+        if status_code in [TicketStatusCode.CLOSED, TicketStatusCode.CANCELLED]:
             return False
 
-        # is_locked_for_amend được bật cả khi vào DONE_WAIT_CLOSE. Nếu chặn
-        # theo cờ này thì "Đã xong" không sửa được, trái với rule ở trên và
-        # làm chết luôn logic reset completed_at trong amend_ticket.
         if (
             getattr(ticket, "is_locked_for_amend", False)
             and status_code != TicketStatusCode.DONE_WAIT_CLOSE
@@ -232,35 +350,38 @@ class PermissionService:
             return False
 
         return PermissionService.is_ticket_owner(user, ticket)
+
     @staticmethod
     def can_update_ticket_status(user, ticket):
-        """
-        Rule:
-        - Superuser được update tất cả
-        - Owner được update status ticket của mình
-        - Assignee được update ticket đang xử lý
-        - Related department member được update khi ticket thuộc unit của họ
-        """
-
         if user is None or not user.is_authenticated:
             return False
 
         if user.is_superuser:
             return True
 
-        if not PermissionService.has_permission(user, PermissionCode.TICKET_UPDATE_STATUS):
+        if not PermissionService.has_permission(
+            user,
+            PermissionCode.TICKET_UPDATE_STATUS,
+        ):
             return False
 
         if ticket is None:
             return False
 
-        if not PermissionService.can_access_ticket_by_scope(user, ticket):
+        if not PermissionService.can_access_ticket_by_scope(
+            user,
+            ticket,
+            permission_code=PermissionCode.TICKET_UPDATE_STATUS,
+        ):
             return False
 
         return (
             PermissionService.is_ticket_owner(user, ticket)
             or PermissionService.is_ticket_assignee(user, ticket)
-            or PermissionService.is_related_dept_member_for_ticket(user, ticket)
+            or PermissionService.is_related_organization_unit_member_for_ticket(
+                user,
+                ticket,
+            )
         )
 
     @staticmethod
@@ -284,62 +405,65 @@ class PermissionService:
 
     @staticmethod
     def can_view_call_history(user, call_log=None):
-        if not PermissionService.has_permission(user, PermissionCode.CALL_HISTORY_VIEW):
+        permission_code = PermissionCode.CALL_HISTORY_VIEW
+
+        if not PermissionService.has_permission(user, permission_code):
             return False
 
-        if call_log is None:
+        if call_log is None or user.is_superuser:
             return True
-
-        if user.is_superuser:
-            return True
-
-        scope = PermissionService.get_highest_scope(user)
-
-        if scope == ScopeType.ALL:
-            return True
-
-        # Cùng quy ước với ticket/sa_record: BRANCH và MULTI_BRANCH đều
-        # dựa trên get_user_branch_ids (gồm cả chi nhánh cấp thêm).
-        if scope in (ScopeType.BRANCH, ScopeType.MULTI_BRANCH):
-            return (
-                call_log.branch_id
-                in PermissionService.get_user_branch_ids(user)
-            )
 
         employee = getattr(user, "employee", None)
 
-        if employee is None:
-            return False
-
-        if scope == ScopeType.OWN:
-            return call_log.employee_id == employee.id
+        for assignment in PermissionService.get_user_role_assignments(
+            user,
+            permission_code=permission_code,
+        ):
+            if assignment.scope_type == ScopeType.ALL:
+                return True
+            if assignment.scope_type == ScopeType.OWN:
+                if employee and call_log.employee_id == employee.id:
+                    return True
+            elif assignment.scope_type == ScopeType.BRANCH:
+                if call_log.branch_id == assignment.branch_id:
+                    return True
+            elif assignment.scope_type == ScopeType.MULTI_BRANCH:
+                if call_log.branch_id in PermissionService.get_user_branch_ids(
+                    user,
+                    permission_code=permission_code,
+                ):
+                    return True
+            elif assignment.scope_type == ScopeType.ORGANIZATION_UNIT:
+                call_employee = getattr(call_log, "employee", None)
+                unit_ids = PermissionService.get_employee_organization_unit_ids(
+                    call_employee,
+                    include_ancestors=assignment.include_descendants,
+                )
+                if assignment.organization_unit_id in unit_ids:
+                    return True
 
         return False
 
     @staticmethod
     def can_listen_call_record(user, call_log):
-        """
-        Rule:
-        - Phải có quyền CALL_HISTORY_LISTEN
-        - CS Staff chỉ nghe được call của ticket họ xử lý
-        - IC/Manager/BOM theo scope rộng hơn
-        """
-
-        if not PermissionService.has_permission(user, PermissionCode.CALL_HISTORY_LISTEN):
+        if not PermissionService.has_permission(
+            user,
+            PermissionCode.CALL_HISTORY_LISTEN,
+        ):
             return False
 
         if user.is_superuser:
             return True
 
-        role_codes = PermissionService.get_user_role_codes(user)
+        role_codes = PermissionService.get_user_role_codes(
+            user,
+            permission_code=PermissionCode.CALL_HISTORY_LISTEN,
+        )
 
         if RoleCode.CS_STAFF in role_codes:
             employee = getattr(user, "employee", None)
 
-            if employee is None:
-                return False
-
-            if call_log is None:
+            if employee is None or call_log is None:
                 return False
 
             if call_log.employee_id == employee.id:
@@ -351,7 +475,7 @@ class PermissionService:
             return False
 
         return PermissionService.can_view_call_history(user, call_log)
-    
+
     @staticmethod
     def is_sa_record_pic(user, record):
         if user is None or record is None:
@@ -361,33 +485,45 @@ class PermissionService:
             return True
 
         employee = getattr(user, "employee", None)
-
-        if employee and record.pic_employee_id == employee.id:
-            return True
-
-        return False
+        return bool(employee and record.pic_employee_id == employee.id)
 
     @staticmethod
-    def can_access_sa_record_by_scope(user, record):
+    def can_access_sa_record_by_scope(user, record, permission_code=None):
         if user is None or not user.is_authenticated or record is None:
             return False
 
         if user.is_superuser:
             return True
 
-        scope = PermissionService.get_highest_scope(user)
+        permission_code = permission_code or PermissionCode.SA_RECORD_VIEW
+        employee = getattr(user, "employee", None)
 
-        if scope == ScopeType.ALL:
-            return True
-
-        if scope in (ScopeType.BRANCH, ScopeType.MULTI_BRANCH):
-            return (
-                record.branch_id
-                in PermissionService.get_user_branch_ids(user)
-            )
-
-        if scope == ScopeType.OWN:
-            return PermissionService.is_sa_record_pic(user, record)
+        for assignment in PermissionService.get_user_role_assignments(
+            user,
+            permission_code=permission_code,
+        ):
+            if assignment.scope_type == ScopeType.ALL:
+                return True
+            if assignment.scope_type == ScopeType.OWN:
+                if PermissionService.is_sa_record_pic(user, record):
+                    return True
+            elif assignment.scope_type == ScopeType.BRANCH:
+                if record.branch_id == assignment.branch_id:
+                    return True
+            elif assignment.scope_type == ScopeType.MULTI_BRANCH:
+                if record.branch_id in PermissionService.get_user_branch_ids(
+                    user,
+                    permission_code=permission_code,
+                ):
+                    return True
+            elif assignment.scope_type == ScopeType.ORGANIZATION_UNIT:
+                # SaleAdminRecord chưa lưu organization_unit, nên scope đơn vị
+                # được giới hạn về branch của đơn vị/nhân viên.
+                branch_id = assignment.organization_unit.branch_id
+                if branch_id and record.branch_id == branch_id:
+                    return True
+                if employee and record.branch_id == employee.branch_id:
+                    return True
 
         return False
 
@@ -395,11 +531,13 @@ class PermissionService:
     def can_view_sa_record(user, record=None):
         if not PermissionService.has_permission(user, PermissionCode.SA_RECORD_VIEW):
             return False
-
         if record is None:
             return True
-
-        return PermissionService.can_access_sa_record_by_scope(user, record)
+        return PermissionService.can_access_sa_record_by_scope(
+            user,
+            record,
+            permission_code=PermissionCode.SA_RECORD_VIEW,
+        )
 
     @staticmethod
     def can_create_sa_record(user):
@@ -409,21 +547,21 @@ class PermissionService:
     def can_update_sa_record(user, record):
         if not PermissionService.has_permission(user, PermissionCode.SA_RECORD_UPDATE):
             return False
-
-        if record is None:
-            return False
-
-        return PermissionService.can_access_sa_record_by_scope(user, record)
+        return PermissionService.can_access_sa_record_by_scope(
+            user,
+            record,
+            permission_code=PermissionCode.SA_RECORD_UPDATE,
+        )
 
     @staticmethod
     def can_delete_sa_record(user, record):
         if not PermissionService.has_permission(user, PermissionCode.SA_RECORD_DELETE):
             return False
-
-        if record is None:
-            return False
-
-        return PermissionService.can_access_sa_record_by_scope(user, record)
+        return PermissionService.can_access_sa_record_by_scope(
+            user,
+            record,
+            permission_code=PermissionCode.SA_RECORD_DELETE,
+        )
 
     @staticmethod
     def can_import_sa_record(user):
@@ -431,13 +569,18 @@ class PermissionService:
 
     @staticmethod
     def can_view_sa_record_audit(user, record=None):
-        if not PermissionService.has_permission(user, PermissionCode.SA_RECORD_AUDIT_VIEW):
+        if not PermissionService.has_permission(
+            user,
+            PermissionCode.SA_RECORD_AUDIT_VIEW,
+        ):
             return False
-
         if record is None:
             return True
-
-        return PermissionService.can_access_sa_record_by_scope(user, record)
+        return PermissionService.can_access_sa_record_by_scope(
+            user,
+            record,
+            permission_code=PermissionCode.SA_RECORD_AUDIT_VIEW,
+        )
 
     @staticmethod
     def can_view_sa_dashboard(user):

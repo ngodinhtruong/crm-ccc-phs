@@ -45,7 +45,7 @@ class SlaPolicyTaskViewSet(viewsets.ModelViewSet):
     serializer_class = SlaPolicyTaskSerializer
     queryset = SlaPolicyTask.objects.select_related(
         "sla_policy",
-        "processing_unit",
+        "organization_unit",
         "default_branch",
     ).all().order_by("sla_policy", "sort_order", "id")
 

@@ -145,17 +145,23 @@ function DonutTooltip({
   );
 }
 
-export function DailyTicketChart({ data }: { data: ChatbotSeriesItem[] }) {
-  if (data.length === 0) {
+export function DailyTicketChart({
+  data,
+}: {
+  data?: ChatbotSeriesItem[] | null;
+}) {
+  const chartData = Array.isArray(data) ? data : [];
+
+  if (chartData.length === 0) {
     return <EmptyState message="Không có dữ liệu ticket chatbot theo ngày." />;
   }
 
-  const total = data.reduce((sum, item) => sum + item.count, 0);
-  const peakDay = data.reduce(
+  const total = chartData.reduce((sum, item) => sum + item.count, 0);
+  const peakDay = chartData.reduce(
     (best, item) => (item.count > best.count ? item : best),
-    data[0],
+    chartData[0],
   );
-  const average = total / data.length;
+  const average = total / chartData.length;
   const gradientId = "chatbot-daily-ticket-gradient";
 
   return (
@@ -190,16 +196,22 @@ export function DailyTicketChart({ data }: { data: ChatbotSeriesItem[] }) {
           </div>
 
           <div className="rounded-full bg-white/90 px-3 py-1 text-[11px] font-semibold text-sky-700 ring-1 ring-sky-100">
-            {data.length} ngày
+            {chartData.length} ngày
           </div>
         </div>
 
         <div className="h-[320px]">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart
-              data={data}
+              data={chartData}
               margin={{ top: 20, right: 8, left: 0, bottom: 0 }}
             >
+              <defs>
+                <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.35} />
+                  <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0.0} />
+                </linearGradient>
+              </defs>
               <CartesianGrid
                 strokeDasharray="4 4"
                 vertical={false}
@@ -244,17 +256,23 @@ export function DailyTicketChart({ data }: { data: ChatbotSeriesItem[] }) {
   );
 }
 
-export function HourlyTicketChart({ data }: { data: ChatbotSeriesItem[] }) {
-  if (data.length === 0) {
+export function HourlyTicketChart({
+  data,
+}: {
+  data?: ChatbotSeriesItem[] | null;
+}) {
+  const chartData = Array.isArray(data) ? data : [];
+
+  if (chartData.length === 0) {
     return <EmptyState message="Không có dữ liệu ticket chatbot theo giờ." />;
   }
 
-  const total = data.reduce((sum, item) => sum + item.count, 0);
-  const peakHour = data.reduce(
+  const total = chartData.reduce((sum, item) => sum + item.count, 0);
+  const peakHour = chartData.reduce(
     (best, item) => (item.count > best.count ? item : best),
-    data[0],
+    chartData[0],
   );
-  const activeHours = data.filter((item) => item.count > 0).length;
+  const activeHours = chartData.filter((item) => item.count > 0).length;
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-3">
@@ -294,7 +312,7 @@ export function HourlyTicketChart({ data }: { data: ChatbotSeriesItem[] }) {
         <div className="h-[320px]">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
-              data={data}
+              data={chartData}
               margin={{ top: 20, right: 8, left: 0, bottom: 0 }}
               barCategoryGap="20%"
             >
@@ -333,7 +351,7 @@ export function HourlyTicketChart({ data }: { data: ChatbotSeriesItem[] }) {
                 barSize={16}
                 isAnimationActive={false}
               >
-                {data.map((item, index) => (
+                {chartData.map((item, index) => (
                   <Cell
                     key={item.key}
                     fill={
@@ -356,10 +374,12 @@ export function DistributionDonutChart({
   data,
   emptyMessage,
 }: {
-  data: ChartItem[];
+  data?: ChartItem[] | null;
   emptyMessage: string;
 }) {
-  const chartData = data.filter((item) => item.value > 0);
+  const chartData = Array.isArray(data)
+    ? data.filter((item) => item.value > 0)
+    : [];
 
   if (chartData.length === 0) {
     return <EmptyState message={emptyMessage} />;

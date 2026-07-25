@@ -206,12 +206,12 @@ class Ticket(TimeStampedModel):
         related_name="handled_tickets",
     )
 
-    assigned_unit = models.ForeignKey(
-        "branches.ProcessingUnit",
+    handling_unit = models.ForeignKey(
+        "branches.OrganizationUnit",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name="assigned_tickets",
+        related_name="handled_tickets",
     )
 
     assigned_employee = models.ForeignKey(
@@ -398,6 +398,7 @@ class Ticket(TimeStampedModel):
             models.Index(fields=["customer"]),
             models.Index(fields=["customer_account"]),
             models.Index(fields=["handling_branch"]),
+            models.Index(fields=["handling_unit"]),
             models.Index(fields=["assigned_employee"]),
             models.Index(fields=["owner_user"]),
             models.Index(fields=["current_status"]),
@@ -419,6 +420,10 @@ class Ticket(TimeStampedModel):
             models.Index(
                 fields=["handling_branch", "created_at"],
                 name="tkt_branch_created_ix",
+            ),
+            models.Index(
+                fields=["handling_unit", "created_at"],
+                name="tkt_unit_created_ix",
             ),
             models.Index(
                 fields=["source", "created_at"],
@@ -511,16 +516,16 @@ class TicketAssignment(models.Model):
         related_name="ticket_assignments_to",
     )
 
-    from_unit = models.ForeignKey(
-        "branches.ProcessingUnit",
+    from_organization_unit = models.ForeignKey(
+        "branches.OrganizationUnit",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="ticket_assignments_from",
     )
 
-    to_unit = models.ForeignKey(
-        "branches.ProcessingUnit",
+    to_organization_unit = models.ForeignKey(
+        "branches.OrganizationUnit",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
@@ -573,7 +578,7 @@ class TicketAssignment(models.Model):
         indexes = [
             models.Index(fields=["ticket"]),
             models.Index(fields=["to_branch"]),
-            models.Index(fields=["to_unit"]),
+            models.Index(fields=["to_organization_unit"]),
             models.Index(fields=["to_employee"]),
             models.Index(fields=["is_current"]),
         ]
@@ -605,16 +610,16 @@ class TicketUpdateLog(models.Model):
         related_name="update_logs_to",
     )
 
-    from_unit = models.ForeignKey(
-        "branches.ProcessingUnit",
+    from_organization_unit = models.ForeignKey(
+        "branches.OrganizationUnit",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="ticket_update_logs_from",
     )
 
-    to_unit = models.ForeignKey(
-        "branches.ProcessingUnit",
+    to_organization_unit = models.ForeignKey(
+        "branches.OrganizationUnit",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,

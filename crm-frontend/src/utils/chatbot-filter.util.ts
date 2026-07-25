@@ -7,7 +7,7 @@ export function normalizeFilters(
 
   Object.entries(raw).forEach(([key, value]) => {
     if (value !== undefined && value !== null && String(value).trim() !== "") {
-      result[key as keyof ChatbotDashboardFilters] = String(value).trim();
+      result[key as keyof ChatbotDashboardFilters] = String(value).trim() as any;
     }
   });
 

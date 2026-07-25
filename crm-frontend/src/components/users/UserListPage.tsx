@@ -72,7 +72,7 @@ export function UserListPage() {
             </h1>
 
             <p className="mt-0.5 text-xs text-slate-500">
-              Quản lý tài khoản đăng nhập, chi nhánh, phòng ban và vai trò của người dùng.
+              Quản lý tài khoản đăng nhập, chi nhánh, đơn vị tổ chức, trách nhiệm và vai trò của người dùng.
             </p>
           </div>
 

@@ -357,10 +357,12 @@ function TicketResultChartCard({
                 <Tooltip content={<ValueTooltip />} />
                 <Legend wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
                 <Area type="monotone" dataKey="total" name="Tổng ticket tiếp nhận" fill="url(#totalGradient)" stroke="#0097cf" strokeWidth={2} isAnimationActive={false} />
-                <Bar dataKey="processed" name="Đã xử lý" fill="#10b981" radius={[4, 4, 0, 0]} barSize={28} isAnimationActive={false}>
-                  <LabelList dataKey="processed" position="top" style={{ fontSize: 10, fill: '#475569', fontWeight: 600 }} />
+                <Bar dataKey="processed" name="Đã xử lý" fill="#10b981" radius={[4, 4, 0, 0]} barSize={24} isAnimationActive={false}>
+                  <LabelList dataKey="processed" position="top" style={{ fontSize: 10, fill: '#10b981', fontWeight: 700 }} formatter={(val: any) => (val && Number(val) > 0 ? val : "")} />
                 </Bar>
-                <Line type="monotone" dataKey="cancelled" name="Spam / Đã hủy" stroke="#ef4444" strokeWidth={2.5} dot={{ r: 4, fill: "#ef4444" }} isAnimationActive={false} />
+                <Bar dataKey="cancelled" name="Spam / Đã hủy" fill="#ef4444" radius={[4, 4, 0, 0]} barSize={24} isAnimationActive={false}>
+                  <LabelList dataKey="cancelled" position="top" style={{ fontSize: 10, fill: '#ef4444', fontWeight: 700 }} formatter={(val: any) => (val && Number(val) > 0 ? val : "")} />
+                </Bar>
               </ComposedChart>
             )}
           </ResponsiveContainer>
@@ -374,48 +376,52 @@ function TicketResultChartCard({
  * 2. PHÂN TÍCH THEO NGUỒN TIẾP NHẬN
  * ==================================================================== */
 function SourceDonutChartCard({ items, globalViewMode }: { items: any[]; globalViewMode?: ChartViewMode }) {
-  const donutData = useMemo(() => {
-    return aggregateTotalOverall(items, getSourceName, (item) => (item.processed ?? item.resolved ?? 0) + (item.cancelled || 0));
+  const chartData = useMemo(() => {
+    const raw = aggregateTotalOverall(items, getSourceName, (item) => (item.processed ?? item.resolved ?? 0) + (item.cancelled || 0));
+    const totalSum = raw.reduce((acc, curr) => acc + curr.value, 0);
+    return raw
+      .sort((a, b) => b.value - a.value)
+      .map((item) => ({
+        ...item,
+        pct: totalSum > 0 ? ((item.value / totalSum) * 100).toFixed(1) : "0",
+      }));
   }, [items]);
+
+  const totalSum = useMemo(() => chartData.reduce((acc, curr) => acc + curr.value, 0), [chartData]);
 
   return (
     <ChartCard
       title="Tỷ trọng Ticket theo Nguồn"
-      description="Cơ cấu tổng lượng ticket từ các kênh tiếp nhận"
+      description="Xếp hạng cơ cấu tổng lượng ticket từ các kênh tiếp nhận"
       className="xl:col-span-5"
     >
       <div className="h-[320px]">
         <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie
-              data={donutData}
-              dataKey="value"
-              nameKey="name"
-              cx="50%"
-              cy="50%"
-              innerRadius={55}
-              outerRadius={85}
-              paddingAngle={3}
-              isAnimationActive={false}
-              label={({ name, value, percent }) =>
-                percent && percent >= 0.02 ? `${name}: ${formatNumber(value)} (${(percent * 100).toFixed(1)}%)` : ""
-              }
-            >
-              {donutData.map((_, index) => (
+          <BarChart
+            layout="vertical"
+            data={chartData}
+            margin={{ left: 20, right: 65, top: 10, bottom: 10 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+            <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
+            <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fontWeight: 600 }} width={90} />
+            <Tooltip content={<ValueTooltip />} />
+            <Bar dataKey="value" name="Số lượng ticket" radius={[0, 4, 4, 0]} isAnimationActive={false}>
+              {chartData.map((_, index) => (
                 <Cell key={index} fill={COLORS[index % COLORS.length]} />
               ))}
-            </Pie>
-            <Tooltip content={<ValueTooltip />} />
-            <Legend
-              wrapperStyle={{ fontSize: 11 }}
-              formatter={(value: string, entry: any) => {
-                const item = entry.payload;
-                const total = donutData.reduce((acc, curr) => acc + curr.value, 0);
-                const pct = total > 0 ? ((item.value / total) * 100).toFixed(1) : "0";
-                return `${value}: ${formatNumber(item.value)} (${pct}%)`;
-              }}
-            />
-          </PieChart>
+              <LabelList
+                dataKey="value"
+                position="right"
+                style={{ fontSize: 10, fontWeight: 700, fill: "#334155" }}
+                formatter={(val: any, entry: any) => {
+                  const p = entry?.pct ?? entry?.payload?.pct;
+                  const pct = p !== undefined ? p : (totalSum > 0 ? ((Number(val) / totalSum) * 100).toFixed(1) : "0");
+                  return val ? `${formatNumber(val)} (${pct}%)` : "";
+                }}
+              />
+            </Bar>
+          </BarChart>
         </ResponsiveContainer>
       </div>
     </ChartCard>
@@ -423,98 +429,103 @@ function SourceDonutChartCard({ items, globalViewMode }: { items: any[]; globalV
 }
 
 function SourceTrendChartCard({ items, globalViewMode }: { items: any[]; globalViewMode?: ChartViewMode }) {
-  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<string>("ALL");
 
-  const percentPivot = useMemo(() => pivot100PercentStacked(items, getSourceName, (i) => i.month_label || i.period_label || String(i.month_key || ""), (i) => i.processed ?? i.resolved ?? 0), [items]);
-
-  const monthDonutData = useMemo(() => {
-    if (!selectedMonth) return [];
-    const filtered = items.filter((i) => isSameMonth(i, selectedMonth));
-    return aggregateTotalOverall(filtered, getSourceName, (item) => (item.processed ?? item.resolved ?? 0));
-  }, [items, selectedMonth]);
-
-  const handleChartClick = (state: any) => {
-    if (state && state.activeLabel) {
-      setSelectedMonth(state.activeLabel);
+  const pivotData = useMemo(() => {
+    const monthMap = new Map<string, string>();
+    for (const item of items) {
+      const key = String(item.month_key || item.period_label || item.month_label || "");
+      const label = item.month_label || item.period_label || key;
+      if (key) monthMap.set(key, label);
     }
-  };
+
+    const sortedMonthKeys = Array.from(monthMap.keys()).sort().slice(-5);
+    const recentMonthLabels = sortedMonthKeys.map((k) => monthMap.get(k)!);
+
+    const sourceMap = new Map<string, Record<string, any>>();
+    for (const item of items) {
+      const key = String(item.month_key || item.period_label || item.month_label || "");
+      if (!sortedMonthKeys.includes(key)) continue;
+
+      const source = getSourceName(item);
+      const monthLabel = item.month_label || item.period_label || key;
+      const value = item.processed ?? item.resolved ?? 0;
+
+      if (!sourceMap.has(source)) {
+        sourceMap.set(source, { source });
+      }
+      const record = sourceMap.get(source)!;
+      record[monthLabel] = (record[monthLabel] || 0) + value;
+    }
+
+    return {
+      monthDimensions: recentMonthLabels,
+      rows: Array.from(sourceMap.values()),
+    };
+  }, [items]);
+
+  const displayedMonths = useMemo(() => {
+    if (selectedMonth === "ALL") return pivotData.monthDimensions;
+    return pivotData.monthDimensions.filter((m) => m === selectedMonth);
+  }, [selectedMonth, pivotData.monthDimensions]);
 
   return (
     <ChartCard
-      title={
-        selectedMonth
-          ? `Tỷ trọng Nguồn Ticket - ${selectedMonth}`
-          : "Tỷ trọng Ticket đã xử lý theo Nguồn (Miền xếp chồng 100%)"
-      }
-      description={
-        selectedMonth
-          ? "Nhấp đúp hoặc bấm 'Quay lại' để xem xu hướng các tháng"
-          : "Nhấp đúp vào điểm/cột tháng để xem biểu đồ Donut chi tiết của tháng đó"
-      }
+      title="Phân bổ Ticket đã xử lý theo Nguồn"
+      description="Trục hoành: Nguồn tiếp nhận | Trục tung: Số lượng ticket (5 cột tháng nhóm cho mỗi nguồn)"
       className="xl:col-span-7"
       headerRight={
-        selectedMonth ? (
-          <button
-            type="button"
-            onClick={() => setSelectedMonth(null)}
-            className="flex items-center gap-1.5 rounded-md bg-sky-50 px-2.5 py-1 text-xs font-bold text-sky-700 hover:bg-sky-100 ring-1 ring-sky-200 transition-all shadow-2xs"
+        <div className="flex items-center gap-2">
+          <label className="text-xs font-semibold text-slate-500">Xem tháng:</label>
+          <select
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-2xs focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 transition-all"
           >
-            ← Quay lại các tháng
-          </button>
-        ) : undefined
+            <option value="ALL">5 tháng gần nhất (5 cột / nguồn)</option>
+            {pivotData.monthDimensions.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+        </div>
       }
     >
       <div className="h-[320px]">
         <ResponsiveContainer width="100%" height="100%">
-          {selectedMonth ? (
-            <PieChart onDoubleClick={() => setSelectedMonth(null)}>
-              <Pie
-                data={monthDonutData}
-                dataKey="value"
-                nameKey="name"
-                cx="50%"
-                cy="50%"
-                innerRadius={55}
-                outerRadius={85}
-                paddingAngle={3}
-                isAnimationActive={false}
-                label={({ name, value, percent }) =>
-                  percent && percent >= 0.02 ? `${name}: ${formatNumber(value)} (${(percent * 100).toFixed(1)}%)` : ""
-                }
-              >
-                {monthDonutData.map((_, index) => (
-                  <Cell key={index} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip content={<ValueTooltip />} />
-              <Legend
-                wrapperStyle={{ fontSize: 11 }}
-                formatter={(value: string, entry: any) => {
-                  const item = entry.payload;
-                  const total = monthDonutData.reduce((acc, curr) => acc + curr.value, 0);
-                  const pct = total > 0 ? ((item.value / total) * 100).toFixed(1) : "0";
-                  return `${value}: ${formatNumber(item.value)} (${pct}%)`;
-                }}
-              />
-            </PieChart>
-          ) : (
-            <AreaChart
-              data={percentPivot.rows}
-              margin={{ left: 10, right: 20, top: 10, bottom: 10 }}
-              onDoubleClick={handleChartClick}
-              onClick={handleChartClick}
-              className="cursor-pointer"
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis dataKey="month" tick={{ fontSize: 11, fontWeight: 600 }} />
-              <YAxis tickFormatter={(v) => `${v}%`} domain={[0, 100]} tick={{ fontSize: 11 }} />
-              <Tooltip content={<PercentTooltip />} />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              {percentPivot.dimensions.map((source, index) => (
-                <Area key={source} type="monotone" dataKey={source} name={source} stackId="1" stroke={COLORS[index % COLORS.length]} fill={COLORS[index % COLORS.length]} isAnimationActive={false} />
-              ))}
-            </AreaChart>
-          )}
+          <BarChart
+            data={pivotData.rows}
+            margin={{ left: 10, right: 20, top: 20, bottom: 10 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+            <XAxis dataKey="source" tick={{ fontSize: 11, fontWeight: 600 }} />
+            <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+            <Tooltip content={<ValueTooltip />} />
+            <Legend wrapperStyle={{ fontSize: 11 }} />
+            {displayedMonths.map((month, index) => {
+              const monthIndexInAll = pivotData.monthDimensions.indexOf(month);
+              const color = COLORS[monthIndexInAll % COLORS.length];
+              return (
+                <Bar
+                  key={month}
+                  dataKey={month}
+                  name={month}
+                  fill={color}
+                  radius={[4, 4, 0, 0]}
+                  barSize={displayedMonths.length === 1 ? 28 : undefined}
+                  isAnimationActive={false}
+                >
+                  <LabelList
+                    dataKey={month}
+                    position="top"
+                    style={{ fontSize: 10, fill: color, fontWeight: 700 }}
+                    formatter={(val: any) => (val && Number(val) > 0 ? val : "")}
+                  />
+                </Bar>
+              );
+            })}
+          </BarChart>
         </ResponsiveContainer>
       </div>
     </ChartCard>

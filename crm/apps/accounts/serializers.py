@@ -1,13 +1,109 @@
 from django.contrib.auth import get_user_model
-from rest_framework import serializers
-
-from apps.accounts.models import Permission, Role, RolePermission, UserBranchAccess, UserRole
-from apps.branches.models import Branch, Employee
+from django.db import transaction
 from django.utils import timezone
 from django.utils.crypto import get_random_string
+from rest_framework import serializers
+
+from apps.accounts.models import (
+    Permission,
+    Role,
+    RolePermission,
+    SCOPE_CHOICES,
+    UserBranchAccess,
+    UserRole,
+)
+from apps.branches.models import (
+    Branch,
+    Employee,
+    EmployeeOrganizationMembership,
+    MembershipResponsibility,
+    OrganizationUnit,
+)
+from apps.common.constants import ScopeType
 
 
 User = get_user_model()
+
+
+def _infer_role_assignment_payload(*, role, employee=None, branches=None):
+    scope_type = role.default_scope_type
+    branches = branches or []
+    payload = {
+        "role": role,
+        "scope_type": scope_type,
+        "organization_unit": None,
+        "branch": None,
+        "include_descendants": False,
+    }
+
+    if scope_type == ScopeType.ORGANIZATION_UNIT:
+        unit = employee.primary_organization_unit if employee else None
+        if unit is None:
+            raise serializers.ValidationError(
+                {
+                    "role_ids": [
+                        f"Role {role.role_code} dùng scope đơn vị tổ chức nhưng "
+                        "nhân viên chưa có đơn vị chính."
+                    ]
+                }
+            )
+        payload["organization_unit"] = unit
+
+    elif scope_type == ScopeType.BRANCH:
+        branch = employee.branch if employee else (branches[0] if branches else None)
+        if branch is None:
+            raise serializers.ValidationError(
+                {
+                    "role_ids": [
+                        f"Role {role.role_code} dùng scope chi nhánh nhưng chưa "
+                        "xác định được chi nhánh."
+                    ]
+                }
+            )
+        payload["branch"] = branch
+
+    return payload
+
+
+def _create_user_role_assignments(*, user, payloads):
+    now = timezone.now()
+    assignments = []
+    seen = set()
+
+    for payload in payloads:
+        scope_type = payload.get("scope_type") or payload["role"].default_scope_type
+        organization_unit = payload.get("organization_unit")
+        branch = payload.get("branch")
+        is_active = payload.get("is_active", True)
+        key = (
+            payload["role"].pk,
+            scope_type,
+            getattr(organization_unit, "pk", None),
+            getattr(branch, "pk", None),
+            is_active,
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+
+        assignment = UserRole(
+            user=user,
+            role=payload["role"],
+            scope_type=scope_type,
+            organization_unit=organization_unit,
+            branch=branch,
+            include_descendants=payload.get("include_descendants", False),
+            is_active=is_active,
+            valid_from=payload.get("valid_from"),
+            valid_to=payload.get("valid_to"),
+            created_at=now,
+            updated_at=now,
+        )
+        assignment.full_clean()
+        assignments.append(assignment)
+
+    UserRole.objects.bulk_create(assignments)
+    return assignments
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -17,16 +113,22 @@ class UserSerializer(serializers.ModelSerializer):
         allow_blank=True,
     )
 
-    employee_name = serializers.SerializerMethodField()
-    employee_code = serializers.SerializerMethodField()
-    branch_name = serializers.SerializerMethodField()
+    employee_name = serializers.CharField(source="employee.full_name", read_only=True)
+    employee_code = serializers.CharField(source="employee.employee_code", read_only=True)
+    branch_name = serializers.CharField(source="employee.branch.branch_name", read_only=True)
     department = serializers.SerializerMethodField()
-    position = serializers.SerializerMethodField()
+    primary_organization_unit_id = serializers.SerializerMethodField()
+    primary_organization_unit_code = serializers.SerializerMethodField()
+    primary_organization_unit_name = serializers.SerializerMethodField()
+    primary_membership_responsibility = serializers.SerializerMethodField()
+    primary_membership_responsibility_label = serializers.SerializerMethodField()
+    position = serializers.CharField(source="employee.position", read_only=True)
     role_names = serializers.SerializerMethodField()
     role_codes = serializers.SerializerMethodField()
-
     role_group_codes = serializers.SerializerMethodField()
+    role_assignments = serializers.SerializerMethodField()
     branch_access_names = serializers.SerializerMethodField()
+
     class Meta:
         model = User
         fields = [
@@ -40,10 +142,16 @@ class UserSerializer(serializers.ModelSerializer):
             "employee_code",
             "branch_name",
             "department",
+            "primary_organization_unit_id",
+            "primary_organization_unit_code",
+            "primary_organization_unit_name",
+            "primary_membership_responsibility",
+            "primary_membership_responsibility_label",
             "position",
             "role_names",
             "role_codes",
             "role_group_codes",
+            "role_assignments",
             "branch_access_names",
             "status",
             "is_active",
@@ -54,94 +162,100 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = ["is_superuser"]
 
     def validate_is_staff(self, value):
-        """
-        is_staff mở cửa vào Django admin, nên chỉ superuser hoặc
-        SYSTEM_ADMIN được đặt. Nếu không, một CS_MANAGER có thể tự cấp
-        cho mình quyền vào admin và vượt qua mọi phân quyền của API.
-        """
         request = self.context.get("request")
-        user = getattr(request, "user", None)
+        current_user = getattr(request, "user", None)
 
-        # Không đổi giá trị thì không cần kiểm tra
         if self.instance is not None and self.instance.is_staff == value:
             return value
-
         if not value:
             return value
-
-        if user is not None and user.is_superuser:
+        if current_user is not None and current_user.is_superuser:
             return value
 
         from apps.accounts.services import PermissionService
 
-        role_codes = {
-            role.role_code for role in PermissionService.get_user_roles(user)
-        }
-
-        if "SYSTEM_ADMIN" in role_codes:
+        if "SYSTEM_ADMIN" in PermissionService.get_user_role_codes(current_user):
             return value
 
         raise serializers.ValidationError(
             "Bạn không có quyền cấp quyền truy cập trang quản trị."
         )
 
-    def get_employee_name(self, obj):
-        return obj.employee.full_name if obj.employee else ""
-
-    def get_employee_code(self, obj):
-        return obj.employee.employee_code if obj.employee else ""
-
-    def get_branch_name(self, obj):
-        if obj.employee and obj.employee.branch:
-            return obj.employee.branch.branch_name
-        return ""
+    def _primary_unit(self, obj):
+        return obj.employee.primary_organization_unit if obj.employee else None
 
     def get_department(self, obj):
-        return obj.employee.department if obj.employee else ""
+        unit = self._primary_unit(obj)
+        return unit.unit_name if unit else ""
 
-    def get_position(self, obj):
-        return obj.employee.position if obj.employee else ""
+    def get_primary_organization_unit_id(self, obj):
+        unit = self._primary_unit(obj)
+        return unit.id if unit else None
+
+    def get_primary_organization_unit_code(self, obj):
+        unit = self._primary_unit(obj)
+        return unit.unit_code if unit else None
+
+    def get_primary_organization_unit_name(self, obj):
+        unit = self._primary_unit(obj)
+        return unit.unit_name if unit else None
+
+    def get_primary_membership_responsibility(self, obj):
+        if not obj.employee:
+            return None
+        return obj.employee.primary_membership_responsibility
+
+    def get_primary_membership_responsibility_label(self, obj):
+        if not obj.employee:
+            return None
+        return obj.employee.primary_membership_responsibility_label
+
+    def _effective_assignments(self, obj):
+        from apps.accounts.services import PermissionService
+
+        return PermissionService.get_user_role_assignments(obj)
 
     def get_role_names(self, obj):
         return list(
-            UserRole.objects.filter(user=obj)
-            .select_related("role")
-            .values_list("role__role_name", flat=True)
+            dict.fromkeys(
+                assignment.role.role_name
+                for assignment in self._effective_assignments(obj)
+            )
         )
 
     def get_role_codes(self, obj):
         return list(
-            UserRole.objects.filter(user=obj)
-            .select_related("role")
-            .values_list("role__role_code", flat=True)
+            dict.fromkeys(
+                assignment.role.role_code
+                for assignment in self._effective_assignments(obj)
+            )
         )
 
     def get_role_group_codes(self, obj):
         return list(
-            UserRole.objects.filter(user=obj)
-            .select_related("role")
-            .values_list("role__group_code", flat=True)
-            .distinct()
+            dict.fromkeys(
+                assignment.role.group_code
+                for assignment in self._effective_assignments(obj)
+            )
         )
 
+    def get_role_assignments(self, obj):
+        return UserRoleSerializer(
+            self._effective_assignments(obj),
+            many=True,
+        ).data
 
     def get_branch_access_names(self, obj):
         return list(
-            UserBranchAccess.objects.filter(user=obj)
-            .select_related("branch")
+            obj.branch_accesses.filter(is_active=True)
             .values_list("branch__branch_name", flat=True)
             .distinct()
         )
+
     def create(self, validated_data):
         password = validated_data.pop("password", None)
-
         user = User(**validated_data)
-
-        if password:
-            user.set_password(password)
-        else:
-            user.set_unusable_password()
-
+        user.set_password(password) if password else user.set_unusable_password()
         user.save()
         return user
 
@@ -159,6 +273,9 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class RoleSerializer(serializers.ModelSerializer):
+    # Alias output cho frontend cũ. Khi input scope_type, map sang default_scope_type.
+    scope_type = serializers.CharField(source="default_scope_type", required=False)
+
     class Meta:
         model = Role
         fields = [
@@ -167,6 +284,7 @@ class RoleSerializer(serializers.ModelSerializer):
             "role_name",
             "scope_type",
             "group_code",
+            "is_active",
             "created_at",
             "updated_at",
         ]
@@ -186,24 +304,53 @@ class PermissionSerializer(serializers.ModelSerializer):
 
 
 class UserRoleSerializer(serializers.ModelSerializer):
-    username = serializers.SerializerMethodField()
-    role_name = serializers.SerializerMethodField()
+    username = serializers.CharField(source="user.username", read_only=True)
+    role_code = serializers.CharField(source="role.role_code", read_only=True)
+    role_name = serializers.CharField(source="role.role_name", read_only=True)
+    organization_unit_code = serializers.CharField(
+        source="organization_unit.unit_code",
+        read_only=True,
+    )
+    organization_unit_name = serializers.CharField(
+        source="organization_unit.unit_name",
+        read_only=True,
+    )
+    branch_name = serializers.CharField(source="branch.branch_name", read_only=True)
 
     class Meta:
         model = UserRole
-        fields = ["id", "user", "username", "role", "role_name", "created_at"]
-
-    def get_username(self, obj):
-        return obj.user.username if obj.user else None
-
-    def get_role_name(self, obj):
-        return obj.role.role_name if obj.role else None
+        fields = [
+            "id",
+            "user",
+            "username",
+            "role",
+            "role_code",
+            "role_name",
+            "scope_type",
+            "organization_unit",
+            "organization_unit_code",
+            "organization_unit_name",
+            "branch",
+            "branch_name",
+            "include_descendants",
+            "is_active",
+            "valid_from",
+            "valid_to",
+            "created_at",
+            "updated_at",
+        ]
 
 
 class RolePermissionSerializer(serializers.ModelSerializer):
-    role_name = serializers.SerializerMethodField()
-    permission_code = serializers.SerializerMethodField()
-    permission_name = serializers.SerializerMethodField()
+    role_name = serializers.CharField(source="role.role_name", read_only=True)
+    permission_code = serializers.CharField(
+        source="permission.permission_code",
+        read_only=True,
+    )
+    permission_name = serializers.CharField(
+        source="permission.permission_name",
+        read_only=True,
+    )
 
     class Meta:
         model = RolePermission
@@ -215,38 +362,112 @@ class RolePermissionSerializer(serializers.ModelSerializer):
             "permission_code",
             "permission_name",
             "created_at",
+            "updated_at",
         ]
-
-    def get_role_name(self, obj):
-        return obj.role.role_name if obj.role else None
-
-    def get_permission_code(self, obj):
-        return obj.permission.permission_code if obj.permission else None
-
-    def get_permission_name(self, obj):
-        return obj.permission.permission_name if obj.permission else None
 
 
 class UserBranchAccessSerializer(serializers.ModelSerializer):
-    username = serializers.SerializerMethodField()
-    branch_name = serializers.SerializerMethodField()
+    username = serializers.CharField(source="user.username", read_only=True)
+    branch_name = serializers.CharField(source="branch.branch_name", read_only=True)
 
     class Meta:
         model = UserBranchAccess
-        fields = ["id", "user", "username", "branch", "branch_name", "created_at"]
+        fields = [
+            "id",
+            "user",
+            "username",
+            "branch",
+            "branch_name",
+            "is_active",
+            "created_at",
+            "updated_at",
+        ]
 
-    def get_username(self, obj):
-        return obj.user.username if obj.user else None
 
-    def get_branch_name(self, obj):
-        return obj.branch.branch_name if obj.branch else None
+class RoleAssignmentInputSerializer(serializers.Serializer):
+    role = serializers.PrimaryKeyRelatedField(queryset=Role.objects.filter(is_active=True))
+    scope_type = serializers.ChoiceField(choices=SCOPE_CHOICES, required=False)
+    organization_unit = serializers.PrimaryKeyRelatedField(
+        queryset=OrganizationUnit.objects.filter(is_active=True),
+        required=False,
+        allow_null=True,
+    )
+    branch = serializers.PrimaryKeyRelatedField(
+        queryset=Branch.objects.all(),
+        required=False,
+        allow_null=True,
+    )
+    include_descendants = serializers.BooleanField(required=False, default=False)
+    is_active = serializers.BooleanField(required=False, default=True)
+    valid_from = serializers.DateTimeField(required=False, allow_null=True)
+    valid_to = serializers.DateTimeField(required=False, allow_null=True)
+
+    def validate(self, attrs):
+        role = attrs["role"]
+        attrs.setdefault("scope_type", role.default_scope_type)
+
+        candidate = UserRole(
+            user=User(),
+            role=role,
+            scope_type=attrs["scope_type"],
+            organization_unit=attrs.get("organization_unit"),
+            branch=attrs.get("branch"),
+            include_descendants=attrs.get("include_descendants", False),
+            valid_from=attrs.get("valid_from"),
+            valid_to=attrs.get("valid_to"),
+        )
+
+        # Kiểm tra rule trường mà không full_clean FK user chưa lưu.
+        if candidate.scope_type == ScopeType.ORGANIZATION_UNIT:
+            if not candidate.organization_unit_id:
+                raise serializers.ValidationError(
+                    {"organization_unit": "Bắt buộc chọn đơn vị tổ chức."}
+                )
+            if candidate.branch_id:
+                raise serializers.ValidationError({"branch": "Không chọn branch."})
+        elif candidate.scope_type == ScopeType.BRANCH:
+            if not candidate.branch_id:
+                raise serializers.ValidationError({"branch": "Bắt buộc chọn chi nhánh."})
+            if candidate.organization_unit_id:
+                raise serializers.ValidationError(
+                    {"organization_unit": "Không chọn đơn vị tổ chức."}
+                )
+        elif candidate.organization_unit_id or candidate.branch_id:
+            raise serializers.ValidationError(
+                "Scope OWN/MULTI_BRANCH/ALL không nhận branch hoặc organization_unit."
+            )
+
+        if candidate.scope_type != ScopeType.ORGANIZATION_UNIT and candidate.include_descendants:
+            raise serializers.ValidationError(
+                {"include_descendants": "Chỉ dùng cho scope đơn vị tổ chức."}
+            )
+
+        if candidate.valid_from and candidate.valid_to and candidate.valid_to < candidate.valid_from:
+            raise serializers.ValidationError(
+                {"valid_to": "Thời điểm kết thúc phải sau thời điểm bắt đầu."}
+            )
+
+        return attrs
 
 
 class SetUserRolesSerializer(serializers.Serializer):
     role_ids = serializers.ListField(
         child=serializers.IntegerField(),
+        required=False,
         allow_empty=True,
     )
+    assignments = RoleAssignmentInputSerializer(
+        many=True,
+        required=False,
+        allow_empty=True,
+    )
+
+    def validate(self, attrs):
+        if "role_ids" not in attrs and "assignments" not in attrs:
+            raise serializers.ValidationError(
+                "Cần truyền role_ids hoặc assignments."
+            )
+        return attrs
 
 
 class SetRolePermissionsSerializer(serializers.Serializer):
@@ -261,50 +482,113 @@ class SetUserBranchesSerializer(serializers.Serializer):
         child=serializers.IntegerField(),
         allow_empty=True,
     )
+
+
+class EmployeeCreateInputSerializer(serializers.Serializer):
+    employee_code = serializers.CharField(max_length=50)
+    full_name = serializers.CharField(max_length=255)
+    email = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
+    phone = serializers.CharField(
+        max_length=50,
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    branch = serializers.PrimaryKeyRelatedField(
+        queryset=Branch.objects.all(),
+    )
+    primary_organization_unit = serializers.PrimaryKeyRelatedField(
+        queryset=OrganizationUnit.objects.filter(is_active=True),
+        required=False,
+        allow_null=True,
+    )
+    primary_membership_responsibility = serializers.ChoiceField(
+        choices=MembershipResponsibility.choices,
+        required=False,
+    )
+    position = serializers.CharField(
+        max_length=100,
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    status = serializers.CharField(max_length=20, required=False, default="ACTIVE")
+
+    def validate_employee_code(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("Mã nhân viên không được để trống.")
+        if Employee.objects.filter(employee_code=value).exists():
+            raise serializers.ValidationError("Mã nhân viên đã tồn tại.")
+        return value
+
+    def validate_full_name(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("Họ tên nhân viên không được để trống.")
+        return value
+
+    def validate(self, attrs):
+        branch = attrs["branch"]
+        unit = attrs.get("primary_organization_unit")
+        responsibility = attrs.get("primary_membership_responsibility")
+
+        if unit and unit.branch_id and unit.branch_id != branch.id:
+            raise serializers.ValidationError(
+                {
+                    "primary_organization_unit": (
+                        "Đơn vị chính không thuộc chi nhánh nhân viên."
+                    )
+                }
+            )
+
+        if unit and not responsibility:
+            raise serializers.ValidationError(
+                {
+                    "primary_membership_responsibility": (
+                        "Phải chọn trách nhiệm trong đơn vị khi chọn đơn vị chính."
+                    )
+                }
+            )
+
+        if responsibility and not unit:
+            raise serializers.ValidationError(
+                {
+                    "primary_membership_responsibility": (
+                        "Không thể chọn trách nhiệm khi chưa chọn đơn vị chính."
+                    )
+                }
+            )
+
+        return attrs
+
+
 class UserCreateWithAccessSerializer(serializers.Serializer):
     username = serializers.CharField(max_length=150)
     email = serializers.EmailField()
-
-    password = serializers.CharField(
-        write_only=True,
-        required=False,
-        allow_blank=True,
-    )
-
-    first_name = serializers.CharField(
-        max_length=150,
-        required=False,
-        allow_blank=True,
-    )
-    last_name = serializers.CharField(
-        max_length=150,
-        required=False,
-        allow_blank=True,
-    )
+    password = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    first_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    last_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
 
     employee = serializers.PrimaryKeyRelatedField(
         queryset=Employee.objects.all(),
         required=False,
         allow_null=True,
     )
-
-    employee_data = serializers.DictField(
-        required=False,
-        allow_empty=True,
-    )
-
-    status = serializers.CharField(
-        max_length=20,
-        required=False,
-        default="ACTIVE",
-    )
+    employee_data = EmployeeCreateInputSerializer(required=False)
+    status = serializers.CharField(max_length=20, required=False, default="ACTIVE")
     is_active = serializers.BooleanField(required=False, default=True)
 
     role_ids = serializers.ListField(
         child=serializers.IntegerField(),
-        allow_empty=False,
+        required=False,
+        allow_empty=True,
     )
-
+    role_assignments = RoleAssignmentInputSerializer(
+        many=True,
+        required=False,
+        allow_empty=True,
+    )
     branch_ids = serializers.ListField(
         child=serializers.IntegerField(),
         required=False,
@@ -313,231 +597,170 @@ class UserCreateWithAccessSerializer(serializers.Serializer):
 
     def validate_username(self, value):
         value = value.strip()
-
         if not value:
             raise serializers.ValidationError("Username không được để trống.")
-
         if User.objects.filter(username=value).exists():
             raise serializers.ValidationError("Username đã tồn tại.")
-
         return value
 
     def validate_email(self, value):
         value = value.strip().lower()
-
-        if not value:
-            raise serializers.ValidationError("Email không được để trống.")
-
         if User.objects.filter(email=value).exists():
             raise serializers.ValidationError("Email đã tồn tại.")
-
         return value
 
     def validate_employee(self, value):
-        if value is None:
-            return value
-
-        if User.objects.filter(employee=value).exists():
+        if value and User.objects.filter(employee=value).exists():
             raise serializers.ValidationError(
                 "Nhân viên này đã được liên kết với tài khoản khác."
             )
-
-        return value
-
-    def validate_employee_data(self, value):
-        if value is None:
-            return {}
-
-        if not isinstance(value, dict):
-            raise serializers.ValidationError("employee_data không hợp lệ.")
-
         return value
 
     def validate(self, attrs):
         employee = attrs.get("employee")
         employee_data = attrs.get("employee_data") or {}
-
         role_ids = attrs.get("role_ids") or []
+        explicit_assignments = attrs.get("role_assignments") or []
         branch_ids = attrs.get("branch_ids") or []
 
-        roles = list(Role.objects.filter(id__in=role_ids))
-        found_role_ids = {role.id for role in roles}
-        missing_role_ids = set(role_ids) - found_role_ids
+        if not role_ids and not explicit_assignments:
+            raise serializers.ValidationError(
+                {"role_ids": ["Phải chọn ít nhất một vai trò."]}
+            )
 
+        roles = list(Role.objects.filter(id__in=role_ids, is_active=True))
+        missing_role_ids = set(role_ids) - {role.id for role in roles}
         if missing_role_ids:
             raise serializers.ValidationError(
-                {
-                    "role_ids": [
-                        f"Role không tồn tại: {sorted(missing_role_ids)}"
-                    ]
-                }
+                {"role_ids": [f"Role không tồn tại: {sorted(missing_role_ids)}"]}
             )
 
         branches = list(Branch.objects.filter(id__in=branch_ids))
-        found_branch_ids = {branch.id for branch in branches}
-        missing_branch_ids = set(branch_ids) - found_branch_ids
-
+        missing_branch_ids = set(branch_ids) - {branch.id for branch in branches}
         if missing_branch_ids:
             raise serializers.ValidationError(
                 {
                     "branch_ids": [
-                        f"Chi nhánh phân quyền không tồn tại: {sorted(missing_branch_ids)}"
+                        f"Chi nhánh không tồn tại: {sorted(missing_branch_ids)}"
                     ]
                 }
             )
 
+        if employee and employee_data:
+            raise serializers.ValidationError(
+                {
+                    "employee_data": (
+                        "Không gửi employee_data khi đã chọn Employee có sẵn."
+                    )
+                }
+            )
+
         if not employee:
-            required_employee_fields = {
-                "employee_code": "Mã nhân viên",
-                "full_name": "Họ tên nhân viên",
-                "branch": "Chi nhánh nhân viên",
-            }
-
-            missing_fields = [
-                label
-                for field, label in required_employee_fields.items()
-                if not employee_data.get(field)
-            ]
-
-            if missing_fields:
+            if not employee_data:
                 raise serializers.ValidationError(
                     {
-                        "employee_data": [
-                            "Nếu không chọn Employee có sẵn, bắt buộc nhập: "
-                            + ", ".join(missing_fields)
-                        ]
+                        "employee_data": (
+                            "Phải nhập thông tin nhân viên mới hoặc chọn Employee có sẵn."
+                        )
                     }
                 )
 
-            employee_code = str(employee_data.get("employee_code")).strip()
-            full_name = str(employee_data.get("full_name")).strip()
-            branch_id = employee_data.get("branch")
-
-            if Employee.objects.filter(employee_code=employee_code).exists():
-                raise serializers.ValidationError(
-                    {
-                        "employee_data": [
-                            "Mã nhân viên đã tồn tại."
-                        ]
-                    }
-                )
-
-            branch = Branch.objects.filter(id=branch_id).first()
-
-            if not branch:
-                raise serializers.ValidationError(
-                    {
-                        "employee_data": [
-                            "Chi nhánh nhân viên không hợp lệ."
-                        ]
-                    }
-                )
+            branch = employee_data["branch"]
+            primary_unit = employee_data.get("primary_organization_unit")
+            primary_responsibility = employee_data.get(
+                "primary_membership_responsibility"
+            )
 
             attrs["_employee_payload"] = {
-                "employee_code": employee_code,
-                "full_name": full_name,
+                "employee_code": employee_data["employee_code"],
+                "full_name": employee_data["full_name"],
+                "email": str(employee_data.get("email") or attrs["email"]).strip(),
+                "phone": str(employee_data.get("phone") or "").strip() or None,
                 "branch": branch,
-                "department": str(employee_data.get("department") or "").strip(),
-                "position": str(employee_data.get("position") or "").strip(),
+                "position": str(employee_data.get("position") or "").strip() or None,
+                "status": str(employee_data.get("status") or "ACTIVE"),
             }
+            attrs["_primary_unit"] = primary_unit
+            attrs["_primary_responsibility"] = primary_responsibility
 
-        requires_branch = False
-
-        for role in roles:
-            if role.group_code == Role.GROUP_GLOBAL or role.scope_type == "ALL":
-                continue
-
-            if role.group_code in [Role.GROUP_CCC, Role.GROUP_SALE_ADMIN]:
-                requires_branch = True
-                break
-
-            if role.scope_type in ["OWN", "BRANCH", "MULTI_BRANCH"]:
-                requires_branch = True
-                break
-
-        if requires_branch and not branch_ids:
-            if employee and employee.branch_id:
-                branch_ids = [employee.branch_id]
-                branches = [employee.branch]
-            elif attrs.get("_employee_payload"):
-                branch = attrs["_employee_payload"]["branch"]
-                branch_ids = [branch.id]
+            if not branches:
                 branches = [branch]
-            else:
-                raise serializers.ValidationError(
-                    {
-                        "branch_ids": [
-                            "Vui lòng chọn chi nhánh cho user nghiệp vụ."
-                        ]
-                    }
-                )
+                attrs["branch_ids"] = [branch.id]
 
-        attrs["branch_ids"] = branch_ids
         attrs["_roles"] = roles
         attrs["_branches"] = branches
-
+        attrs["_explicit_assignments"] = explicit_assignments
         return attrs
 
+    @transaction.atomic
     def create(self, validated_data):
         roles = validated_data.pop("_roles", [])
         branches = validated_data.pop("_branches", [])
+        explicit_assignments = validated_data.pop("_explicit_assignments", [])
         employee_payload = validated_data.pop("_employee_payload", None)
+        primary_unit = validated_data.pop("_primary_unit", None)
+        primary_responsibility = validated_data.pop(
+            "_primary_responsibility",
+            None,
+        )
 
         validated_data.pop("role_ids", None)
+        validated_data.pop("role_assignments", None)
         validated_data.pop("branch_ids", None)
-
         employee = validated_data.pop("employee", None)
         validated_data.pop("employee_data", None)
-
         password = validated_data.pop("password", None)
 
         if not employee:
             employee = Employee.objects.create(**employee_payload)
+            if primary_unit:
+                EmployeeOrganizationMembership.objects.create(
+                    employee=employee,
+                    organization_unit=primary_unit,
+                    responsibility=primary_responsibility,
+                    is_primary=True,
+                    is_active=True,
+                    joined_at=timezone.now(),
+                )
 
-        user = User(
-            employee=employee,
-            **validated_data,
-        )
+        user = User(employee=employee, **validated_data)
 
         if password:
             user.set_password(password)
         else:
-            # Không đặt mật khẩu suy ra từ username (kiểu "<username>123"):
-            # ai biết quy ước đặt tên đều đăng nhập được vào tài khoản mới.
-            # Sinh chuỗi ngẫu nhiên và trả về đúng một lần cho người tạo.
             password = get_random_string(12)
             user.set_password(password)
             self._generated_password = password
 
         user.save()
-
         now = timezone.now()
-
-        UserRole.objects.bulk_create(
-            [
-                UserRole(
-                    user=user,
-                    role=role,
-                    created_at=now,
-                )
-                for role in roles
-            ],
-            ignore_conflicts=True,
-        )
 
         UserBranchAccess.objects.bulk_create(
             [
                 UserBranchAccess(
                     user=user,
                     branch=branch,
+                    is_active=True,
                     created_at=now,
+                    updated_at=now,
                 )
                 for branch in branches
             ],
             ignore_conflicts=True,
         )
 
+        payloads = list(explicit_assignments)
+        payloads.extend(
+            _infer_role_assignment_payload(
+                role=role,
+                employee=employee,
+                branches=branches,
+            )
+            for role in roles
+        )
+        _create_user_role_assignments(user=user, payloads=payloads)
         return user
+
 
 class CurrentUserSerializer(serializers.ModelSerializer):
     roles = serializers.SerializerMethodField()
@@ -563,93 +786,51 @@ class CurrentUserSerializer(serializers.ModelSerializer):
             "is_global_admin",
         ]
 
+    def _assignments(self, obj):
+        from apps.accounts.services import PermissionService
+
+        return list(PermissionService.get_user_role_assignments(obj))
+
     def get_roles(self, obj):
-        return [
-            {
-                "id": user_role.role.id,
-                "role_code": user_role.role.role_code,
-                "role_name": user_role.role.role_name,
-                "scope_type": user_role.role.scope_type,
-                "group_code": user_role.role.group_code,
-            }
-            for user_role in obj.user_roles.select_related("role").all()
-            if user_role.role
-        ]
+        return UserRoleSerializer(self._assignments(obj), many=True).data
 
     def get_permissions(self, obj):
-        permissions = []
-
-        for user_role in obj.user_roles.select_related("role").prefetch_related(
-            "role__role_permissions__permission"
-        ):
-            role = user_role.role
-
-            if not role:
-                continue
-
-            for role_permission in role.role_permissions.all():
+        permissions = {}
+        for assignment in self._assignments(obj):
+            for role_permission in assignment.role.role_permissions.select_related(
+                "permission"
+            ).all():
                 permission = role_permission.permission
-
-                if not permission:
-                    continue
-
-                permissions.append(
-                    {
+                if permission and permission.is_active:
+                    permissions[permission.permission_code] = {
                         "id": permission.id,
                         "permission_code": permission.permission_code,
                         "permission_name": permission.permission_name,
                         "module_code": permission.module_code,
                         "action_code": permission.action_code,
                     }
-                )
+        return list(permissions.values())
 
-        unique = {}
-        for item in permissions:
-            unique[item["permission_code"]] = item
-
-        return list(unique.values())
-
-    def _get_user_roles(self, obj):
-        return [
-            user_role.role
-            for user_role in obj.user_roles.select_related("role").all()
-            if user_role.role
-        ]
+    def _roles(self, obj):
+        return [assignment.role for assignment in self._assignments(obj)]
 
     def get_accessible_groups(self, obj):
-        roles = self._get_user_roles(obj)
-
+        roles = self._roles(obj)
         role_codes = {role.role_code for role in roles}
         group_codes = {role.group_code for role in roles if role.group_code}
 
         if "SYSTEM_ADMIN" in role_codes or "GLOBAL" in group_codes:
             return ["CCC", "SALE_ADMIN"]
 
-        result = []
-
-        if "CCC" in group_codes:
-            result.append("CCC")
-
-        if "SALE_ADMIN" in group_codes:
-            result.append("SALE_ADMIN")
-
-        return result
+        return [code for code in ["CCC", "SALE_ADMIN"] if code in group_codes]
 
     def get_default_group(self, obj):
         groups = self.get_accessible_groups(obj)
-
-        if "CCC" in groups:
-            return "CCC"
-
-        if "SALE_ADMIN" in groups:
-            return "SALE_ADMIN"
-
-        return None
+        return "CCC" if "CCC" in groups else ("SALE_ADMIN" if "SALE_ADMIN" in groups else None)
 
     def get_is_global_admin(self, obj):
-        roles = self._get_user_roles(obj)
-
-        role_codes = {role.role_code for role in roles}
-        group_codes = {role.group_code for role in roles if role.group_code}
-
-        return "SYSTEM_ADMIN" in role_codes or "GLOBAL" in group_codes
+        roles = self._roles(obj)
+        return any(
+            role.role_code == "SYSTEM_ADMIN" or role.group_code == "GLOBAL"
+            for role in roles
+        )

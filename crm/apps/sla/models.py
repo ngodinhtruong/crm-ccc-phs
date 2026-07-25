@@ -34,8 +34,8 @@ class SlaPolicy(TimeStampedModel):
         related_name="sla_policies",
     )
 
-    processing_unit = models.ForeignKey(
-        "branches.ProcessingUnit",
+    organization_unit = models.ForeignKey(
+        "branches.OrganizationUnit",
         on_delete=models.PROTECT,
         null=True,
         blank=True,
@@ -113,7 +113,7 @@ class SlaPolicy(TimeStampedModel):
             models.Index(fields=["support_category"]),
             models.Index(fields=["classification"]),
             models.Index(fields=["priority"]),
-            models.Index(fields=["processing_unit"]),
+            models.Index(fields=["organization_unit"]),
             models.Index(fields=["branch"]),
             models.Index(fields=["customer_type"]),
             models.Index(fields=["status"]),
@@ -134,8 +134,8 @@ class SlaPolicyTask(TimeStampedModel):
     task_name = models.CharField(max_length=255)
     task_description = models.TextField(null=True, blank=True)
 
-    processing_unit = models.ForeignKey(
-        "branches.ProcessingUnit",
+    organization_unit = models.ForeignKey(
+        "branches.OrganizationUnit",
         on_delete=models.PROTECT,
         null=True,
         blank=True,
@@ -165,7 +165,7 @@ class SlaPolicyTask(TimeStampedModel):
         db_table = "sla_policy_tasks"
         indexes = [
             models.Index(fields=["sla_policy"]),
-            models.Index(fields=["processing_unit"]),
+            models.Index(fields=["organization_unit"]),
             models.Index(fields=["default_branch"]),
             models.Index(fields=["sort_order"]),
             models.Index(fields=["is_active"]),
@@ -437,8 +437,8 @@ class TicketTask(TimeStampedModel):
     task_name = models.CharField(max_length=255)
     task_description = models.TextField(null=True, blank=True)
 
-    processing_unit = models.ForeignKey(
-        "branches.ProcessingUnit",
+    organization_unit = models.ForeignKey(
+        "branches.OrganizationUnit",
         on_delete=models.PROTECT,
         null=True,
         blank=True,
@@ -489,7 +489,7 @@ class TicketTask(TimeStampedModel):
         db_table = "ticket_tasks"
         indexes = [
             models.Index(fields=["ticket"]),
-            models.Index(fields=["processing_unit"]),
+            models.Index(fields=["organization_unit"]),
             models.Index(fields=["branch"]),
             models.Index(fields=["assigned_employee"]),
             models.Index(fields=["task_status"]),
@@ -600,17 +600,17 @@ class TicketTaskLog(models.Model):
         ]
 
 
-class TicketDepartmentSlaTracking(TimeStampedModel):
+class TicketOrganizationUnitSlaTracking(TimeStampedModel):
     ticket = models.ForeignKey(
         "tickets.Ticket",
         on_delete=models.CASCADE,
-        related_name="department_sla_trackings",
+        related_name="organization_unit_sla_trackings",
     )
 
-    processing_unit = models.ForeignKey(
-        "branches.ProcessingUnit",
+    organization_unit = models.ForeignKey(
+        "branches.OrganizationUnit",
         on_delete=models.CASCADE,
-        related_name="department_sla_trackings",
+        related_name="organization_unit_sla_trackings",
     )
 
     branch = models.ForeignKey(
@@ -618,7 +618,7 @@ class TicketDepartmentSlaTracking(TimeStampedModel):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name="department_sla_trackings",
+        related_name="organization_unit_sla_trackings",
     )
 
     total_standard_minutes = models.IntegerField(null=True, blank=True)
@@ -635,19 +635,19 @@ class TicketDepartmentSlaTracking(TimeStampedModel):
     completed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        db_table = "ticket_department_sla_tracking"
+        db_table = "ticket_organization_unit_sla_tracking"
         constraints = [
             models.UniqueConstraint(
-                fields=["ticket", "processing_unit", "branch"],
-                name="uq_ticket_department_sla_tracking",
+                fields=["ticket", "organization_unit", "branch"],
+                name="uq_ticket_organization_unit_sla_tracking",
             )
         ]
         indexes = [
             models.Index(fields=["ticket"]),
-            models.Index(fields=["processing_unit"]),
+            models.Index(fields=["organization_unit"]),
             models.Index(fields=["branch"]),
             models.Index(fields=["sla_status"]),
         ]
 
     def __str__(self):
-        return f"{self.ticket} - {self.processing_unit}"
+        return f"{self.ticket} - {self.organization_unit}"

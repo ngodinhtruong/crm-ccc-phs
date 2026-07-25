@@ -87,7 +87,7 @@ def _get_error_tickets_queryset(request):
         "customer",
         "customer_account",
         "handling_branch",
-        "assigned_unit",
+        "handling_unit",
         "assigned_employee",
         "owner_user",
         "current_status",

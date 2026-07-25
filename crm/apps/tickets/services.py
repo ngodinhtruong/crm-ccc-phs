@@ -56,6 +56,49 @@ class TicketService:
         return TicketAccountLinkStatus.UNLINKED
 
     @staticmethod
+    def _resolve_assignment(*, employee=None, organization_unit=None, branch=None):
+        """Chuẩn hóa employee -> organization_unit -> branch và kiểm tra nhất quán."""
+        from apps.branches.models import EmployeeOrganizationMembership
+
+        if organization_unit is not None:
+            if not organization_unit.is_active:
+                raise ValidationError("Đơn vị tổ chức không còn hoạt động.")
+            if not organization_unit.is_ticket_assignable:
+                raise ValidationError("Đơn vị tổ chức này không nhận ticket.")
+
+        if employee is not None:
+            if employee.status != "ACTIVE":
+                raise ValidationError("Nhân viên không còn hoạt động.")
+
+            if organization_unit is None:
+                primary = employee.get_primary_membership()
+                if primary is None:
+                    raise ValidationError("Nhân viên chưa có đơn vị tổ chức chính.")
+                organization_unit = primary.organization_unit
+            elif not EmployeeOrganizationMembership.objects.filter(
+                employee=employee,
+                organization_unit=organization_unit,
+                is_active=True,
+            ).exists():
+                raise ValidationError("Nhân viên không thuộc đơn vị tổ chức được chọn.")
+
+            if branch is None:
+                branch = employee.branch
+            elif branch.id != employee.branch_id:
+                raise ValidationError("Chi nhánh xử lý không khớp chi nhánh của nhân viên.")
+
+        if organization_unit is not None and organization_unit.branch_id:
+            if branch is None:
+                branch = organization_unit.branch
+            elif branch.id != organization_unit.branch_id:
+                raise ValidationError("Chi nhánh xử lý không khớp đơn vị tổ chức.")
+
+        if branch is None:
+            raise ValidationError("Không xác định được chi nhánh xử lý ticket.")
+
+        return employee, organization_unit, branch
+
+    @staticmethod
     @transaction.atomic
     def create_ticket(
         *,
@@ -66,7 +109,7 @@ class TicketService:
         handling_branch=None,
         contact_type=None,
         raw_account_number=None,
-        assigned_unit=None,
+        handling_unit=None,
         assigned_employee=None,
         owner_user=None,
         support_category=None,
@@ -92,28 +135,26 @@ class TicketService:
         now = timezone.now()
         if check_permission and not PermissionService.can_create_ticket(created_by_user):
             raise PermissionDenied("Bạn không có quyền tạo ticket.")
+
+        assigned_employee, handling_unit, handling_branch = TicketService._resolve_assignment(
+            employee=assigned_employee,
+            organization_unit=handling_unit,
+            branch=handling_branch,
+        )
         created_status = current_status or TicketStatus.objects.get(
             status_code=TicketStatusCode.CREATED
         )
-
         owner_user = owner_user or created_by_user
-        owner_employee = None
-
-        if owner_user is not None:
-            owner_employee = getattr(owner_user, "employee", None)
-
+        owner_employee = getattr(owner_user, "employee", None) if owner_user else None
         account_link_status = TicketService.resolve_account_link_status(
             customer_account=customer_account,
         )
 
+        ticket = None
         for _ in range(5):
-            ticket_code = TicketService.generate_ticket_code(
-                branch=handling_branch
-            )
-
             try:
                 ticket = Ticket.objects.create(
-                    ticket_code=ticket_code,
+                    ticket_code=TicketService.generate_ticket_code(branch=handling_branch),
                     title=title,
                     customer=customer,
                     company=company,
@@ -121,7 +162,7 @@ class TicketService:
                     raw_account_number=raw_account_number,
                     account_link_status=account_link_status,
                     handling_branch=handling_branch,
-                    assigned_unit=assigned_unit,
+                    handling_unit=handling_unit,
                     assigned_employee=assigned_employee,
                     owner_user=owner_user,
                     owner_employee=owner_employee,
@@ -164,7 +205,6 @@ class TicketService:
             note="Ticket created",
             created_at=now,
         )
-
         TicketActivityLog.objects.create(
             ticket=ticket,
             action_type=TicketActionType.CREATE,
@@ -175,11 +215,11 @@ class TicketService:
             note="Ticket created",
         )
 
-        if assigned_employee is not None:
+        if handling_unit is not None or assigned_employee is not None:
             TicketAssignment.objects.create(
                 ticket=ticket,
                 to_branch=handling_branch,
-                to_unit=assigned_unit,
+                to_organization_unit=handling_unit,
                 to_employee=assigned_employee,
                 assigned_by_user=created_by_user,
                 assigned_at=now,
@@ -188,80 +228,76 @@ class TicketService:
                 created_at=now,
             )
 
+        if assigned_employee is not None:
             NotificationService.notify_ticket_assigned(
                 ticket=ticket,
                 assigned_employee=assigned_employee,
             )
 
         if sla_policy is not None:
-            SlaService.create_sla_tracking_for_ticket(
-                ticket=ticket,
-                sla_policy=sla_policy,
-            )
-
+            SlaService.create_sla_tracking_for_ticket(ticket=ticket, sla_policy=sla_policy)
             SlaService.copy_tasks_from_policy(
                 ticket=ticket,
                 sla_policy=sla_policy,
                 created_by_user=created_by_user,
             )
-
         return ticket
-    
-    @staticmethod  
+
+    @staticmethod
     @transaction.atomic
     def assign_ticket(
         *,
         ticket,
         to_employee=None,
-        to_unit=None,
+        to_organization_unit=None,
         to_branch=None,
         assigned_by_user=None,
         transfer_reason=None,
         note=None,
         check_permission=True,
     ):
-        
         now = timezone.now()
-
-        # Lock ticket để tránh 2 người assign cùng lúc
         ticket = Ticket.objects.select_for_update().get(pk=ticket.pk)
 
-
-        if check_permission and not PermissionService.can_assign_ticket(
-            assigned_by_user,
-            ticket,
-        ):
+        if check_permission and not PermissionService.can_assign_ticket(assigned_by_user, ticket):
             raise PermissionDenied("Bạn không có quyền giao/chuyển ticket.")
 
+        if to_employee is None and to_organization_unit is None and to_branch is None:
+            raise ValidationError("Phải chọn nhân viên, đơn vị tổ chức hoặc chi nhánh.")
+
+        # Khi giao cho nhân viên/đơn vị thuộc chi nhánh khác, chi nhánh phải
+        # được suy ra từ đối tượng đích thay vì giữ chi nhánh cũ của ticket.
+        # Riêng đơn vị toàn hệ thống không có branch thì giữ branch hiện tại
+        # nếu người gọi không chỉ định branch mới.
+        resolved_branch = to_branch
+        if (
+            resolved_branch is None
+            and to_employee is None
+            and to_organization_unit is not None
+            and to_organization_unit.branch_id is None
+        ):
+            resolved_branch = ticket.handling_branch
+
+        to_employee, to_organization_unit, to_branch = TicketService._resolve_assignment(
+            employee=to_employee,
+            organization_unit=to_organization_unit,
+            branch=resolved_branch,
+        )
+
         from_branch = ticket.handling_branch
-        from_unit = ticket.assigned_unit
+        from_organization_unit = ticket.handling_unit
         from_employee = ticket.assigned_employee
 
-        # Nếu không truyền chi nhánh mới, tự suy ra
-        if to_branch is None:
-            if to_employee is not None:
-                to_branch = to_employee.branch
-            elif to_unit is not None and to_unit.default_branch_id:
-                to_branch = to_unit.default_branch
-            else:
-                to_branch = from_branch
-
-        # Đóng assignment hiện tại nếu có
-        TicketAssignment.objects.filter(
-            ticket=ticket,
-            is_current=True,
-        ).update(
+        TicketAssignment.objects.filter(ticket=ticket, is_current=True).update(
             is_current=False,
             unassigned_at=now,
         )
-
-        # Tạo assignment mới
         assignment = TicketAssignment.objects.create(
             ticket=ticket,
             from_branch=from_branch,
             to_branch=to_branch,
-            from_unit=from_unit,
-            to_unit=to_unit,
+            from_organization_unit=from_organization_unit,
+            to_organization_unit=to_organization_unit,
             from_employee=from_employee,
             to_employee=to_employee,
             assigned_by_user=assigned_by_user,
@@ -272,41 +308,34 @@ class TicketService:
             created_at=now,
         )
 
-        # Update trạng thái xử lý hiện tại trên bảng tickets
         ticket.handling_branch = to_branch
-        ticket.assigned_unit = to_unit
+        ticket.handling_unit = to_organization_unit
         ticket.assigned_employee = to_employee
         ticket.assigned_at = now
         ticket.updated_by_user = assigned_by_user
         ticket.updated_at = now
-        ticket.save(
-            update_fields=[
-                "handling_branch",
-                "assigned_unit",
-                "assigned_employee",
-                "assigned_at",
-                "updated_by_user",
-                "updated_at",
-            ]
-        )
-
-        # Xác định action_type
-        action_type = TicketActionType.ASSIGN_EMPLOYEE
+        ticket.save(update_fields=[
+            "handling_branch", "handling_unit", "assigned_employee", "assigned_at",
+            "updated_by_user", "updated_at",
+        ])
 
         if from_branch_id := getattr(from_branch, "id", None):
-            if to_branch and from_branch_id != to_branch.id:
-                action_type = TicketActionType.TRANSFER_BRANCH
+            action_type = (
+                TicketActionType.TRANSFER_BRANCH
+                if from_branch_id != to_branch.id
+                else TicketActionType.ASSIGN_EMPLOYEE
+            )
+        else:
+            action_type = TicketActionType.ASSIGN_EMPLOYEE
 
-        if from_unit_id := getattr(from_unit, "id", None):
-            if to_unit and from_unit_id != to_unit.id:
-                action_type = TicketActionType.TRANSFER_UNIT
+        if getattr(from_organization_unit, "id", None) != getattr(to_organization_unit, "id", None):
+            action_type = TicketActionType.TRANSFER_ORGANIZATION_UNIT
 
-        # Ghi log cập nhật ticket
         TicketUpdateLog.objects.create(
             ticket=ticket,
             action_type=action_type,
-            from_unit=from_unit,
-            to_unit=to_unit,
+            from_organization_unit=from_organization_unit,
+            to_organization_unit=to_organization_unit,
             from_branch=from_branch,
             to_branch=to_branch,
             from_employee=from_employee,
@@ -315,28 +344,24 @@ class TicketService:
             created_by_user=assigned_by_user,
             created_at=now,
         )
-
-        # Ghi activity log chung
         TicketActivityLog.objects.create(
             ticket=ticket,
             action_type=action_type,
             action_name="Assign / transfer ticket",
-            old_value=str(from_employee) if from_employee else "",
-            new_value=str(to_employee) if to_employee else "",
+            old_value=str(from_employee or from_organization_unit or ""),
+            new_value=str(to_employee or to_organization_unit or ""),
             created_by_user=assigned_by_user,
             created_at=now,
             note=note or transfer_reason,
         )
 
-        # Gửi notification cho nhân viên được giao
         if to_employee is not None:
             NotificationService.notify_ticket_assigned(
                 ticket=ticket,
                 assigned_employee=to_employee,
             )
-
         return assignment
-    
+
     @staticmethod
     def _set_if_has_field(obj, field_name, value, update_fields):
         field_names = {field.name for field in obj._meta.fields}

@@ -11,7 +11,7 @@ from apps.sla.models import (
     TicketTask,
     TicketTaskDependency,
     TicketTaskLog,
-    TicketDepartmentSlaTracking,
+    TicketOrganizationUnitSlaTracking,
 )
 
 
@@ -81,8 +81,8 @@ class SlaService:
         if policy_task.default_branch_id:
             return policy_task.default_branch
 
-        if policy_task.processing_unit_id and policy_task.processing_unit.default_branch_id:
-            return policy_task.processing_unit.default_branch
+        if policy_task.organization_unit_id and policy_task.organization_unit.branch_id:
+            return policy_task.organization_unit.branch
 
         return ticket.handling_branch
 
@@ -119,7 +119,7 @@ class SlaService:
                 sla_policy_task=policy_task,
                 task_name=policy_task.task_name,
                 task_description=policy_task.task_description,
-                processing_unit=policy_task.processing_unit,
+                organization_unit=policy_task.organization_unit,
                 branch=SlaService.resolve_task_branch(
                     ticket=ticket,
                     policy_task=policy_task,
@@ -165,32 +165,32 @@ class SlaService:
                 created_at=now,
             )
 
-        SlaService.rebuild_department_sla_tracking(ticket=ticket)
+        SlaService.rebuild_organization_unit_sla_tracking(ticket=ticket)
 
         return list(task_map.values())
 
     @staticmethod
-    def rebuild_department_sla_tracking(*, ticket):
+    def rebuild_organization_unit_sla_tracking(*, ticket):
         now = timezone.now()
 
-        TicketDepartmentSlaTracking.objects.filter(ticket=ticket).delete()
+        TicketOrganizationUnitSlaTracking.objects.filter(ticket=ticket).delete()
 
         tasks = TicketTask.objects.filter(ticket=ticket).select_related(
-            "processing_unit",
+            "organization_unit",
             "branch",
         )
 
         grouped = {}
 
         for task in tasks:
-            if task.processing_unit_id is None:
+            if task.organization_unit_id is None:
                 continue
 
-            key = (task.processing_unit_id, task.branch_id)
+            key = (task.organization_unit_id, task.branch_id)
 
             if key not in grouped:
                 grouped[key] = {
-                    "processing_unit": task.processing_unit,
+                    "organization_unit": task.organization_unit,
                     "branch": task.branch,
                     "task_count": 0,
                     "completed_task_count": 0,
@@ -214,9 +214,9 @@ class SlaService:
             item["total_actual_minutes"] += task.actual_minutes or 0
 
         for item in grouped.values():
-            TicketDepartmentSlaTracking.objects.create(
+            TicketOrganizationUnitSlaTracking.objects.create(
                 ticket=ticket,
-                processing_unit=item["processing_unit"],
+                organization_unit=item["organization_unit"],
                 branch=item["branch"],
                 total_standard_minutes=item["total_standard_minutes"],
                 total_actual_minutes=item["total_actual_minutes"],

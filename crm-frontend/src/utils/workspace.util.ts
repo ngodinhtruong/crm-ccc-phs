@@ -31,5 +31,5 @@ export function getDefaultPathByWorkspace(workspace: WorkspaceCode) {
     return "/sale-admin/dashboard";
   }
 
-  return "/dashboard";
+  return "/tickets/dashboard";
 }

@@ -13,7 +13,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from apps.accounts.models import Role, User
-from apps.branches.models import Branch, Employee, ProcessingUnit
+from apps.branches.models import Branch, Employee, OrganizationUnit
 from apps.customers.models import (
     Company,
     Customer,
@@ -198,7 +198,7 @@ SCENARIOS = [
         "titles": [
             "eKYC không nhận diện được Căn cước công dân",
             "Yêu cầu cập nhật thông tin Căn cước gắn chip",
-            "Không hoàn tất bước xác thực khuôn mặt liveness",
+            "Không hoàn tất bước xác thực khuôn mặt eKYC",
             "Kiểm tra tiến độ duyệt hồ sơ mở tài khoản trực tuyến",
             "Lỗi liên kết tài khoản ngân hàng chính chủ",
         ],
@@ -458,12 +458,10 @@ class Command(BaseCommand):
         rng = random.Random(options["random_seed"])
 
         if options["reset"]:
-            deleted_count, _ = Ticket.objects.filter(
-                ticket_code__startswith=TICKET_CODE_PREFIX
-            ).delete()
+            deleted_count, _ = Ticket.objects.all().delete()
             self.stdout.write(
                 self.style.WARNING(
-                    f"Đã xóa {deleted_count} bản ghi ticket và dữ liệu liên quan của seed cũ."
+                    f"Đã xóa toàn bộ {deleted_count} bản ghi ticket và dữ liệu liên quan trong DB."
                 )
             )
 
@@ -512,7 +510,7 @@ class Command(BaseCommand):
             .order_by("group__sort_order", "sort_order", "id")
         )
         tags = list(Tag.objects.filter(is_active=True).order_by("id"))
-        units = self._load_processing_units(branch, employees)
+        units = self._load_organization_units(branch, employees)
         sla_policies = self._load_sla_policies()
 
         ticket_datetimes = self._build_ticket_datetimes(
@@ -587,7 +585,7 @@ class Command(BaseCommand):
                 rng=rng,
             )
 
-            assigned_unit = self._choose_unit(
+            handling_unit = self._choose_unit(
                 units=units,
                 employee=assigned_employee,
                 rng=rng,
@@ -670,7 +668,7 @@ class Command(BaseCommand):
                 "account_link_status": account_link_status,
                 "raw_account_number": raw_account_number,
                 "handling_branch": assigned_employee.branch or branch,
-                "assigned_unit": assigned_unit,
+                "handling_unit": handling_unit,
                 "assigned_employee": assigned_employee,
                 "owner_user": assigned_user,
                 "owner_employee": assigned_employee,
@@ -757,7 +755,7 @@ class Command(BaseCommand):
                 created_by_user=created_by_user,
                 supervisor_user=supervisor_user,
                 branch=branch,
-                unit=assigned_unit,
+                unit=handling_unit,
                 priority=priority,
                 sla_policy=sla_policy,
                 customer=customer,
@@ -918,15 +916,32 @@ class Command(BaseCommand):
         self,
         branch: Branch,
     ) -> tuple[list[Employee], list[User], User | None]:
-        # Load active employees across all branches so assignments are diverse
-        employees = list(
+        # Filter active employees belonging to CS or CCC department/position/roles
+        cs_ccc_employees = list(
+            Employee.objects.filter(status="ACTIVE")
+            .filter(
+                Q(organization_memberships__organization_unit__unit_code__icontains="CCC")
+                | Q(organization_memberships__organization_unit__unit_code__icontains="CS")
+                | Q(position__icontains="CCC")
+                | Q(position__icontains="CS")
+                | Q(position__icontains="Chăm sóc")
+                | Q(user_account__user_roles__role__role_code__startswith="CS_")
+                | Q(employee_code__icontains="CCC")
+                | Q(employee_code__icontains="CS")
+            )
+            .distinct()
+            .select_related("user_account", "branch")
+            .order_by("employee_code")
+        )
+
+        employees = cs_ccc_employees if cs_ccc_employees else list(
             Employee.objects.filter(status="ACTIVE")
             .select_related("user_account", "branch")
             .order_by("employee_code")
         )
 
         if not employees:
-            raise CommandError("Không tìm thấy nhân viên nào có status=ACTIVE trong DB.")
+            raise CommandError("Không tìm thấy nhân viên CS/CCC nào có status=ACTIVE trong DB.")
 
         users = list(User.objects.filter(is_active=True))
         if not users:
@@ -942,18 +957,23 @@ class Command(BaseCommand):
         ) or users[0]
 
         self.stdout.write(
-            f"Đã nạp {len(employees)} nhân viên từ bảng Employee và {len(users)} người dùng hệ thống."
+            f"Đã nạp {len(employees)} nhân viên CS/CCC từ bảng Employee và {len(users)} người dùng hệ thống."
         )
 
         return employees, users, supervisor_user
 
-    def _load_processing_units(
+    def _load_organization_units(
         self,
         branch: Branch,
         employees: list[Employee],
-    ) -> list[ProcessingUnit]:
+    ) -> list[OrganizationUnit]:
         return list(
-            ProcessingUnit.objects.filter(is_active=True).order_by("id")
+            OrganizationUnit.objects.filter(
+                is_active=True,
+                is_ticket_assignable=True,
+            )
+            .filter(Q(branch=branch) | Q(branch__isnull=True))
+            .order_by("id")
         )
 
     def _load_sla_policies(self) -> list[Any]:
@@ -1061,19 +1081,7 @@ class Command(BaseCommand):
         total: int,
         statuses: list[TicketStatus],
     ) -> dict[int, TicketStatus]:
-        if total < len(statuses):
-            return {}
-
-        positions: dict[int, TicketStatus] = {}
-        last_position = total - 1
-
-        for index, status in enumerate(statuses):
-            position = round(index * last_position / (len(statuses) - 1))
-            while position in positions and position < last_position:
-                position += 1
-            positions[position] = status
-
-        return positions
+        return {}
 
     def _choose_status(
         self,
@@ -1082,50 +1090,24 @@ class Command(BaseCommand):
         end_date: date,
         rng: random.Random,
     ) -> TicketStatus:
-        age_days = max(0, (end_date - created_at.date()).days)
-        weights = [
-            self._status_weight(status, age_days)
-            for status in statuses
-        ]
-        return rng.choices(statuses, weights=weights, k=1)[0]
+        closed_status = next((s for s in statuses if s.status_code == "CLOSED"), None)
+        cancelled_status = next((s for s in statuses if s.status_code == "CANCELLED"), None)
 
-    def _status_weight(self, status: TicketStatus, age_days: int) -> int:
-        stage = self._status_stage(status)
+        if not closed_status or not cancelled_status:
+            for s in statuses:
+                stage = self._status_stage(s)
+                if stage in {"closed", "done"} and not closed_status:
+                    closed_status = s
+                elif stage == "cancelled" and not cancelled_status:
+                    cancelled_status = s
 
-        if age_days >= 90:
-            return {
-                "created": 1,
-                "accepted": 2,
-                "processing": 5,
-                "done": 12,
-                "pending_close": 12,
-                "closed": 50,
-                "cancelled": 10,
-                "other": 4,
-            }.get(stage, 4)
+        closed_status = closed_status or statuses[0]
+        cancelled_status = cancelled_status or statuses[-1]
 
-        if age_days >= 30:
-            return {
-                "created": 3,
-                "accepted": 5,
-                "processing": 15,
-                "done": 20,
-                "pending_close": 18,
-                "closed": 30,
-                "cancelled": 8,
-                "other": 5,
-            }.get(stage, 5)
-
-        return {
-            "created": 18,
-            "accepted": 18,
-            "processing": 30,
-            "done": 16,
-            "pending_close": 12,
-            "closed": 5,
-            "cancelled": 6,
-            "other": 6,
-        }.get(stage, 6)
+        # 80% Đã xử lý (CLOSED), 20% Hủy (CANCELLED) -> Tổng Đã xử lý + Đã hủy = Tổng tiếp nhận 100%
+        if rng.random() < 0.80:
+            return closed_status
+        return cancelled_status
 
     def _status_stage(self, status: TicketStatus) -> str:
         value = f"{status.status_code} {status.status_name}".upper()
@@ -1244,17 +1226,17 @@ class Command(BaseCommand):
 
     def _choose_unit(
         self,
-        units: list[ProcessingUnit],
+        units: list[OrganizationUnit],
         employee: Employee,
         rng: random.Random,
-    ) -> ProcessingUnit | None:
+    ) -> OrganizationUnit | None:
         if not units:
             return None
 
         employee_units = [
             unit
             for unit in units
-            if unit.members.filter(
+            if unit.employee_memberships.filter(
                 employee=employee,
                 is_active=True,
             ).exists()
@@ -1263,7 +1245,13 @@ class Command(BaseCommand):
         if employee_units:
             return rng.choice(employee_units)
 
-        return rng.choice(units)
+        primary_unit = employee.primary_organization_unit
+        if primary_unit and primary_unit in units:
+            return primary_unit
+
+        # Không gán ngẫu nhiên một đơn vị mà nhân viên không thuộc về vì sẽ
+        # tạo dữ liệu ticket không nhất quán.
+        return None
 
     def _execution_cap(self, end_date: date) -> datetime:
         if end_date == timezone.localdate():
@@ -1485,7 +1473,7 @@ class Command(BaseCommand):
         created_by_user: User,
         supervisor_user: User | None,
         branch: Branch,
-        unit: ProcessingUnit | None,
+        unit: OrganizationUnit | None,
         priority: TicketPriority,
         sla_policy: Any | None,
         customer: Customer | None,
@@ -1526,8 +1514,8 @@ class Command(BaseCommand):
                 ticket=ticket,
                 from_branch=branch,
                 to_branch=initial_employee.branch or branch,
-                from_unit=None,
-                to_unit=unit,
+                from_organization_unit=None,
+                to_organization_unit=unit,
                 from_employee=None,
                 to_employee=initial_employee,
                 assigned_by_user=created_by_user,
@@ -1543,8 +1531,8 @@ class Command(BaseCommand):
                 ticket=ticket,
                 from_branch=initial_employee.branch or branch,
                 to_branch=assigned_employee.branch or branch,
-                from_unit=unit,
-                to_unit=unit,
+                from_organization_unit=unit,
+                to_organization_unit=unit,
                 from_employee=initial_employee,
                 to_employee=assigned_employee,
                 assigned_by_user=supervisor_user or assigned_user,
@@ -1560,8 +1548,8 @@ class Command(BaseCommand):
                 ticket=ticket,
                 from_branch=branch,
                 to_branch=assigned_employee.branch or branch,
-                from_unit=None,
-                to_unit=unit,
+                from_organization_unit=None,
+                to_organization_unit=unit,
                 from_employee=None,
                 to_employee=assigned_employee,
                 assigned_by_user=created_by_user,
@@ -1602,8 +1590,8 @@ class Command(BaseCommand):
             action_type="ASSIGN_EMPLOYEE",
             from_status=None,
             to_status=None,
-            from_unit=None,
-            to_unit=unit,
+            from_organization_unit=None,
+            to_organization_unit=unit,
             from_branch=branch,
             to_branch=assigned_employee.branch or branch,
             from_employee=None,
@@ -1624,8 +1612,8 @@ class Command(BaseCommand):
                 action_type="TRANSFER_EMPLOYEE",
                 from_status=None,
                 to_status=None,
-                from_unit=unit,
-                to_unit=unit,
+                from_organization_unit=unit,
+                to_organization_unit=unit,
                 from_branch=initial_employee.branch or branch,
                 to_branch=assigned_employee.branch or branch,
                 from_employee=initial_employee,
@@ -1697,8 +1685,8 @@ class Command(BaseCommand):
                 action_type=action_type,
                 from_status=previous_status,
                 to_status=timeline_status,
-                from_unit=unit,
-                to_unit=unit,
+                from_organization_unit=unit,
+                to_organization_unit=unit,
                 from_branch=assigned_employee.branch or branch,
                 to_branch=assigned_employee.branch or branch,
                 from_employee=assigned_employee,
@@ -1740,8 +1728,8 @@ class Command(BaseCommand):
                 action_type="UPDATE_INFO",
                 from_status=status,
                 to_status=status,
-                from_unit=unit,
-                to_unit=unit,
+                from_organization_unit=unit,
+                to_organization_unit=unit,
                 from_branch=assigned_employee.branch or branch,
                 to_branch=assigned_employee.branch or branch,
                 from_employee=assigned_employee,

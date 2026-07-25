@@ -39,3 +39,32 @@ class ChatbotTicketRoutingTests(SimpleTestCase):
         outcome = detect_outcome([], has_state=True, has_request=True)
 
         self.assertEqual(outcome, ChatbotSessionSummary.OUTCOME_CCC)
+
+
+class ChatbotDashboardSectionTests(SimpleTestCase):
+    def test_missing_sections_keeps_full_backward_compatible_payload(self):
+        from apps.chatbots.dashboard.constants import ALL_SECTIONS, parse_dashboard_sections
+
+        sections, explicit = parse_dashboard_sections(None)
+
+        self.assertEqual(sections, ALL_SECTIONS)
+        self.assertFalse(explicit)
+
+    def test_sections_are_deduplicated_and_unknown_values_are_ignored(self):
+        from apps.chatbots.dashboard.constants import parse_dashboard_sections
+
+        sections, explicit = parse_dashboard_sections(
+            "summary,traffic,summary,unknown"
+        )
+
+        self.assertEqual(sections, ("summary", "traffic"))
+        self.assertTrue(explicit)
+
+    def test_list_serializer_does_not_expose_full_conversation(self):
+        from apps.chatbots.serializers import ChatbotSessionListSerializer
+
+        self.assertNotIn(
+            "full_conversation",
+            ChatbotSessionListSerializer.Meta.fields,
+        )
+        self.assertIn("last_question", ChatbotSessionListSerializer.Meta.fields)

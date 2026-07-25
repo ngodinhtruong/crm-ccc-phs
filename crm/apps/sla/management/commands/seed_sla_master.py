@@ -345,7 +345,7 @@ class Command(BaseCommand):
                     "support_category": category,
                     "classification": None,
                     "priority": priority,
-                    "processing_unit": None,
+                    "organization_unit": None,
                     "branch": None,
                     "customer_type": None,
                     "response_time_minutes": (
@@ -398,7 +398,7 @@ class Command(BaseCommand):
                         "task_description": (
                             task_item["task_description"]
                         ),
-                        "processing_unit": None,
+                        "organization_unit": None,
                         "default_branch": None,
                         "branch_resolve_type": "TICKET_BRANCH",
                         "standard_minutes": standard_minutes,

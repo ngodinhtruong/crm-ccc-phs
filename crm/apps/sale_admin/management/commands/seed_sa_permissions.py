@@ -43,28 +43,33 @@ class Command(BaseCommand):
         roles = {
             "SA_STAFF": {
                 "role_name": "Sale Admin Staff",
-                "scope_type": "OWN",
+                "default_scope_type": "OWN",
                 "group_code": "SALE_ADMIN",
+                "is_active": True,
             },
             "SA_SUPERVISOR": {
                 "role_name": "Sale Admin Supervisor",
-                "scope_type": "BRANCH",
+                "default_scope_type": "BRANCH",
                 "group_code": "SALE_ADMIN",
+                "is_active": True,
             },
             "CCC_STAFF": {
                 "role_name": "CCC Staff",
-                "scope_type": "BRANCH",
+                "default_scope_type": "OWN",
                 "group_code": "CCC",
+                "is_active": True,
             },
             "CCC_SUPERVISOR": {
                 "role_name": "CCC Supervisor",
-                "scope_type": "BRANCH",
+                "default_scope_type": "ORGANIZATION_UNIT",
                 "group_code": "CCC",
+                "is_active": True,
             },
             "SYSTEM_ADMIN": {
                 "role_name": "System Admin",
-                "scope_type": "ALL",
+                "default_scope_type": "ALL",
                 "group_code": "GLOBAL",
+                "is_active": True,
             },
         }
 

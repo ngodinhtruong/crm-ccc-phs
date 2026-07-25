@@ -12,7 +12,7 @@ from .models import (
     TicketTask,
     TicketTaskDependency,
     TicketTaskLog,
-    TicketDepartmentSlaTracking,
+    TicketOrganizationUnitSlaTracking,
 )
 
 
@@ -20,14 +20,14 @@ from .models import (
 class SlaPolicyAdmin(admin.ModelAdmin):
     list_display = ("id", "sla_name", "status", "version", "is_active", "effective_from", "effective_to")
     search_fields = ("sla_name",)
-    list_filter = ("status", "is_active", "support_category", "classification", "priority", "processing_unit")
+    list_filter = ("status", "is_active", "support_category", "classification", "priority", "organization_unit")
 
 
 @admin.register(SlaPolicyTask)
 class SlaPolicyTaskAdmin(admin.ModelAdmin):
-    list_display = ("id", "sla_policy", "task_name", "processing_unit", "default_branch", "standard_minutes", "is_sla_counted", "is_required", "sort_order", "is_active")
-    search_fields = ("task_name", "sla_policy__sla_code", "sla_policy__sla_name")
-    list_filter = ("sla_policy", "processing_unit", "is_sla_counted", "is_required", "is_active")
+    list_display = ("id", "sla_policy", "task_name", "organization_unit", "default_branch", "standard_minutes", "is_sla_counted", "is_required", "sort_order", "is_active")
+    search_fields = ("task_name", "sla_policy__sla_name")
+    list_filter = ("sla_policy", "organization_unit", "is_sla_counted", "is_required", "is_active")
 
 
 @admin.register(SlaPolicyTaskDependency)
@@ -73,9 +73,9 @@ class TicketAlertAdmin(admin.ModelAdmin):
 
 @admin.register(TicketTask)
 class TicketTaskAdmin(admin.ModelAdmin):
-    list_display = ("id", "ticket", "task_name", "processing_unit", "branch", "assigned_employee", "task_status", "sla_status", "due_at", "completed_at")
+    list_display = ("id", "ticket", "task_name", "organization_unit", "branch", "assigned_employee", "task_status", "sla_status", "due_at", "completed_at")
     search_fields = ("ticket__ticket_code", "task_name", "assigned_employee__full_name")
-    list_filter = ("processing_unit", "branch", "task_status", "sla_status")
+    list_filter = ("organization_unit", "branch", "task_status", "sla_status")
 
 
 @admin.register(TicketTaskDependency)
@@ -91,7 +91,7 @@ class TicketTaskLogAdmin(admin.ModelAdmin):
     list_filter = ("action_type",)
 
 
-@admin.register(TicketDepartmentSlaTracking)
-class TicketDepartmentSlaTrackingAdmin(admin.ModelAdmin):
-    list_display = ("id", "ticket", "processing_unit", "branch", "sla_status", "task_count", "completed_task_count", "overdue_task_count")
-    list_filter = ("processing_unit", "branch", "sla_status")
+@admin.register(TicketOrganizationUnitSlaTracking)
+class TicketOrganizationUnitSlaTrackingAdmin(admin.ModelAdmin):
+    list_display = ("id", "ticket", "organization_unit", "branch", "sla_status", "task_count", "completed_task_count", "overdue_task_count")
+    list_filter = ("organization_unit", "branch", "sla_status")

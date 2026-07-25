@@ -13,7 +13,7 @@ from apps.accounts.scopes import (
     filter_tickets_by_user,
 )
 from apps.accounts.services import PermissionService
-from apps.branches.models import Branch, Employee, ProcessingUnit
+from apps.branches.models import Branch, Employee, OrganizationUnit
 from apps.customers.models import Customer
 from apps.sla.models import SlaPolicy
 from apps.tickets.models import (
@@ -171,11 +171,11 @@ class DashboardSummaryAPIView(APIView):
                 "icon": "permission",
             },
             {
-                "key": "processing_units",
+                "key": "organization_units",
                 "title": "Phòng ban xử lý",
                 "description": "Quản lý đơn vị xử lý ticket",
                 "href": "/master-data/processing-units",
-                "value": ProcessingUnit.objects.filter(is_active=True).count(),
+                "value": OrganizationUnit.objects.filter(is_active=True).count(),
                 "icon": "unit",
             },
             {

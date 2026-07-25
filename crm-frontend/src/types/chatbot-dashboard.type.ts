@@ -22,6 +22,7 @@ export type ChatbotDashboardFilters = {
   end_date?: string;
   start_hour?: string;
   end_hour?: string;
+  granularity?: "day" | "week" | "month";
 };
 
 /** Một ô KPI / một cột trong biểu đồ phân loại xử lý. */
@@ -105,6 +106,56 @@ export type ChatbotSeriesItem = {
   count: number;
 };
 
+export type TimeSeriesOutcomeItem = {
+  date: string;
+  label: string;
+  total: number;
+  bot_done: number;
+  ccc: number;
+  pending: number;
+  spam: number;
+  bot_done_rate: number;
+};
+
+export type HourlyPeakItem = {
+  hour: string;
+  label: string;
+  total: number;
+  ccc: number;
+  bot_done: number;
+};
+
+export type AvgHandlingTimes = {
+  avg_bot_duration_min: number;
+  avg_response_time_min: number;
+  avg_resolution_time_min: number;
+};
+
+export type SlaComplianceTrend = {
+  total_tickets: number;
+  on_time: number;
+  overdue: number;
+  warning: number;
+  on_time_rate: number;
+  items: Array<{ name: string; value: number; color: string }>;
+};
+
+export type TopicTransferRateItem = {
+  category: string;
+  total: number;
+  ccc: number;
+  bot_done: number;
+  transfer_rate: number;
+};
+
+export type CustomerLinkageData = {
+  total: number;
+  linked: number;
+  unlinked: number;
+  linked_rate: number;
+  items: Array<{ name: string; value: number; color: string }>;
+};
+
 export type ChatbotOverviewResponse = {
   filters?: ChatbotDashboardFilters;
 
@@ -125,6 +176,13 @@ export type ChatbotOverviewResponse = {
     hourly_chatbot_tickets: ChatbotSeriesItem[];
     channel_distribution: ChartItem[];
     ticket_status_distribution: ChartItem[];
+
+    time_series_outcomes?: TimeSeriesOutcomeItem[];
+    hourly_peak_chart?: HourlyPeakItem[];
+    avg_handling_times?: AvgHandlingTimes;
+    sla_compliance_trend?: SlaComplianceTrend;
+    topic_transfer_rates?: TopicTransferRateItem[];
+    customer_linkage?: CustomerLinkageData;
   };
 
   quick_lists: {

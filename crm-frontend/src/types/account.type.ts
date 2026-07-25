@@ -15,7 +15,12 @@ export type CurrentUser = {
     id: number;
     employee_code: string;
     full_name: string;
-    department: string | null;
+    department?: string | null;
+    primary_organization_unit_id?: number | null;
+    primary_organization_unit_code?: string | null;
+    primary_organization_unit_name?: string | null;
+    primary_membership_responsibility?: string | null;
+    primary_membership_responsibility_label?: string | null;
     position: string | null;
     branch: null | {
       id: number;
@@ -26,10 +31,17 @@ export type CurrentUser = {
 
   roles: {
     id: number;
+    role?: number;
     role_code: string;
     role_name: string;
     scope_type: string;
     group_code?: "GLOBAL" | "CCC" | "SALE_ADMIN" | string;
+    organization_unit?: number | null;
+    organization_unit_code?: string | null;
+    organization_unit_name?: string | null;
+    branch?: number | null;
+    branch_name?: string | null;
+    include_descendants?: boolean;
   }[];
 
   permissions: {

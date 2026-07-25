@@ -1,5 +1,5 @@
-import { GeneralDashboardPage } from "@/components/dashboard/GeneralDashboardPage";
+import { redirect } from "next/navigation";
 
 export default function Page() {
-  return <GeneralDashboardPage />;
+  redirect("/tickets/dashboard");
 }

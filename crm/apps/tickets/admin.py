@@ -86,7 +86,7 @@ class TicketAdmin(admin.ModelAdmin):
         "account_link_status",
         "raw_account_number",
         "handling_branch",
-        "assigned_unit",
+        "handling_unit",
         "assigned_employee",
         "owner_user",
         "current_status",
@@ -111,7 +111,7 @@ class TicketAdmin(admin.ModelAdmin):
     )
     list_filter = (
         "handling_branch",
-        "assigned_unit",
+        "handling_unit",
         "current_status",
         "priority",
         "source",
@@ -134,9 +134,9 @@ class TicketProcessLogAdmin(admin.ModelAdmin):
 
 @admin.register(TicketAssignment)
 class TicketAssignmentAdmin(admin.ModelAdmin):
-    list_display = ("id", "ticket", "to_branch", "to_unit", "to_employee", "assigned_by_user", "assigned_at", "unassigned_at", "is_current")
+    list_display = ("id", "ticket", "to_branch", "to_organization_unit", "to_employee", "assigned_by_user", "assigned_at", "unassigned_at", "is_current")
     search_fields = ("ticket__ticket_code", "to_employee__full_name")
-    list_filter = ("to_branch", "to_unit", "is_current")
+    list_filter = ("to_branch", "to_organization_unit", "is_current")
 
 
 @admin.register(TicketUpdateLog)

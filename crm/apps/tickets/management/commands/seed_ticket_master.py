@@ -1,7 +1,7 @@
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
-from apps.branches.models import ProcessingUnit
+from apps.branches.models import OrganizationUnit, OrganizationUnitType
 from apps.tickets.models import (
     TicketClassification,
     TicketPriority,
@@ -413,7 +413,7 @@ class Command(BaseCommand):
 
         self.seed_support_categories()
         self.seed_classifications()
-        self.seed_processing_units()
+        self.seed_organization_units()
         self.seed_priorities()
         self.seed_sources()
         self.seed_statuses()
@@ -486,14 +486,16 @@ class Command(BaseCommand):
                 created,
             )
 
-    def seed_processing_units(self):
+    def seed_organization_units(self):
         self.stdout.write("\nSeed đơn vị xử lý...")
 
         for code, name in PROCESSING_UNITS:
-            obj, created = ProcessingUnit.objects.update_or_create(
+            obj, created = OrganizationUnit.objects.update_or_create(
                 unit_code=code,
                 defaults={
                     "unit_name": name,
+                    "unit_type": OrganizationUnitType.PROCESSING_UNIT,
+                    "is_ticket_assignable": True,
                     "is_active": True,
                 },
             )

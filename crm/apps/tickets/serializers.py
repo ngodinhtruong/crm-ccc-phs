@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.utils import timezone
-from apps.branches.models import Branch, Employee, ProcessingUnit
+from apps.branches.models import Branch, Employee, OrganizationUnit
 from apps.customers.models import Customer, Company, CustomerAccount
 from apps.sla.models import SlaPolicy, SlaBreachReason
 from apps.tickets.models import (
@@ -168,6 +168,8 @@ class TicketReadSerializer(serializers.ModelSerializer):
     account_link_status_label = serializers.SerializerMethodField()
 
     handling_branch_name = serializers.SerializerMethodField()
+    handling_unit_name = serializers.SerializerMethodField()
+    assigned_unit = serializers.IntegerField(source="handling_unit_id", read_only=True)
     assigned_unit_name = serializers.SerializerMethodField()
     assigned_employee_name = serializers.SerializerMethodField()
 
@@ -215,6 +217,8 @@ class TicketReadSerializer(serializers.ModelSerializer):
 
             "handling_branch",
             "handling_branch_name",
+            "handling_unit",
+            "handling_unit_name",
             "assigned_unit",
             "assigned_unit_name",
             "assigned_employee",
@@ -324,8 +328,11 @@ class TicketReadSerializer(serializers.ModelSerializer):
     def get_handling_branch_name(self, obj):
         return obj.handling_branch.branch_name if obj.handling_branch else None
 
+    def get_handling_unit_name(self, obj):
+        return obj.handling_unit.unit_name if obj.handling_unit else None
+
     def get_assigned_unit_name(self, obj):
-        return obj.assigned_unit.unit_name if obj.assigned_unit else None
+        return self.get_handling_unit_name(obj)
 
     def get_assigned_employee_name(self, obj):
         return obj.assigned_employee.full_name if obj.assigned_employee else None
@@ -404,12 +411,20 @@ class TicketCreateSerializer(serializers.Serializer):
 
     handling_branch = serializers.PrimaryKeyRelatedField(
         queryset=Branch.objects.all(),
-    )
-
-    assigned_unit = serializers.PrimaryKeyRelatedField(
-        queryset=ProcessingUnit.objects.all(),
         required=False,
         allow_null=True,
+    )
+
+    handling_unit = serializers.PrimaryKeyRelatedField(
+        queryset=OrganizationUnit.objects.filter(is_active=True, is_ticket_assignable=True),
+        required=False,
+        allow_null=True,
+    )
+    assigned_unit = serializers.PrimaryKeyRelatedField(
+        queryset=OrganizationUnit.objects.filter(is_active=True, is_ticket_assignable=True),
+        required=False,
+        allow_null=True,
+        write_only=True,
     )
     assigned_employee = serializers.PrimaryKeyRelatedField(
         queryset=Employee.objects.all(),
@@ -512,6 +527,11 @@ class TicketCreateSerializer(serializers.Serializer):
         )
 
     def validate(self, attrs):
+        legacy_unit = attrs.pop("assigned_unit", None)
+        if legacy_unit is not None:
+            if attrs.get("handling_unit") and attrs["handling_unit"].id != legacy_unit.id:
+                raise serializers.ValidationError({"assigned_unit": "Không khớp handling_unit."})
+            attrs["handling_unit"] = legacy_unit
         return normalize_ticket_error_fields(attrs)
 
 
@@ -521,10 +541,16 @@ class TicketAssignSerializer(serializers.Serializer):
         required=False,
         allow_null=True,
     )
-    to_unit = serializers.PrimaryKeyRelatedField(
-        queryset=ProcessingUnit.objects.all(),
+    to_organization_unit = serializers.PrimaryKeyRelatedField(
+        queryset=OrganizationUnit.objects.filter(is_active=True, is_ticket_assignable=True),
         required=False,
         allow_null=True,
+    )
+    to_unit = serializers.PrimaryKeyRelatedField(
+        queryset=OrganizationUnit.objects.filter(is_active=True, is_ticket_assignable=True),
+        required=False,
+        allow_null=True,
+        write_only=True,
     )
     to_branch = serializers.PrimaryKeyRelatedField(
         queryset=Branch.objects.all(),
@@ -541,6 +567,19 @@ class TicketAssignSerializer(serializers.Serializer):
         allow_blank=True,
         allow_null=True,
     )
+
+    def validate(self, attrs):
+        legacy_unit = attrs.pop("to_unit", None)
+        if legacy_unit is not None:
+            if (
+                attrs.get("to_organization_unit")
+                and attrs["to_organization_unit"].id != legacy_unit.id
+            ):
+                raise serializers.ValidationError(
+                    {"to_unit": "Không khớp to_organization_unit."}
+                )
+            attrs["to_organization_unit"] = legacy_unit
+        return attrs
 
 
 class TicketStatusUpdateSerializer(serializers.Serializer):
@@ -736,8 +775,13 @@ class TicketSerializer(serializers.ModelSerializer):
         source="handling_branch.branch_name",
         read_only=True,
     )
+    handling_unit_name = serializers.CharField(
+        source="handling_unit.unit_name",
+        read_only=True,
+    )
+    assigned_unit = serializers.IntegerField(source="handling_unit_id", read_only=True)
     assigned_unit_name = serializers.CharField(
-        source="assigned_unit.unit_name",
+        source="handling_unit.unit_name",
         read_only=True,
     )
 

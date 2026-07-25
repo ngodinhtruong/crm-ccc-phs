@@ -91,7 +91,7 @@ REPORT_TICKET_SELECT_RELATED = (
     "current_status",
     "error_group",
     "error_type",
-    "assigned_unit",
+    "handling_unit",
     "assigned_employee",
     "owner_user",
     "sla_tracking",
@@ -155,9 +155,9 @@ REPORT_TICKET_ONLY_FIELDS = (
     "error_group__group_name",
     "error_type_id",
     "error_type__type_name",
-    "assigned_unit_id",
-    "assigned_unit__unit_code",
-    "assigned_unit__unit_name",
+    "handling_unit_id",
+    "handling_unit__unit_code",
+    "handling_unit__unit_name",
     "assigned_employee_id",
     "assigned_employee__full_name",
     "owner_user_id",
@@ -298,7 +298,7 @@ def _period_label(value):
     return f"{value.month:02d}/{value.year}"
 
 
-def dashboard_date_range_from_params(params):
+def _date_range_from_params(params):
     """
     Dashboard CCC mặc định lấy tháng hiện tại.
     Hỗ trợ:
@@ -334,13 +334,11 @@ def dashboard_date_range_from_params(params):
 
     date_from = (
         params.get("date_from")
-        or params.get("start_date")
         or params.get("created_from")
         or params.get("from")
     )
     date_to = (
         params.get("date_to")
-        or params.get("end_date")
         or params.get("created_to")
         or params.get("to")
     )
@@ -354,19 +352,6 @@ def dashboard_date_range_from_params(params):
     if parsed_to:
         end_date = parsed_to
 
-    # Dashboard chatbot dùng bộ lọc year/month thay cho period. Chỉ áp dụng
-    # khi người dùng không truyền khoảng ngày cụ thể, để quy tắc ưu tiên
-    # start_date/end_date vẫn giống filter_summaries().
-    if not parsed_from and not parsed_to and not period:
-        year = _safe_int(params.get("year"), 0)
-        month = _safe_int(params.get("month"), 0)
-
-        if year > 0 and 1 <= month <= 12:
-            start_date = date(year, month, 1)
-            end_date = _month_end(start_date)
-        elif year > 0:
-            start_date = date(year, 1, 1)
-            end_date = date(year, 12, 31)
     if start_date > end_date:
         start_date, end_date = end_date, start_date
 
@@ -401,30 +386,6 @@ def _selected_report_months(date_from, date_to, max_months=None):
         months = months[-max_months:]
 
     return months
-
-
-def build_report_tickets(queryset, date_from, date_to):
-    """
-    Chuẩn hóa danh sách ticket dùng cho báo cáo tháng.
-
-    Hàm này được dùng chung bởi dashboard ticket và dashboard chatbot để
-    bảo đảm cùng một quy tắc khoảng thời gian, timezone và select_related.
-    """
-    report_months = _selected_report_months(date_from, date_to)
-    report_from = report_months[0]
-    report_to = _month_end(report_months[-1])
-    start_at, end_at = _datetime_range(report_from, report_to)
-
-    report_queryset = (
-        queryset.filter(
-            created_at__gte=start_at,
-            created_at__lt=end_at,
-        )
-        .select_related(*REPORT_TICKET_SELECT_RELATED)
-        .distinct()
-    )
-
-    return list(report_queryset), report_months, report_from, report_to
 
 
 def _base_queryset_without_date(request):
@@ -563,7 +524,7 @@ def _ticket_queryset_for_range(request, start_date, end_date):
 
 
 def _base_ticket_queryset(request):
-    date_from, date_to = dashboard_date_range_from_params(request.query_params)
+    date_from, date_to = _date_range_from_params(request.query_params)
     return _ticket_queryset_for_range(request, date_from, date_to), date_from, date_to
 
 
@@ -663,7 +624,6 @@ def _is_report_processed_ticket(ticket):
         "_dashboard_is_report_processed",
         lambda: (
             _is_resolved_ticket(ticket)
-            and not _is_ekyc_ticket(ticket)
             and not _is_spam_ticket(ticket)
         ),
     )
@@ -1232,8 +1192,8 @@ def _build_audit_trail(queryset, limit):
         "to_status",
         "from_branch",
         "to_branch",
-        "from_unit",
-        "to_unit",
+        "from_organization_unit",
+        "to_organization_unit",
         "from_employee",
         "to_employee",
         "created_by_user",
@@ -1276,7 +1236,7 @@ def _is_related_unit_ticket(ticket):
     return _memoized_ticket_value(
         ticket,
         "_dashboard_is_related_unit",
-        lambda: bool(ticket.assigned_unit and not _is_cs_unit(ticket.assigned_unit)),
+        lambda: bool(ticket.handling_unit and not _is_cs_unit(ticket.handling_unit)),
     )
 
 
@@ -1307,7 +1267,7 @@ def _ticket_month_key(ticket):
     return _month_key(month) if month else None
 
 
-def build_monthly_processing_report(tickets, months):
+def _build_monthly_processing_report(tickets, months):
     month_rows = _month_bucket_template(months)
 
     for row in month_rows.values():
@@ -1579,8 +1539,8 @@ def _build_sla_report(tickets, months):
         else:
             overdue_by_category[category_name]["not_overdue"] += 1
 
-        if status == SlaStatus.OVERDUE and ticket.assigned_unit:
-            unit_name = ticket.assigned_unit.unit_name
+        if status == SlaStatus.OVERDUE and ticket.handling_unit:
+            unit_name = ticket.handling_unit.unit_name
             item_key = (key, unit_name)
             overdue_task_by_unit_month[item_key].update(
                 {
@@ -1952,7 +1912,7 @@ class TicketCccDashboardAPIView(APIView):
                 requested_report_sections,
                 {"report_monthly", "report_summary"},
             ):
-                report_monthly_processing = build_monthly_processing_report(
+                report_monthly_processing = _build_monthly_processing_report(
                     report_tickets,
                     report_months,
                 )

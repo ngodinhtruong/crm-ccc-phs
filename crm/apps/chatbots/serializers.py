@@ -9,22 +9,18 @@ from apps.chatbots.models import (
 )
 
 
-class ChatbotSessionSummarySerializer(serializers.ModelSerializer):
+class ChatbotSessionTicketFieldsMixin(serializers.Serializer):
     ticket_code = serializers.SerializerMethodField()
     ticket_status = serializers.SerializerMethodField()
     outcome_label = serializers.SerializerMethodField()
     category_label = serializers.SerializerMethodField()
     linked_status = serializers.SerializerMethodField()
 
-    # Giữ tên trường ticket_chatbot_* cho frontend cũ; giá trị giờ lấy từ
-    # FK ticket dùng chung sau khi gộp bảng ticket_chatbots vào tickets.
+    # Giữ tên ticket_chatbot_* cho frontend cũ sau khi bảng ticket chatbot
+    # được gộp vào tickets.Ticket.
     ticket_chatbot_id = serializers.SerializerMethodField()
     ticket_chatbot_code = serializers.SerializerMethodField()
     ticket_chatbot_status = serializers.SerializerMethodField()
-
-    class Meta:
-        model = ChatbotSessionSummary
-        fields = "__all__"
 
     def get_ticket_code(self, obj):
         return obj.ticket.ticket_code if obj.ticket else ""
@@ -32,7 +28,6 @@ class ChatbotSessionSummarySerializer(serializers.ModelSerializer):
     def get_ticket_status(self, obj):
         if obj.ticket and obj.ticket.current_status:
             return obj.ticket.current_status.status_name
-
         return ""
 
     def get_outcome_label(self, obj):
@@ -53,8 +48,85 @@ class ChatbotSessionSummarySerializer(serializers.ModelSerializer):
     def get_ticket_chatbot_status(self, obj):
         if obj.ticket and obj.ticket.current_status:
             return obj.ticket.current_status.status_name
-
         return ""
+
+
+class ChatbotSessionListSerializer(
+    ChatbotSessionTicketFieldsMixin,
+    serializers.ModelSerializer,
+):
+    """Payload gọn cho bảng phân trang; không trả full_conversation."""
+
+    class Meta:
+        model = ChatbotSessionSummary
+        fields = [
+            "id",
+            "session_id",
+            "user_id",
+            "channel",
+            "dashboard_category",
+            "category_label",
+            "outcome_type",
+            "outcome_label",
+            "msg_count_total",
+            "has_cskh_state",
+            "has_cskh_request",
+            "state_step",
+            "contact_info",
+            "contact_type",
+            "reason",
+            "last_question",
+            "ticket",
+            "ticket_code",
+            "ticket_status",
+            "ticket_chatbot_id",
+            "ticket_chatbot_code",
+            "ticket_chatbot_status",
+            "linked_status",
+            "started_at",
+            "ended_at",
+        ]
+
+
+class ChatbotSessionQuickSerializer(
+    ChatbotSessionTicketFieldsMixin,
+    serializers.ModelSerializer,
+):
+    """Payload tối thiểu cho bảng 5 ticket đang chờ ở overview."""
+
+    class Meta:
+        model = ChatbotSessionSummary
+        fields = [
+            "id",
+            "session_id",
+            "dashboard_category",
+            "category_label",
+            "reason",
+            "last_question",
+            "ticket",
+            "ticket_code",
+            "ticket_status",
+            "ticket_chatbot_id",
+            "ticket_chatbot_code",
+            "ticket_chatbot_status",
+            "linked_status",
+            "started_at",
+        ]
+
+
+class ChatbotSessionDetailSerializer(
+    ChatbotSessionTicketFieldsMixin,
+    serializers.ModelSerializer,
+):
+    """Payload đầy đủ chỉ dùng ở endpoint chi tiết một phiên."""
+
+    class Meta:
+        model = ChatbotSessionSummary
+        fields = "__all__"
+
+
+# Alias tương thích cho code ngoài app đang import tên serializer cũ.
+ChatbotSessionSummarySerializer = ChatbotSessionDetailSerializer
 
 
 class ChatbotChatLogSerializer(serializers.ModelSerializer):
