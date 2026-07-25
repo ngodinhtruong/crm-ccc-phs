@@ -200,6 +200,11 @@ export function useChatbotDashboard() {
 
   const changeTab = (nextTab: ActiveTab) => {
     setActiveTab(nextTab);
+
+    router.replace(`/chatbots/dashboard?tab=${nextTab}`, {
+      scroll: false,
+    });
+
     void loadData(undefined, nextTab);
   };
 
@@ -291,7 +296,22 @@ export function useChatbotDashboard() {
       return;
     }
 
-    void loadData(undefined, "overview");
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get("tab");
+
+    const initialTab: ActiveTab =
+      tabParam === "tickets"
+        ? "tickets"
+        : tabParam === "faqs"
+          ? "faqs"
+          : "overview";
+
+    const frame = window.requestAnimationFrame(() => {
+      setActiveTab(initialTab);
+      void loadData(undefined, initialTab);
+    });
+
+    return () => window.cancelAnimationFrame(frame);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);

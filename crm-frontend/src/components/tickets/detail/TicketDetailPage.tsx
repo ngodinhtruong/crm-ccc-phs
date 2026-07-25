@@ -8,7 +8,6 @@ import {
   History,
   MessageSquareText,
   Pencil,
-  UserPlus,
   X,
 } from "lucide-react";
 
@@ -31,7 +30,6 @@ import { DashboardLayout } from "@/layouts/DashboardLayout";
 import { ChatbotTicketItem } from "@/types/chatbot-dashboard.type";
 import { TicketDetail, TicketStatusCode } from "@/types/ticket.type";
 import { formatDateTime } from "@/utils/date.util";
-import { getApiErrorDetail } from "@/utils/error.util";
 
 /** Hàng "nhãn : giá trị". Khi editing=true, render input do caller truyền. */
 function Field({
@@ -91,6 +89,25 @@ const SELECT_CLS =
 const INPUT_CLS =
   "w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs outline-none focus:border-sky-400";
 
+const CHATBOT_TICKET_LIST_URL = "/chatbots/dashboard?tab=tickets";
+
+type TicketDetailWithSourceRef = TicketDetail & {
+  source_ref_id?: string | null;
+};
+
+function getSourceRefId(ticket: TicketDetail): string {
+  return (
+    (ticket as TicketDetailWithSourceRef).source_ref_id?.trim() || ""
+  );
+}
+
+function isChatbotGeneratedTicket(ticket: TicketDetail): boolean {
+  return (
+    ticket.classification_method === "AUTO" &&
+    Boolean(getSourceRefId(ticket))
+  );
+}
+
 /** Dropdown gọn cho chế độ sửa. */
 function EditSelect({
   value,
@@ -132,8 +149,6 @@ export function TicketDetailPage({ id }: { id: number }) {
   const [showHistory, setShowHistory] = useState(false);
   const [showBreachModal, setShowBreachModal] = useState(false);
   const [showConversation, setShowConversation] = useState(false);
-  const [claiming, setClaiming] = useState(false);
-  const [claimError, setClaimError] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -182,21 +197,14 @@ export function TicketDetailPage({ id }: { id: number }) {
       setShowBreachModal={setShowBreachModal}
       showConversation={showConversation}
       setShowConversation={setShowConversation}
-      claiming={claiming}
-      claimError={claimError}
-      onClaim={async () => {
-        try {
-          setClaiming(true);
-          setClaimError("");
-          setTicket(await ticketApi.claimTicket(id));
-        } catch (err) {
-          setClaimError(getApiErrorDetail(err, "Không nhận được ticket."));
-        } finally {
-          setClaiming(false);
-        }
-      }}
       onSaved={setTicket}
-      onBack={() => router.push("/tickets")}
+      onBack={() =>
+        router.push(
+          isChatbotGeneratedTicket(ticket)
+            ? CHATBOT_TICKET_LIST_URL
+            : "/tickets"
+        )
+      }
     />
   );
 }
@@ -212,9 +220,6 @@ function TicketDetailInner({
   setShowBreachModal,
   showConversation,
   setShowConversation,
-  claiming,
-  claimError,
-  onClaim,
   onSaved,
   onBack,
 }: {
@@ -227,18 +232,19 @@ function TicketDetailInner({
   setShowBreachModal: (v: boolean) => void;
   showConversation: boolean;
   setShowConversation: (v: boolean) => void;
-  claiming: boolean;
-  claimError: string;
-  onClaim: () => void;
   onSaved: (t: TicketDetail) => void;
   onBack: () => void;
 }) {
   const f = useTicketEditForm(ticket);
   const statusCode = (ticket.current_status_code || "") as TicketStatusCode;
 
-  // Ticket sinh từ chatbot: classification_method = AUTO và có id phiên chat gốc.
-  const isChatbotTicket = ticket.classification_method === "AUTO";
-  const sessionId = ticket.source_ref_id || "";
+  // Ticket chatbot được nhận diện bằng AUTO và có source_ref_id của phiên chat gốc.
+  const sessionId = getSourceRefId(ticket);
+  const isChatbotTicket =
+    ticket.classification_method === "AUTO" && Boolean(sessionId);
+  const ticketListHref = isChatbotTicket
+    ? CHATBOT_TICKET_LIST_URL
+    : "/tickets";
   const [customerQuestions, setCustomerQuestions] = useState<string[] | null>(null);
 
   useEffect(() => {
@@ -269,8 +275,6 @@ function TicketDetailInner({
       active = false;
     };
   }, [isChatbotTicket, sessionId]);
-  const canClaim = isChatbotTicket && !ticket.owner_user_name;
-
   const handleSave = async (breach?: { reason: number; note: string }) => {
     const res = await f.save(breach);
 
@@ -289,7 +293,7 @@ function TicketDetailInner({
     <DashboardLayout
       breadcrumbs={[
         { label: "TRANG CHỦ", href: "/" },
-        { label: "Tickets", href: "/tickets" },
+        { label: "Tickets", href: ticketListHref },
         { label: ticket.ticket_code || "Chi tiết" },
       ]}
       rightAction={
@@ -326,18 +330,6 @@ function TicketDetailInner({
             </p>
 
             <div className="flex items-center gap-2">
-              {canClaim && (
-                <button
-                  type="button"
-                  disabled={claiming}
-                  onClick={onClaim}
-                  className="flex items-center gap-1.5 rounded-lg bg-[#0097cf] px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-[#0089bd] disabled:opacity-60"
-                >
-                  <UserPlus size={13} />
-                  {claiming ? "Đang nhận..." : "Nhận ticket"}
-                </button>
-              )}
-
               <button
                 type="button"
                 onClick={() => setShowHistory(true)}
@@ -359,12 +351,6 @@ function TicketDetailInner({
               )}
             </div>
           </div>
-
-          {claimError && (
-            <div className="mx-5 mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">
-              {claimError}
-            </div>
-          )}
 
           <TicketStatusFlow status={statusCode} />
         </div>
@@ -804,7 +790,13 @@ function TicketDetailInner({
               id: ticket.id,
               session_id: sessionId,
               ticket_code: ticket.ticket_code,
-              contact_info: ticket.contact_value,
+              contact_info:
+                ticket.customer_phone ||
+                ticket.customer_email ||
+                ticket.display_account_number ||
+                ticket.customer_account_number ||
+                ticket.raw_account_number ||
+                null,
               outcome_label: "Chuyển CCC xử lý",
               outcome_type: "CCC",
               started_at: ticket.created_at,
