@@ -41,6 +41,13 @@ class Command(BaseCommand):
             permission_map[code] = permission
 
         roles = {
+            "MG_STAFF": {
+                "role_name": "Sale Admin Staff",
+                "default_scope_type": "OWN",
+                "group_code": "SALE_ADMIN",
+                "is_active": True,
+            },
+
             "SA_STAFF": {
                 "role_name": "Sale Admin Staff",
                 "default_scope_type": "OWN",
@@ -53,6 +60,7 @@ class Command(BaseCommand):
                 "group_code": "SALE_ADMIN",
                 "is_active": True,
             },
+
             "CCC_STAFF": {
                 "role_name": "CCC Staff",
                 "default_scope_type": "OWN",
@@ -83,6 +91,15 @@ class Command(BaseCommand):
             role_map[code] = role
 
         role_permissions = {
+            "MG_STAFF": [
+                "SA_RECORD_VIEW",
+                "SA_RECORD_CREATE",
+                "SA_RECORD_UPDATE",
+                "SA_RECORD_IMPORT",
+                "SA_RECORD_AUDIT_VIEW",
+                "SA_KPI_VIEW_SELF",
+                "CUSTOMER_360_VIEW",
+            ],
             "SA_STAFF": [
                 "SA_RECORD_VIEW",
                 "SA_RECORD_CREATE",

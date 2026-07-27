@@ -259,6 +259,22 @@ export function SaleAdminDashboardPage() {
             <AdminOverviewCards items={cards} />
 
             <div className="grid grid-cols-1 gap-4 2xl:grid-cols-12">
+              <div className="2xl:col-span-6">
+                <TopEmployeesTable
+                  rows={dashboard.data.top_employees}
+                  month={dashboard.month}
+                  year={dashboard.year}
+                />
+              </div>
+
+              <div className="2xl:col-span-6">
+                <TopAccountsTable
+                  rows={dashboard.data.top_accounts}
+                  month={dashboard.month}
+                  year={dashboard.year}
+                />
+              </div>
+
               <div className="2xl:col-span-12">
                 <BranchRankingTable
                   rows={dashboard.data.branch_ranking}
@@ -311,22 +327,6 @@ export function SaleAdminDashboardPage() {
                   month={dashboard.month}
                   year={dashboard.year}
                   periodLabel={periodLabel}
-                />
-              </div>
-
-              <div className="2xl:col-span-6">
-                <TopEmployeesTable
-                  rows={dashboard.data.top_employees}
-                  month={dashboard.month}
-                  year={dashboard.year}
-                />
-              </div>
-
-              <div className="2xl:col-span-6">
-                <TopAccountsTable
-                  rows={dashboard.data.top_accounts}
-                  month={dashboard.month}
-                  year={dashboard.year}
                 />
               </div>
             </div>

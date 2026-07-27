@@ -11,7 +11,9 @@ const nextConfig: NextConfig = {
     "http://13.215.176.236",
     "192.168.200.112",
     "http://192.168.200.112",
-    
+    "http://172.31.0.1:3000",
+    "172.31.0.1"
+
   ],
   /**
    * Giữ nguyên URL, không để Next.js trả 308 redirect cắt dấu "/" cuối —

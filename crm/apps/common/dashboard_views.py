@@ -357,45 +357,20 @@ def _sum_field(queryset, field_name):
     return queryset.aggregate(total=Sum(field_name))["total"] or 0
 
 
-def _transaction_account_values(transactions_qs, transaction_model):
-    if _has_model_field(transaction_model, "account_no"):
-        return transactions_qs.exclude(account_no__isnull=True).exclude(account_no="").values_list(
-            "account_no",
-            flat=True,
-        )
-
-    if _has_model_field(transaction_model, "customer_account"):
-        return transactions_qs.exclude(customer_account__isnull=True).values_list(
-            "customer_account__account_number",
-            flat=True,
-        )
-
-    return []
+def _transaction_account_values(transactions_qs):
+    return transactions_qs.exclude(customer_account__isnull=True).values_list(
+        "customer_account__account_number",
+        flat=True,
+    )
 
 
-def _filter_transactions_by_branch(transactions_qs, transaction_model, branch_id):
+def _filter_transactions_by_branch(transactions_qs, branch_id):
     if not branch_id:
         return transactions_qs
 
-    if _has_model_field(transaction_model, "branch"):
-        return transactions_qs.filter(branch_id=branch_id)
-
-    if _has_model_field(transaction_model, "customer"):
-        return transactions_qs.filter(customer__branch_id=branch_id)
-
-    if _has_model_field(transaction_model, "customer_account"):
-        return transactions_qs.filter(customer_account__customer__branch_id=branch_id)
-
-    if _has_model_field(transaction_model, "account_no"):
-        from apps.customers.models import CustomerAccount
-
-        branch_accounts = CustomerAccount.objects.filter(
-            customer__branch_id=branch_id
-        ).values_list("account_number", flat=True)
-
-        return transactions_qs.filter(account_no__in=branch_accounts)
-
-    return transactions_qs
+    return transactions_qs.filter(
+        customer_account__customer__branch_id=branch_id
+    )
 
 
 def _filter_valid_matched_transactions(transactions_qs, transaction_model):
@@ -441,7 +416,7 @@ class GeneralDashboardAPIView(APIView):
             branch = None
 
         from apps.branches.models import Branch
-        from apps.customers.models import Customer, CustomerAccount
+        from apps.customers.models import Customer
         from apps.tickets.models import Ticket
         from apps.sale_admin.models import SaRecord
 
@@ -487,7 +462,6 @@ class GeneralDashboardAPIView(APIView):
             transactions_qs = TransactionLog.objects.all()
             transactions_qs = _filter_transactions_by_branch(
                 transactions_qs,
-                TransactionLog,
                 branch,
             )
 
@@ -511,20 +485,18 @@ class GeneralDashboardAPIView(APIView):
         total_transactions = transactions_qs.count() if transactions_qs is not None else 0
 
         if transactions_qs is not None:
-            account_values = _transaction_account_values(transactions_qs, TransactionLog)
+            account_values = _transaction_account_values(transactions_qs)
 
-            if _has_model_field(TransactionLog, "customer"):
-                active_customer_ids = transactions_qs.exclude(customer__isnull=True).values_list(
-                    "customer_id",
-                    flat=True,
-                )
-                active_customers = customers_qs.filter(id__in=active_customer_ids).distinct().count()
-            elif account_values:
-                active_customers = customers_qs.filter(
-                    accounts__account_number__in=account_values
-                ).distinct().count()
-            else:
-                active_customers = 0
+            active_customer_ids = transactions_qs.exclude(
+                customer_account__isnull=True
+            ).values_list(
+                "customer_account__customer_id",
+                flat=True,
+            )
+
+            active_customers = customers_qs.filter(
+                id__in=active_customer_ids
+            ).distinct().count()
 
             fee_field = _first_existing_field(
                 TransactionLog,

@@ -294,15 +294,32 @@ class KpiUserSummaryAdmin(admin.ModelAdmin):
 class TransactionLogAdmin(admin.ModelAdmin):
     list_display = (
         "id",
-        "account_no",
+        "customer_account",
+        "transaction_code",
+        "stock_code",
         "transaction_date",
         "order_status",
         "transaction_value",
         "transaction_fee",
         "source_system",
     )
-    search_fields = ("account_no", "source_transaction_id", "customer__full_name")
-    list_filter = ("order_status", "source_system", "transaction_date")
+
+    search_fields = (
+        "transaction_code",
+        "source_transaction_id",
+        "stock_code",
+        "customer_account__account_number",
+        "customer_account__customer__customer_code",
+        "customer_account__customer__full_name",
+    )
+
+    list_filter = (
+        "order_status",
+        "source_system",
+        "market",
+        "side",
+        "transaction_date",
+    )
 
 
 @admin.register(KpiAuditLog)

@@ -783,48 +783,41 @@ class KpiUserSummary(TimeStampedModel):
 
 
 class TransactionLog(TimeStampedModel):
-    account_no = models.CharField(max_length=100, db_index=True)
-    customer_account = models.ForeignKey(
-        "customers.CustomerAccount",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="transaction_logs",
-    )
-    customer = models.ForeignKey(
-        "customers.Customer",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="transaction_logs",
-    )
-    branch = models.ForeignKey(
-        "branches.Branch",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="transaction_logs",
-    )
+    customer_account = models.ForeignKey("customers.CustomerAccount", on_delete=models.SET_NULL, null=True, blank=True, related_name="transaction_logs")
+    branch = models.ForeignKey("branches.Branch", on_delete=models.SET_NULL, null=True, blank=True, related_name="transaction_logs")
+
     transaction_date = models.DateField(db_index=True)
     matched_at = models.DateTimeField(null=True, blank=True)
+
+    transaction_code = models.CharField(max_length=100, db_index=True, null=True, blank=True)
+    source_transaction_id = models.CharField(max_length=100, db_index=True, null=True, blank=True)
+    stock_code = models.CharField(max_length=20, db_index=True, null=True, blank=True)
+    side = models.CharField(max_length=10, db_index=True, null=True, blank=True)
+    quantity = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal("0"))
+    price = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal("0"))
+    market = models.CharField(max_length=20, null=True, blank=True)
+    order_type = models.CharField(max_length=20, null=True, blank=True)
     transaction_value = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal("0.00"))
     transaction_fee = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal("0.00"))
     order_status = models.CharField(max_length=50, db_index=True)
     product_code = models.CharField(max_length=100, null=True, blank=True)
     source_system = models.CharField(max_length=100, null=True, blank=True)
-    source_transaction_id = models.CharField(max_length=100, null=True, blank=True)
 
     class Meta:
         db_table = "transaction_logs"
         indexes = [
-            models.Index(fields=["account_no", "transaction_date"]),
+            models.Index(fields=["customer_account", "transaction_date"]),
+            models.Index(fields=["customer_account", "stock_code"]),
+            models.Index(fields=["transaction_date", "stock_code"]),
+            models.Index(fields=["transaction_code"]),
+            models.Index(fields=["stock_code"]),
             models.Index(fields=["order_status"]),
             models.Index(fields=["source_transaction_id"]),
         ]
 
     def __str__(self):
-        return f"{self.account_no} - {self.transaction_date}"
-
+        account_number = self.customer_account.account_number if self.customer_account else "Không có tài khoản"
+        return f"{self.transaction_code or account_number} - {self.transaction_date}"
 
 class KpiAuditLog(models.Model):
     ACTION_CREATE = "CREATE"
