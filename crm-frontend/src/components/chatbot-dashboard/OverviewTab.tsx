@@ -9,7 +9,7 @@ import {
 export function OverviewTab({
   overview,
   onOpenTickets,
-  granularity = "day",
+  granularity = "month",
   onGranularityChange,
 }: {
   overview: ChatbotOverviewResponse;
@@ -23,6 +23,7 @@ export function OverviewTab({
         charts={overview.charts}
         granularity={granularity}
         onGranularityChange={onGranularityChange}
+        faqs={overview.quick_lists?.top_faqs}
       />
     </div>
   );

@@ -32,7 +32,7 @@ export function KpiCards({
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
       <KpiCard
         bucket={summary.total_received}
-        subtitle="Toàn bộ lượt hỏi & phiên trong kỳ"
+        subtitle="Toàn bộ phiên tương tác trong kỳ"
         icon={<Bot size={22} />}
         iconClassName="bg-sky-100 text-sky-600"
         showRate={false}
@@ -114,16 +114,9 @@ function KpiCard({
 
           <div className="mt-3 flex items-baseline gap-1.5">
             <span className="text-3xl font-bold text-slate-800">
-              {bucket.value}
-            </span>
-            <span className="text-xs font-normal text-slate-500">lượt</span>
-
-            <span className="text-slate-300">/</span>
-
-            <span className="text-xl font-bold text-slate-700">
               {bucket.session_count}
             </span>
-            <span className="text-xs font-normal text-slate-500">phiên</span>
+            <span className="text-xs font-semibold text-slate-500">phiên</span>
           </div>
         </div>
 

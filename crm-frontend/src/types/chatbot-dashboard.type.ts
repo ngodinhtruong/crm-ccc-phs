@@ -117,43 +117,53 @@ export type TimeSeriesOutcomeItem = {
   bot_done_rate: number;
 };
 
-export type HourlyPeakItem = {
-  hour: string;
-  label: string;
-  total: number;
-  ccc: number;
-  bot_done: number;
-};
-
-export type AvgHandlingTimes = {
-  avg_bot_duration_min: number;
-  avg_response_time_min: number;
-  avg_resolution_time_min: number;
-};
-
-export type SlaComplianceTrend = {
-  total_tickets: number;
-  on_time: number;
-  overdue: number;
-  warning: number;
-  on_time_rate: number;
-  items: Array<{ name: string; value: number; color: string }>;
-};
-
-export type TopicTransferRateItem = {
-  category: string;
-  total: number;
-  ccc: number;
-  bot_done: number;
-  transfer_rate: number;
-};
-
 export type CustomerLinkageData = {
   total: number;
   linked: number;
   unlinked: number;
   linked_rate: number;
   items: Array<{ name: string; value: number; color: string }>;
+};
+
+export type CccMultiMonthTopicsData = {
+  month_labels: string[];
+  top_categories: string[];
+  data_by_month: Array<Record<string, any>>;
+  data_by_category: Array<Record<string, any>>;
+};
+
+export type TopicStackedOutcomesData = {
+  month_labels: string[];
+  top_categories: string[];
+  data: Array<Record<string, any>>;
+};
+
+export type CategoryCccRateItem = {
+  name: string;
+  total: number;
+  ccc: number;
+  rate: number;
+};
+
+export type FunnelStepItem = {
+  step: number;
+  name: string;
+  count: number;
+};
+
+export type HourlyPeakItem = {
+  hour: number;
+  label: string;
+  count: number;
+};
+
+export type ChannelPerformanceItem = {
+  name: string;
+  total: number;
+  bot_done: number;
+  ccc: number;
+  bot_done_rate: number;
+  ccc_rate: number;
 };
 
 export type ChatbotOverviewResponse = {
@@ -169,7 +179,7 @@ export type ChatbotOverviewResponse = {
 
   charts: {
     process_classification: ProcessChartItem[];
-    ccc_issue_pie: ChartItem[];
+    ccc_issue_pie?: ChartItem[];
     topic_bar: ChartItem[];
     monthly_chatbot_tickets: ChatbotMonthlyTicketItem[];
     daily_chatbot_tickets: ChatbotSeriesItem[];
@@ -178,11 +188,19 @@ export type ChatbotOverviewResponse = {
     ticket_status_distribution: ChartItem[];
 
     time_series_outcomes?: TimeSeriesOutcomeItem[];
-    hourly_peak_chart?: HourlyPeakItem[];
-    avg_handling_times?: AvgHandlingTimes;
-    sla_compliance_trend?: SlaComplianceTrend;
-    topic_transfer_rates?: TopicTransferRateItem[];
     customer_linkage?: CustomerLinkageData;
+    ccc_multi_month_topics?: CccMultiMonthTopicsData;
+    topic_stacked_outcomes?: TopicStackedOutcomesData;
+    all_topic_multi_month?: CccMultiMonthTopicsData;
+    category_ccc_rate_multi_month?: CccMultiMonthTopicsData;
+
+    category_ccc_rate?: CategoryCccRateItem[];
+    chat_funnel?: FunnelStepItem[];
+    hourly_peak?: HourlyPeakItem[];
+    top_reasons?: ChartItem[];
+    top_reasons_multi_period?: CccMultiMonthTopicsData;
+    channel_performance?: ChannelPerformanceItem[];
+    channel_performance_multi_period?: CccMultiMonthTopicsData;
   };
 
   quick_lists: {

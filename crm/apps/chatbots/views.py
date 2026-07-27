@@ -49,23 +49,26 @@ class ChatbotDashboardOverviewAPIView(ChatbotDashboardFilterMixin, APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        granularity = request.query_params.get("granularity", "day").lower()
+        granularity = request.query_params.get("granularity", "month").lower()
         if granularity not in {"day", "week", "month"}:
-            granularity = "day"
+            granularity = "month"
 
         sections, explicit_sections = parse_dashboard_sections(
             request.query_params.get("sections")
         )
         summaries = self.get_filtered_summaries()
+        prev_summaries = self.get_previous_period_summaries()
         logs = self.get_filtered_logs()
-        aggregator = ChatbotDashboardAggregator(summaries, logs)
+        aggregator = ChatbotDashboardAggregator(
+            summaries, logs, prev_summaries=prev_summaries
+        )
         signature = self.get_filter_signature(granularity=granularity)
 
         builders = {
             SECTION_SUMMARY: aggregator.build_summary_section,
-            SECTION_TOPICS: aggregator.build_topics_section,
+            SECTION_TOPICS: lambda: aggregator.build_topics_section(granularity),
             SECTION_TRAFFIC: lambda: aggregator.build_traffic_section(granularity),
-            SECTION_OPERATIONS: aggregator.build_operations_section,
+            SECTION_OPERATIONS: lambda: aggregator.build_operations_section(granularity),
             SECTION_SLA: aggregator.build_sla_section,
             SECTION_QUICK_LISTS: aggregator.build_quick_lists_section,
         }

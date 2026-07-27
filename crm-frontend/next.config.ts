@@ -8,7 +8,10 @@ const nextConfig: NextConfig = {
     "192.168.200.133",
     "http://192.168.2.16",
     "13.215.176.236",
-    "http:13.215.176.236"
+    "http://13.215.176.236",
+    "192.168.200.112",
+    "http://192.168.200.112",
+    
   ],
   /**
    * Giữ nguyên URL, không để Next.js trả 308 redirect cắt dấu "/" cuối —

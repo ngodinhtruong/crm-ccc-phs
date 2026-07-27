@@ -20,7 +20,7 @@ import { normalizeFilters } from "@/utils/chatbot-filter.util";
 import { formatDateInput, getStartOfWeek } from "@/utils/date.util";
 import { getErrorMessage } from "@/utils/error.util";
 
-export type QuickPreset = "TODAY" | "THIS_WEEK" | "THIS_MONTH";
+export type QuickPreset = "TODAY" | "THIS_WEEK" | "THIS_MONTH" | "LAST_5_MONTHS";
 
 const PAGE_SIZE = 50;
 const DEFAULT_PANEL_TITLE = "Tất cả phiên chatbot";
@@ -36,12 +36,14 @@ const AUTO_REFRESH_MS = 120_000;
 function getPresetFilters(preset: QuickPreset): ChatbotDashboardFilters {
   const now = new Date();
 
-  const start =
-    preset === "TODAY"
-      ? now
-      : preset === "THIS_WEEK"
-      ? getStartOfWeek(now)
-      : new Date(now.getFullYear(), now.getMonth(), 1);
+  let start = new Date(now.getFullYear(), now.getMonth(), 1);
+  if (preset === "TODAY") {
+    start = now;
+  } else if (preset === "THIS_WEEK") {
+    start = getStartOfWeek(now);
+  } else if (preset === "LAST_5_MONTHS") {
+    start = new Date(now.getFullYear(), now.getMonth() - 4, 1);
+  }
 
   return {
     start_date: formatDateInput(start),
@@ -56,6 +58,7 @@ const EMPTY_FILTERS: ChatbotDashboardFilters = {
   end_date: "",
   start_hour: "",
   end_hour: "",
+  granularity: "month",
 };
 
 export function useChatbotDashboard() {
@@ -63,10 +66,11 @@ export function useChatbotDashboard() {
 
   const [activeTab, setActiveTab] = useState<ActiveTab>("overview");
 
-  // Mặc định xem tháng hiện tại
+  // Mặc định xem 5 tháng gần nhất
   const [filters, setFilters] = useState<ChatbotDashboardFilters>({
     ...EMPTY_FILTERS,
-    ...getPresetFilters("THIS_MONTH"),
+    granularity: "month",
+    ...getPresetFilters("LAST_5_MONTHS"),
   });
 
   const [overview, setOverview] = useState<ChatbotOverviewResponse | null>(null);

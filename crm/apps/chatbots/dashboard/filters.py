@@ -127,6 +127,42 @@ class ChatbotDashboardFilterMixin:
     def get_filtered_summaries(self):
         return self.filter_summaries(ChatbotSessionSummary.objects.all())
 
+    def get_previous_period_summaries(self):
+        start_at, end_at, standalone_month = self._date_range()
+        qs = ChatbotSessionSummary.objects.all()
+
+        if start_at is not None and end_at is not None:
+            delta = end_at - start_at
+            prev_start = start_at - delta
+            prev_end = start_at
+            qs = qs.filter(started_at__gte=prev_start, started_at__lt=prev_end)
+        elif start_at is not None:
+            prev_start = start_at - timedelta(days=30)
+            qs = qs.filter(started_at__gte=prev_start, started_at__lt=start_at)
+        elif standalone_month is not None:
+            prev_month = standalone_month - 1 if standalone_month > 1 else 12
+            qs = qs.filter(started_at__month=prev_month)
+
+        start_hour = self.get_int_param("start_hour")
+        end_hour = self.get_int_param("end_hour")
+        if (
+            start_hour is not None
+            and end_hour is not None
+            and 0 <= start_hour <= 23
+            and 0 <= end_hour <= 23
+        ):
+            if start_hour <= end_hour:
+                qs = qs.filter(
+                    started_at__hour__gte=start_hour, started_at__hour__lte=end_hour
+                )
+            else:
+                qs = qs.filter(
+                    Q(started_at__hour__gte=start_hour)
+                    | Q(started_at__hour__lte=end_hour)
+                )
+
+        return qs
+
     def get_filter_response(self):
         return {
             name: self.request.query_params.get(name)

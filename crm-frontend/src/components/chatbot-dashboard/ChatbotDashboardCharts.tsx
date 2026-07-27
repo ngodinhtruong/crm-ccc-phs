@@ -11,6 +11,7 @@ import {
   ComposedChart,
   Legend,
   Line,
+  LineChart,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -21,15 +22,18 @@ import {
 } from "recharts";
 
 import { EmptyState } from "@/components/chatbot-dashboard/EmptyState";
+import { FunnelChartComponent } from "@/components/chatbot-dashboard/charts/FunnelChartComponent";
 import { ExpandableChartCard as ChartCard } from "@/components/common";
 import type {
-  AvgHandlingTimes,
+  CategoryCccRateItem,
+  CccMultiMonthTopicsData,
+  ChannelPerformanceItem,
+  ChatbotFaqItem,
   ChatbotOverviewResponse,
   CustomerLinkageData,
+  FunnelStepItem,
   HourlyPeakItem,
-  SlaComplianceTrend,
   TimeSeriesOutcomeItem,
-  TopicTransferRateItem,
 } from "@/types/chatbot-dashboard.type";
 
 export type ChatbotOverviewCharts = ChatbotOverviewResponse["charts"];
@@ -39,15 +43,13 @@ const COLORS = [
   "#0097cf", // Primary PHS Sky Blue
   "#00713d", // PHS Green
   "#f59e0b", // Amber
-  "#ef4444", // Rose / Red
+  "#ef4444", // Red
   "#8b5cf6", // Purple
   "#06b6d4", // Cyan
   "#84cc16", // Lime
   "#f97316", // Orange
   "#0f766e", // Teal
-  "#7c3aed", // Violet
   "#64748b", // Slate
-  "#dc2626", // Dark Red
 ];
 
 const integerFormatter = new Intl.NumberFormat("vi-VN");
@@ -99,7 +101,7 @@ function GranularitySelector({
           key={opt.key}
           type="button"
           onClick={() => onChange(opt.key)}
-          className={`cursor-pointer px-3 py-1 text-xs font-bold rounded-md transition-all duration-200 ${
+          className={`cursor-pointer px-2.5 py-1 text-xs font-bold rounded-md transition-all duration-200 ${
             value === opt.key
               ? "bg-[#00713d] text-white shadow-xs"
               : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
@@ -113,297 +115,393 @@ function GranularitySelector({
 }
 
 /* ====================================================================
- * SECTION 1: KẾT QUẢ XỬ LÝ & XU HƯỚNG TỰ ĐỘNG HÓA THEO THỜI GIAN
+ * 📊 TOP SECTION: XU HƯỚNG TỰ ĐỘNG HÓA (BOT TỰ XỬ LÝ VS CHUYỂN CCC)
  * ==================================================================== */
 function AutomationTrendChartCard({
   data,
-  granularity = "day",
+  granularity = "month",
   onGranularityChange,
 }: {
   data?: TimeSeriesOutcomeItem[] | null;
   granularity?: GranularityMode;
   onGranularityChange?: (mode: GranularityMode) => void;
 }) {
-  const [selectedPeriod, setSelectedPeriod] = useState<string | null>(null);
-
-  const rawData = useMemo(() => (Array.isArray(data) ? data : []), [data]);
-
-  const totalSessions = useMemo(() => rawData.reduce((sum, d) => sum + d.total, 0), [rawData]);
-  const totalBotDone = useMemo(() => rawData.reduce((sum, d) => sum + d.bot_done, 0), [rawData]);
-  const totalCcc = useMemo(() => rawData.reduce((sum, d) => sum + d.ccc, 0), [rawData]);
-  const totalSpamPending = useMemo(
-    () => rawData.reduce((sum, d) => sum + (d.spam || 0) + (d.pending || 0), 0),
-    [rawData]
-  );
-  const avgBotRate = totalSessions > 0 ? ((totalBotDone / totalSessions) * 100).toFixed(1) : "0";
-
-  const periodDonutData = useMemo(() => {
-    if (!selectedPeriod) return [];
-    const item = rawData.find((d) => d.label === selectedPeriod || d.date === selectedPeriod);
-    if (!item) return [];
-    return [
-      { name: "Bot tự xử lý", value: item.bot_done, color: "#00713d" },
-      { name: "Chuyển CCC xử lý", value: item.ccc, color: "#f59e0b" },
-    ].filter((d) => d.value > 0);
-  }, [rawData, selectedPeriod]);
-
-  if (rawData.length === 0) {
-    return <EmptyState message="Không có dữ liệu xu hướng tự động hóa theo thời gian." />;
-  }
-
-  const handleChartClick = (state: any) => {
-    if (state && state.activeLabel) {
-      setSelectedPeriod(state.activeLabel);
+  const chartData = useMemo(() => {
+    if (Array.isArray(data) && data.length > 0) return data;
+    const now = new Date();
+    const fallback: TimeSeriesOutcomeItem[] = [];
+    for (let i = 4; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const mStr = String(d.getMonth() + 1).padStart(2, "0");
+      fallback.push({
+        date: `${d.getFullYear()}-${mStr}`,
+        label: `T${mStr}/${d.getFullYear()}`,
+        total: 0,
+        bot_done: 0,
+        ccc: 0,
+        pending: 0,
+        spam: 0,
+        bot_done_rate: 0,
+      });
     }
-  };
+    return fallback;
+  }, [data]);
 
   return (
-    <div className="space-y-4">
-      {/* 4 Summary Cards Top */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div className="rounded-xl border border-sky-100 bg-gradient-to-br from-sky-50 to-white p-3.5 shadow-sm">
-          <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Tổng Tiếp Nhận</p>
-          <p className="mt-1 text-xl font-black text-sky-700">{formatNumber(totalSessions)}</p>
-          <p className="mt-0.5 text-[11px] text-slate-500">Phiên tương tác chatbot</p>
-        </div>
-        <div className="rounded-xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-white p-3.5 shadow-sm">
-          <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Bot Tự Xử Lý</p>
-          <p className="mt-1 text-xl font-black text-[#00713d]">{formatNumber(totalBotDone)}</p>
-          <p className="mt-0.5 text-[11px] text-[#00713d] font-semibold">Tỷ lệ tự động: {avgBotRate}%</p>
-        </div>
-        <div className="rounded-xl border border-amber-100 bg-gradient-to-br from-amber-50 to-white p-3.5 shadow-sm">
-          <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Chuyển CCC Xử Lý</p>
-          <p className="mt-1 text-xl font-black text-amber-700">{formatNumber(totalCcc)}</p>
-          <p className="mt-0.5 text-[11px] text-slate-500">Cần tư vấn viên hỗ trợ</p>
-        </div>
-        <div className="rounded-xl border border-rose-100 bg-gradient-to-br from-rose-50 to-white p-3.5 shadow-sm">
-          <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Chờ Khách & Spam</p>
-          <p className="mt-1 text-xl font-black text-rose-600">{formatNumber(totalSpamPending)}</p>
-          <p className="mt-0.5 text-[11px] text-slate-500">Chờ bổ sung / Tin rác</p>
-        </div>
+    <ChartCard
+      title="Xu hướng Tự động hóa & Phân loại Xử lý (Bot tự xử lý vs Chuyển CCC)"
+      description="Trục hoành: Chuỗi thời gian | Vùng Xanh: Bot tự xử lý (BOT_DONE) | Cột Vàng: Chuyển CCC (CCC)"
+      headerRight={
+        onGranularityChange && (
+          <GranularitySelector value={granularity} onChange={onGranularityChange} />
+        )
+      }
+      className="xl:col-span-12"
+    >
+      <div className="h-[320px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart
+            data={chartData}
+            margin={{ top: 15, right: 25, left: 0, bottom: 15 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+            <XAxis dataKey="label" tick={{ fontSize: 11, fontWeight: 600, fill: "#334155" }} />
+            <YAxis tick={{ fontSize: 11, fill: "#64748b" }} allowDecimals={false} />
+            <Tooltip content={<ValueTooltip />} />
+            <Legend wrapperStyle={{ fontSize: 11, paddingTop: 6 }} />
+            <Area
+              type="monotone"
+              dataKey="bot_done"
+              name="Bot tự xử lý (BOT_DONE)"
+              fill="#00713d"
+              stroke="#00713d"
+              fillOpacity={0.2}
+              strokeWidth={2.5}
+              isAnimationActive={false}
+            />
+            <Bar
+              dataKey="ccc"
+              name="Chuyển CCC (CCC)"
+              fill="#f59e0b"
+              radius={[4, 4, 0, 0]}
+              barSize={24}
+              isAnimationActive={false}
+            >
+              <LabelList
+                dataKey="ccc"
+                position="top"
+                style={{ fontSize: 10, fill: "#b45309", fontWeight: 700 }}
+                formatter={(val: any) => (val && Number(val) > 0 ? val : "")}
+              />
+            </Bar>
+          </ComposedChart>
+        </ResponsiveContainer>
       </div>
+    </ChartCard>
+  );
+}
 
-      <ChartCard
-        title={
-          selectedPeriod
-            ? `Cơ cấu kết quả xử lý - ${selectedPeriod}`
-            : "Xu hướng Tự động hóa & Phân loại xử lý (Time-Series Deflection)"
-        }
-        description={
-          selectedPeriod
-            ? "Nhấp đúp hoặc bấm nút 'Quay lại' để xem xu hướng tất cả các mốc thời gian"
-            : "So sánh số phiên Chatbot tự giải quyết (xanh) vs Chuyển CCC (vàng). Double-click vào điểm mốc để xem chi tiết."
-        }
-        headerRight={
-          <div className="flex items-center gap-2">
-            {selectedPeriod ? (
-              <button
-                type="button"
-                onClick={() => setSelectedPeriod(null)}
-                className="flex items-center gap-1.5 rounded-md bg-sky-50 px-2.5 py-1 text-xs font-bold text-sky-700 hover:bg-sky-100 ring-1 ring-sky-200 transition-all shadow-2xs"
-              >
-                ← Quay lại các mốc
-              </button>
-            ) : (
-              onGranularityChange && (
-                <GranularitySelector value={granularity} onChange={onGranularityChange} />
-              )
-            )}
-          </div>
-        }
-      >
-        <div className="h-[320px]">
-          <ResponsiveContainer width="100%" height="100%">
-            {selectedPeriod ? (
-              <PieChart onDoubleClick={() => setSelectedPeriod(null)}>
-                <Pie
-                  data={periodDonutData}
+/* ====================================================================
+ * 📈 1. XU HƯỚNG SESSION THEO THỜI GIAN (LINE CHART)
+ * ==================================================================== */
+function SessionTrendLineChartCard({
+  data,
+}: {
+  data?: TimeSeriesOutcomeItem[] | null;
+}) {
+  const chartData = useMemo(() => {
+    if (Array.isArray(data) && data.length > 0) return data;
+    const now = new Date();
+    const fallback: TimeSeriesOutcomeItem[] = [];
+    for (let i = 4; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const mStr = String(d.getMonth() + 1).padStart(2, "0");
+      fallback.push({
+        date: `${d.getFullYear()}-${mStr}`,
+        label: `T${mStr}/${d.getFullYear()}`,
+        total: 0,
+        bot_done: 0,
+        ccc: 0,
+        pending: 0,
+        spam: 0,
+        bot_done_rate: 0,
+      });
+    }
+    return fallback;
+  }, [data]);
+
+  return (
+    <ChartCard
+      title="📈 1. Xu hướng Session theo Thời gian"
+      description="Chatbot đang được sử dụng nhiều hay ít theo thời gian?"
+      className="xl:col-span-8"
+    >
+      <div className="h-[320px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart
+            data={chartData}
+            margin={{ top: 15, right: 25, left: 0, bottom: 15 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+            <XAxis dataKey="label" tick={{ fontSize: 11, fontWeight: 600, fill: "#334155" }} />
+            <YAxis tick={{ fontSize: 11, fill: "#64748b" }} allowDecimals={false} />
+            <Tooltip content={<ValueTooltip />} />
+            <Legend wrapperStyle={{ fontSize: 11, paddingTop: 6 }} />
+            <Line
+              type="monotone"
+              dataKey="total"
+              name="Tổng số Session"
+              stroke="#0097cf"
+              strokeWidth={3}
+              dot={{ r: 4, fill: "#0097cf" }}
+              activeDot={{ r: 6 }}
+              isAnimationActive={false}
+            >
+              <LabelList
+                dataKey="total"
+                position="top"
+                style={{ fontSize: 10, fill: "#0097cf", fontWeight: 700 }}
+                formatter={(val: any) => (val && Number(val) > 0 ? val : "")}
+              />
+            </Line>
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </ChartCard>
+  );
+}
+
+/* ====================================================================
+ * 🍩 2. KẾT QUẢ XỬ LÝ PHIÊN CHAT (DONUT CHART)
+ * ==================================================================== */
+function OutcomeDonutChartCard({
+  processClassification,
+}: {
+  processClassification?: any[] | null;
+}) {
+  const chartData = useMemo(() => {
+    if (Array.isArray(processClassification) && processClassification.length > 0) {
+      return processClassification.map((item) => {
+        let color = "#64748b";
+        if (item.code === "BOT_DONE") color = "#00713d";
+        if (item.code === "CCC") color = "#f59e0b";
+        if (item.code === "PENDING") color = "#0284c7";
+        if (item.code === "SPAM") color = "#ef4444";
+        return {
+          name: item.name || item.label,
+          value: item.session_count || item.value || 0,
+          color,
+        };
+      });
+    }
+    return [
+      { name: "Chatbot tự xử lý (BOT_DONE)", value: 0, color: "#00713d" },
+      { name: "Chuyển CCC xử lý (CCC)", value: 0, color: "#f59e0b" },
+      { name: "Chờ thông tin KH (PENDING)", value: 0, color: "#0284c7" },
+      { name: "Câu hỏi rác (SPAM)", value: 0, color: "#ef4444" },
+    ];
+  }, [processClassification]);
+
+  const total = chartData.reduce((acc, curr) => acc + curr.value, 0);
+
+  return (
+    <ChartCard
+      title="🍩 2. Kết quả Xử lý Phiên Chat"
+      description="Chatbot đang tự xử lý thành công được bao nhiêu %? (BOT_DONE / CCC / PENDING / SPAM)"
+      className="xl:col-span-4"
+    >
+      <div className="h-[320px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={chartData}
+              dataKey="value"
+              nameKey="name"
+              cx="50%"
+              cy="50%"
+              innerRadius={55}
+              outerRadius={85}
+              paddingAngle={3}
+              isAnimationActive={false}
+              label={({ percent }) =>
+                percent && percent >= 0.02
+                  ? `${(percent * 100).toFixed(1)}%`
+                  : ""
+              }
+            >
+              {chartData.map((entry, index) => (
+                <Cell key={index} fill={entry.color} />
+              ))}
+            </Pie>
+            <Tooltip content={<ValueTooltip />} />
+            <Legend
+              wrapperStyle={{ fontSize: 11 }}
+              formatter={(value: string, entry: any) => {
+                const item = entry.payload;
+                const pct = total > 0 ? ((item.value / total) * 100).toFixed(1) : "0";
+                return `${value}: ${formatNumber(item.value)} (${pct}%)`;
+              }}
+            />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+    </ChartCard>
+  );
+}
+
+function formatLabelByWords(text: string, maxWords: number = 6) {
+  if (!text) return "";
+  const words = text.trim().split(/\s+/);
+  if (words.length > maxWords) {
+    return `${words.slice(0, maxWords).join(" ")}...`;
+  }
+  return text;
+}
+
+function CustomCategoryAxisTick({ x, y, payload }: any) {
+  const text = payload?.value || "";
+  const formatted = formatLabelByWords(text, 6);
+
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <text x={0} y={0} dy={12} textAnchor="middle" fill="#334155" fontSize={11} fontWeight={600}>
+        {formatted}
+      </text>
+    </g>
+  );
+}
+
+/* ====================================================================
+ * 📊 3. TOP CATEGORY ĐƯỢC HỎI NHIỀU NHẤT (HORIZONTAL BAR & TIME SERIES)
+ * ==================================================================== */
+function TopCategoryHorizontalBarCard({
+  data,
+  multiMonthData,
+}: {
+  data?: any[] | null;
+  multiMonthData?: CccMultiMonthTopicsData | null;
+}) {
+  const [viewMode, setViewMode] = useState<"DEFAULT" | "TIME">("DEFAULT");
+
+  const defaultChartData = useMemo(() => {
+    if (Array.isArray(data) && data.length > 0) {
+      return data.slice(0, 6).map((item) => ({
+        name: item.name,
+        value: item.value,
+      }));
+    }
+    return [];
+  }, [data]);
+
+  const timeSeriesData = useMemo(() => {
+    if (multiMonthData && multiMonthData.data_by_category?.length > 0) {
+      return multiMonthData;
+    }
+    return {
+      month_labels: [],
+      top_categories: [],
+      data_by_category: [],
+    };
+  }, [multiMonthData]);
+
+  const monthLabels = timeSeriesData.month_labels;
+
+  return (
+    <ChartCard
+      title="📊 3. Top Category Khách hàng Hỏi nhiều nhất"
+      description={
+        viewMode === "DEFAULT"
+          ? "Khách hàng đang quan tâm vấn đề gì nhất? (Tổng quan)"
+          : "Trục hoành: Các chủ đề nghiệp vụ | Biến động theo thời gian (phụ thuộc bộ lọc)"
+      }
+      headerRight={
+        <div className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-100 p-0.5 shadow-2xs">
+          <button
+            type="button"
+            onClick={() => setViewMode("DEFAULT")}
+            className={`cursor-pointer px-2.5 py-1 text-xs font-bold rounded-md transition-all ${
+              viewMode === "DEFAULT"
+                ? "bg-[#00713d] text-white shadow-xs"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            Tổng quan
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("TIME")}
+            className={`cursor-pointer px-2.5 py-1 text-xs font-bold rounded-md transition-all ${
+              viewMode === "TIME"
+                ? "bg-[#00713d] text-white shadow-xs"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            📅 Theo thời gian
+          </button>
+        </div>
+      }
+      className="xl:col-span-6"
+    >
+      <div className="h-[330px]">
+        <ResponsiveContainer width="100%" height="100%">
+          {viewMode === "DEFAULT" ? (
+            <BarChart
+              layout="vertical"
+              data={defaultChartData}
+              margin={{ top: 10, right: 45, left: 20, bottom: 5 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis type="number" tick={{ fontSize: 11, fill: "#64748b" }} allowDecimals={false} />
+              <YAxis
+                type="category"
+                dataKey="name"
+                tickFormatter={(val: string) => formatLabelByWords(val, 6)}
+                tick={{ fontSize: 11, fontWeight: 600, fill: "#1e293b" }}
+                width={140}
+              />
+              <Tooltip content={<ValueTooltip />} />
+              <Bar dataKey="value" name="Số lượt hỏi" fill="#0097cf" radius={[0, 4, 4, 0]} barSize={20} isAnimationActive={false}>
+                <LabelList
                   dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={55}
-                  outerRadius={85}
-                  paddingAngle={3}
-                  isAnimationActive={false}
-                  label={({ name, value, percent }) =>
-                    percent && percent >= 0.02
-                      ? `${name}: ${formatNumber(value)} (${(percent * 100).toFixed(1)}%)`
-                      : ""
-                  }
-                >
-                  {periodDonutData.map((entry, index) => (
-                    <Cell key={index} fill={entry.color || COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip content={<ValueTooltip />} />
-                <Legend
-                  wrapperStyle={{ fontSize: 11 }}
-                  formatter={(value: string, entry: any) => {
-                    const item = entry.payload;
-                    const total = periodDonutData.reduce((acc, curr) => acc + curr.value, 0);
-                    const pct = total > 0 ? ((item.value / total) * 100).toFixed(1) : "0";
-                    return `${value}: ${formatNumber(item.value)} (${pct}%)`;
-                  }}
+                  position="right"
+                  style={{ fontSize: 11, fill: "#0284c7", fontWeight: 700 }}
+                  formatter={(val: any) => (val && Number(val) > 0 ? val : "")}
                 />
-              </PieChart>
-            ) : (
-              <ComposedChart
-                data={rawData}
-                onDoubleClick={handleChartClick}
-                onClick={handleChartClick}
-                className="cursor-pointer"
-                margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
-              >
-                <defs>
-                  <linearGradient id="colorBotDoneGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#00713d" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#00713d" stopOpacity={0.0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis dataKey="label" tick={{ fontSize: 11, fontWeight: 600, fill: "#64748b" }} />
-                <YAxis tick={{ fontSize: 11, fill: "#64748b" }} allowDecimals={false} />
-                <Tooltip content={<ValueTooltip />} />
-                <Legend wrapperStyle={{ fontSize: 11, paddingTop: 6 }} />
-                <Area
-                  type="monotone"
-                  dataKey="bot_done"
-                  name="Bot tự xử lý"
-                  fill="url(#colorBotDoneGrad)"
-                  stroke="#00713d"
-                  strokeWidth={2.5}
-                  isAnimationActive={false}
-                />
+              </Bar>
+            </BarChart>
+          ) : (
+            <BarChart
+              data={timeSeriesData.data_by_category}
+              margin={{ top: 20, right: 25, left: -10, bottom: 35 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis
+                dataKey="label"
+                interval={0}
+                tick={<CustomCategoryAxisTick />}
+              />
+              <YAxis tick={{ fontSize: 11, fill: "#64748b" }} allowDecimals={false} />
+              <Tooltip content={<ValueTooltip />} />
+              <Legend wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
+              {monthLabels.map((mLabel, idx) => (
                 <Bar
-                  dataKey="ccc"
-                  name="Chuyển CCC"
-                  fill="#f59e0b"
+                  key={mLabel}
+                  dataKey={mLabel}
+                  name={mLabel}
+                  fill={COLORS[idx % COLORS.length]}
                   radius={[4, 4, 0, 0]}
-                  barSize={24}
                   isAnimationActive={false}
                 >
                   <LabelList
-                    dataKey="ccc"
+                    dataKey={mLabel}
                     position="top"
-                    style={{ fontSize: 10, fill: "#b45309", fontWeight: 700 }}
+                    style={{ fontSize: 9, fill: "#334155", fontWeight: 700 }}
                     formatter={(val: any) => (val && Number(val) > 0 ? val : "")}
                   />
                 </Bar>
-              </ComposedChart>
-            )}
-          </ResponsiveContainer>
-        </div>
-      </ChartCard>
-    </div>
-  );
-}
-
-/* ====================================================================
- * SECTION 2: KÊNH TIẾP NHẬN & ĐỊNH DANH KHÁCH HÀNG
- * ==================================================================== */
-function ChannelDonutChartCard({ data }: { data?: { name: string; value: number }[] | null }) {
-  const chartData = useMemo(() => (Array.isArray(data) ? data.filter((d) => d.value > 0) : []), [data]);
-
-  if (chartData.length === 0) {
-    return <EmptyState message="Không có dữ liệu phân bổ kênh tiếp nhận." />;
-  }
-
-  const total = chartData.reduce((acc, curr) => acc + curr.value, 0);
-
-  return (
-    <ChartCard
-      title="Tỷ trọng Phiên Chatbot theo Kênh (Channel Mix)"
-      description="Cơ cấu lượt hội thoại từ Web Portal, Mobile App, Zalo OA"
-      className="xl:col-span-5"
-    >
-      <div className="h-[320px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie
-              data={chartData}
-              dataKey="value"
-              nameKey="name"
-              cx="50%"
-              cy="50%"
-              innerRadius={55}
-              outerRadius={85}
-              paddingAngle={3}
-              isAnimationActive={false}
-              label={({ name, value, percent }) =>
-                percent && percent >= 0.02
-                  ? `${name}: ${formatNumber(value)} (${(percent * 100).toFixed(1)}%)`
-                  : ""
-              }
-            >
-              {chartData.map((_, index) => (
-                <Cell key={index} fill={COLORS[index % COLORS.length]} />
               ))}
-            </Pie>
-            <Tooltip content={<ValueTooltip />} />
-            <Legend
-              wrapperStyle={{ fontSize: 11 }}
-              formatter={(value: string, entry: any) => {
-                const item = entry.payload;
-                const pct = total > 0 ? ((item.value / total) * 100).toFixed(1) : "0";
-                return `${value}: ${formatNumber(item.value)} (${pct}%)`;
-              }}
-            />
-          </PieChart>
-        </ResponsiveContainer>
-      </div>
-    </ChartCard>
-  );
-}
-
-function CustomerLinkageChartCard({ data }: { data?: CustomerLinkageData | null }) {
-  const chartData = useMemo(() => (data && Array.isArray(data.items) ? data.items : []), [data]);
-
-  if (chartData.length === 0) {
-    return <EmptyState message="Không có dữ liệu định danh khách hàng." />;
-  }
-
-  const total = chartData.reduce((acc, curr) => acc + curr.value, 0);
-
-  return (
-    <ChartCard
-      title="Tỷ lệ Định danh Tài khoản Khách hàng (Linked vs Unlinked)"
-      description="Tỷ lệ phiên gắn liền với số tài khoản chứng khoán đã xác thực"
-      className="xl:col-span-7"
-    >
-      <div className="h-[320px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie
-              data={chartData}
-              dataKey="value"
-              nameKey="name"
-              cx="50%"
-              cy="50%"
-              innerRadius={55}
-              outerRadius={85}
-              paddingAngle={3}
-              isAnimationActive={false}
-              label={({ name, value, percent }) =>
-                percent && percent >= 0.02
-                  ? `${name}: ${formatNumber(value)} (${(percent * 100).toFixed(1)}%)`
-                  : ""
-              }
-            >
-              {chartData.map((entry, index) => (
-                <Cell key={index} fill={entry.color || COLORS[index % COLORS.length]} />
-              ))}
-            </Pie>
-            <Tooltip content={<ValueTooltip />} />
-            <Legend
-              wrapperStyle={{ fontSize: 11 }}
-              formatter={(value: string, entry: any) => {
-                const item = entry.payload;
-                const pct = total > 0 ? ((item.value / total) * 100).toFixed(1) : "0";
-                return `${value}: ${formatNumber(item.value)} (${pct}%)`;
-              }}
-            />
-          </PieChart>
+            </BarChart>
+          )}
         </ResponsiveContainer>
       </div>
     </ChartCard>
@@ -411,96 +509,138 @@ function CustomerLinkageChartCard({ data }: { data?: CustomerLinkageData | null 
 }
 
 /* ====================================================================
- * SECTION 3: PHÂN TÍCH CHỦ ĐỀ & TỶ LỆ CHUYỂN CCC
+ * 📊 4. TỶ LỆ CHUYỂN CCC THEO CATEGORY (HORIZONTAL BAR & TIME SERIES)
  * ==================================================================== */
-function TopicTransferRateChartCard({ data }: { data?: TopicTransferRateItem[] | null }) {
-  const chartData = useMemo(() => (Array.isArray(data) ? data.slice(0, 10) : []), [data]);
+function CategoryCccRateHorizontalBarCard({
+  data,
+  multiMonthData,
+}: {
+  data?: CategoryCccRateItem[] | null;
+  multiMonthData?: CccMultiMonthTopicsData | null;
+}) {
+  const [viewMode, setViewMode] = useState<"DEFAULT" | "TIME">("DEFAULT");
 
-  if (chartData.length === 0) {
-    return <EmptyState message="Không có dữ liệu tỷ lệ chuyển CCC theo chủ đề." />;
-  }
+  const defaultChartData = useMemo(() => {
+    if (Array.isArray(data) && data.length > 0) {
+      return data.slice(0, 6).map((item) => ({
+        name: item.name,
+        ccc: item.ccc,
+        total: item.total,
+        rate: item.rate,
+      }));
+    }
+    return [];
+  }, [data]);
+
+  const timeSeriesData = useMemo(() => {
+    if (multiMonthData && multiMonthData.data_by_category?.length > 0) {
+      return multiMonthData;
+    }
+    return {
+      month_labels: [],
+      top_categories: [],
+      data_by_category: [],
+    };
+  }, [multiMonthData]);
+
+  const monthLabels = timeSeriesData.month_labels;
 
   return (
     <ChartCard
-      title="Tỷ lệ Chuyển CCC theo Chủ đề Nghiệp vụ"
-      description="So sánh lượt Chatbot tự xử lý vs Chuyển tư vấn viên CCC cho top các nhóm chủ đề"
-      className="xl:col-span-6"
-    >
-      <div className="h-[320px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart
-            data={chartData}
-            layout="vertical"
-            margin={{ top: 5, right: 20, left: 40, bottom: 5 }}
+      title="📊 4. Số lượt Chuyển CCC theo Category"
+      description={
+        viewMode === "DEFAULT"
+          ? "Biết số lượt phiên chuyển CCC hỗ trợ cho từng chủ đề nghiệp vụ"
+          : "Trục hoành: Các chủ đề nghiệp vụ | Số lượt chuyển CCC theo thời gian (phụ thuộc bộ lọc)"
+      }
+      headerRight={
+        <div className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-100 p-0.5 shadow-2xs">
+          <button
+            type="button"
+            onClick={() => setViewMode("DEFAULT")}
+            className={`cursor-pointer px-2.5 py-1 text-xs font-bold rounded-md transition-all ${
+              viewMode === "DEFAULT"
+                ? "bg-[#00713d] text-white shadow-xs"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
           >
-            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
-            <XAxis type="number" tick={{ fontSize: 10, fill: "#64748b" }} allowDecimals={false} />
-            <YAxis
-              dataKey="category"
-              type="category"
-              width={140}
-              tick={{ fontSize: 10, fill: "#334155", fontWeight: 600 }}
-              interval={0}
-            />
-            <Tooltip content={<ValueTooltip />} />
-            <Legend wrapperStyle={{ fontSize: 11 }} />
-            <Bar dataKey="bot_done" name="Bot tự xử lý" stackId="topic" fill="#00713d" isAnimationActive={false} />
-            <Bar dataKey="ccc" name="Chuyển CCC" stackId="topic" fill="#f59e0b" radius={[0, 4, 4, 0]} isAnimationActive={false} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-    </ChartCard>
-  );
-}
-
-function CccTopicDonutChartCard({ data }: { data?: { name: string; value: number }[] | null }) {
-  const chartData = useMemo(() => (Array.isArray(data) ? data.filter((d) => d.value > 0) : []), [data]);
-
-  if (chartData.length === 0) {
-    return <EmptyState message="Không có dữ liệu chủ đề ticket chuyển CCC." />;
-  }
-
-  const total = chartData.reduce((acc, curr) => acc + curr.value, 0);
-
-  return (
-    <ChartCard
-      title="Cơ cấu Chủ đề Ticket Yêu cầu CCC Hỗ trợ"
-      description="Phân bổ nghiệp vụ chuyên sâu đối với các yêu cầu không giải quyết được bằng Chatbot"
+            Tổng quan
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("TIME")}
+            className={`cursor-pointer px-2.5 py-1 text-xs font-bold rounded-md transition-all ${
+              viewMode === "TIME"
+                ? "bg-[#00713d] text-white shadow-xs"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            📅 Theo thời gian
+          </button>
+        </div>
+      }
       className="xl:col-span-6"
     >
-      <div className="h-[320px]">
+      <div className="h-[330px]">
         <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie
-              data={chartData}
-              dataKey="value"
-              nameKey="name"
-              cx="50%"
-              cy="50%"
-              innerRadius={55}
-              outerRadius={85}
-              paddingAngle={3}
-              isAnimationActive={false}
-              label={({ name, value, percent }) =>
-                percent && percent >= 0.02
-                  ? `${name}: ${formatNumber(value)} (${(percent * 100).toFixed(1)}%)`
-                  : ""
-              }
+          {viewMode === "DEFAULT" ? (
+            <BarChart
+              layout="vertical"
+              data={defaultChartData}
+              margin={{ top: 10, right: 45, left: 20, bottom: 5 }}
             >
-              {chartData.map((_, index) => (
-                <Cell key={index} fill={COLORS[index % COLORS.length]} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis type="number" tick={{ fontSize: 11, fill: "#64748b" }} allowDecimals={false} />
+              <YAxis
+                type="category"
+                dataKey="name"
+                tickFormatter={(val: string) => formatLabelByWords(val, 6)}
+                tick={{ fontSize: 11, fontWeight: 600, fill: "#1e293b" }}
+                width={140}
+              />
+              <Tooltip content={<ValueTooltip />} />
+              <Bar dataKey="ccc" name="Số lượt chuyển CCC" fill="#f59e0b" radius={[0, 4, 4, 0]} barSize={20} isAnimationActive={false}>
+                <LabelList
+                  dataKey="ccc"
+                  position="right"
+                  style={{ fontSize: 11, fill: "#b45309", fontWeight: 700 }}
+                  formatter={(val: any) => (val && Number(val) > 0 ? val : "")}
+                />
+              </Bar>
+            </BarChart>
+          ) : (
+            <BarChart
+              data={timeSeriesData.data_by_category}
+              margin={{ top: 20, right: 25, left: -10, bottom: 35 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis
+                dataKey="label"
+                interval={0}
+                tick={<CustomCategoryAxisTick />}
+              />
+              <YAxis tick={{ fontSize: 11, fill: "#64748b" }} allowDecimals={false} />
+              <Tooltip content={<ValueTooltip />} />
+              <Legend wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
+              {monthLabels.map((mLabel, idx) => (
+                <Bar
+                  key={mLabel}
+                  dataKey={mLabel}
+                  name={mLabel}
+                  fill={COLORS[idx % COLORS.length]}
+                  radius={[4, 4, 0, 0]}
+                  isAnimationActive={false}
+                >
+                  <LabelList
+                    dataKey={mLabel}
+                    position="top"
+                    style={{ fontSize: 9, fill: "#334155", fontWeight: 700 }}
+                    formatter={(val: any) => (val && Number(val) > 0 ? val : "")}
+                  />
+                </Bar>
               ))}
-            </Pie>
-            <Tooltip content={<ValueTooltip />} />
-            <Legend
-              wrapperStyle={{ fontSize: 11 }}
-              formatter={(value: string, entry: any) => {
-                const item = entry.payload;
-                const pct = total > 0 ? ((item.value / total) * 100).toFixed(1) : "0";
-                return `${value}: ${formatNumber(item.value)} (${pct}%)`;
-              }}
-            />
-          </PieChart>
+            </BarChart>
+          )}
         </ResponsiveContainer>
       </div>
     </ChartCard>
@@ -508,99 +648,45 @@ function CccTopicDonutChartCard({ data }: { data?: { name: string; value: number
 }
 
 /* ====================================================================
- * SECTION 4: TUÂN THỦ SLA & KHUNG GIỜ CAO ĐIỂM
+ * 🔻 5. FUNNEL CHUYỂN ĐỔI CHATBOT → TICKET → CCC (FUNNEL CHART)
  * ==================================================================== */
-function SlaTrendChartCard({ data }: { data?: SlaComplianceTrend | null }) {
-  const chartData = useMemo(() => (data && Array.isArray(data.items) ? data.items : []), [data]);
-
-  if (chartData.length === 0) {
-    return <EmptyState message="Không có dữ liệu tuân thủ SLA." />;
-  }
-
-  const total = chartData.reduce((acc, curr) => acc + curr.value, 0);
-
+function ChatbotFunnelChartCard({ data }: { data?: FunnelStepItem[] | null }) {
   return (
     <ChartCard
-      title="Tỷ lệ Tuân thủ SLA Ticket Chatbot (SLA Compliance)"
-      description={`Tổng số Ticket CCC: ${formatNumber(data?.total_tickets || 0)} - Tỷ lệ đạt đúng hạn: ${
-        data?.on_time_rate || 0
-      }%`}
+      title="🔻 5. Funnel Chuyển đổi Chatbot → Ticket → CCC"
+      description="Theo dõi tỷ lệ rơi rớt (drop-off) qua 6 bước nghiệp vụ từ tiếp nhận tới xử lý xong"
       className="xl:col-span-6"
     >
-      <div className="h-[320px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie
-              data={chartData}
-              dataKey="value"
-              nameKey="name"
-              cx="50%"
-              cy="50%"
-              innerRadius={55}
-              outerRadius={85}
-              paddingAngle={3}
-              isAnimationActive={false}
-              label={({ name, value, percent }) =>
-                percent && percent >= 0.02
-                  ? `${name}: ${formatNumber(value)} (${(percent * 100).toFixed(1)}%)`
-                  : ""
-              }
-            >
-              {chartData.map((entry, index) => (
-                <Cell key={index} fill={entry.color || COLORS[index % COLORS.length]} />
-              ))}
-            </Pie>
-            <Tooltip content={<ValueTooltip />} />
-            <Legend
-              wrapperStyle={{ fontSize: 11 }}
-              formatter={(value: string, entry: any) => {
-                const item = entry.payload;
-                const pct = total > 0 ? ((item.value / total) * 100).toFixed(1) : "0";
-                return `${value}: ${formatNumber(item.value)} (${pct}%)`;
-              }}
-            />
-          </PieChart>
-        </ResponsiveContainer>
+      <div className="min-h-[320px] flex items-center justify-center">
+        <FunnelChartComponent data={data} />
       </div>
     </ChartCard>
   );
 }
 
+/* ====================================================================
+ * 🕒 6. SESSION THEO KHUNG GIỜ TRONG NGÀY (HOURLY PEAK)
+ * ==================================================================== */
 function HourlyPeakChartCard({ data }: { data?: HourlyPeakItem[] | null }) {
-  const chartData = useMemo(() => (Array.isArray(data) ? data : []), [data]);
-
-  if (chartData.length === 0) {
-    return <EmptyState message="Không có dữ liệu khung giờ cao điểm." />;
-  }
-
-  const peakHour = chartData.reduce(
-    (best, item) => (item.total > best.total ? item : best),
-    chartData[0]
-  );
+  const chartData = useMemo(() => {
+    if (Array.isArray(data) && data.length > 0) return data;
+    return [];
+  }, [data]);
 
   return (
     <ChartCard
-      title="Khung giờ Cao điểm trong ngày (24-Hour Peak Hours)"
-      description={`Phân bổ 24h hội thoại. Khung giờ cao nhất: ${peakHour?.label || "-"} (${formatNumber(
-        peakHour?.total || 0
-      )} phiên)`}
+      title="🕒 6. Session theo Khung Giờ trong Ngày (0h - 23h)"
+      description="Xác định các khoảng thời gian bùng nổ lượng chat để chủ động bố trí nhân sự CCC"
       className="xl:col-span-6"
     >
       <div className="h-[320px]">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={chartData} margin={{ top: 15, right: 10, left: -15, bottom: 0 }} barCategoryGap="20%">
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-            <XAxis dataKey="label" tickLine={false} axisLine={false} interval={2} tick={{ fontSize: 10, fill: "#64748b" }} />
-            <YAxis tickLine={false} axisLine={false} allowDecimals={false} tick={{ fontSize: 10, fill: "#94a3b8" }} />
+          <BarChart data={chartData} margin={{ top: 15, right: 15, left: -15, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+            <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#334155" }} interval={1} />
+            <YAxis tick={{ fontSize: 11, fill: "#64748b" }} allowDecimals={false} />
             <Tooltip content={<ValueTooltip />} />
-            <Bar dataKey="total" name="Tổng hội thoại" radius={[6, 6, 0, 0]} isAnimationActive={false}>
-              {chartData.map((entry) => (
-                <Cell
-                  key={entry.hour}
-                  fill={entry.total === peakHour.total && entry.total > 0 ? "#00713d" : "#0097cf"}
-                />
-              ))}
-            </Bar>
+            <Bar dataKey="count" name="Số lượt chat" fill="#00713d" radius={[4, 4, 0, 0]} isAnimationActive={false} />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -608,38 +694,335 @@ function HourlyPeakChartCard({ data }: { data?: HourlyPeakItem[] | null }) {
   );
 }
 
-function AvgHandlingTimeChartCard({ data }: { data?: AvgHandlingTimes | null }) {
-  if (!data) {
-    return <EmptyState message="Không có dữ liệu thời gian xử lý trung bình." />;
-  }
+function CustomYAxisReasonTick({ x, y, payload }: any) {
+  const text = payload?.value || "";
+  const formatted = formatLabelByWords(text, 6);
 
-  const chartData = [
-    { name: "Chatbot xử lý (Phút)", value: data.avg_bot_duration_min, fill: "#00713d" },
-    { name: "CCC Phản hồi đầu tiên (Phút)", value: data.avg_response_time_min, fill: "#0097cf" },
-    { name: "CCC Hoàn tất giải quyết (Phút)", value: data.avg_resolution_time_min, fill: "#f59e0b" },
-  ];
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <text x={-6} y={4} textAnchor="end" fill="#1e293b" fontSize={11} fontWeight={600}>
+        {formatted}
+      </text>
+    </g>
+  );
+}
+
+/* ====================================================================
+ * 📊 7. TOP LÝ DO CHUYỂN CCC (HORIZONTAL BAR & TIME SERIES)
+ * ==================================================================== */
+function TopReasonHorizontalBarCard({
+  data,
+  multiPeriodData,
+}: {
+  data?: any[] | null;
+  multiPeriodData?: CccMultiMonthTopicsData | null;
+}) {
+  const [viewMode, setViewMode] = useState<"DEFAULT" | "TIME">("DEFAULT");
+
+  const defaultChartData = useMemo(() => {
+    if (Array.isArray(data) && data.length > 0) {
+      return data.slice(0, 6).map((item) => ({
+        name: item.name,
+        value: item.value,
+      }));
+    }
+    return [];
+  }, [data]);
+
+  const timeSeriesData = useMemo(() => {
+    if (multiPeriodData && multiPeriodData.data_by_category?.length > 0) {
+      return multiPeriodData;
+    }
+    return {
+      month_labels: [],
+      top_categories: [],
+      data_by_category: [],
+    };
+  }, [multiPeriodData]);
+
+  const monthLabels = timeSeriesData.month_labels;
 
   return (
     <ChartCard
-      title="Thời gian Phản hồi & Giải quyết Trung bình (Handling Times)"
-      description="So sánh thời gian hội thoại Chatbot vs Thời gian phản hồi & giải quyết ticket của CCC"
+      title="📊 7. Top Lý do Chuyển CCC"
+      description={
+        viewMode === "DEFAULT"
+          ? "Dựa vào trường reason để tìm điểm nghẽn và cải tiến kịch bản Chatbot"
+          : "Trục hoành: Các lý do chuyển CCC | Biến động theo thời gian (phụ thuộc bộ lọc)"
+      }
+      headerRight={
+        <div className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-100 p-0.5 shadow-2xs">
+          <button
+            type="button"
+            onClick={() => setViewMode("DEFAULT")}
+            className={`cursor-pointer px-2.5 py-1 text-xs font-bold rounded-md transition-all ${
+              viewMode === "DEFAULT"
+                ? "bg-[#00713d] text-white shadow-xs"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            Tổng quan
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("TIME")}
+            className={`cursor-pointer px-2.5 py-1 text-xs font-bold rounded-md transition-all ${
+              viewMode === "TIME"
+                ? "bg-[#00713d] text-white shadow-xs"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            📅 Theo thời gian
+          </button>
+        </div>
+      }
+      className="xl:col-span-6"
+    >
+      <div className="h-[330px]">
+        <ResponsiveContainer width="100%" height="100%">
+          {viewMode === "DEFAULT" ? (
+            <BarChart
+              layout="vertical"
+              data={defaultChartData}
+              margin={{ top: 10, right: 45, left: 10, bottom: 5 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis type="number" tick={{ fontSize: 11, fill: "#64748b" }} allowDecimals={false} />
+              <YAxis
+                type="category"
+                dataKey="name"
+                interval={0}
+                tick={<CustomYAxisReasonTick />}
+                width={180}
+              />
+              <Tooltip content={<ValueTooltip />} />
+              <Bar dataKey="value" name="Số phiên" fill="#8b5cf6" radius={[0, 4, 4, 0]} barSize={18} isAnimationActive={false}>
+                <LabelList
+                  dataKey="value"
+                  position="right"
+                  style={{ fontSize: 11, fill: "#6d28d9", fontWeight: 700 }}
+                  formatter={(val: any) => (val && Number(val) > 0 ? val : "")}
+                />
+              </Bar>
+            </BarChart>
+          ) : (
+            <BarChart
+              data={timeSeriesData.data_by_category}
+              margin={{ top: 25, right: 25, left: -10, bottom: 45 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis
+                dataKey="label"
+                interval={0}
+                tick={<CustomCategoryAxisTick />}
+              />
+              <YAxis tick={{ fontSize: 11, fill: "#64748b" }} allowDecimals={false} />
+              <Tooltip content={<ValueTooltip />} />
+              <Legend wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
+              {monthLabels.map((mLabel, idx) => (
+                <Bar
+                  key={mLabel}
+                  dataKey={mLabel}
+                  name={mLabel}
+                  fill={COLORS[idx % COLORS.length]}
+                  radius={[4, 4, 0, 0]}
+                  isAnimationActive={false}
+                >
+                  <LabelList
+                    dataKey={mLabel}
+                    position="top"
+                    style={{ fontSize: 9, fill: "#334155", fontWeight: 700 }}
+                    formatter={(val: any) => (val && Number(val) > 0 ? val : "")}
+                  />
+                </Bar>
+              ))}
+            </BarChart>
+          )}
+        </ResponsiveContainer>
+      </div>
+    </ChartCard>
+  );
+}
+
+/* ====================================================================
+ * 📊 8. HIỆU QUẢ THEO CHANNEL (GROUPED BAR & TIME SERIES)
+ * ==================================================================== */
+function ChannelPerformanceBarCard({
+  data,
+  multiPeriodData,
+}: {
+  data?: ChannelPerformanceItem[] | null;
+  multiPeriodData?: CccMultiMonthTopicsData | null;
+}) {
+  const [viewMode, setViewMode] = useState<"DEFAULT" | "TIME">("DEFAULT");
+
+  const defaultChartData = useMemo(() => {
+    if (Array.isArray(data) && data.length > 0) return data;
+    return [];
+  }, [data]);
+
+  const timeSeriesData = useMemo(() => {
+    if (multiPeriodData && multiPeriodData.data_by_category?.length > 0) {
+      return multiPeriodData;
+    }
+    return {
+      month_labels: [],
+      top_categories: [],
+      data_by_category: [],
+    };
+  }, [multiPeriodData]);
+
+  const monthLabels = timeSeriesData.month_labels;
+
+  return (
+    <ChartCard
+      title="📊 Hiệu quả theo Channel (Web / App / Zalo / Facebook)"
+      description={
+        viewMode === "DEFAULT"
+          ? "Đánh giá kịch bản Chatbot hoạt động tốt nhất trên kênh giao tiếp nào"
+          : "Trục hoành: Các kênh giao tiếp | Số phiên theo thời gian (phụ thuộc bộ lọc)"
+      }
+      headerRight={
+        <div className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-100 p-0.5 shadow-2xs">
+          <button
+            type="button"
+            onClick={() => setViewMode("DEFAULT")}
+            className={`cursor-pointer px-2.5 py-1 text-xs font-bold rounded-md transition-all ${
+              viewMode === "DEFAULT"
+                ? "bg-[#00713d] text-white shadow-xs"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            Tổng quan
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("TIME")}
+            className={`cursor-pointer px-2.5 py-1 text-xs font-bold rounded-md transition-all ${
+              viewMode === "TIME"
+                ? "bg-[#00713d] text-white shadow-xs"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            📅 Theo thời gian
+          </button>
+        </div>
+      }
+      className="xl:col-span-6"
+    >
+      <div className="h-[330px]">
+        <ResponsiveContainer width="100%" height="100%">
+          {viewMode === "DEFAULT" ? (
+            <BarChart data={defaultChartData} margin={{ top: 20, right: 25, left: 0, bottom: 15 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis dataKey="name" tick={{ fontSize: 11, fontWeight: 600, fill: "#334155" }} />
+              <YAxis tick={{ fontSize: 11, fill: "#64748b" }} allowDecimals={false} />
+              <Tooltip content={<ValueTooltip />} />
+              <Legend wrapperStyle={{ fontSize: 11, paddingTop: 6 }} />
+              <Bar dataKey="bot_done" name="Bot xử lý (phiên)" fill="#00713d" radius={[4, 4, 0, 0]} barSize={22} isAnimationActive={false}>
+                <LabelList
+                  dataKey="bot_done"
+                  position="top"
+                  style={{ fontSize: 9, fill: "#00713d", fontWeight: 700 }}
+                  formatter={(val: any) => (val && Number(val) > 0 ? val : "")}
+                />
+              </Bar>
+              <Bar dataKey="ccc" name="Chuyển CCC (phiên)" fill="#f59e0b" radius={[4, 4, 0, 0]} barSize={22} isAnimationActive={false}>
+                <LabelList
+                  dataKey="ccc"
+                  position="top"
+                  style={{ fontSize: 9, fill: "#b45309", fontWeight: 700 }}
+                  formatter={(val: any) => (val && Number(val) > 0 ? val : "")}
+                />
+              </Bar>
+            </BarChart>
+          ) : (
+            <BarChart
+              data={timeSeriesData.data_by_category}
+              margin={{ top: 20, right: 25, left: -10, bottom: 35 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis
+                dataKey="label"
+                interval={0}
+                tick={<CustomCategoryAxisTick />}
+              />
+              <YAxis tick={{ fontSize: 11, fill: "#64748b" }} allowDecimals={false} />
+              <Tooltip content={<ValueTooltip />} />
+              <Legend wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
+              {monthLabels.map((mLabel, idx) => (
+                <Bar
+                  key={mLabel}
+                  dataKey={mLabel}
+                  name={mLabel}
+                  fill={COLORS[idx % COLORS.length]}
+                  radius={[4, 4, 0, 0]}
+                  isAnimationActive={false}
+                >
+                  <LabelList
+                    dataKey={mLabel}
+                    position="top"
+                    style={{ fontSize: 9, fill: "#334155", fontWeight: 700 }}
+                    formatter={(val: any) => (val && Number(val) > 0 ? val : "")}
+                  />
+                </Bar>
+              ))}
+            </BarChart>
+          )}
+        </ResponsiveContainer>
+      </div>
+    </ChartCard>
+  );
+}
+
+/* ====================================================================
+ * 📋 8. TOP CÂU HỎI PHỔ BIẾN (TABLE)
+ * ==================================================================== */
+function TopFaqTableCard({ faqs }: { faqs?: ChatbotFaqItem[] | null }) {
+  const list = useMemo(() => {
+    if (Array.isArray(faqs) && faqs.length > 0) return faqs;
+    return [];
+  }, [faqs]);
+
+  return (
+    <ChartCard
+      title="📋 8. Top Câu hỏi Phổ biến (Knowledge Base)"
+      description="Danh sách các câu hỏi thường gặp nhất làm cơ sở xây dựng bộ tri thức Chatbot"
       className="xl:col-span-12"
     >
-      <div className="h-[280px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={chartData} margin={{ top: 15, right: 30, left: 20, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-            <XAxis dataKey="name" tick={{ fontSize: 11, fontWeight: 600, fill: "#334155" }} />
-            <YAxis tick={{ fontSize: 10, fill: "#94a3b8" }} />
-            <Tooltip content={<ValueTooltip />} />
-            <Bar dataKey="value" name="Thời gian trung bình (Phút)" radius={[6, 6, 0, 0]} isAnimationActive={false}>
-              {chartData.map((entry, index) => (
-                <Cell key={index} fill={entry.fill} />
-              ))}
-              <LabelList dataKey="value" position="top" style={{ fontSize: 11, fill: "#334155", fontWeight: 700 }} />
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-xs border-collapse">
+          <thead>
+            <tr className="border-b border-slate-200 bg-slate-50 text-slate-700">
+              <th className="py-2.5 px-4 font-bold">#</th>
+              <th className="py-2.5 px-4 font-bold">Chủ đề / Câu hỏi</th>
+              <th className="py-2.5 px-4 font-bold text-right">Số lần hỏi</th>
+              <th className="py-2.5 px-4 font-bold text-right">Số phiên</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {list.length > 0 ? (
+              list.map((item, idx) => (
+                <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
+                  <td className="py-2.5 px-4 font-semibold text-slate-500">{idx + 1}</td>
+                  <td className="py-2.5 px-4 font-bold text-slate-800">{item.category}</td>
+                  <td className="py-2.5 px-4 font-extrabold text-sky-700 text-right">
+                    {formatNumber(item.hit_count)}
+                  </td>
+                  <td className="py-2.5 px-4 font-semibold text-slate-600 text-right">
+                    {formatNumber(item.session_count)}
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={4} className="py-6 text-center text-slate-400 font-medium">
+                  Chưa có dữ liệu câu hỏi phổ biến
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </ChartCard>
   );
@@ -650,39 +1033,63 @@ function AvgHandlingTimeChartCard({ data }: { data?: AvgHandlingTimes | null }) 
  * ==================================================================== */
 export function ChatbotDashboardCharts({
   charts,
-  granularity = "day",
+  granularity = "month",
   onGranularityChange,
+  faqs,
 }: {
   charts: ChatbotOverviewCharts;
   granularity?: GranularityMode;
   onGranularityChange?: (mode: GranularityMode) => void;
+  faqs?: ChatbotFaqItem[];
 }) {
   return (
     <div className="space-y-6">
-      {/* SECTION 1: XU HƯỚNG TỰ ĐỘNG HÓA */}
+      {/* SECTION 1: XU HƯỚNG TỰ ĐỘNG HÓA (BOT TỰ XỬ LÝ VS CHUYỂN CCC) */}
       <AutomationTrendChartCard
         data={charts.time_series_outcomes}
         granularity={granularity}
         onGranularityChange={onGranularityChange}
       />
 
-      {/* SECTION 2: PHÂN TÍCH CHỦ ĐỀ NGHIỆP VỤ & TỶ LỆ CHUYỂN CCC */}
+      {/* SECTION 2: XU HƯỚNG SESSION & KẾT QUẢ XỬ LÝ */}
       <div className="grid gap-4 xl:grid-cols-12">
-        <TopicTransferRateChartCard data={charts.topic_transfer_rates} />
-        <CccTopicDonutChartCard data={charts.ccc_issue_pie} />
+        <SessionTrendLineChartCard data={charts.time_series_outcomes} />
+        <OutcomeDonutChartCard processClassification={charts.process_classification} />
       </div>
 
-      {/* SECTION 3: KHUNG GIỜ CAO ĐIỂM & TUÂN THỦ SLA */}
+      {/* SECTION 3: PHÂN TÍCH CATEGORY & TỶ LỆ CHUYỂN CCC */}
       <div className="grid gap-4 xl:grid-cols-12">
-        <SlaTrendChartCard data={charts.sla_compliance_trend} />
-        <HourlyPeakChartCard data={charts.hourly_peak_chart} />
+        <TopCategoryHorizontalBarCard
+          data={charts.topic_bar}
+          multiMonthData={charts.all_topic_multi_month}
+        />
+        <CategoryCccRateHorizontalBarCard
+          data={charts.category_ccc_rate}
+          multiMonthData={charts.ccc_multi_month_topics}
+        />
       </div>
 
-      {/* SECTION 4: KÊNH TIẾP NHẬN, ĐỊNH DANH KHÁCH HÀNG & THỜI GIAN XỬ LÝ */}
+      {/* SECTION 4: FUNNEL CHUYỂN ĐỔI & HOURLY PEAK */}
       <div className="grid gap-4 xl:grid-cols-12">
-        <ChannelDonutChartCard data={charts.channel_distribution} />
-        <CustomerLinkageChartCard data={charts.customer_linkage} />
-        <AvgHandlingTimeChartCard data={charts.avg_handling_times} />
+        <ChatbotFunnelChartCard data={charts.chat_funnel} />
+        <HourlyPeakChartCard data={charts.hourly_peak} />
+      </div>
+
+      {/* SECTION 5: PHÂN TÍCH LÝ DO & HIỆU QUẢ CHANNEL */}
+      <div className="grid gap-4 xl:grid-cols-12">
+        <TopReasonHorizontalBarCard
+          data={charts.top_reasons}
+          multiPeriodData={charts.top_reasons_multi_period}
+        />
+        <ChannelPerformanceBarCard
+          data={charts.channel_performance}
+          multiPeriodData={charts.channel_performance_multi_period}
+        />
+      </div>
+
+      {/* SECTION 6: TOP CÂU HỎI PHỔ BIẾN (TABLE) */}
+      <div className="grid gap-4 xl:grid-cols-12">
+        <TopFaqTableCard faqs={faqs} />
       </div>
     </div>
   );
