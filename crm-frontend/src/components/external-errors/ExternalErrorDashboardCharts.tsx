@@ -368,6 +368,7 @@ export const ExternalErrorDashboardCharts = memo(function ExternalErrorDashboard
 }) {
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+      <RecurringIssuesTable items={recurringIssues} />
       <HorizontalBarChart
         chart={charts.byDevice}
         title="Số lượng lỗi theo thiết bị"
@@ -414,7 +415,7 @@ export const ExternalErrorDashboardCharts = memo(function ExternalErrorDashboard
         horizontal
       />
 
-      <RecurringIssuesTable items={recurringIssues} />
+
     </div>
   );
 });

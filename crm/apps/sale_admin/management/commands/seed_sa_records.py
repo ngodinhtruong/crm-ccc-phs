@@ -1,14 +1,16 @@
-import random
-from datetime import date, datetime, timedelta
+from collections import Counter
+from datetime import datetime, time, timedelta
+from decimal import Decimal
 
-from django.contrib.auth import get_user_model
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
+from django.db.models import Sum
 from django.utils import timezone
 
-from apps.accounts.models import UserRole
-from apps.branches.models import Branch, Employee
-from apps.customers.models import Customer, CustomerAccount
+from apps.accounts.models import User
+from apps.branches.models import Employee
+from apps.customers.models import CustomerAccount
+from apps.kpis.models import TransactionLog
 from apps.sale_admin.models import (
     SaCallResult,
     SaIcpGroup,
@@ -16,254 +18,319 @@ from apps.sale_admin.models import (
     SaRecord,
 )
 
-User = get_user_model()
 
-
-# Mẫu ghi chú đa dạng cho từng loại cuộc gọi
-ANSWERED_NOTES = [
-    "KH quan tâm gói sản phẩm Margin ưu đãi 8.8%, đề nghị gửi bảng phí qua Zalo.",
-    "KH phản hồi thị trường biến động nên tạm dừng giao dịch, hẹn gọi lại vào tuần sau.",
-    "Đã hướng dẫn KH thao tác tái kích hoạt tài khoản thành công qua ứng dụng.",
-    "KH hỏi về điều kiện nâng hạng VIP và chính sách giảm phí giao dịch.",
-    "KH cần hỗ trợ đăng ký mở tài khoản Ký quỹ (Margin) trực tuyến.",
-    "Đã tư vấn dịch vụ tư vấn đầu tư chuyên sâu, KH hào hứng và hẹn gặp trực tiếp.",
-    "KH có nhu cầu rút vốn chuyển kênh đầu tư khác, SA đã tư vấn giữ chân.",
-    "KH phản hồi hệ thống đặt lệnh nhanh chóng, sẽ tiếp tục giao dịch thường xuyên.",
-    "KH bận họp, yêu cầu SA liên hệ lại sau 17h00 cùng ngày.",
-    "Đã tư vấn gói Margin T+3, KH đồng ý trải nghiệm thử với quy mô tài sản nhỏ.",
-    "KH thắc mắc về lịch sao kê tài khoản và thuế TNCN giao dịch chứng khoán.",
-    "KH cần môi giới hỗ trợ tư vấn danh mục đầu tư dài hạn.",
+SA_EMPLOYEE_CODES = [
+    "HOQ7_SA_STAFF",
+    "Q1_SA_STAFF",
+    "Q3_SA_STAFF",
+    "TB_SA_STAFF",
+    "TX_SA_STAFF",
+    "HN_SA_STAFF",
+    "HP_SA_STAFF",
 ]
 
-NO_ANSWER_NOTES = [
-    "Số điện thoại đổ chuông nhưng không có người nghe máy. Đã gọi 2 lần.",
-    "Máy bận. Đã gửi tin nhắn Zalo chăm sóc tự động.",
-    "KH không bắt máy, hẹn thử liên hệ lại vào khung giờ chiều.",
-    "Cuộc gọi bị hủy giữa chừng từ phía khách hàng.",
+MATCHED_STATUSES = [
+    "MATCHED",
+    "PARTIALLY_MATCHED",
+    "COMPLETED",
 ]
-
-INVALID_NOTES = [
-    "Số điện thoại báo thuê bao không liên lạc được.",
-    "Số máy không tồn tại hoặc đã thay đổi chủ sở hữu.",
-    "Không thể kết nối tổng đài tới số điện thoại này.",
-]
-
-BROKER_HANDOVER_NOTES = [
-    "Bàn giao KH VIP cho Broker chuyên trách hỗ trợ giao dịch lớn.",
-    "Chuyển Broker quản lý danh mục theo yêu cầu trực tiếp của KH.",
-    "Bàn giao chi nhánh hỗ trợ làm thủ tục thay đổi thông tin hợp đồng.",
-]
-
-ACCOUNT_STATUSES = ["ACTIVE", "INACTIVE", "DORMANT", "NEW_OPENED"]
-VIP_CLASSES = ["NORMAL", "SILVER", "GOLD", "PLATINUM", "DIAMOND"]
-
-# Phân bổ số lượng record từng tháng từ T1 -> T7 năm 2026 (Tổng = 185 record < 200)
-MONTHLY_COUNTS = {
-    1: 18,
-    2: 22,
-    3: 35,
-    4: 25,
-    5: 30,
-    6: 28,
-    7: 27,
-}
 
 
 class Command(BaseCommand):
-    help = "Seed ~185 SA Records phân bổ từ đầu năm 2026 (T1->T7), đầy đủ các chi nhánh & nhân viên SA."
+    help = (
+        "Tạo 50 SaRecord khớp với CustomerAccount và TransactionLog, "
+        "phân đều cho SA tại tất cả chi nhánh."
+    )
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "--clear",
+            "--count",
+            type=int,
+            default=50,
+            help="Số tài khoản cần tạo SaRecord, mặc định 50.",
+        )
+        parser.add_argument(
+            "--reactivated",
+            type=int,
+            default=30,
+            help="Số tài khoản tái kích hoạt thành công, mặc định 30.",
+        )
+        parser.add_argument(
+            "--reset",
             action="store_true",
-            help="Xóa toàn bộ SaRecord hiện có trước khi seed.",
+            help="Xóa các SaRecord có mã FAKE-SA-HSQ7-* trước khi tạo lại.",
         )
 
+    @transaction.atomic
     def handle(self, *args, **options):
-        if options["clear"]:
-            count = SaRecord.objects.count()
-            SaRecord.objects.all().delete()
-            self.stdout.write(self.style.WARNING(f"Da xoa {count} SaRecord cu."))
+        count = options["count"]
+        reactivated_count = options["reactivated"]
+        reset = options["reset"]
 
-        self.stdout.write("Bat dau khoi tao du lieu SaRecord...")
+        if count <= 0:
+            raise CommandError("--count phải lớn hơn 0.")
 
-        # Lấy Master Data
-        call_results = {cr.result_code: cr for cr in SaCallResult.objects.all()}
-        interest_levels = {il.level_code: il for il in SaInterestLevel.objects.all()}
-        icp_groups = {icp.icp_code: icp for icp in SaIcpGroup.objects.all()}
+        if reactivated_count < 0 or reactivated_count > count:
+            raise CommandError("--reactivated phải nằm trong khoảng từ 0 đến --count.")
 
-        if not call_results or not interest_levels or not icp_groups:
-            self.stdout.write(self.style.ERROR("Thiếu master data SA. Hãy chạy `python manage.py seed_sa_record_master` trước."))
-            return
+        sa_staff = self.get_sa_staff()
 
-        branches = list(Branch.objects.all())
+        call_results = list(SaCallResult.objects.all().order_by("id"))
+        interest_levels = list(SaInterestLevel.objects.all().order_by("id"))
+        icp_groups = list(SaIcpGroup.objects.all().order_by("id"))
 
-        if not branches:
-            self.stdout.write(self.style.ERROR("Chưa có Branch trong hệ thống."))
-            return
+        if not call_results:
+            raise CommandError("Chưa có dữ liệu SaCallResult.")
 
-        # Map SA Users theo Branch
-        sa_users_by_branch = {}
-        all_sa_users = list(User.objects.filter(user_roles__role__role_code__in=["SA_STAFF", "SA_SUPERVISOR"]).distinct())
+        accounts = list(
+            CustomerAccount.objects.select_related(
+                "customer",
+                "customer__branch",
+                "customer__membership_tier",
+            )
+            .filter(
+                customer__customer_code__startswith="FAKE_HSQ7_",
+                account_status="ACTIVE",
+            )
+            .order_by("customer__customer_code")[:count]
+        )
 
-        for u in all_sa_users:
-            ur = UserRole.objects.filter(user=u, role__role_code__in=["SA_STAFF", "SA_SUPERVISOR"]).first()
-            br = ur.branch if ur and ur.branch else None
-            if not br:
-                # Gán chi nhánh dựa trên tên username nếu ur.branch null
-                uname = u.username.lower()
-                if "q1" in uname:
-                    br = Branch.objects.filter(branch_code="CN_Q1").first()
-                elif "q3" in uname:
-                    br = Branch.objects.filter(branch_code="CN_Q3").first()
-                elif "tanbinh" in uname or "tb" in uname:
-                    br = Branch.objects.filter(branch_code="CN_TB").first()
-                elif "thanhxuan" in uname or "tx" in uname:
-                    br = Branch.objects.filter(branch_code="CN_TX").first()
-                elif "hanoi" in uname or "hn" in uname:
-                    br = Branch.objects.filter(branch_code="CN_HN").first()
-                elif "haiphong" in uname or "hp" in uname:
-                    br = Branch.objects.filter(branch_code="CN_HP").first()
-                else:
-                    br = Branch.objects.filter(branch_code="HS_Q7").first()
+        if len(accounts) < count:
+            raise CommandError(
+                f"Chỉ tìm thấy {len(accounts)} tài khoản khách hàng mẫu, "
+                f"không đủ {count}. Hãy seed CustomerAccount trước."
+            )
 
-            if br:
-                sa_users_by_branch.setdefault(br.id, []).append(u)
+        if reset:
+            deleted_count, _ = SaRecord.objects.filter(
+                record_code__startswith="FAKE-SA-HSQ7-"
+            ).delete()
+            self.stdout.write(
+                self.style.WARNING(
+                    f"Đã xóa {deleted_count} bản ghi SA mẫu cũ."
+                )
+            )
 
-        # Mẫu danh sách khách hàng & tài khoản
-        customer_accounts = list(CustomerAccount.objects.select_related("customer").all())
-        existing_customers = list(Customer.objects.all())
+        now = timezone.now()
+        branch_distribution = Counter()
+        created_count = 0
+        updated_count = 0
+        successful_reactivation_count = 0
 
-        admin_user = User.objects.filter(is_superuser=True).first() or (all_sa_users[0] if all_sa_users else None)
+        for index, customer_account in enumerate(accounts, start=1):
+            employee, pic_user = sa_staff[(index - 1) % len(sa_staff)]
+            branch = employee.branch
+            customer = customer_account.customer
+            is_reactivated = index <= reactivated_count
 
-        records_to_create = []
-        record_idx = 1000
+            # Đồng bộ Customer và TransactionLog theo chi nhánh của PIC SA.
+            # CustomerEmployeeAssignment CCC HS_Q7 vẫn được giữ nguyên.
+            if customer.branch_id != branch.id:
+                customer.branch = branch
+                customer.save(update_fields=["branch", "updated_at"])
 
-        year = 2026
+            transactions_qs = TransactionLog.objects.filter(
+                customer_account=customer_account
+            ).order_by("transaction_date", "id")
 
-        with transaction.atomic():
-            for m, target_count in MONTHLY_COUNTS.items():
-                self.stdout.write(f"Dang seed Thang {m}/{year}: {target_count} records...")
+            if not transactions_qs.exists():
+                raise CommandError(
+                    f"Tài khoản {customer_account.account_number} chưa có TransactionLog."
+                )
 
-                # Tính ngày đầu & ngày cuối tháng (nếu T7 thì đến ngày 27)
-                start_day = 1
-                end_day = 27 if m == 7 else (28 if m == 2 else 30)
+            transactions_qs.update(branch=branch)
 
-                for _ in range(target_count):
-                    record_idx += 1
-                    rec_code = f"SA{year}{m:02d}{record_idx:04d}"
+            if is_reactivated:
+                call_date, confirmed_at = self.prepare_reactivated_transactions(
+                    transactions_qs
+                )
 
-                    # Chọn ngẫu nhiên Branch (đảm bảo chia đều cho tất cả các Chi nhánh)
-                    branch = random.choice(branches)
+                matched_after_call = transactions_qs.filter(
+                    order_status__in=MATCHED_STATUSES,
+                    transaction_date__gte=call_date,
+                )
 
-                    # Chọn PIC User từ Chi nhánh này (hoặc fallback)
-                    possible_pics = sa_users_by_branch.get(branch.id) or all_sa_users
-                    pic_user = random.choice(possible_pics) if possible_pics else admin_user
+                snapshot = matched_after_call.aggregate(
+                    total_value=Sum("transaction_value"),
+                    total_fee=Sum("transaction_fee"),
+                )
 
-                    # Tìm employee tương ứng với pic_user nếu có
-                    pic_employee = Employee.objects.filter(branch=branch).first()
+                transaction_value_snapshot = (
+                    snapshot["total_value"] or Decimal("0.00")
+                )
+                transaction_fee_snapshot = (
+                    snapshot["total_fee"] or Decimal("0.00")
+                )
 
-                    # Chọn Customer Account
-                    if customer_accounts:
-                        ca = random.choice(customer_accounts)
-                        acc_no = ca.account_number
-                        cust = ca.customer
-                        cust_name = cust.full_name if cust else ca.account_number
-                    else:
-                        acc_no = f"057C{random.randint(100000, 999999)}"
-                        cust = random.choice(existing_customers) if existing_customers else None
-                        cust_name = cust.full_name if cust else f"Khách hàng {acc_no}"
+                account_status = "REACTIVATED"
+                successful_reactivation_count += 1
+            else:
+                latest_transaction_date = transactions_qs.order_by(
+                    "-transaction_date"
+                ).values_list(
+                    "transaction_date",
+                    flat=True,
+                ).first()
 
-                    # Chọn ngày gọi ngẫu nhiên trong tháng
-                    day_val = random.randint(start_day, end_day)
-                    call_dt = date(year, m, day_val)
+                call_date = latest_transaction_date + timedelta(days=5)
+                confirmed_at = None
+                transaction_value_snapshot = Decimal("0.00")
+                transaction_fee_snapshot = Decimal("0.00")
+                account_status = "INACTIVE"
 
-                    # Xác định Loại kết quả cuộc gọi & Phân nhóm ICP
-                    rand_res = random.random()
-                    if rand_res < 0.65:
-                        # 65% Nghe máy
-                        c_res = call_results.get("ANSWERED") or random.choice(list(call_results.values()))
-                        i_lev = random.choice([interest_levels.get("VERY_INTERESTED"), interest_levels.get("INTERESTED"), interest_levels.get("NO_CURRENT_NEED")])
-                        icp = random.choice([icp_groups.get("A"), icp_groups.get("B"), icp_groups.get("C")])
-                        note_text = random.choice(ANSWERED_NOTES)
-                    elif rand_res < 0.85:
-                        # 20% Không nghe máy
-                        c_res = call_results.get("NO_ANSWER") or random.choice(list(call_results.values()))
-                        i_lev = interest_levels.get("NOT_INTERESTED")
-                        icp = random.choice([icp_groups.get("E"), icp_groups.get("D")])
-                        note_text = random.choice(NO_ANSWER_NOTES)
-                    elif rand_res < 0.95:
-                        # 10% Thuê bao / Không hợp lệ
-                        c_res = call_results.get("INVALID_PHONE") or random.choice(list(call_results.values()))
-                        i_lev = None
-                        icp = random.choice([icp_groups.get("F"), icp_groups.get("G")])
-                        note_text = random.choice(INVALID_NOTES)
-                    else:
-                        # 5% Trực tiếp
-                        c_res = call_results.get("DIRECT") or random.choice(list(call_results.values()))
-                        i_lev = interest_levels.get("VERY_INTERESTED")
-                        icp = icp_groups.get("A")
-                        note_text = "Tư vấn trực tiếp tại sàn chi nhánh, KH ký hợp đồng dịch vụ."
+            call_result = call_results[(index - 1) % len(call_results)]
+            interest_level = (
+                interest_levels[(index - 1) % len(interest_levels)]
+                if interest_levels
+                else None
+            )
+            icp_group = (
+                icp_groups[(index - 1) % len(icp_groups)]
+                if icp_groups
+                else None
+            )
 
-                    # Boolean indicators
-                    is_reactivation = random.choice([True, False, False, False]) # 25% tái kích hoạt
-                    intro_prod = random.choice([True, True, False])
-                    supp_info = random.choice([True, False])
-                    ref_rm = random.choice([True, False, False])
-                    handover_broker = random.choice([True, False, False, False]) # 25% bàn giao broker
+            record_code = f"FAKE-SA-HSQ7-{index:04d}"
 
-                    # Financial snapshots
-                    if is_reactivation or i_lev == interest_levels.get("VERY_INTERESTED"):
-                        fee_snap = round(random.uniform(200000, 4500000), -3)
-                        val_snap = round(random.uniform(50000000, 1500000000), -5)
-                    else:
-                        fee_snap = round(random.uniform(0, 500000), -3) if random.random() > 0.5 else 0
-                        val_snap = round(random.uniform(0, 100000000), -5) if fee_snap > 0 else 0
+            _, created = SaRecord.objects.update_or_create(
+                record_code=record_code,
+                defaults={
+                    "account_no": customer_account.account_number,
+                    "customer_name_snapshot": customer.full_name,
+                    "branch_name_snapshot": branch.branch_name,
+                    "pic_name_snapshot": employee.full_name,
+                    "account_status": account_status,
+                    "vip_classification": (
+                        customer.membership_tier.tier_name
+                        if customer.membership_tier
+                        else None
+                    ),
+                    "customer_account": customer_account,
+                    "customer": customer,
+                    "company": customer.company,
+                    "branch": branch,
+                    "pic_user": pic_user,
+                    "pic_employee": employee,
+                    "call_date": call_date,
+                    "follow_no": 1,
+                    "call_result": call_result,
+                    "interest_level": interest_level,
+                    "icp_group": icp_group,
+                    "reactivation": is_reactivated,
+                    "reactivation_confirmed_at": confirmed_at,
+                    "introduced_product": True,
+                    "support_info": True,
+                    "referred_rm": is_reactivated and index % 2 == 0,
+                    "handover_to_broker": False,
+                    "broker_user": None,
+                    "broker_employee": None,
+                    "broker_handover_at": None,
+                    "broker_handover_note": None,
+                    "transaction_fee_snapshot": transaction_fee_snapshot,
+                    "transaction_value_snapshot": transaction_value_snapshot,
+                    "note": (
+                        "Khách hàng đã phát sinh lệnh khớp sau cuộc gọi."
+                        if is_reactivated
+                        else "Chưa phát sinh lệnh khớp sau cuộc gọi."
+                    ),
+                    "source_system": SaRecord.SOURCE_CRM_MINI,
+                    "source_call_id": f"FAKE-CALL-HSQ7-{index:04d}",
+                    "data_status": SaRecord.STATUS_VALID,
+                    "created_by_user": pic_user,
+                    "updated_by_user": pic_user,
+                },
+            )
 
-                    react_time = timezone.make_aware(datetime.combine(call_dt, datetime.min.time()) + timedelta(hours=random.randint(2, 48))) if is_reactivation else None
+            branch_distribution[branch.branch_code] += 1
 
-                    broker_emp = Employee.objects.filter(branch=branch).order_by("?").first() if handover_broker else None
-                    broker_time = timezone.make_aware(datetime.combine(call_dt, datetime.min.time()) + timedelta(hours=random.randint(1, 24))) if handover_broker else None
-                    broker_note = random.choice(BROKER_HANDOVER_NOTES) if handover_broker else None
+            if created:
+                created_count += 1
+            else:
+                updated_count += 1
 
-                    record = SaRecord(
-                        record_code=rec_code,
-                        account_no=acc_no,
-                        customer_name_snapshot=cust_name,
-                        branch_name_snapshot=branch.branch_name if branch else "Chi nhánh Q1",
-                        pic_name_snapshot=pic_user.get_full_name() or pic_user.username if pic_user else "Sale Admin",
-                        account_status=random.choice(ACCOUNT_STATUSES),
-                        vip_classification=random.choice(VIP_CLASSES),
-                        customer_account=ca if customer_accounts else None,
-                        customer=cust,
-                        branch=branch,
-                        pic_user=pic_user,
-                        pic_employee=pic_employee,
-                        call_date=call_dt,
-                        follow_no=random.randint(1, 4),
-                        call_result=c_res,
-                        interest_level=i_lev,
-                        icp_group=icp,
-                        reactivation=is_reactivation,
-                        reactivation_confirmed_at=react_time,
-                        introduced_product=intro_prod,
-                        support_info=supp_info,
-                        referred_rm=ref_rm,
-                        handover_to_broker=handover_broker,
-                        broker_user=getattr(broker_emp, "user", None) if broker_emp else None,
-                        broker_employee=broker_emp,
-                        broker_handover_at=broker_time,
-                        broker_handover_note=broker_note,
-                        transaction_fee_snapshot=fee_snap,
-                        transaction_value_snapshot=val_snap,
-                        note=note_text,
-                        source_system=random.choice([SaRecord.SOURCE_CRM_MINI, SaRecord.SOURCE_EXCEL]),
-                        data_status=SaRecord.STATUS_VALID,
-                        created_by_user=admin_user,
-                    )
-                    records_to_create.append(record)
+        self.stdout.write("\nPhân bổ SaRecord theo chi nhánh:")
+        for employee, _ in sa_staff:
+            branch_code = employee.branch.branch_code
+            self.stdout.write(
+                f"- {branch_code:<8}: "
+                f"{branch_distribution[branch_code]:>2} bản ghi "
+                f"({employee.employee_code} - {employee.full_name})"
+            )
 
-            SaRecord.objects.bulk_create(records_to_create)
+        self.stdout.write(
+            self.style.SUCCESS(
+                "\n=== HOÀN TẤT TẠO SA RECORD ===\n"
+                f"- Tổng SaRecord: {count}\n"
+                f"- Tái kích hoạt hợp lệ: {successful_reactivation_count}\n"
+                f"- Chưa tái kích hoạt: {count - successful_reactivation_count}\n"
+                f"- Tạo mới: {created_count}\n"
+                f"- Cập nhật: {updated_count}\n"
+                "- Phân bổ dự kiến với 50 bản ghi: 8, 7, 7, 7, 7, 7, 7"
+            )
+        )
 
-        total_created = len(records_to_create)
-        self.stdout.write(self.style.SUCCESS(f"Hoan thanh! Da khoi tao {total_created} SaRecord thanh cong."))
+    def get_sa_staff(self):
+        result = []
+
+        for employee_code in SA_EMPLOYEE_CODES:
+            employee = Employee.objects.select_related("branch").filter(
+                employee_code=employee_code,
+                status="ACTIVE",
+            ).first()
+
+            if employee is None:
+                raise CommandError(
+                    f"Không tìm thấy nhân viên SA đang hoạt động: {employee_code}"
+                )
+
+            pic_user = User.objects.filter(
+                employee=employee,
+                is_active=True,
+            ).first()
+
+            if pic_user is None:
+                raise CommandError(
+                    f"Nhân viên {employee_code} chưa có tài khoản User đang hoạt động."
+                )
+
+            result.append((employee, pic_user))
+
+        return result
+
+    @staticmethod
+    def prepare_reactivated_transactions(transactions_qs):
+        first_transaction = transactions_qs.first()
+        call_date = first_transaction.transaction_date - timedelta(days=3)
+
+        matched_transaction = transactions_qs.filter(
+            order_status__in=MATCHED_STATUSES
+        ).first()
+
+        if matched_transaction is None:
+            matched_transaction = first_transaction
+            matched_transaction.order_status = "MATCHED"
+
+        if matched_transaction.transaction_date < call_date:
+            matched_transaction.transaction_date = call_date + timedelta(days=1)
+
+        confirmed_at = matched_transaction.matched_at
+
+        if confirmed_at is None or confirmed_at.date() < call_date:
+            confirmed_at = timezone.make_aware(
+                datetime.combine(
+                    matched_transaction.transaction_date,
+                    time(hour=10, minute=0),
+                )
+            )
+            matched_transaction.matched_at = confirmed_at
+
+        matched_transaction.save(
+            update_fields=[
+                "order_status",
+                "transaction_date",
+                "matched_at",
+                "updated_at",
+            ]
+        )
+
+        return call_date, confirmed_at
