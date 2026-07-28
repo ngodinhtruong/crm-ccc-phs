@@ -12,6 +12,7 @@ from apps.chatbots.dashboard.aggregations import (
 )
 from apps.chatbots.dashboard.cache import get_or_build_dashboard_section
 from apps.chatbots.dashboard.constants import (
+    SECTION_COMPARISON,
     SECTION_OPERATIONS,
     SECTION_QUICK_LISTS,
     SECTION_SLA,
@@ -21,6 +22,7 @@ from apps.chatbots.dashboard.constants import (
     parse_dashboard_sections,
 )
 from apps.chatbots.dashboard.filters import ChatbotDashboardFilterMixin
+from apps.chatbots.dashboard.periods import GRANULARITY_LABELS
 from apps.chatbots.models import ChatbotChatLog, ChatbotSessionSummary
 from apps.chatbots.serializers import (
     ChatbotChatLogSerializer,
@@ -49,18 +51,25 @@ class ChatbotDashboardOverviewAPIView(ChatbotDashboardFilterMixin, APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        granularity = request.query_params.get("granularity", "month").lower()
-        if granularity not in {"day", "week", "month"}:
-            granularity = "month"
+        # Không truyền granularity thì tự suy từ độ dài khoảng lọc:
+        # lọc trong tháng -> ngày, lọc trọn năm -> tháng, nhiều năm -> năm.
+        granularity = self.resolve_granularity(
+            request.query_params.get("granularity")
+        )
 
         sections, explicit_sections = parse_dashboard_sections(
             request.query_params.get("sections")
         )
         summaries = self.get_filtered_summaries()
-        prev_summaries = self.get_previous_period_summaries()
         logs = self.get_filtered_logs()
         aggregator = ChatbotDashboardAggregator(
-            summaries, logs, prev_summaries=prev_summaries
+            summaries,
+            logs,
+            # Biểu đồ so sánh cần các kỳ ngang hàng nên nhìn rộng hơn bộ lọc;
+            # các biểu đồ còn lại vẫn bám đúng khoảng người dùng chọn.
+            comparison_summaries=self.get_comparison_summaries(granularity),
+            series_summaries=self.get_series_summaries(granularity),
+            focus_bounds=self.get_focus_bounds(),
         )
         signature = self.get_filter_signature(granularity=granularity)
 
@@ -69,12 +78,17 @@ class ChatbotDashboardOverviewAPIView(ChatbotDashboardFilterMixin, APIView):
             SECTION_TOPICS: lambda: aggregator.build_topics_section(granularity),
             SECTION_TRAFFIC: lambda: aggregator.build_traffic_section(granularity),
             SECTION_OPERATIONS: lambda: aggregator.build_operations_section(granularity),
+            SECTION_COMPARISON: lambda: aggregator.build_comparison_section(granularity),
             SECTION_SLA: aggregator.build_sla_section,
             SECTION_QUICK_LISTS: aggregator.build_quick_lists_section,
         }
 
         payload = {
             "filters": self.get_filter_response(),
+            # Frontend cần biết backend đã chọn mốc nào để hiển thị đúng nhãn
+            # khi người dùng để chế độ tự động.
+            "granularity": granularity,
+            "granularity_label": GRANULARITY_LABELS[granularity],
             "summary": {},
             "charts": {},
             "quick_lists": {},

@@ -1,17 +1,25 @@
 """Các truy vấn aggregate nhỏ, độc lập theo section của dashboard chatbot."""
 
-from datetime import datetime, timedelta
-
 from django.db.models import (
     Count,
     Max,
     Q,
     Sum,
 )
-from django.db.models.functions import ExtractHour, TruncDate, TruncMonth, TruncWeek
-from django.utils import timezone
+from django.db.models.functions import ExtractHour
 
 from apps.chatbots.constants import SPAM_QUESTION_TYPES, UNCATEGORIZED_LABEL
+from apps.chatbots.dashboard.periods import (
+    GRANULARITY_LABELS,
+    comparison_bounds,
+    comparison_granularity,
+    iter_periods,
+    normalize_granularity,
+    period_bounds,
+    period_key,
+    period_label,
+    period_trunc,
+)
 from apps.chatbots.models import ChatbotSessionSummary
 from apps.chatbots.serializers import ChatbotSessionQuickSerializer
 from apps.common.constants import TicketStatusCode
@@ -24,10 +32,29 @@ TOPIC_OUTCOMES = (OUTCOME_BOT_DONE, OUTCOME_CCC)
 
 
 class ChatbotDashboardAggregator:
-    def __init__(self, summaries, logs, prev_summaries=None):
+    def __init__(
+        self,
+        summaries,
+        logs,
+        comparison_summaries=None,
+        series_summaries=None,
+        focus_bounds=(None, None),
+    ):
         self.summaries = summaries
         self.logs = logs
-        self.prev_summaries = prev_summaries
+
+        # Ba phạm vi khác nhau, cố ý:
+        #   summaries            - đúng bộ lọc (KPI, donut, phễu, khung giờ...)
+        #   series_summaries     - nới ra kỳ cha KHI bộ lọc chỉ gói một kỳ
+        #   comparison_summaries - luôn nới ra kỳ cha để có kỳ ngang hàng
+        # Không truyền thì tất cả rơi về đúng bộ lọc.
+        self.comparison_summaries = (
+            summaries if comparison_summaries is None else comparison_summaries
+        )
+        self.series_summaries = (
+            summaries if series_summaries is None else series_summaries
+        )
+        self.focus_bounds = focus_bounds
 
     @staticmethod
     def rate(value, total, digits=2):
@@ -111,13 +138,8 @@ class ChatbotDashboardAggregator:
     def _build_time_series_by_category(
         self, summaries_qs, mode="total", granularity="month"
     ):
-        if granularity == "day":
-            trunc_fn = TruncDate("started_at")
-        elif granularity == "week":
-            trunc_fn = TruncWeek("started_at")
-        else:
-            granularity = "month"
-            trunc_fn = TruncMonth("started_at")
+        granularity = normalize_granularity(granularity)
+        trunc_fn = period_trunc(granularity)
 
         rows = list(
             summaries_qs.filter(started_at__isnull=False)
@@ -141,15 +163,9 @@ class ChatbotDashboardAggregator:
             p = r["period"]
             if not p:
                 continue
-            if granularity == "month":
-                p_key = p.strftime("%Y-%m")
-                p_label = f"T{p.strftime('%m/%Y')}"
-            elif granularity == "week":
-                p_key = p.strftime("%Y-W%W")
-                p_label = f"Tuần {p.strftime('%W')} ({p.strftime('%d/%m')})"
-            else:
-                p_key = p.strftime("%Y-%m-%d")
-                p_label = p.strftime("%d/%m")
+
+            p_key = period_key(granularity, p)
+            p_label = period_label(granularity, p)
 
             period_map[p_key] = p_label
             cat_name = label(r["dashboard_category"])
@@ -215,60 +231,49 @@ class ChatbotDashboardAggregator:
             self.summaries, mode="ccc_rate", granularity=granularity
         )
 
-    def build_multi_month_topic_outcomes(self, num_months=5):
-        now = timezone.now()
-        year = now.year
-        month = now.month
+    def build_topic_outcomes(self, granularity="month"):
+        """
+        Chủ đề x nhóm xử lý theo từng kỳ.
 
-        start_year = year
-        start_month = month - (num_months - 1)
-        while start_month <= 0:
-            start_month += 12
-            start_year -= 1
-
-        start_dt = datetime(start_year, start_month, 1)
-        if timezone.is_aware(now):
-            start_dt = timezone.make_aware(start_dt, timezone.get_current_timezone())
-
-        qs = ChatbotSessionSummary.objects.filter(
-            started_at__gte=start_dt,
-            outcome_type__in=[OUTCOME_BOT_DONE, OUTCOME_CCC],
-        )
+        Trước đây hàm này bỏ qua ``self.summaries`` và tự truy vấn lại toàn
+        bảng với cửa sổ cứng "5 tháng gần nhất tính từ now()", nên người dùng
+        lọc kỳ nào cũng thấy đúng 5 tháng đó. Giờ dùng chung queryset đã lọc
+        và lấy danh sách kỳ từ chính dữ liệu.
+        """
+        granularity = normalize_granularity(granularity)
+        trunc_fn = period_trunc(granularity)
 
         rows = list(
-            qs.annotate(month=TruncMonth("started_at"))
-            .values("month", "dashboard_category", "outcome_type")
+            self.summaries.filter(
+                started_at__isnull=False,
+                outcome_type__in=TOPIC_OUTCOMES,
+            )
+            .annotate(period=trunc_fn)
+            .values("period", "dashboard_category", "outcome_type")
             .annotate(cnt=Count("id"))
-            .order_by("month")
+            .order_by("period")
         )
 
         def label(cat):
             return cat or UNCATEGORIZED_LABEL
 
-        months_list = []
-        cur_y, cur_m = start_year, start_month
-        for _ in range(num_months):
-            m_dt = datetime(cur_y, cur_m, 1)
-            months_list.append({
-                "key": m_dt.strftime("%Y-%m"),
-                "label": f"T{m_dt.strftime('%m/%Y')}",
-            })
-            cur_m += 1
-            if cur_m > 12:
-                cur_m = 1
-                cur_y += 1
-
+        period_map = {}
         cat_totals = {}
-        month_outcome_map = {}
+        period_outcome_map = {}
+
         for r in rows:
-            if not r["month"]:
+            p = r["period"]
+            if not p:
                 continue
-            m_key = r["month"].strftime("%Y-%m")
+
+            p_key = period_key(granularity, p)
+            period_map[p_key] = period_label(granularity, p)
+
             cat_name = label(r["dashboard_category"])
-            outcome = r["outcome_type"]
-            cnt = r["cnt"]
+            cnt = r["cnt"] or 0
+
             cat_totals[cat_name] = cat_totals.get(cat_name, 0) + cnt
-            month_outcome_map[(m_key, cat_name, outcome)] = cnt
+            period_outcome_map[(p_key, cat_name, r["outcome_type"])] = cnt
 
         sorted_cats = [
             cat for cat, _ in sorted(cat_totals.items(), key=lambda x: x[1], reverse=True)
@@ -277,21 +282,22 @@ class ChatbotDashboardAggregator:
         if not sorted_cats:
             sorted_cats = [UNCATEGORIZED_LABEL]
 
+        periods_sorted = sorted(period_map.keys())
+
         data = []
-        for m_info in months_list:
-            m_key = m_info["key"]
-            item = {"label": m_info["label"], "key": m_key}
+        for p_key in periods_sorted:
+            item = {"label": period_map[p_key], "key": p_key}
             for cat in sorted_cats:
-                bot_val = month_outcome_map.get((m_key, cat, OUTCOME_BOT_DONE), 0)
-                ccc_val = month_outcome_map.get((m_key, cat, OUTCOME_CCC), 0)
-                item[f"{cat} - Bot"] = bot_val
-                item[f"{cat} - CCC"] = ccc_val
+                item[f"{cat} - Bot"] = period_outcome_map.get(
+                    (p_key, cat, OUTCOME_BOT_DONE), 0
+                )
+                item[f"{cat} - CCC"] = period_outcome_map.get(
+                    (p_key, cat, OUTCOME_CCC), 0
+                )
             data.append(item)
 
-        month_labels = [m["label"] for m in months_list]
-
         return {
-            "month_labels": month_labels,
+            "month_labels": [period_map[k] for k in periods_sorted],
             "top_categories": sorted_cats,
             "data": data,
         }
@@ -316,7 +322,7 @@ class ChatbotDashboardAggregator:
         ]
 
         ccc_multi_month_topics = self.build_multi_month_ccc_topics(granularity=granularity)
-        topic_stacked_outcomes = self.build_multi_month_topic_outcomes(num_months=5)
+        topic_stacked_outcomes = self.build_topic_outcomes(granularity=granularity)
         all_topic_multi_month = self.build_multi_month_all_topics(granularity=granularity)
         category_ccc_rate_multi_month = self.build_multi_month_ccc_rate(granularity=granularity)
 
@@ -331,71 +337,57 @@ class ChatbotDashboardAggregator:
         }
 
     @staticmethod
-    def _monthly_rows(summaries):
+    def _period_rows(summaries, granularity):
+        """Đếm phiên theo kỳ trên đúng queryset đã lọc."""
+        granularity = normalize_granularity(granularity)
+
         rows = (
             summaries.filter(started_at__isnull=False)
-            .annotate(month=TruncMonth("started_at"))
-            .values("month")
+            .annotate(period=period_trunc(granularity))
+            .values("period")
             .annotate(count=Count("id"))
-            .order_by("month")
+            .order_by("period")
         )
         return [
             {
-                "month": row["month"].strftime("%Y-%m"),
-                "month_key": row["month"].strftime("%Y-%m"),
-                "month_label": f"Tháng {row['month'].strftime('%m/%Y')}",
+                "key": period_key(granularity, row["period"]),
+                "label": period_label(granularity, row["period"]),
                 "count": row["count"],
             }
             for row in rows
-            if row["month"]
+            if row["period"]
         ]
 
-    @staticmethod
-    def _daily_rows(summaries):
-        rows = (
-            summaries.filter(started_at__isnull=False)
-            .annotate(date=TruncDate("started_at"))
-            .values("date")
-            .annotate(count=Count("id"))
-            .order_by("date")
-        )
+    @classmethod
+    def _monthly_rows(cls, summaries):
         return [
             {
-                "key": row["date"].strftime("%Y-%m-%d"),
-                "label": row["date"].strftime("%d/%m"),
+                "month": row["key"],
+                "month_key": row["key"],
+                "month_label": row["label"],
                 "count": row["count"],
             }
-            for row in rows
-            if row["date"]
+            for row in cls._period_rows(summaries, "month")
         ]
+
+    @classmethod
+    def _daily_rows(cls, summaries):
+        return cls._period_rows(summaries, "day")
 
     def _time_series_rows(self, granularity):
-        if granularity == "month":
-            trunc_fn = TruncMonth("started_at")
-            now = timezone.now()
-            year = now.year
-            month = now.month
-            start_year = year
-            start_month = month - 4
-            while start_month <= 0:
-                start_month += 12
-                start_year -= 1
-            start_dt = datetime(start_year, start_month, 1)
-            if timezone.is_aware(now):
-                start_dt = timezone.make_aware(
-                    start_dt, timezone.get_current_timezone()
-                )
-            qs = ChatbotSessionSummary.objects.filter(started_at__gte=start_dt)
-        elif granularity == "week":
-            trunc_fn = TruncWeek("started_at")
-            qs = self.summaries
-        else:
-            granularity = "day"
-            trunc_fn = TruncDate("started_at")
-            qs = self.summaries
+        """
+        Chuỗi thời gian chính của dashboard.
+
+        Nhánh ``month`` trước đây bỏ qua ``self.summaries`` và tự dựng lại
+        queryset với cửa sổ cứng 5 tháng gần nhất, khiến mọi bộ lọc bị vô
+        hiệu ở mốc tháng. Giờ chạy trên ``series_summaries`` — bằng đúng bộ
+        lọc, chỉ nới ra kỳ cha khi bộ lọc gói gọn trong một kỳ.
+        """
+        granularity = normalize_granularity(granularity)
+        trunc_fn = period_trunc(granularity)
 
         rows = (
-            qs.filter(started_at__isnull=False)
+            self.series_summaries.filter(started_at__isnull=False)
             .annotate(period=trunc_fn)
             .values("period")
             .annotate(
@@ -414,20 +406,12 @@ class ChatbotDashboardAggregator:
             if not period:
                 continue
 
-            if granularity == "month":
-                date_value = period.strftime("%Y-%m")
-                label_value = f"Tháng {period.strftime('%m/%Y')}"
-            elif granularity == "week":
-                date_value = period.strftime("%Y-W%W")
-                label_value = f"Tuần {period.strftime('%W')} ({period.strftime('%d/%m')})"
-            else:
-                date_value = period.strftime("%Y-%m-%d")
-                label_value = period.strftime("%d/%m")
-
             result.append(
                 {
-                    "date": date_value,
-                    "label": label_value,
+                    "date": period_key(granularity, period),
+                    "label": period_label(granularity, period),
+                    # Kỳ nằm trong bộ lọc; các kỳ còn lại chỉ là nền so sánh.
+                    "is_current": self._is_in_focus(granularity, period),
                     "total": row["total"],
                     "bot_done": row["bot_done"],
                     "ccc": row["ccc"],
@@ -610,13 +594,8 @@ class ChatbotDashboardAggregator:
         return res
 
     def build_multi_period_reasons(self, granularity="month"):
-        if granularity == "day":
-            trunc_fn = TruncDate("started_at")
-        elif granularity == "week":
-            trunc_fn = TruncWeek("started_at")
-        else:
-            granularity = "month"
-            trunc_fn = TruncMonth("started_at")
+        granularity = normalize_granularity(granularity)
+        trunc_fn = period_trunc(granularity)
 
         qs = self.summaries.filter(started_at__isnull=False).exclude(reason__isnull=True).exclude(reason__exact="")
         rows = list(
@@ -634,15 +613,8 @@ class ChatbotDashboardAggregator:
             p = r["period"]
             if not p:
                 continue
-            if granularity == "month":
-                p_key = p.strftime("%Y-%m")
-                p_label = f"T{p.strftime('%m/%Y')}"
-            elif granularity == "week":
-                p_key = p.strftime("%Y-W%W")
-                p_label = f"Tuần {p.strftime('%W')} ({p.strftime('%d/%m')})"
-            else:
-                p_key = p.strftime("%Y-%m-%d")
-                p_label = p.strftime("%d/%m")
+            p_key = period_key(granularity, p)
+            p_label = period_label(granularity, p)
 
             period_map[p_key] = p_label
             r_name = r["reason"]
@@ -676,13 +648,8 @@ class ChatbotDashboardAggregator:
         }
 
     def build_multi_period_channels(self, granularity="month"):
-        if granularity == "day":
-            trunc_fn = TruncDate("started_at")
-        elif granularity == "week":
-            trunc_fn = TruncWeek("started_at")
-        else:
-            granularity = "month"
-            trunc_fn = TruncMonth("started_at")
+        granularity = normalize_granularity(granularity)
+        trunc_fn = period_trunc(granularity)
 
         qs = self.summaries.filter(started_at__isnull=False)
         rows = list(
@@ -704,15 +671,8 @@ class ChatbotDashboardAggregator:
             p = r["period"]
             if not p:
                 continue
-            if granularity == "month":
-                p_key = p.strftime("%Y-%m")
-                p_label = f"T{p.strftime('%m/%Y')}"
-            elif granularity == "week":
-                p_key = p.strftime("%Y-W%W")
-                p_label = f"Tuần {p.strftime('%W')} ({p.strftime('%d/%m')})"
-            else:
-                p_key = p.strftime("%Y-%m-%d")
-                p_label = p.strftime("%d/%m")
+            p_key = period_key(granularity, p)
+            p_label = period_label(granularity, p)
 
             period_map[p_key] = p_label
             ch = (r["channel"] or "KHÁC").upper()
@@ -769,6 +729,115 @@ class ChatbotDashboardAggregator:
                 "top_reasons_multi_period": self.build_multi_period_reasons(granularity),
                 "channel_performance": self._channel_performance(),
                 "channel_performance_multi_period": self.build_multi_period_channels(granularity),
+            }
+        }
+
+    def _is_in_focus(self, granularity, period):
+        """Kỳ này có nằm trong khoảng người dùng đang lọc không."""
+        focus_start, focus_end = self.focus_bounds
+
+        if focus_start is None and focus_end is None:
+            return False
+
+        start, end = period_bounds(granularity, period)
+
+        if focus_end is not None and start >= focus_end:
+            return False
+
+        if focus_start is not None and end <= focus_start:
+            return False
+
+        return True
+
+    def build_comparison_section(self, granularity="month"):
+        """
+        Biểu đồ so sánh kỳ: các kỳ ngang hàng đặt cạnh nhau.
+
+        Mốc do ``comparison_granularity`` quyết định từ chính khoảng đang lọc:
+        lọc trùng khít một kỳ lịch thì so theo kỳ đó (trọn năm so các năm,
+        trọn quý so các quý, một ngày so các ngày trong tuần), lọc lệch ranh
+        giới thì lùi về mốc thô hơn mốc chính một bậc.
+
+        Nguồn dữ liệu là ``comparison_summaries`` — khoảng đã nới ra trọn kỳ
+        cha, vì nếu chỉ lấy đúng bộ lọc thì lọc một ngày sẽ ra đúng một cột,
+        không so được với gì.
+        """
+        focus_start, focus_end = self.focus_bounds
+
+        # comparison_bounds() tự quy mốc chính -> mốc so sánh, nên phải giữ
+        # nguyên mốc CHÍNH khi gọi nó. Truyền mốc đã quy vào sẽ bị quy lần
+        # thứ hai và nới cửa sổ rộng gấp bội (lọc 15 ngày ra 52 cột tuần).
+        window_lo, window_hi = comparison_bounds(
+            granularity, start=focus_start, end=focus_end
+        )
+        granularity = comparison_granularity(
+            granularity, start=focus_start, end=focus_end
+        )
+
+        rows = (
+            self.comparison_summaries.filter(started_at__isnull=False)
+            .annotate(period=period_trunc(granularity))
+            .values("period")
+            .annotate(
+                total=Count("id"),
+                bot_done=Count("id", filter=Q(outcome_type=OUTCOME_BOT_DONE)),
+                ccc=Count("id", filter=Q(outcome_type=OUTCOME_CCC)),
+                pending=Count("id", filter=Q(outcome_type=OUTCOME_PENDING)),
+                spam=Count("id", filter=Q(outcome_type=OUTCOME_SPAM)),
+            )
+            .order_by("period")
+        )
+
+        by_key = {
+            period_key(granularity, row["period"]): row
+            for row in rows
+            if row["period"]
+        }
+
+        # Trục phải đủ kỳ kể cả kỳ không có phiên nào: tuần luôn 7 ngày, năm
+        # luôn 4 quý. Thiếu cột 0 thì người đọc tưởng tuần chỉ có 5 ngày.
+        items = []
+        previous = None
+
+        for period in iter_periods(granularity, window_lo, window_hi):
+            row = by_key.get(period_key(granularity, period)) or {}
+
+            total = row.get("total") or 0
+            prev_total = previous["total"] if previous else None
+
+            item = {
+                "key": period_key(granularity, period),
+                "label": period_label(granularity, period),
+                # Cột ứng với khoảng đang lọc, để frontend tô nổi bật.
+                "is_current": self._is_in_focus(granularity, period),
+                "total": total,
+                "bot_done": row.get("bot_done") or 0,
+                "ccc": row.get("ccc") or 0,
+                "pending": row.get("pending") or 0,
+                "spam": row.get("spam") or 0,
+                "ccc_rate": self.rate(row.get("ccc") or 0, total, digits=1),
+                "prev_label": previous["label"] if previous else None,
+                "prev_total": prev_total,
+                # Kỳ đầu tiên không có gì để so nên để None, không phải 0:
+                # frontend cần phân biệt "không so được" với "không đổi".
+                "delta": None if prev_total is None else total - prev_total,
+                "growth_percent": (
+                    self.rate(total - prev_total, prev_total, digits=1)
+                    if prev_total
+                    else None
+                ),
+            }
+
+            items.append(item)
+            previous = {"label": item["label"], "total": total}
+
+        return {
+            "charts": {
+                "period_comparison": {
+                    "granularity": granularity,
+                    "granularity_label": GRANULARITY_LABELS[granularity],
+                    "items": items,
+                }
             }
         }
 
