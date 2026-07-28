@@ -11,9 +11,16 @@ import {
   YAxis,
 } from "recharts";
 import { EmptyState } from "@/components/chatbot-dashboard/EmptyState";
-import type { TimeSeriesOutcomeItem } from "@/types/chatbot-dashboard.type";
+import { GRANULARITY_OPTIONS } from "@/constants/chatbot-dashboard.constant";
+import type {
+  GranularityChoice,
+  TimeSeriesOutcomeItem,
+} from "@/types/chatbot-dashboard.type";
 
-export type GranularityMode = "day" | "week" | "month";
+// Mốc thời gian khai báo một chỗ duy nhất ở types; trước đây file này và
+// ChatbotDashboardCharts.tsx mỗi nơi tự khai một bản nên thêm quý/năm là
+// phải sửa hai chỗ.
+export type GranularityMode = GranularityChoice;
 
 const integerFormatter = new Intl.NumberFormat("vi-VN");
 const decimalFormatter = new Intl.NumberFormat("vi-VN", {
@@ -27,15 +34,9 @@ function GranularitySelector({
   value: GranularityMode;
   onChange: (mode: GranularityMode) => void;
 }) {
-  const options: { key: GranularityMode; label: string }[] = [
-    { key: "day", label: "Ngày" },
-    { key: "week", label: "Tuần" },
-    { key: "month", label: "Tháng" },
-  ];
-
   return (
     <div className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-100 p-0.5 shadow-xs">
-      {options.map((opt) => (
+      {GRANULARITY_OPTIONS.map((opt) => (
         <button
           key={opt.key}
           type="button"

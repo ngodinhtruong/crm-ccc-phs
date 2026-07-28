@@ -38,3 +38,4 @@ crm/.venv/
 crm-frontend/.next/
 crm-frontend/node_modules/
 tree.txt
+crm/db.sqlite3.backup_20260725_083501

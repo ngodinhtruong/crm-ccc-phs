@@ -93,8 +93,8 @@ export function ChatbotDashboardPage() {
             <OverviewTab
               overview={dashboard.overview}
               onOpenTickets={dashboard.openTicketsFromOverview}
-              granularity={dashboard.filters.granularity || "month"}
-              onGranularityChange={(mode) => dashboard.updateFilter("granularity", mode)}
+              granularity={dashboard.filters.granularity || "auto"}
+              onGranularityChange={dashboard.changeGranularity}
             />
           )}
 

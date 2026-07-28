@@ -1,4 +1,23 @@
-import { OutcomeCode } from "@/types/chatbot-dashboard.type";
+import { GranularityChoice, OutcomeCode } from "@/types/chatbot-dashboard.type";
+
+/**
+ * Bộ chọn mốc thời gian dùng chung cho mọi biểu đồ.
+ *
+ * "Tự động" để backend suy mốc từ độ dài khoảng lọc: lọc trong một tháng thì
+ * xem theo ngày, lọc trọn năm thì xem theo tháng, lọc nhiều năm thì xem theo
+ * năm. Các mốc còn lại là ép thủ công.
+ */
+export const GRANULARITY_OPTIONS: {
+  key: GranularityChoice;
+  label: string;
+}[] = [
+  { key: "auto", label: "Tự động" },
+  { key: "day", label: "Ngày" },
+  { key: "week", label: "Tuần" },
+  { key: "month", label: "Tháng" },
+  { key: "quarter", label: "Quý" },
+  { key: "year", label: "Năm" },
+];
 
 export const CHATBOT_TICKET_STATUS_OPTIONS: {
   value: OutcomeCode;

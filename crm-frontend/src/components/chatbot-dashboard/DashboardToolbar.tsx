@@ -52,6 +52,22 @@ export function DashboardToolbar({
         </div>
 
         <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+          {/* Hook đã hỗ trợ sẵn 4 preset, trước đây chỉ mới lộ ra một cái. */}
+          <QuickPresetButton
+            label="Hôm nay"
+            onClick={() => onQuickPreset("TODAY")}
+          />
+
+          <QuickPresetButton
+            label="Tuần này"
+            onClick={() => onQuickPreset("THIS_WEEK")}
+          />
+
+          <QuickPresetButton
+            label="Tháng này"
+            onClick={() => onQuickPreset("THIS_MONTH")}
+          />
+
           <QuickPresetButton
             label="5 tháng gần đây"
             onClick={() => onQuickPreset("LAST_5_MONTHS")}

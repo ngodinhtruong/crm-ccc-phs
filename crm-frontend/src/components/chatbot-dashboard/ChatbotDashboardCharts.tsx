@@ -23,7 +23,9 @@ import {
 
 import { EmptyState } from "@/components/chatbot-dashboard/EmptyState";
 import { FunnelChartComponent } from "@/components/chatbot-dashboard/charts/FunnelChartComponent";
+import { PeriodComparisonChart } from "@/components/chatbot-dashboard/charts/PeriodComparisonChart";
 import { ExpandableChartCard as ChartCard } from "@/components/common";
+import { GRANULARITY_OPTIONS } from "@/constants/chatbot-dashboard.constant";
 import type {
   CategoryCccRateItem,
   CccMultiMonthTopicsData,
@@ -32,12 +34,15 @@ import type {
   ChatbotOverviewResponse,
   CustomerLinkageData,
   FunnelStepItem,
+  GranularityChoice,
   HourlyPeakItem,
   TimeSeriesOutcomeItem,
 } from "@/types/chatbot-dashboard.type";
 
 export type ChatbotOverviewCharts = ChatbotOverviewResponse["charts"];
-export type GranularityMode = "day" | "week" | "month";
+// Khai báo gốc nằm ở types/chatbot-dashboard.type.ts; giữ alias này để các
+// component đang import từ đây không phải sửa.
+export type GranularityMode = GranularityChoice;
 
 const COLORS = [
   "#0097cf", // Primary PHS Sky Blue
@@ -88,15 +93,9 @@ function GranularitySelector({
   value: GranularityMode;
   onChange: (mode: GranularityMode) => void;
 }) {
-  const options: { key: GranularityMode; label: string }[] = [
-    { key: "day", label: "Ngày" },
-    { key: "week", label: "Tuần" },
-    { key: "month", label: "Tháng" },
-  ];
-
   return (
     <div className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-100 p-0.5 shadow-xs">
-      {options.map((opt) => (
+      {GRANULARITY_OPTIONS.map((opt) => (
         <button
           key={opt.key}
           type="button"
@@ -136,6 +135,7 @@ function AutomationTrendChartCard({
       fallback.push({
         date: `${d.getFullYear()}-${mStr}`,
         label: `T${mStr}/${d.getFullYear()}`,
+        is_current: false,
         total: 0,
         bot_done: 0,
         ccc: 0,
@@ -147,10 +147,20 @@ function AutomationTrendChartCard({
     return fallback;
   }, [data]);
 
+  // Có kỳ nằm ngoài bộ lọc nghĩa là dữ liệu đã được nới ra kỳ cha.
+  const hasContextPeriods = chartData.some((row) => !row.is_current);
+  const focusedLabels = chartData
+    .filter((row) => row.is_current)
+    .map((row) => row.label);
+
   return (
     <ChartCard
       title="Xu hướng Tự động hóa & Phân loại Xử lý (Bot tự xử lý vs Chuyển CCC)"
-      description="Trục hoành: Chuỗi thời gian | Vùng Xanh: Bot tự xử lý (BOT_DONE) | Cột Vàng: Chuyển CCC (CCC)"
+      description={
+        hasContextPeriods
+          ? `Đang xem ${focusedLabels.join(", ")} — các kỳ làm mờ xung quanh là nền so sánh.`
+          : "Trục hoành: Chuỗi thời gian | Vùng Xanh: Bot tự xử lý (BOT_DONE) | Cột Vàng: Chuyển CCC (CCC)"
+      }
       headerRight={
         onGranularityChange && (
           <GranularitySelector value={granularity} onChange={onGranularityChange} />
@@ -187,6 +197,15 @@ function AutomationTrendChartCard({
               barSize={24}
               isAnimationActive={false}
             >
+              {/* Khi backend nới dữ liệu ra kỳ cha (vd lọc "hôm nay" -> vẽ cả
+                  tuần), các kỳ nền được làm mờ để kỳ đang xem nổi lên. */}
+              {hasContextPeriods &&
+                chartData.map((row) => (
+                  <Cell
+                    key={row.date}
+                    fillOpacity={row.is_current ? 1 : 0.35}
+                  />
+                ))}
               <LabelList
                 dataKey="ccc"
                 position="top"
@@ -219,6 +238,7 @@ function SessionTrendLineChartCard({
       fallback.push({
         date: `${d.getFullYear()}-${mStr}`,
         label: `T${mStr}/${d.getFullYear()}`,
+        is_current: false,
         total: 0,
         bot_done: 0,
         ccc: 0,
@@ -1050,6 +1070,11 @@ export function ChatbotDashboardCharts({
         granularity={granularity}
         onGranularityChange={onGranularityChange}
       />
+
+      {/* SECTION 1B: SO SÁNH KỲ (kỳ này với kỳ liền trước) */}
+      <div className="grid gap-4 xl:grid-cols-12">
+        <PeriodComparisonChart data={charts.period_comparison} />
+      </div>
 
       {/* SECTION 2: XU HƯỚNG SESSION & KẾT QUẢ XỬ LÝ */}
       <div className="grid gap-4 xl:grid-cols-12">

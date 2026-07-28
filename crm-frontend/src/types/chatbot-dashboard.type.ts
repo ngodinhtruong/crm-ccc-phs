@@ -15,6 +15,16 @@ export type TicketOpenOptions = {
   dashboard_category?: string;
 };
 
+/** Mốc thời gian của trục hoành. AUTO = để backend suy từ khoảng lọc. */
+export type GranularityMode =
+  | "day"
+  | "week"
+  | "month"
+  | "quarter"
+  | "year";
+
+export type GranularityChoice = GranularityMode | "auto";
+
 export type ChatbotDashboardFilters = {
   year?: string;
   month?: string;
@@ -22,7 +32,32 @@ export type ChatbotDashboardFilters = {
   end_date?: string;
   start_hour?: string;
   end_hour?: string;
-  granularity?: "day" | "week" | "month";
+  granularity?: GranularityChoice;
+};
+
+/** Một cột trong biểu đồ so sánh kỳ (kỳ này với kỳ liền trước). */
+export type PeriodComparisonItem = {
+  key: string;
+  label: string;
+  /** Kỳ nằm trong khoảng người dùng đang lọc — tô nổi bật. */
+  is_current: boolean;
+  total: number;
+  bot_done: number;
+  ccc: number;
+  pending: number;
+  spam: number;
+  ccc_rate: number;
+  prev_label: string | null;
+  prev_total: number | null;
+  /** null = kỳ đầu tiên, không có gì để so sánh (khác với 0 = không đổi). */
+  delta: number | null;
+  growth_percent: number | null;
+};
+
+export type PeriodComparison = {
+  granularity: GranularityMode;
+  granularity_label: string;
+  items: PeriodComparisonItem[];
 };
 
 /** Một ô KPI / một cột trong biểu đồ phân loại xử lý. */
@@ -109,6 +144,12 @@ export type ChatbotSeriesItem = {
 export type TimeSeriesOutcomeItem = {
   date: string;
   label: string;
+  /**
+   * Kỳ nằm trong bộ lọc. Khi bộ lọc gói gọn trong một kỳ (vd "hôm nay"),
+   * backend nới dữ liệu ra trọn kỳ cha nên chuỗi có cả các kỳ xung quanh
+   * làm nền so sánh — cờ này để tô nổi kỳ đang xem.
+   */
+  is_current: boolean;
   total: number;
   bot_done: number;
   ccc: number;
@@ -169,6 +210,10 @@ export type ChannelPerformanceItem = {
 export type ChatbotOverviewResponse = {
   filters?: ChatbotDashboardFilters;
 
+  /** Mốc backend đã thực sự dùng (quan trọng khi frontend để chế độ tự động). */
+  granularity?: GranularityMode;
+  granularity_label?: string;
+
   summary: {
     total_received: SummaryBucket;
     bot_done: SummaryBucket;
@@ -180,6 +225,7 @@ export type ChatbotOverviewResponse = {
   charts: {
     process_classification: ProcessChartItem[];
     ccc_issue_pie?: ChartItem[];
+    period_comparison?: PeriodComparison;
     topic_bar: ChartItem[];
     monthly_chatbot_tickets: ChatbotMonthlyTicketItem[];
     daily_chatbot_tickets: ChatbotSeriesItem[];
