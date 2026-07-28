@@ -1,4 +1,5 @@
 "use client";
+import { masterDataApi } from "@/apis/master-data.api";
 import { getErrorMessage } from "@/utils/error.util";
 
 import { useEffect, useState } from "react";
@@ -50,13 +51,14 @@ const initialForm: SaRecordCreateFormState = {
   referredRm: false,
 
   handoverToBroker: false,
+  brokerEmployee: "",
+  brokerUser: "",
   brokerHandoverNote: "",
 
   transactionValueSnapshot: "0",
   transactionFeeSnapshot: "0",
 
   note: "",
-
 };
 
 function mapRecordToForm(item: SaRecordItem): SaRecordCreateFormState {
@@ -93,13 +95,14 @@ function mapRecordToForm(item: SaRecordItem): SaRecordCreateFormState {
     referredRm: Boolean(item.referred_rm),
 
     handoverToBroker: Boolean(item.handover_to_broker),
+    brokerEmployee: item.broker_employee ? String(item.broker_employee) : "",
+    brokerUser: item.broker_user ? String(item.broker_user) : "",
     brokerHandoverNote: item.broker_handover_note || "",
 
     transactionValueSnapshot: item.transaction_value_snapshot || "0",
     transactionFeeSnapshot: item.transaction_fee_snapshot || "0",
 
     note: item.note || "",
-
   };
 }
 
@@ -114,6 +117,7 @@ export function useSaRecordEdit(recordId: string) {
   const [icpGroups, setIcpGroups] = useState<SaIcpGroup[]>([]);
   const [accountStatusOptions, setAccountStatusOptions] = useState<SaSelectOption[]>([]);
   const [vipClassificationOptions, setVipClassificationOptions] = useState<SaSelectOption[]>([]);
+  const [employeeOptions, setEmployeeOptions] = useState<SaSelectOption[]>([]);
 
   const [loadingRecord, setLoadingRecord] = useState(true);
   const [loadingMaster, setLoadingMaster] = useState(true);
@@ -143,12 +147,14 @@ export function useSaRecordEdit(recordId: string) {
         icpGroupData,
         accountStatusData,
         vipClassificationData,
+        employeeData,
       ] = await Promise.all([
         saleAdminService.getCallResults(),
         saleAdminService.getInterestLevels(),
         saleAdminService.getIcpGroups(),
         saleAdminService.getAccountStatusOptions(),
         saleAdminService.getVipClassificationOptions(),
+        masterDataApi.getEmployees().catch(() => []),
       ]);
 
       setCallResults(callResultData);
@@ -156,6 +162,12 @@ export function useSaRecordEdit(recordId: string) {
       setIcpGroups(icpGroupData);
       setAccountStatusOptions(accountStatusData);
       setVipClassificationOptions(vipClassificationData);
+
+      const empOpts: SaSelectOption[] = (employeeData || []).map((emp: any) => ({
+        value: String(emp.id),
+        label: `${emp.full_name || emp.employee_code}${emp.branch_name ? ` (${emp.branch_name})` : ""}`,
+      }));
+      setEmployeeOptions(empOpts);
     } catch (err) {
       setMasterError(
         getErrorMessage(err, "Không tải được master data SA Record")
@@ -184,20 +196,16 @@ export function useSaRecordEdit(recordId: string) {
   };
 
   const validate = () => {
-    if (!form.accountNo.trim()) {
-      return "Vui lòng nhập số tài khoản lưu ký.";
-    }
-
-    if (!form.callDate) {
-      return "Vui lòng chọn ngày gọi.";
-    }
-
     if (!form.callResult) {
       return "Vui lòng chọn kết quả cuộc gọi.";
     }
 
-    if (Number(form.followNo || 0) < 1) {
+    if (!form.followNo || Number(form.followNo) < 1) {
       return "Lần follow phải lớn hơn hoặc bằng 1.";
+    }
+
+    if (form.handoverToBroker && !form.brokerEmployee && !form.brokerUser) {
+      return "Vui lòng chọn nhân viên môi giới khi bàn giao.";
     }
 
     if (
@@ -237,10 +245,12 @@ export function useSaRecordEdit(recordId: string) {
       introduced_product: form.introducedProduct,
       reactivation: form.reactivation,
       support_info: form.supportInfo,
-      referred_rm: form.referredRm,
+      referred_rm: form.handoverToBroker,
 
       handover_to_broker: form.handoverToBroker,
-      broker_handover_note: form.brokerHandoverNote.trim(),
+      broker_employee: form.handoverToBroker ? (form.brokerEmployee ? Number(form.brokerEmployee) : null) : null,
+      broker_user: form.handoverToBroker ? (form.brokerUser ? Number(form.brokerUser) : null) : null,
+      broker_handover_note: form.handoverToBroker ? form.brokerHandoverNote.trim() : "",
 
       transaction_value_snapshot: form.transactionValueSnapshot || "0",
       transaction_fee_snapshot: form.transactionFeeSnapshot || "0",
@@ -249,7 +259,6 @@ export function useSaRecordEdit(recordId: string) {
 
       source_system: record?.source_system || "CRM_MINI",
       data_status: record?.data_status || "VALID",
-
     };
   };
 
@@ -315,6 +324,7 @@ export function useSaRecordEdit(recordId: string) {
     icpGroups,
     accountStatusOptions,
     vipClassificationOptions,
+    employeeOptions,
 
     accountSuggestions: [],
     accountSuggestionLoading: false,

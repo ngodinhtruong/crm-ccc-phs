@@ -1,4 +1,4 @@
-"use client";
+import { masterDataApi } from "@/apis/master-data.api";
 import { getErrorMessage } from "@/utils/error.util";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -47,6 +47,8 @@ const initialForm: SaRecordCreateFormState = {
   referredRm: false,
 
   handoverToBroker: false,
+  brokerEmployee: "",
+  brokerUser: "",
   brokerHandoverNote: "",
 
   transactionValueSnapshot: "0",
@@ -196,6 +198,8 @@ export function useSaRecordCreate() {
     setAccountSuggestionLoading(false);
   };
 
+  const [employeeOptions, setEmployeeOptions] = useState<SaSelectOption[]>([]);
+
   const loadMasterData = async () => {
     try {
       setLoadingMaster(true);
@@ -207,12 +211,14 @@ export function useSaRecordCreate() {
         icpGroupData,
         accountStatusData,
         vipClassificationData,
+        employeeData,
       ] = await Promise.all([
         saleAdminService.getCallResults(),
         saleAdminService.getInterestLevels(),
         saleAdminService.getIcpGroups(),
         saleAdminService.getAccountStatusOptions(),
         saleAdminService.getVipClassificationOptions(),
+        masterDataApi.getEmployees().catch(() => []),
       ]);
 
       setCallResults(callResultData);
@@ -220,6 +226,12 @@ export function useSaRecordCreate() {
       setIcpGroups(icpGroupData);
       setAccountStatusOptions(accountStatusData);
       setVipClassificationOptions(vipClassificationData);
+
+      const empOpts: SaSelectOption[] = (employeeData || []).map((emp: any) => ({
+        value: String(emp.id),
+        label: `${emp.full_name || emp.employee_code}${emp.branch_name ? ` (${emp.branch_name})` : ""}`,
+      }));
+      setEmployeeOptions(empOpts);
     } catch (err) {
       setMasterError(getErrorMessage(err, "Không tải được dữ liệu SA Record"));
     } finally {
@@ -301,6 +313,10 @@ export function useSaRecordCreate() {
         return "Kết quả cuộc gọi không được để trống.";
       }
 
+      if (form.handoverToBroker && !form.brokerEmployee && !form.brokerUser) {
+        return "Vui lòng chọn nhân viên môi giới khi bàn giao.";
+      }
+
       return "";
     };
   }, [form]);
@@ -339,9 +355,12 @@ export function useSaRecordCreate() {
         reactivation: form.reactivation,
         introduced_product: form.introducedProduct,
         support_info: form.supportInfo,
-        referred_rm: form.referredRm,
+        referred_rm: form.handoverToBroker,
+
         handover_to_broker: form.handoverToBroker,
-        broker_handover_note: form.brokerHandoverNote.trim(),
+        broker_employee: form.handoverToBroker ? toId(form.brokerEmployee) : null,
+        broker_user: form.handoverToBroker ? toId(form.brokerUser) : null,
+        broker_handover_note: form.handoverToBroker ? form.brokerHandoverNote.trim() : "",
 
         transaction_value_snapshot: form.transactionValueSnapshot || "0",
         transaction_fee_snapshot: form.transactionFeeSnapshot || "0",
@@ -372,6 +391,7 @@ export function useSaRecordCreate() {
     icpGroups,
     accountStatusOptions,
     vipClassificationOptions,
+    employeeOptions,
 
     accountSuggestions,
     accountSuggestionLoading,

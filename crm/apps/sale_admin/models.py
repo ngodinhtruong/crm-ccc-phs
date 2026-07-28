@@ -293,6 +293,10 @@ class SaRecord(TimeStampedModel):
             models.Index(fields=["reactivation"]),
             models.Index(fields=["source_system"]),
             models.Index(fields=["data_status"]),
+            models.Index(fields=["branch", "call_date"], name="sa_rec_branch_call_idx"),
+            models.Index(fields=["pic_user", "call_date"], name="sa_rec_pic_call_idx"),
+            models.Index(fields=["reactivation", "call_date"], name="sa_rec_react_call_idx"),
+            models.Index(fields=["customer_account", "call_date"], name="sa_rec_account_call_idx"),
         ]
 
     def __str__(self):

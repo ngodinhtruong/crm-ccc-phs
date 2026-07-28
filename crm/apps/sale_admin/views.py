@@ -1,9 +1,11 @@
 from django.db.models import Case, IntegerField, Q, Value, When
 from rest_framework import status, viewsets
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.db import IntegrityError, transaction
+from apps.kpis.permissions import is_kpi_admin, is_sa_supervisor
 from apps.sale_admin.models import (
     SaCallResult,
     SaInterestLevel,
@@ -433,6 +435,9 @@ class SaRecordViewSet(viewsets.ModelViewSet):
 
     @transaction.atomic
     def create(self, request, *args, **kwargs):
+        if is_sa_supervisor(request.user) and not is_kpi_admin(request.user) and not request.user.is_superuser:
+            raise PermissionDenied("Chỉ nhân viên SA mới có quyền ghi nhận cuộc gọi.")
+
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 

@@ -183,7 +183,7 @@ export function useTicketEditForm(ticket: TicketDetail) {
         breach_reason: breach?.reason,
         breach_note: breach?.note,
         cancelled_reason:
-          status === "CANCELLED" ? cancelledReason || undefined : undefined,
+          (status as string) === "CANCELLED" ? cancelledReason || undefined : undefined,
       });
 
       if (sendSurvey) {

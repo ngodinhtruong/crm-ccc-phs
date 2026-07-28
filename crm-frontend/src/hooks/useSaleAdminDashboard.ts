@@ -1,5 +1,4 @@
 "use client";
-import { getErrorMessage } from "@/utils/error.util";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -10,6 +9,7 @@ import {
   SaAdminDashboardParams,
   SaAdminDashboardResponse,
 } from "@/types/sale-admin-dashboard.type";
+import { getErrorMessage } from "@/utils/error.util";
 
 function toDateInputValue(date: Date) {
   const year = date.getFullYear();
@@ -61,6 +61,9 @@ export function useSaleAdminDashboard() {
   const [backgroundRefreshing, setBackgroundRefreshing] = useState(false);
   const [error, setError] = useState("");
 
+  const requestIdRef = useRef(0);
+  const mountedRef = useRef(true);
+
   const year = useMemo(() => yearFromDate(dateFrom), [dateFrom]);
   const month = useMemo(() => monthFromDate(dateFrom), [dateFrom]);
 
@@ -79,6 +82,8 @@ export function useSaleAdminDashboard() {
     customParams: SaAdminDashboardParams = params,
     options: { background?: boolean } = {}
   ) => {
+    const requestId = ++requestIdRef.current;
+
     try {
       if (options.background) {
         setBackgroundRefreshing(true);
@@ -87,13 +92,21 @@ export function useSaleAdminDashboard() {
       }
 
       setError("");
+
       const response = await saleAdminDashboardService.getDashboard(customParams);
-      setData(response);
+
+      if (mountedRef.current && requestId === requestIdRef.current) {
+        setData(response);
+      }
     } catch (err) {
-      setError(getErrorMessage(err, "Không tải được báo cáo Sale Admin"));
+      if (mountedRef.current && requestId === requestIdRef.current) {
+        setError(getErrorMessage(err, "Không tải được báo cáo Sale Admin"));
+      }
     } finally {
-      setLoading(false);
-      setBackgroundRefreshing(false);
+      if (mountedRef.current && requestId === requestIdRef.current) {
+        setLoading(false);
+        setBackgroundRefreshing(false);
+      }
     }
   };
 
@@ -158,12 +171,26 @@ export function useSaleAdminDashboard() {
   };
 
   useEffect(() => {
+    mountedRef.current = true;
+
     if (!authService.isAuthenticated()) {
       router.push("/login");
       return;
     }
 
-    void loadDashboard(params);
+    // Hoãn sang task kế tiếp để lần cleanup mô phỏng của React Strict Mode
+    // có thể hủy timer trước khi request được gửi. Không abort HTTP request
+    // qua Next proxy vì việc đó tạo ECONNRESET / socket hang up.
+    const initialLoadTimer = window.setTimeout(() => {
+      void loadDashboard(params);
+    }, 0);
+
+    return () => {
+      mountedRef.current = false;
+      requestIdRef.current += 1;
+      window.clearTimeout(initialLoadTimer);
+    };
+    // Chỉ tải lần đầu. Các thay đổi bộ lọc được áp dụng qua search/changeMonth.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
@@ -173,13 +200,15 @@ export function useSaleAdminDashboard() {
   });
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      void refreshRef.current();
-    }, 120000); // 120 seconds
+    const interval = window.setInterval(() => {
+      // Không gọi API khi tab đang ẩn, tránh request thừa và tranh chấp request.
+      if (document.visibilityState === "visible") {
+        void refreshRef.current();
+      }
+    }, 120_000);
 
-    return () => clearInterval(interval);
+    return () => window.clearInterval(interval);
   }, []);
-
 
   return {
     data,

@@ -1,17 +1,130 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Edit, Plus, RefreshCw, Save, Trash2 } from "lucide-react";
-
+import { Edit, Filter, Plus, RefreshCw, Save, Trash2, X } from "lucide-react";
+import { DateRangeFilter } from "@/components/common/DateRangeFilter";
 import { KpiConfigController } from "@/hooks/useKpiConfig";
 import { KpiConfigModal, ModalField } from "./KpiConfigModal";
 
 type PeriodModalMode = "create" | "edit" | null;
 
-export function KpiPeriodHeader({ config }: { config: KpiConfigController }) {
-  const now = new Date();
+function getCurrentMonthRange() {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const lastDayNumber = new Date(yyyy, d.getMonth() + 1, 0).getDate();
+  const lastDay = String(lastDayNumber).padStart(2, "0");
 
-  const [modalMode, setModalMode] = useState<PeriodModalMode>(null);
+  return {
+    from: `${yyyy}-${mm}-01`,
+    to: `${yyyy}-${mm}-${lastDay}`,
+  };
+}
+
+export function KpiHeaderActions({
+  config,
+  onOpenCreate,
+  onOpenEdit,
+  filterOpen,
+  onToggleFilter,
+}: {
+  config: KpiConfigController;
+  onOpenCreate: () => void;
+  onOpenEdit: () => void;
+  filterOpen: boolean;
+  onToggleFilter: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        onClick={onToggleFilter}
+        className={[
+          "flex h-8 items-center gap-1.5 rounded border px-3 text-xs font-semibold transition-all",
+          filterOpen
+            ? "border-[#0097cf] bg-sky-50 text-[#0097cf] shadow-sm"
+            : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50",
+        ].join(" ")}
+      >
+        <Filter size={14} />
+        Bộ lọc
+      </button>
+
+      <button
+        type="button"
+        onClick={config.reloadPeriodDetail}
+        disabled={!config.selectedPeriodId || config.loadingDetail}
+        className="flex h-8 items-center gap-1 rounded border border-sky-300 bg-white px-3 text-xs font-semibold text-sky-600 hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <RefreshCw size={14} />
+        Tải lại
+      </button>
+
+      {config.canManage && (
+        <>
+          <button
+            type="button"
+            onClick={onOpenCreate}
+            className="flex h-8 items-center gap-1 rounded bg-[#0097cf] px-3 text-xs font-semibold text-white shadow-sm hover:bg-[#0089bd]"
+          >
+            <Plus size={14} />
+            Thêm kỳ
+          </button>
+
+          <button
+            type="button"
+            onClick={onOpenEdit}
+            disabled={!config.selectedPeriod}
+            className="flex h-8 items-center gap-1 rounded border border-sky-300 bg-white px-3 text-xs font-semibold text-sky-600 hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Edit size={14} />
+            Sửa kỳ
+          </button>
+
+          <button
+            type="button"
+            onClick={() =>
+              config.selectedPeriod &&
+              config.deletePeriod(config.selectedPeriod.id)
+            }
+            disabled={!config.selectedPeriod}
+            className="flex h-8 items-center gap-1 rounded border border-red-200 bg-white px-3 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Trash2 size={14} />
+            Xóa kỳ
+          </button>
+
+          <button
+            type="button"
+            onClick={config.saveWeights}
+            disabled={
+              config.saving || !config.periodDetail || !config.selectedProfile
+            }
+            className="flex h-8 items-center gap-1 rounded bg-emerald-500 px-3 text-xs font-semibold text-white hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Save size={14} />
+            Lưu trọng số
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+export function KpiPeriodHeader({
+  config,
+  modalMode,
+  setModalMode,
+  filterOpen,
+  setFilterOpen,
+}: {
+  config: KpiConfigController;
+  modalMode: PeriodModalMode;
+  setModalMode: (mode: PeriodModalMode) => void;
+  filterOpen: boolean;
+  setFilterOpen: (open: boolean) => void;
+}) {
+  const now = new Date();
 
   const [year, setYear] = useState(String(now.getFullYear()));
   const [month, setMonth] = useState(String(now.getMonth() + 1));
@@ -22,6 +135,10 @@ export function KpiPeriodHeader({ config }: { config: KpiConfigController }) {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
+  const initialRange = getCurrentMonthRange();
+  const [dateRangeFrom, setDateRangeFrom] = useState(initialRange.from);
+  const [dateRangeTo, setDateRangeTo] = useState(initialRange.to);
+
   useEffect(() => {
     if (!config.selectedPeriod) return;
 
@@ -31,9 +148,18 @@ export function KpiPeriodHeader({ config }: { config: KpiConfigController }) {
     setEndDate(config.selectedPeriod.end_date || "");
   }, [config.selectedPeriod]);
 
-  const openEdit = () => {
-    if (!config.selectedPeriod) return;
-    setModalMode("edit");
+  // Handle DateRange change to select matching period automatically
+  const handleDateRangeFilterChange = (from: string, to: string) => {
+    if (!from || !to || config.periods.length === 0) return;
+
+    const matched = config.periods.find((p) => {
+      if (!p.start_date || !p.end_date) return false;
+      return p.start_date <= to && p.end_date >= from;
+    });
+
+    if (matched) {
+      config.setSelectedPeriodId(String(matched.id));
+    }
   };
 
   const submitCreate = async () => {
@@ -56,123 +182,79 @@ export function KpiPeriodHeader({ config }: { config: KpiConfigController }) {
 
   return (
     <>
-      <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
-        <div className="flex h-12 items-center justify-between border-b bg-white px-4">
-          <div>
-            <h1 className="text-sm font-semibold text-slate-800">
-              Cấu hình KPI Sale Admin
-            </h1>
-            <p className="mt-0.5 text-xs text-slate-500">
-              Quản lý kỳ KPI, bộ KPI SA/SA_SUP, phần, nhóm và chỉ tiêu KPI.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
+      {filterOpen && (
+        <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-md animate-in fade-in duration-150">
+          <div className="flex items-center justify-between border-b bg-slate-50 px-4 py-2">
+            <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
+              <Filter size={14} className="text-[#0097cf]" />
+              Bộ lọc Cấu hình KPI
+            </div>
             <button
               type="button"
-              onClick={config.reloadPeriodDetail}
-              disabled={!config.selectedPeriodId || config.loadingDetail}
-              className="flex h-8 items-center gap-1 rounded border border-sky-300 bg-white px-3 text-xs font-semibold text-sky-600 hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={() => setFilterOpen(false)}
+              className="rounded p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700"
             >
-              <RefreshCw size={15} />
-              Tải lại
+              <X size={15} />
             </button>
-
-            {config.canManage && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setModalMode("create")}
-                  className="flex h-8 items-center gap-1 rounded bg-[#0097cf] px-3 text-xs font-semibold text-white shadow-sm hover:bg-[#0089bd]"
-                >
-                  <Plus size={15} />
-                  Thêm kỳ
-                </button>
-
-                <button
-                  type="button"
-                  onClick={openEdit}
-                  disabled={!config.selectedPeriod}
-                  className="flex h-8 items-center gap-1 rounded border border-sky-300 bg-white px-3 text-xs font-semibold text-sky-600 hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <Edit size={15} />
-                  Sửa kỳ
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    config.selectedPeriod &&
-                    config.deletePeriod(config.selectedPeriod.id)
-                  }
-                  disabled={!config.selectedPeriod}
-                  className="flex h-8 items-center gap-1 rounded border border-red-200 bg-white px-3 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <Trash2 size={15} />
-                  Xóa kỳ
-                </button>
-
-                <button
-                  type="button"
-                  onClick={config.saveWeights}
-                  disabled={
-                    config.saving || !config.periodDetail || !config.selectedProfile
-                  }
-                  className="flex h-8 items-center gap-1 rounded bg-emerald-500 px-3 text-xs font-semibold text-white hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <Save size={15} />
-                  Lưu trọng số
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-12 gap-3 px-4 py-3">
-          <div className="col-span-12 md:col-span-5">
-            <label className="mb-1 block text-xs font-semibold text-slate-600">
-              Kỳ KPI
-            </label>
-            <select
-              value={config.selectedPeriodId}
-              onChange={(event) => config.setSelectedPeriodId(event.target.value)}
-              className="h-9 w-full rounded border border-slate-300 bg-white px-3 text-xs outline-none focus:border-sky-400"
-            >
-              <option value="">Chọn kỳ KPI</option>
-              {config.periods.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.period_code} - {item.period_name} ({item.status})
-                </option>
-              ))}
-            </select>
           </div>
 
-          <div className="col-span-12 md:col-span-4">
-            <label className="mb-1 block text-xs font-semibold text-slate-600">
-              Bộ KPI
-            </label>
-            <select
-              value={config.selectedProfileId}
-              onChange={(event) => config.setSelectedProfileId(event.target.value)}
-              disabled={!config.periodDetail || config.profileRows.length === 0}
-              className="h-9 w-full rounded border border-slate-300 bg-white px-3 text-xs outline-none focus:border-sky-400 disabled:bg-slate-50"
-            >
-              <option value="">Chọn bộ KPI</option>
-              {config.profileRows.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.profile_code} - {item.profile_name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {config.selectedPeriod && (
-            <div className="col-span-12 flex items-end text-xs text-slate-500 md:col-span-3">
-              {config.selectedPeriod.start_date} → {config.selectedPeriod.end_date}
+          <div className="flex flex-wrap items-end gap-3 px-4 py-3">
+            <div className="flex items-end gap-2">
+              <DateRangeFilter
+                fromLabel="Từ ngày"
+                toLabel="Đến ngày"
+                fromValue={dateRangeFrom}
+                toValue={dateRangeTo}
+                onFromChange={(val) => {
+                  setDateRangeFrom(val);
+                  handleDateRangeFilterChange(val, dateRangeTo);
+                }}
+                onToChange={(val) => {
+                  setDateRangeTo(val);
+                  handleDateRangeFilterChange(dateRangeFrom, val);
+                }}
+              />
             </div>
-          )}
+
+            <div className="flex-1 min-w-[200px]">
+              <label className="mb-1 block text-xs font-semibold text-slate-600">
+                Kỳ KPI
+              </label>
+              <select
+                value={config.selectedPeriodId}
+                onChange={(event) => config.setSelectedPeriodId(event.target.value)}
+                className="h-9 w-full rounded border border-slate-300 bg-white px-3 text-xs outline-none focus:border-sky-400"
+              >
+                <option value="">Chọn kỳ KPI</option>
+                {config.periods.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.period_code} - {item.period_name} ({item.status})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex-1 min-w-[200px]">
+              <label className="mb-1 block text-xs font-semibold text-slate-600">
+                Bộ KPI
+              </label>
+              <select
+                value={config.selectedProfileId}
+                onChange={(event) => config.setSelectedProfileId(event.target.value)}
+                disabled={!config.periodDetail || config.profileRows.length === 0}
+                className="h-9 w-full rounded border border-slate-300 bg-white px-3 text-xs outline-none focus:border-sky-400 disabled:bg-slate-50"
+              >
+                <option value="">Chọn bộ KPI</option>
+                {config.profileRows.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.profile_code} - {item.profile_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
 
       {modalMode === "create" && (
         <KpiConfigModal

@@ -110,7 +110,6 @@ function CurrentInfoTab({ item }: { item: SaRecordItem }) {
                 <InfoRow label="Giới thiệu sản phẩm" value={formatBoolean(item.introduced_product)} />
                 <InfoRow label="Tái kích hoạt" value={formatBoolean(item.reactivation)} />
                 <InfoRow label="Hỗ trợ thông tin" value={formatBoolean(item.support_info)} />
-                <InfoRow label="Referral RM" value={formatBoolean(item.referred_rm)} />
                 <InfoRow label="Bàn giao môi giới" value={formatBoolean(item.handover_to_broker)} />
                 <InfoRow label="Ghi chú bàn giao" value={item.broker_handover_note} />
             </section>

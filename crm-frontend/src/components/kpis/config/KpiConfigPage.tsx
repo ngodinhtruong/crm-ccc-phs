@@ -7,9 +7,12 @@ import { KpiConfigTabs } from "./KpiConfigTabs";
 import { KpiGateConfigsTab } from "./KpiGateConfigsTab";
 import { KpiGroupsTab } from "./KpiGroupsTab";
 import { KpiMetricsTab } from "./KpiMetricsTab";
-import { KpiPeriodHeader } from "./KpiPeriodHeader";
+import { KpiPeriodHeader, KpiHeaderActions } from "./KpiPeriodHeader";
 import { KpiRewardTiersTab } from "./KpiRewardTiersTab";
 import { KpiWeightValidationPanel } from "./KpiWeightValidationPanel";
+
+import { useEffect, useState } from "react";
+import { ToastItem, ToastMessage } from "@/components/ui/Toast";
 
 function StatusBadge({ status }: { status: string }) {
   if (status === "ACTIVE") {
@@ -37,6 +40,40 @@ function StatusBadge({ status }: { status: string }) {
 
 export function KpiConfigPage() {
   const config = useKpiConfig();
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [modalMode, setModalMode] = useState<"create" | "edit" | null>(null);
+  const [filterOpen, setFilterOpen] = useState(false);
+
+  useEffect(() => {
+    if (config.notice) {
+      setToasts((prev) => [
+        ...prev,
+        {
+          id: `notice-${Date.now()}`,
+          type: "success",
+          title: config.notice || "Cấu hình trọng số KPI hợp lệ.",
+        },
+      ]);
+    }
+  }, [config.notice]);
+
+  useEffect(() => {
+    if (config.error) {
+      setToasts((prev) => [
+        ...prev,
+        {
+          id: `error-${Date.now()}`,
+          type: "error",
+          title: "Thao tác không thành công",
+          message: config.error,
+        },
+      ]);
+    }
+  }, [config.error]);
+
+  const removeToast = (id: string) => {
+    setToasts((prev) => prev.filter((item) => item.id !== id));
+  };
 
   return (
     <DashboardLayout
@@ -52,9 +89,25 @@ export function KpiConfigPage() {
           label: "Cấu hình KPI",
         },
       ]}
+      rightAction={
+        <KpiHeaderActions
+          config={config}
+          onOpenCreate={() => setModalMode("create")}
+          onOpenEdit={() => setModalMode("edit")}
+          filterOpen={filterOpen}
+          onToggleFilter={() => setFilterOpen((prev) => !prev)}
+        />
+      }
       sidebarDefaultExpandedGroupKey="sale-admin"
       sidebarDefaultActiveChildKey="sale-admin-kpi-config"
     >
+      {/* Floating Toast Container */}
+      <div className="fixed top-4 right-4 z-50 flex flex-col gap-2">
+        {toasts.map((toast) => (
+          <ToastItem key={toast.id} toast={toast} onClose={removeToast} />
+        ))}
+      </div>
+
       {config.loading ? (
         <div className="rounded-md border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500 shadow-sm">
           Đang tải cấu hình KPI...
@@ -65,19 +118,13 @@ export function KpiConfigPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          <KpiPeriodHeader config={config} />
-
-          {config.error && (
-            <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
-              {config.error}
-            </div>
-          )}
-
-          {config.notice && (
-            <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-              {config.notice}
-            </div>
-          )}
+          <KpiPeriodHeader
+            config={config}
+            modalMode={modalMode}
+            setModalMode={setModalMode}
+            filterOpen={filterOpen}
+            setFilterOpen={setFilterOpen}
+          />
 
           {!config.periodDetail ? (
             <div className="rounded-md border border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500 shadow-sm">

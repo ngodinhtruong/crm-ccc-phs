@@ -414,9 +414,8 @@ function SourceDonutChartCard({ items, globalViewMode }: { items: any[]; globalV
                 dataKey="value"
                 position="right"
                 style={{ fontSize: 10, fontWeight: 700, fill: "#334155" }}
-                formatter={(val: any, entry: any) => {
-                  const p = entry?.pct ?? entry?.payload?.pct;
-                  const pct = p !== undefined ? p : (totalSum > 0 ? ((Number(val) / totalSum) * 100).toFixed(1) : "0");
+                formatter={(val: any) => {
+                  const pct = totalSum > 0 ? ((Number(val) / totalSum) * 100).toFixed(1) : "0";
                   return val ? `${formatNumber(val)} (${pct}%)` : "";
                 }}
               />

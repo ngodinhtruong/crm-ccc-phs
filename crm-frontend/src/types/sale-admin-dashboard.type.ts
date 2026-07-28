@@ -139,6 +139,11 @@ export type SaAdminCriteriaDefinition = {
 };
 
 export type SaAdminDashboardFilters = {
+  year?: string | number;
+  month?: string | number;
+  date_from?: string;
+  date_to?: string;
+  branch?: string;
   branch_options: SaAdminBranchOption[];
 };
 

@@ -498,14 +498,14 @@ export function KpiAdminTargetsTab({ admin }: { admin: KpiAdminController }) {
                             className="h-8 w-full rounded border border-slate-300 bg-white px-2 text-sm font-semibold text-slate-800 outline-none focus:border-sky-400"
                           />
 
-                          <div className="mt-1 space-y-0.5 text-[11px] leading-4 text-slate-500">
+                          {/* <div className="mt-1 space-y-0.5 text-[11px] leading-4 text-slate-500">
                             <div>
                               Thực tế: <span className="font-semibold text-slate-700">{formatTargetValue(result?.actual_value, metric.target_unit)}</span>
                             </div>
                             <div>
                               Áp dụng: <span className="font-semibold text-slate-700">{formatTargetValue(appliedTarget, metric.target_unit)}</span>
                             </div>
-                          </div>
+                          </div> */}
                         </td>
                       );
                     })}

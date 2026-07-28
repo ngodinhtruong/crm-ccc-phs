@@ -6,9 +6,10 @@ import {
   SaAdminDashboardResponse,
 } from "@/types/sale-admin-dashboard.type";
 
-const PRIMARY_ENDPOINT = "/api/sale-admin/admin-dashboard/";
-const REPORT_ENDPOINT = "/api/sale-admin/report-dashboard/";
-const FALLBACK_ENDPOINT = "/api/sale-admin/dashboard/";
+// Backend đã có route chuẩn này. Không gọi tuần tự 3 endpoint vì một URL sai
+// có thể làm người dùng phải chờ hết timeout trước khi thử URL tiếp theo.
+const DASHBOARD_ENDPOINT = "/api/sale-admin/dashboard/";
+const DASHBOARD_TIMEOUT_MS = 45_000;
 
 type LooseCustomerGroupRow = Partial<SaAdminCustomerGroupRow> & {
   id?: string | number | null;
@@ -22,11 +23,20 @@ function normalizeCustomerGroupRow(
   index: number
 ): SaAdminCustomerGroupRow {
   const groupCode =
-    row.group_code || row.icp_code || row.code || row.icp_type ||
+    row.group_code ||
+    row.icp_code ||
+    row.code ||
+    row.icp_type ||
     (row.id !== undefined && row.id !== null ? String(row.id) : `G${index + 1}`);
 
   const groupName =
-    row.group_name || row.icp_name || row.group_label || row.label || row.name || groupCode || "Chưa phân nhóm";
+    row.group_name ||
+    row.icp_name ||
+    row.group_label ||
+    row.label ||
+    row.name ||
+    groupCode ||
+    "Chưa phân nhóm";
 
   return {
     ...row,
@@ -49,6 +59,11 @@ function normalizeDashboardResponse(
     generated_at: data.generated_at || null,
     period: data.period || null,
     filters: {
+      year: data.filters?.year,
+      month: data.filters?.month,
+      date_from: data.filters?.date_from,
+      date_to: data.filters?.date_to,
+      branch: data.filters?.branch,
       branch_options: data.filters?.branch_options || [],
     },
     overview,
@@ -67,38 +82,15 @@ function normalizeDashboardResponse(
   };
 }
 
-async function requestDashboard(endpoint: string, params: SaAdminDashboardParams) {
-  const response = await api.get<SaAdminDashboardResponse>(endpoint, {
-    params: cleanParams(params),
-  });
-
-  return normalizeDashboardResponse(response.data);
-}
-
 export const saleAdminDashboardApi = {
   getDashboard: async (
     params: SaAdminDashboardParams = {}
   ): Promise<SaAdminDashboardResponse> => {
-    try {
-      return await requestDashboard(PRIMARY_ENDPOINT, params);
-    } catch (error) {
-      const status = (error as { response?: { status?: number } })?.response?.status;
+    const response = await api.get<SaAdminDashboardResponse>(DASHBOARD_ENDPOINT, {
+      params: cleanParams(params),
+      timeout: DASHBOARD_TIMEOUT_MS,
+    });
 
-      if (status !== 404) {
-        throw error;
-      }
-    }
-
-    try {
-      return await requestDashboard(REPORT_ENDPOINT, params);
-    } catch (error) {
-      const status = (error as { response?: { status?: number } })?.response?.status;
-
-      if (status !== 404) {
-        throw error;
-      }
-    }
-
-    return requestDashboard(FALLBACK_ENDPOINT, params);
+    return normalizeDashboardResponse(response.data);
   },
 };

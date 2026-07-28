@@ -6,20 +6,26 @@ from datetime import date, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 
-from django.db.models import Q
+from django.db.models import Count, Exists, OuterRef, Q, Sum
 from django.utils import timezone
 
 from apps.accounts.scopes import filter_branches_by_user, filter_sa_records_by_user
 from apps.branches.models import Branch
 from apps.sale_admin.models import SaRecord, SaIcpGroup
 
-try:
-    from apps.kpis.models import TransactionLog
-except Exception:  # pragma: no cover - only for older deployments during transition
-    TransactionLog = None
+from apps.kpis.models import TransactionLog
 
 
 ZERO = Decimal("0.00")
+
+MATCHED_ORDER_STATUSES = (
+    "MATCHED",
+    "PARTIALLY_MATCHED",
+    "COMPLETED",
+    "FILLED",
+    "PARTIALLY_FILLED",
+    "EXECUTED",
+)
 
 
 @dataclass(frozen=True)
@@ -203,27 +209,38 @@ def _records_for_period(records_qs, period: PeriodRange):
     return records_qs.filter(call_date__gte=period.start, call_date__lt=period.end)
 
 
-def _transactions_for_period(account_nos: set[str], period: PeriodRange):
-    if not TransactionLog or not account_nos:
+def _transactions_for_period(account_ids: set[int], period: PeriodRange):
+    """Lấy dữ liệu giao dịch đã tổng hợp ngay tại DB.
+
+    TransactionLog không còn account_no/customer trực tiếp. Liên kết chuẩn là:
+    TransactionLog -> CustomerAccount -> Customer.
+    """
+    if not account_ids:
         return []
 
-    qs = TransactionLog.objects.filter(
-        account_no__in=account_nos,
-        transaction_date__gte=period.start,
-        transaction_date__lt=period.end,
-    ).select_related("branch", "customer")
-
-    # Không hard-code một trạng thái khớp duy nhất vì dữ liệu có thể từ nhiều hệ thống.
-    # Chỉ loại các trạng thái hủy/từ chối phổ biến nếu có.
-    qs = qs.exclude(
-        Q(order_status__iexact="CANCELLED")
-        | Q(order_status__iexact="CANCELED")
-        | Q(order_status__iexact="REJECTED")
-        | Q(order_status__icontains="HUY")
-        | Q(order_status__icontains="HỦY")
+    return list(
+        TransactionLog.objects.filter(
+            customer_account_id__in=account_ids,
+            transaction_date__gte=period.start,
+            transaction_date__lt=period.end,
+            order_status__in=MATCHED_ORDER_STATUSES,
+        )
+        .values(
+            "customer_account_id",
+            "customer_account__account_number",
+            "customer_account__customer__full_name",
+            "branch_id",
+            "branch__branch_name",
+            "branch__branch_code",
+            "product_code",
+        )
+        .annotate(
+            transaction_value=Sum("transaction_value"),
+            transaction_fee=Sum("transaction_fee"),
+            order_count=Count("id"),
+        )
+        .order_by()
     )
-
-    return list(qs)
 
 
 def _transaction_totals(transactions) -> dict[str, Decimal]:
@@ -231,10 +248,10 @@ def _transaction_totals(transactions) -> dict[str, Decimal]:
     fee = ZERO
     order_count = 0
 
-    for transaction in transactions:
-        value += _decimal(getattr(transaction, "transaction_value", 0))
-        fee += _decimal(getattr(transaction, "transaction_fee", 0))
-        order_count += 1
+    for row in transactions:
+        value += _decimal(row.get("transaction_value"))
+        fee += _decimal(row.get("transaction_fee"))
+        order_count += _number(row.get("order_count"))
 
     return {
         "transaction_value": value,
@@ -256,30 +273,59 @@ def _build_account_transaction_map(transactions) -> dict[str, dict[str, Any]]:
         }
     )
 
-    for transaction in transactions:
-        account_no = str(getattr(transaction, "account_no", "") or "").strip()
+    for row in transactions:
+        account_no = str(row.get("customer_account__account_number") or "").strip()
         if not account_no:
             continue
 
         item = account_map[account_no]
-        item["transaction_value"] += _decimal(getattr(transaction, "transaction_value", 0))
-        item["transaction_fee"] += _decimal(getattr(transaction, "transaction_fee", 0))
-        item["order_count"] += 1
+        item["transaction_value"] += _decimal(row.get("transaction_value"))
+        item["transaction_fee"] += _decimal(row.get("transaction_fee"))
+        item["order_count"] += _number(row.get("order_count"))
 
-        product_code = str(getattr(transaction, "product_code", "") or "Không xác định").strip() or "Không xác định"
-        item["product_fee"][product_code] += _decimal(getattr(transaction, "transaction_fee", 0))
+        product_code = str(row.get("product_code") or "Không xác định").strip() or "Không xác định"
+        item["product_fee"][product_code] += _decimal(row.get("transaction_fee"))
 
-        branch = getattr(transaction, "branch", None)
-        if branch and not item["branch_id"]:
-            item["branch_id"] = branch.id
-            item["branch_name"] = _branch_name(branch)
+        if row.get("branch_id") and not item["branch_id"]:
+            item["branch_id"] = row["branch_id"]
+            item["branch_name"] = (
+                row.get("branch__branch_name")
+                or row.get("branch__branch_code")
+                or f"Chi nhánh {row['branch_id']}"
+            )
 
-        customer = getattr(transaction, "customer", None)
-        if customer and not item["customer_name"]:
-            item["customer_name"] = getattr(customer, "full_name", None)
+        if row.get("customer_account__customer__full_name") and not item["customer_name"]:
+            item["customer_name"] = row["customer_account__customer__full_name"]
 
     return account_map
 
+
+def _record_account_no(record: SaRecord) -> str:
+    customer_account = getattr(record, "customer_account", None)
+    if customer_account and customer_account.account_number:
+        return str(customer_account.account_number).strip()
+    return str(record.account_no or "").strip()
+
+
+def _active_account_numbers(records_qs, period: PeriodRange) -> set[str]:
+    """TK tái kích hoạt hợp lệ: cờ reactivation và có lệnh khớp sau ngày gọi."""
+    matched_transactions = TransactionLog.objects.filter(
+        customer_account_id=OuterRef("customer_account_id"),
+        transaction_date__gte=OuterRef("call_date"),
+        transaction_date__lt=period.end,
+        order_status__in=MATCHED_ORDER_STATUSES,
+    )
+
+    return set(
+        records_qs.filter(
+            reactivation=True,
+            customer_account__isnull=False,
+        )
+        .annotate(has_matched_transaction=Exists(matched_transactions))
+        .filter(has_matched_transaction=True)
+        .values_list("customer_account__account_number", flat=True)
+        .distinct()
+    )
 
 def _record_customer_name(record: SaRecord) -> str:
     customer = getattr(record, "customer", None)
@@ -310,7 +356,7 @@ def _latest_records_by_account(records) -> dict[str, SaRecord]:
     account_map: dict[str, SaRecord] = {}
 
     for record in sorted(records, key=lambda item: (item.call_date, item.id)):
-        account_no = str(record.account_no or "").strip()
+        account_no = _record_account_no(record)
         if account_no:
             account_map[account_no] = record
 
@@ -424,15 +470,24 @@ def _build_branch_ranking(branch_options, current_records, previous_records, cur
         records = records_by_branch.get(branch_id, [])
         previous_branch_records = previous_records_by_branch.get(branch_id, [])
 
-        account_nos = {str(record.account_no or "").strip() for record in records if record.account_no}
-        previous_account_nos = {str(record.account_no or "").strip() for record in previous_branch_records if record.account_no}
+        account_nos = {_record_account_no(record) for record in records if _record_account_no(record)}
+        previous_account_nos = {_record_account_no(record) for record in previous_branch_records if _record_account_no(record)}
 
-        reactivated_nos = {
-            str(record.account_no or "").strip()
+        reactivation_flag_nos = {
+            _record_account_no(record)
             for record in records
-            if record.reactivation and record.account_no
+            if record.reactivation and _record_account_no(record)
         }
-        potential_active_nos = reactivated_nos.intersection(current_active_accounts)
+        reactivated_nos = reactivation_flag_nos.intersection(current_active_accounts)
+        potential_active_nos = {
+            _record_account_no(record)
+            for record in records
+            if (
+                _record_account_no(record) in reactivated_nos
+                and record.icp_group
+                and record.icp_group.is_potential
+            )
+        }
 
         sa_value = ZERO
         sa_fee = ZERO
@@ -455,8 +510,26 @@ def _build_branch_ranking(branch_options, current_records, previous_records, cur
 
             record = latest_record_map.get(account_no)
             if record and (record.handover_to_broker or record.broker_user_id or record.broker_employee_id):
-                broker_value += value
-                broker_fee += fee
+                handover_date = record.broker_handover_at.date() if record.broker_handover_at else record.call_date
+                if record.customer_account_id:
+                    tx_split = TransactionLog.objects.filter(
+                        customer_account_id=record.customer_account_id,
+                        transaction_date__gte=period.start,
+                        transaction_date__lt=period.end,
+                        order_status__in=MATCHED_ORDER_STATUSES,
+                    ).aggregate(
+                        broker_v=Sum("transaction_value", filter=Q(transaction_date__gte=handover_date)),
+                        broker_f=Sum("transaction_fee", filter=Q(transaction_date__gte=handover_date)),
+                        sa_v=Sum("transaction_value", filter=Q(transaction_date__lt=handover_date)),
+                        sa_f=Sum("transaction_fee", filter=Q(transaction_date__lt=handover_date)),
+                    )
+                    broker_value += _decimal(tx_split.get("broker_v"))
+                    broker_fee += _decimal(tx_split.get("broker_f"))
+                    sa_value += _decimal(tx_split.get("sa_v"))
+                    sa_fee += _decimal(tx_split.get("sa_f"))
+                else:
+                    broker_value += value
+                    broker_fee += fee
             else:
                 sa_value += value
                 sa_fee += fee
@@ -603,7 +676,7 @@ def _build_top_employees(current_records, current_account_map, current_active_ac
         row = rows_by_key[key]
         row["total_calls"] += 1
 
-        account_no = str(record.account_no or "").strip()
+        account_no = _record_account_no(record)
         if not account_no:
             continue
 
@@ -611,22 +684,21 @@ def _build_top_employees(current_records, current_account_map, current_active_ac
             row["reactivated_accounts"].add(account_no)
 
         totals = current_account_map.get(account_no)
-        if not totals:
+        if not totals or account_no in row["accounts"]:
             continue
 
+        # Một tài khoản có thể có nhiều lần gọi trong kỳ; chỉ cộng giao dịch một lần.
         row["transaction_fee"] += _decimal(totals["transaction_fee"])
         row["transaction_value"] += _decimal(totals["transaction_value"])
-
-        if account_no not in row["accounts"]:
-            row["accounts"][account_no] = {
-                "account_no": account_no,
-                "customer_name": _record_customer_name(record),
-                "branch_name": totals.get("branch_name") or _record_branch_name(record),
-                "transaction_fee": _money(totals["transaction_fee"]),
-                "transaction_value": _money(totals["transaction_value"]),
-                "order_count": _number(totals["order_count"]),
-                "call_date": record.call_date.isoformat() if record.call_date else None,
-            }
+        row["accounts"][account_no] = {
+            "account_no": account_no,
+            "customer_name": _record_customer_name(record),
+            "branch_name": totals.get("branch_name") or _record_branch_name(record),
+            "transaction_fee": _money(totals["transaction_fee"]),
+            "transaction_value": _money(totals["transaction_value"]),
+            "order_count": _number(totals["order_count"]),
+            "call_date": record.call_date.isoformat() if record.call_date else None,
+        }
 
     rows = []
     for row in rows_by_key.values():
@@ -677,6 +749,7 @@ def _build_product_fee(current_account_map):
 
 
 def _build_icp_distribution(current_records):
+    current_records = list(_latest_records_by_account(current_records).values())
     total = len(current_records)
     type_map: dict[str, dict[str, Any]] = defaultdict(lambda: {"count": 0, "label": "Chưa phân nhóm"})
 
@@ -705,6 +778,7 @@ def _build_icp_distribution(current_records):
 
 
 def _build_customer_group_distribution(current_records, current_account_map):
+    current_records = list(_latest_records_by_account(current_records).values())
     total = len(current_records)
     groups: dict[str, dict[str, Any]] = {}
 
@@ -733,13 +807,17 @@ def _build_customer_group_distribution(current_records, current_account_map):
                 "description": description,
                 "count": 0,
                 "percent": 0,
+                "transaction_fee": ZERO,
+                "transaction_value": ZERO,
                 "accounts": [],
             }
 
         groups[key]["count"] += 1
 
-        account_no = str(record.account_no or "").strip()
+        account_no = _record_account_no(record)
         totals = current_account_map.get(account_no, {})
+        groups[key]["transaction_fee"] += _decimal(totals.get("transaction_fee", 0))
+        groups[key]["transaction_value"] += _decimal(totals.get("transaction_value", 0))
         groups[key]["accounts"].append(
             {
                 "account_no": account_no,
@@ -757,6 +835,8 @@ def _build_customer_group_distribution(current_records, current_account_map):
     rows = list(groups.values())
     for row in rows:
         row["percent"] = float(_safe_percent(row["count"], total))
+        row["transaction_fee"] = _money(row["transaction_fee"])
+        row["transaction_value"] = _money(row["transaction_value"])
         row["accounts"].sort(key=lambda item: _decimal(item["transaction_fee"]), reverse=True)
         row["accounts"] = row["accounts"][:50]
 
@@ -767,7 +847,7 @@ def _build_customer_group_distribution(current_records, current_account_map):
 def _build_criteria():
     return {
         "title": "Tiêu chí đánh giá tài khoản Kích Hoạt Tiềm năng",
-        "formula": "KH có reactivation = true trong tháng và có giao dịch khớp trong transaction_logs của tháng đó.",
+        "formula": "KH có reactivation = true và có ít nhất một lệnh khớp từ ngày gọi trong transaction_logs.",
         "groups": [
             {"code": "A", "name": "Rất tiềm năng", "description": "Hoạt động thường xuyên, giao dịch đều."},
             {"code": "B", "name": "Tiềm năng", "description": "Có giao dịch nhưng chưa ổn định."},
@@ -807,33 +887,30 @@ def get_sale_admin_report_payload(request) -> dict[str, Any]:
     if branch_param:
         scoped_records_qs = scoped_records_qs.filter(branch_id=branch_param)
 
-    current_records = list(_records_for_period(scoped_records_qs, period))
-    previous_records = list(_records_for_period(scoped_records_qs, previous))
+    current_records_qs = _records_for_period(scoped_records_qs, period)
+    previous_records_qs = _records_for_period(scoped_records_qs, previous)
+
+    # Exists chạy trong DB, tránh N+1 khi kiểm tra lệnh khớp theo từng SaRecord.
+    current_active_accounts = _active_account_numbers(current_records_qs, period)
+    previous_active_accounts = _active_account_numbers(previous_records_qs, previous)
+
+    current_records = list(current_records_qs)
+    previous_records = list(previous_records_qs)
 
     branch_options = _build_branch_options(request.user, current_records + previous_records)
 
-    current_account_nos = {str(record.account_no or "").strip() for record in current_records if record.account_no}
-    previous_account_nos = {str(record.account_no or "").strip() for record in previous_records if record.account_no}
+    current_account_ids = {
+        record.customer_account_id for record in current_records if record.customer_account_id
+    }
+    previous_account_ids = {
+        record.customer_account_id for record in previous_records if record.customer_account_id
+    }
 
-    current_transactions = _transactions_for_period(current_account_nos, period)
-    previous_transactions = _transactions_for_period(previous_account_nos, previous)
+    current_transactions = _transactions_for_period(current_account_ids, period)
+    previous_transactions = _transactions_for_period(previous_account_ids, previous)
 
     current_account_map = _build_account_transaction_map(current_transactions)
     previous_account_map = _build_account_transaction_map(previous_transactions)
-
-    current_reactivated_nos = {
-        str(record.account_no or "").strip()
-        for record in current_records
-        if record.reactivation and record.account_no
-    }
-    previous_reactivated_nos = {
-        str(record.account_no or "").strip()
-        for record in previous_records
-        if record.reactivation and record.account_no
-    }
-
-    current_active_accounts = current_reactivated_nos.intersection(set(current_account_map.keys()))
-    previous_active_accounts = previous_reactivated_nos.intersection(set(previous_account_map.keys()))
 
     overview = _build_overview(
         period,

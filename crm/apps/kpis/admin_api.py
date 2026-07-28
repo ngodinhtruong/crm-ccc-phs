@@ -3,7 +3,7 @@ from decimal import Decimal, InvalidOperation
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
-from django.db.models import Avg, Count, Q, Sum
+from django.db.models import Avg, Count, Exists, OuterRef, Q, Sum
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
@@ -14,12 +14,20 @@ from rest_framework.views import APIView
 from apps.accounts.services import PermissionService
 from apps.branches.models import Branch
 from apps.kpis.models import (
+    KpiGroup,
     KpiPeriod,
     KpiPeriodMetric,
     KpiProfile,
     KpiUserMetricResult,
     KpiUserSummary,
     KpiUserTarget,
+    TransactionLog,
+)
+from apps.kpis.auto_calculation import (
+    calculate_metric_actual_value,
+    get_branch_sa_records,
+    get_user_employee_and_branch,
+    get_user_sa_records,
 )
 from apps.sale_admin.models import SaRecord
 from apps.kpis.permissions import (
@@ -543,6 +551,7 @@ class KpiAdminRankingAPIView(KpiAdminBaseAPIView):
         summaries = get_summary_map(period, profile, users)
         part_scores = get_part_score_map(period, profile, users)
         metric_results = get_metric_result_map(period, profile, users, metrics)
+        target_map = get_target_map(period, profile, users, metrics)
 
         rows = []
         for user in users:
@@ -551,14 +560,37 @@ class KpiAdminRankingAPIView(KpiAdminBaseAPIView):
             row_metrics = []
             for metric in metrics:
                 result = metric_results.get((user.id, metric.id))
+                target_obj = target_map.get((user.id, metric.id))
+
+                # Determine target value: result -> assigned target -> default metric target
+                target_val = getattr(result, "target_value", None)
+                if target_val is None and target_obj and target_obj.target_value is not None:
+                    target_val = target_obj.target_value
+                if target_val is None and metric.target_value is not None:
+                    target_val = metric.target_value
+
+                # Determine actual value: result -> compute live dynamically if auto metric
+                actual_val = getattr(result, "actual_value", None)
+                if actual_val is None and metric.group and metric.group.group_type == KpiGroup.GROUP_TYPE_AUTO:
+                    try:
+                        if profile.profile_code == KpiProfile.PROFILE_SA_SUP:
+                            employee, branch = get_user_employee_and_branch(user)
+                            records_qs = get_branch_sa_records(period, branch_id=branch.id if branch else None, metric=metric)
+                        else:
+                            records_qs = get_user_sa_records(period, user, metric=metric)
+                        computed_actual, _ = calculate_metric_actual_value(period, metric, records_qs, user=user)
+                        actual_val = computed_actual
+                    except Exception:
+                        actual_val = None
+
                 row_metrics.append(
                     {
                         "metric_id": metric.id,
                         "metric_code": metric.metric_code,
                         "metric_name": metric.metric_name,
                         "group_code": metric.group.group_code if metric.group else None,
-                        "actual_value": decimal_to_string(getattr(result, "actual_value", None), None),
-                        "target_value": decimal_to_string(getattr(result, "target_value", None), None),
+                        "actual_value": decimal_to_string(actual_val, None),
+                        "target_value": decimal_to_string(target_val, None),
                         "score": decimal_to_string(getattr(result, "score", None), "0"),
                         "weighted_score": decimal_to_string(getattr(result, "weighted_score", None), "0"),
                         "result_status": getattr(result, "result_status", None),
@@ -617,6 +649,16 @@ def calculate_per_call(value, call_count):
     return (value / call_count).quantize(Decimal("0.01"))
 
 
+MATCHED_ORDER_STATUSES = (
+    "MATCHED",
+    "PARTIALLY_MATCHED",
+    "COMPLETED",
+    "FILLED",
+    "PARTIALLY_FILLED",
+    "EXECUTED",
+)
+
+
 def get_sa_records_for_operational_report(period, users):
     user_ids = [item.id for item in users]
     if not user_ids:
@@ -628,6 +670,7 @@ def get_sa_records_for_operational_report(period, users):
             "pic_user__employee",
             "pic_user__employee__branch",
             "branch",
+            "customer_account",
         )
         .filter(
             pic_user_id__in=user_ids,
@@ -643,33 +686,95 @@ def get_sa_records_for_operational_report(period, users):
     return queryset
 
 
-def get_distinct_activated_filter():
-    return Q(reactivation=True) & ~Q(account_no="") & Q(account_no__isnull=False)
-
-
 def get_operational_user_rows(period, users):
-    records = get_sa_records_for_operational_report(period, users)
-    activated_filter = get_distinct_activated_filter()
+    records_qs = get_sa_records_for_operational_report(period, users)
+    records = list(records_qs)
 
-    aggregates = {
-        row["pic_user_id"]: row
-        for row in records.values("pic_user_id").annotate(
-            call_count=Count("id"),
-            activated_account_count=Count("account_no", filter=activated_filter, distinct=True),
-            transaction_fee=Sum("transaction_fee_snapshot"),
-            transaction_value=Sum("transaction_value_snapshot"),
+    matched_transactions = TransactionLog.objects.filter(
+        customer_account_id=OuterRef("customer_account_id"),
+        transaction_date__gte=OuterRef("call_date"),
+        transaction_date__lte=period.end_date,
+        order_status__in=MATCHED_ORDER_STATUSES,
+    )
+    active_account_numbers = set(
+        records_qs.filter(
+            reactivation=True,
+            customer_account__isnull=False,
         )
-    }
+        .annotate(has_matched_transaction=Exists(matched_transactions))
+        .filter(has_matched_transaction=True)
+        .values_list("customer_account__account_number", flat=True)
+        .distinct()
+    )
+
+    account_ids = {r.customer_account_id for r in records if r.customer_account_id}
+    account_tx_map = {}
+    if account_ids:
+        tx_rows = (
+            TransactionLog.objects.filter(
+                customer_account_id__in=account_ids,
+                transaction_date__gte=period.start_date,
+                transaction_date__lte=period.end_date,
+                order_status__in=MATCHED_ORDER_STATUSES,
+            )
+            .values("customer_account__account_number")
+            .annotate(
+                transaction_value=Sum("transaction_value"),
+                transaction_fee=Sum("transaction_fee"),
+            )
+        )
+        for row in tx_rows:
+            acc_no = str(row.get("customer_account__account_number") or "").strip()
+            if acc_no:
+                account_tx_map[acc_no] = {
+                    "fee": Decimal(str(row.get("transaction_fee") or 0)),
+                    "value": Decimal(str(row.get("transaction_value") or 0)),
+                }
+
+    records_by_user = defaultdict(list)
+    for r in records:
+        if r.pic_user_id:
+            records_by_user[r.pic_user_id].append(r)
 
     rows = []
     for user in users:
         employee = getattr(user, "employee", None)
         branch = getattr(employee, "branch", None) if employee else None
-        row = aggregates.get(user.id, {})
-        call_count = int(row.get("call_count") or 0)
-        activated_count = int(row.get("activated_account_count") or 0)
-        fee = row.get("transaction_fee") or Decimal("0")
-        value = row.get("transaction_value") or Decimal("0")
+        user_records = records_by_user.get(user.id, [])
+        call_count = len(user_records)
+
+        user_account_nos = set()
+        user_activated_accounts = set()
+        fee = Decimal("0")
+        value = Decimal("0")
+
+        for r in user_records:
+            acc_no = r.customer_account.account_number if (r.customer_account and r.customer_account.account_number) else str(r.account_no or "").strip()
+            if acc_no:
+                if acc_no not in user_account_nos:
+                    user_account_nos.add(acc_no)
+                    if r.handover_to_broker:
+                        handover_date = r.broker_handover_at.date() if r.broker_handover_at else r.call_date
+                        if r.customer_account_id:
+                            tx_before = TransactionLog.objects.filter(
+                                customer_account_id=r.customer_account_id,
+                                transaction_date__gte=period.start_date,
+                                transaction_date__lt=handover_date,
+                                order_status__in=MATCHED_ORDER_STATUSES,
+                            ).aggregate(
+                                f=Sum("transaction_fee"),
+                                v=Sum("transaction_value"),
+                            )
+                            fee += tx_before.get("f") or Decimal("0")
+                            value += tx_before.get("v") or Decimal("0")
+                    else:
+                        fee += account_tx_map.get(acc_no, {}).get("fee", Decimal("0"))
+                        value += account_tx_map.get(acc_no, {}).get("value", Decimal("0"))
+
+                if r.reactivation and (acc_no in active_account_numbers):
+                    user_activated_accounts.add(acc_no)
+
+        activated_count = len(user_activated_accounts)
 
         rows.append(
             {
@@ -736,13 +841,46 @@ def get_operational_branch_rows(employee_rows):
 
 
 def get_operational_report_payload(period, users):
+    records_qs = get_sa_records_for_operational_report(period, users)
+    total_calls = records_qs.count()
+
+    matched_transactions = TransactionLog.objects.filter(
+        customer_account_id=OuterRef("customer_account_id"),
+        transaction_date__gte=OuterRef("call_date"),
+        transaction_date__lte=period.end_date,
+        order_status__in=MATCHED_ORDER_STATUSES,
+    )
+    total_activated = (
+        records_qs.filter(
+            reactivation=True,
+            customer_account__isnull=False,
+        )
+        .annotate(has_matched_transaction=Exists(matched_transactions))
+        .filter(has_matched_transaction=True)
+        .values_list("customer_account__account_number", flat=True)
+        .distinct()
+        .count()
+    )
+
+    account_ids = set(records_qs.exclude(customer_account_id__isnull=True).values_list("customer_account_id", flat=True))
+    total_fee = Decimal("0")
+    total_value = Decimal("0")
+
+    if account_ids:
+        tx_agg = TransactionLog.objects.filter(
+            customer_account_id__in=account_ids,
+            transaction_date__gte=period.start_date,
+            transaction_date__lte=period.end_date,
+            order_status__in=MATCHED_ORDER_STATUSES,
+        ).aggregate(
+            fee=Sum("transaction_fee"),
+            val=Sum("transaction_value"),
+        )
+        total_fee = tx_agg.get("fee") or Decimal("0")
+        total_value = tx_agg.get("val") or Decimal("0")
+
     employee_rows = get_operational_user_rows(period, users)
     branch_rows = get_operational_branch_rows(employee_rows)
-
-    total_calls = sum(int(row.get("call_count") or 0) for row in employee_rows)
-    total_activated = sum(int(row.get("activated_account_count") or 0) for row in employee_rows)
-    total_fee = sum(Decimal(str(row.get("transaction_fee") or 0)) for row in employee_rows)
-    total_value = sum(Decimal(str(row.get("transaction_value") or 0)) for row in employee_rows)
 
     return {
         "overview": {

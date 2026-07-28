@@ -55,17 +55,11 @@ class Command(BaseCommand):
             default=30,
             help="Số tài khoản tái kích hoạt thành công, mặc định 30.",
         )
-        parser.add_argument(
-            "--reset",
-            action="store_true",
-            help="Xóa các SaRecord có mã FAKE-SA-HSQ7-* trước khi tạo lại.",
-        )
 
     @transaction.atomic
     def handle(self, *args, **options):
         count = options["count"]
         reactivated_count = options["reactivated"]
-        reset = options["reset"]
 
         if count <= 0:
             raise CommandError("--count phải lớn hơn 0.")
@@ -101,15 +95,12 @@ class Command(BaseCommand):
                 f"không đủ {count}. Hãy seed CustomerAccount trước."
             )
 
-        if reset:
-            deleted_count, _ = SaRecord.objects.filter(
-                record_code__startswith="FAKE-SA-HSQ7-"
-            ).delete()
-            self.stdout.write(
-                self.style.WARNING(
-                    f"Đã xóa {deleted_count} bản ghi SA mẫu cũ."
-                )
+        deleted_count, _ = SaRecord.objects.all().delete()
+        self.stdout.write(
+            self.style.WARNING(
+                f"Đã xóa toàn bộ {deleted_count} bản ghi SaRecord trước khi seed."
             )
+        )
 
         now = timezone.now()
         branch_distribution = Counter()

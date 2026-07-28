@@ -1,6 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.db import models
-from django.db.models import Count, Q, Sum
+from django.db.models import Count, Exists, OuterRef, Q, Sum
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -10,6 +10,7 @@ from apps.accounts.scopes import (
     filter_branches_by_user,
     filter_customers_by_user,
     filter_employees_by_user,
+    filter_sa_records_by_user,
     filter_tickets_by_user,
 )
 from apps.accounts.services import PermissionService
@@ -25,6 +26,15 @@ from apps.tickets.models import (
     TicketSupportCategory,
 )
 
+
+MATCHED_ORDER_STATUSES = (
+    "MATCHED",
+    "PARTIALLY_MATCHED",
+    "COMPLETED",
+    "FILLED",
+    "PARTIALLY_FILLED",
+    "EXECUTED",
+)
 
 User = get_user_model()
 
@@ -420,105 +430,71 @@ class GeneralDashboardAPIView(APIView):
         from apps.tickets.models import Ticket
         from apps.sale_admin.models import SaRecord
 
-        try:
-            from apps.kpis.models import TransactionLog
-        except Exception:
-            TransactionLog = None
+        from apps.kpis.models import TransactionLog
 
-        customers_qs = Customer.objects.select_related(
-            "branch",
-            "customer_type",
-            "membership_tier",
-            "source",
-        ).all()
-        tickets_qs = Ticket.objects.select_related(
-            "handling_branch",
-            "current_status",
-            "support_category",
-            "source",
-            "priority",
-            "classification",
-            "customer_account",
-        ).all()
-        records_qs = SaRecord.objects.select_related(
-            "branch",
-            "pic_employee",
-            "pic_user",
-            "call_result",
-            "interest_level",
-            "icp_group",
-        ).all()
+        scoped_customers_qs = filter_customers_by_user(Customer.objects.all(), request.user)
+        tickets_qs = filter_tickets_by_user(Ticket.objects.all(), request.user)
+        records_qs = filter_sa_records_by_user(SaRecord.objects.all(), request.user)
 
         if branch:
-            customers_qs = customers_qs.filter(branch_id=branch)
+            scoped_customers_qs = scoped_customers_qs.filter(branch_id=branch)
             tickets_qs = tickets_qs.filter(handling_branch_id=branch)
             records_qs = records_qs.filter(branch_id=branch)
 
-        customers_qs = _apply_date_range(customers_qs, "created_at", date_from, date_to)
+        customers_qs = _apply_date_range(scoped_customers_qs, "created_at", date_from, date_to)
         tickets_qs = _apply_date_range(tickets_qs, "created_at", date_from, date_to)
         records_qs = _apply_date_range(records_qs, "call_date", date_from, date_to)
 
-        if TransactionLog:
-            transactions_qs = TransactionLog.objects.all()
-            transactions_qs = _filter_transactions_by_branch(
-                transactions_qs,
-                branch,
-            )
+        transactions_qs = TransactionLog.objects.filter(
+            customer_account__customer_id__in=scoped_customers_qs.values("id")
+        )
+        transactions_qs = _filter_transactions_by_branch(
+            transactions_qs,
+            branch,
+        )
 
-            transaction_date_field = _first_existing_field(
-                TransactionLog,
-                ["transaction_date", "trading_date", "order_date", "matched_at", "created_at"],
-            )
-            transactions_qs = _apply_date_range(
-                transactions_qs,
-                transaction_date_field,
-                date_from,
-                date_to,
-            )
-        else:
-            transactions_qs = None
+        transaction_date_field = _first_existing_field(
+            TransactionLog,
+            ["transaction_date", "trading_date", "order_date", "matched_at", "created_at"],
+        )
+        transactions_qs = _apply_date_range(
+            transactions_qs,
+            transaction_date_field,
+            date_from,
+            date_to,
+        )
 
         total_customers = customers_qs.count()
         total_tickets = tickets_qs.count()
         unlinked_tickets = tickets_qs.filter(customer_account__isnull=True).count()
 
-        total_transactions = transactions_qs.count() if transactions_qs is not None else 0
+        total_transactions = transactions_qs.count()
 
-        if transactions_qs is not None:
-            account_values = _transaction_account_values(transactions_qs)
+        active_customer_ids = transactions_qs.exclude(
+            customer_account__isnull=True
+        ).values_list(
+            "customer_account__customer_id",
+            flat=True,
+        )
 
-            active_customer_ids = transactions_qs.exclude(
-                customer_account__isnull=True
-            ).values_list(
-                "customer_account__customer_id",
-                flat=True,
-            )
+        active_customers = customers_qs.filter(
+            id__in=active_customer_ids
+        ).distinct().count()
 
-            active_customers = customers_qs.filter(
-                id__in=active_customer_ids
-            ).distinct().count()
+        fee_field = _first_existing_field(
+            TransactionLog,
+            ["transaction_fee", "fee", "matched_fee", "commission_fee"],
+        )
+        value_field = _first_existing_field(
+            TransactionLog,
+            ["transaction_value", "matched_value", "value", "amount"],
+        )
 
-            fee_field = _first_existing_field(
-                TransactionLog,
-                ["transaction_fee", "fee", "matched_fee", "commission_fee"],
-            )
-            value_field = _first_existing_field(
-                TransactionLog,
-                ["transaction_value", "matched_value", "value", "amount"],
-            )
-
-            total_fees = _sum_field(transactions_qs, fee_field)
-            matched_value_sum = _sum_field(
-                _filter_valid_matched_transactions(transactions_qs, TransactionLog),
-                value_field,
-            )
-        else:
-            account_values = []
-            active_customers = 0
-            fee_field = None
-            value_field = None
-            total_fees = 0
-            matched_value_sum = 0
+        valid_transactions_qs = _filter_valid_matched_transactions(
+            transactions_qs, TransactionLog
+        )
+        total_fees = _sum_field(valid_transactions_qs, fee_field)
+        matched_value_sum = _sum_field(valid_transactions_qs, value_field)
 
         grouped_customers_count = customers_qs.filter(
             sa_records__icp_group__isnull=False
@@ -527,15 +503,29 @@ class GeneralDashboardAPIView(APIView):
 
         avg_ltv = round(float(total_fees) / active_customers, 2) if active_customers else 0
 
-        reactivated_records_qs = records_qs.filter(reactivation=True)
-        total_reactivated_records = reactivated_records_qs.count()
+        reactivated_records_qs = records_qs.filter(
+            reactivation=True,
+            customer_account__isnull=False,
+        )
 
-        if transactions_qs is not None and account_values:
-            reactivated_with_trades = reactivated_records_qs.filter(
-                account_no__in=account_values
-            ).values("account_no").distinct().count()
-        else:
-            reactivated_with_trades = 0
+        matched_after_call = transactions_qs.filter(
+            customer_account_id=OuterRef("customer_account_id"),
+            transaction_date__gte=OuterRef("call_date"),
+            order_status__in=MATCHED_ORDER_STATUSES,
+        )
+
+        reactivated_records_qs = reactivated_records_qs.annotate(
+            has_matched_after_call=Exists(matched_after_call)
+        )
+
+        total_reactivated_records = reactivated_records_qs.values(
+            "customer_account_id"
+        ).distinct().count()
+        reactivated_with_trades = reactivated_records_qs.filter(
+            has_matched_after_call=True
+        ).values(
+            "customer_account_id"
+        ).distinct().count()
 
         aar_score = (
             round((reactivated_with_trades / total_reactivated_records * 100), 1)
@@ -549,52 +539,44 @@ class GeneralDashboardAPIView(APIView):
         referral_count = customers_qs.filter(source__source_code__iexact="REFERRAL").count()
         referral_rate = round((referral_count / total_customers * 100), 1) if total_customers else 0
 
-        if transactions_qs is not None:
-            product_type_dist = _direct_field_chart(
-                transactions_qs,
-                TransactionLog,
-                ["product_code", "product_type", "product_name", "product"],
-                "Khác",
-                limit=12,
-            )
-            channel_dist = _direct_field_chart(
-                transactions_qs,
-                TransactionLog,
-                ["source_system", "channel", "source"],
-                "Không rõ",
-                limit=12,
-            )
-            order_status_dist = _direct_field_chart(
-                transactions_qs,
-                TransactionLog,
-                ["order_status", "status", "transaction_status"],
-                "Không rõ",
-                limit=12,
-            )
-            top_tickers_dist = _direct_field_chart(
-                transactions_qs,
-                TransactionLog,
-                ["ticker", "stock_code", "symbol", "security_code"],
-                "Không rõ",
-                limit=10,
-            )
+        product_type_dist = _direct_field_chart(
+            transactions_qs,
+            TransactionLog,
+            ["product_code", "product_type", "product_name", "product"],
+            "Khác",
+            limit=12,
+        )
+        channel_dist = _direct_field_chart(
+            transactions_qs,
+            TransactionLog,
+            ["source_system", "channel", "source"],
+            "Không rõ",
+            limit=12,
+        )
+        order_status_dist = _direct_field_chart(
+            transactions_qs,
+            TransactionLog,
+            ["order_status", "status", "transaction_status"],
+            "Không rõ",
+            limit=12,
+        )
+        top_tickers_dist = _direct_field_chart(
+            transactions_qs,
+            TransactionLog,
+            ["ticker", "stock_code", "symbol", "security_code"],
+            "Không rõ",
+            limit=10,
+        )
 
-            side_field = _first_existing_field(
-                TransactionLog,
-                ["side", "order_side", "buy_sell", "transaction_type"],
-            )
-            buy_sell_dist = (
-                _chart_from_queryset(transactions_qs, side_field, "Không rõ", limit=8)
-                if side_field
-                else []
-            )
-        else:
-            product_type_dist = []
-            channel_dist = []
-            order_status_dist = []
-            top_tickers_dist = []
-            buy_sell_dist = []
-
+        side_field = _first_existing_field(
+            TransactionLog,
+            ["side", "order_side", "buy_sell", "transaction_type"],
+        )
+        buy_sell_dist = (
+            _chart_from_queryset(transactions_qs, side_field, "Không rõ", limit=8)
+            if side_field
+            else []
+        )
         branch_options = [
             {
                 "id": "all",
@@ -605,7 +587,9 @@ class GeneralDashboardAPIView(APIView):
                 "id": str(item["id"]),
                 "name": item["branch_name"],
             }
-            for item in Branch.objects.order_by("branch_name").values("id", "branch_name")
+            for item in filter_branches_by_user(
+                Branch.objects.order_by("branch_name"), request.user
+            ).values("id", "branch_name")
         ]
 
         return Response(

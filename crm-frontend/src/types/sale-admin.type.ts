@@ -170,6 +170,7 @@ export type SaRecordFormController = {
   icpGroups: SaIcpGroup[];
   accountStatusOptions: SaSelectOption[];
   vipClassificationOptions: SaSelectOption[];
+  employeeOptions?: SaSelectOption[];
 
   accountSuggestions: SaCustomerAccountSuggestion[];
   accountSuggestionLoading: boolean;
@@ -258,6 +259,8 @@ export type SaRecordCreateFormState = {
     referredRm: boolean;
 
     handoverToBroker: boolean;
+    brokerEmployee: string;
+    brokerUser: string;
     brokerHandoverNote: string;
 
     transactionValueSnapshot: string;

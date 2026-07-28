@@ -1,14 +1,8 @@
 /**
  * Message nghiệp vụ để hiển thị cho người dùng cuối.
- *
- * Backend trả lỗi dạng {"detail": "..."} (DRF) hoặc
- * {"field": ["..."]} (validation). Ưu tiên lấy đúng câu tiếng Việt
- * thay vì dán JSON thô lên màn hình như getErrorMessage.
  */
 export function getApiErrorDetail(err: unknown, fallback: string): string {
-  const data = (
-    err as { response?: { data?: unknown } }
-  )?.response?.data;
+  const data = (err as { response?: { data?: unknown } })?.response?.data;
 
   if (typeof data === "string" && data.trim()) {
     return data;
@@ -21,7 +15,6 @@ export function getApiErrorDetail(err: unknown, fallback: string): string {
       return record.detail;
     }
 
-    // Lỗi validation theo field: lấy thông báo đầu tiên tìm được
     for (const value of Object.values(record)) {
       if (typeof value === "string" && value.trim()) {
         return value;
@@ -36,24 +29,30 @@ export function getApiErrorDetail(err: unknown, fallback: string): string {
   return fallback;
 }
 
-/** Trạng thái HTTP của lỗi, dùng để phân nhánh xử lý (409, 400...). */
 export function getErrorStatus(err: unknown): number | undefined {
   return (err as { response?: { status?: number } })?.response?.status;
 }
 
 export function getErrorMessage(err: unknown, fallback: string): string {
   const error = err as {
+    code?: string;
+    message?: string;
     response?: {
       status?: number;
       data?: unknown;
     };
-    message?: string;
   };
 
-  const status = error?.response?.status || "unknown";
-  const detail = error?.response?.data
-    ? JSON.stringify(error.response.data)
-    : error?.message;
+  if (error?.code === "ECONNABORTED") {
+    return `${fallback}: API xử lý quá thời gian cho phép.`;
+  }
+
+  if (error?.code === "ERR_NETWORK" || !error?.response) {
+    return `${fallback}: không kết nối được tới backend. Kiểm tra NEXT_PUBLIC_API_URL hoặc cấu hình proxy /api.`;
+  }
+
+  const status = error.response.status ?? "unknown";
+  const detail = getApiErrorDetail(error, error.message || "Lỗi không xác định");
 
   return `${fallback}. Status: ${status} - ${detail}`;
 }

@@ -81,7 +81,7 @@ export function TopAccountsTable({
               <th className="w-[220px] px-3 font-semibold">Tên tài khoản</th>
               <th className="w-[160px] px-3 font-semibold">Chi nhánh</th>
               <th className="w-[130px] px-3 text-right font-semibold">Phí GD</th>
-              <th className="w-[130px] px-3 text-right font-semibold">KL GD</th>
+              <th className="w-[130px] px-3 text-right font-semibold">GT GD</th>
               <th className="w-[180px] px-3 font-semibold">NV kích hoạt</th>
             </tr>
           </thead>

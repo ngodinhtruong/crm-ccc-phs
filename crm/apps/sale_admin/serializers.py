@@ -1,3 +1,4 @@
+from django.utils import timezone
 from rest_framework import serializers
 
 from apps.customers.models import CustomerAccount, MembershipTier
@@ -348,6 +349,35 @@ class SaRecordWriteSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"vip_classification": "Phân loại VIP không nằm trong danh mục hệ thống."}
             )
+
+        handover_to_broker = attrs.get("handover_to_broker")
+        if handover_to_broker is None and self.instance:
+            handover_to_broker = self.instance.handover_to_broker
+
+        attrs["referred_rm"] = bool(handover_to_broker)
+
+        if handover_to_broker:
+            broker_user = attrs.get("broker_user")
+            broker_employee = attrs.get("broker_employee")
+            if not broker_user and not broker_employee and self.instance:
+                broker_user = self.instance.broker_user
+                broker_employee = self.instance.broker_employee
+
+            if not broker_user and not broker_employee:
+                raise serializers.ValidationError(
+                    {"broker_user": "Vui lòng chọn nhân viên môi giới khi bàn giao."}
+                )
+
+            if not attrs.get("broker_handover_at"):
+                if self.instance and self.instance.broker_handover_at:
+                    attrs["broker_handover_at"] = self.instance.broker_handover_at
+                else:
+                    attrs["broker_handover_at"] = timezone.now()
+        else:
+            attrs["broker_user"] = None
+            attrs["broker_employee"] = None
+            attrs["broker_handover_at"] = None
+            attrs["broker_handover_note"] = ""
 
         account_no = attrs.get("account_no")
         call_date = attrs.get("call_date")
