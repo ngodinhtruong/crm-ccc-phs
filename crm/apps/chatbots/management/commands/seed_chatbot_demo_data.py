@@ -81,10 +81,9 @@ STATUS_DEFINITIONS = [
     (TicketStatusCode.CREATED, "Mở", 1, False),
     (TicketStatusCode.ACCEPTED, "Tiếp nhận", 2, False),
     (TicketStatusCode.PROCESSING, "Đang xử lý", 3, False),
-    (TicketStatusCode.DONE_WAIT_CLOSE, "Đã xong", 4, False),
-    (TicketStatusCode.PENDING_CLOSE, "Chờ đóng", 5, False),
-    (TicketStatusCode.CLOSED, "Đã đóng", 6, True),
-    (TicketStatusCode.CANCELLED, "Đã hủy", 7, True),
+    (TicketStatusCode.DONE_WAIT_CLOSE, "Đã xong (chờ đóng)", 4, False),
+    (TicketStatusCode.CLOSED, "Đã đóng", 5, True),
+    (TicketStatusCode.CANCELLED, "Đã hủy", 6, True),
 ]
 
 TICKET_SOURCES = [
@@ -868,7 +867,6 @@ class Command(BaseCommand):
             TicketStatusCode.ACCEPTED,
             TicketStatusCode.PROCESSING,
             TicketStatusCode.DONE_WAIT_CLOSE,
-            TicketStatusCode.PENDING_CLOSE,
             TicketStatusCode.CLOSED,
             TicketStatusCode.CANCELLED,
         }:
@@ -877,7 +875,6 @@ class Command(BaseCommand):
         if status_code in {
             TicketStatusCode.PROCESSING,
             TicketStatusCode.DONE_WAIT_CLOSE,
-            TicketStatusCode.PENDING_CLOSE,
             TicketStatusCode.CLOSED,
             TicketStatusCode.CANCELLED,
         }:
@@ -885,7 +882,6 @@ class Command(BaseCommand):
 
         if status_code in {
             TicketStatusCode.DONE_WAIT_CLOSE,
-            TicketStatusCode.PENDING_CLOSE,
             TicketStatusCode.CLOSED,
         }:
             done_at = processing_started_at + timedelta(minutes=30 + index % 240)

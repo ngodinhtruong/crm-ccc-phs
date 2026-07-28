@@ -397,10 +397,9 @@ STATUSES = [
     ("CREATED", "Mở", 1, False),
     ("ACCEPTED", "Tiếp nhận", 2, False),
     ("PROCESSING", "Đang xử lý", 3, False),
-    ("DONE_WAIT_CLOSE", "Đã xong", 4, False),
-    ("PENDING_CLOSE", "Chờ đóng", 5, False),
-    ("CLOSED", "Đã đóng", 6, True),
-    ("CANCELLED", "Đã hủy", 7, True),
+    ("DONE_WAIT_CLOSE", "Đã xong (chờ đóng)", 4, False),
+    ("CLOSED", "Đã đóng", 5, True),
+    ("CANCELLED", "Đã hủy", 6, True),
 ]
 
 

@@ -2,18 +2,19 @@ class TicketStatusCode:
     CREATED = "CREATED"              # Mở (ban đầu khi tạo ticket)
     ACCEPTED = "ACCEPTED"            # Tiếp nhận
     PROCESSING = "PROCESSING"       # Đang xử lý
-    DONE_WAIT_CLOSE = "DONE_WAIT_CLOSE"  # Đã xong (đếm 1h trước khi tự đóng)
-    PENDING_CLOSE = "PENDING_CLOSE"  # Chờ đóng (bước trung gian)
+    DONE_WAIT_CLOSE = "DONE_WAIT_CLOSE"  # Đã xong (chờ đóng) — đếm 1h rồi tự đóng
     CLOSED = "CLOSED"               # Đã đóng (khóa, chỉ admin sửa)
-    CANCELLED = "CANCELLED"
+    CANCELLED = "CANCELLED"         # Đã hủy — nằm ngoài vòng đời, không phải một bước
 
-    # Nhãn hiển thị tiếng Việt
+    # Nhãn hiển thị tiếng Việt.
+    # Bỏ PENDING_CLOSE ("Chờ đóng"): việc chờ đóng đã nằm ngay trong
+    # DONE_WAIT_CLOSE (đếm 1 tiếng rồi tự chuyển CLOSED) nên một trạng thái
+    # trung gian riêng chỉ làm vòng đời dài thêm mà không mang thêm thông tin.
     LABELS = {
         CREATED: "Mở",
         ACCEPTED: "Tiếp nhận",
         PROCESSING: "Đang xử lý",
-        DONE_WAIT_CLOSE: "Đã xong",
-        PENDING_CLOSE: "Chờ đóng",
+        DONE_WAIT_CLOSE: "Đã xong (chờ đóng)",
         CLOSED: "Đã đóng",
         CANCELLED: "Đã hủy",
     }

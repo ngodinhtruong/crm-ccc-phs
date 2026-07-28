@@ -9,8 +9,8 @@ export type ChatbotTicketStatus =
   | "ACCEPTED"
   | "PROCESSING"
   | "DONE_WAIT_CLOSE"
-  | "PENDING_CLOSE"
-  | "CLOSED";
+  | "CLOSED"
+  | "CANCELLED";
 
 export type ChatbotTicketLinkStatus = "LINKED" | "UNLINKED";
 
@@ -109,7 +109,7 @@ export type ChatbotTicketUpdatePayload = {
 
   /**
    * Lý do vượt SLA — backend bắt buộc khai trước khi đưa ticket đã trễ
-   * về trạng thái kết thúc (DONE_WAIT_CLOSE / PENDING_CLOSE).
+   * về trạng thái kết thúc (DONE_WAIT_CLOSE / CLOSED).
    */
   breach_reason?: number | null;
   breach_note?: string;

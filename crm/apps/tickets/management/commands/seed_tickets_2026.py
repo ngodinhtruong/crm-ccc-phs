@@ -1116,8 +1116,9 @@ class Command(BaseCommand):
             return "cancelled"
         if any(token in value for token in ("CLOSED", "ĐÃ ĐÓNG", "DA DONG")):
             return "closed"
-        if any(token in value for token in ("PENDING_CLOSE", "CHỜ ĐÓNG", "CHO DONG")):
-            return "pending_close"
+        # Không còn nhánh PENDING_CLOSE: trạng thái đó đã bỏ, và token "CHỜ ĐÓNG"
+        # bây giờ nằm ngay trong tên "Đã xong (chờ đóng)" nên sẽ bắt nhầm
+        # DONE_WAIT_CLOSE, đẩy nó lệch một bậc trong timeline.
         if any(token in value for token in ("DONE_WAIT_CLOSE", "DONE", "ĐÃ XONG", "DA XONG", "HOÀN TẤT", "HOAN TAT")):
             return "done"
         if any(token in value for token in ("PROCESSING", "ĐANG XỬ LÝ", "DANG XU LY")):

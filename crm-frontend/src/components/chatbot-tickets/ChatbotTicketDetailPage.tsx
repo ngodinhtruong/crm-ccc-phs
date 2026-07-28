@@ -28,7 +28,6 @@ import { getApiErrorDetail } from "@/utils/error.util";
 /** Trạng thái kết thúc — backend bắt khai lý do nếu ticket đã vượt SLA. */
 const CLOSING_STATUSES: ChatbotTicketStatus[] = [
   "DONE_WAIT_CLOSE",
-  "PENDING_CLOSE",
   "CLOSED",
 ];
 

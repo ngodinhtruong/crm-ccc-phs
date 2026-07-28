@@ -204,39 +204,7 @@ def scan_normal_tickets():
     return result
 
 
-def scan_chatbot_tickets():
-    """Quét ticket chatbot (deadline lưu ngay trên TicketChatbot)."""
-    from apps.chatbots.models import TicketChatbot
-
-    now = timezone.now()
-    result = {"checked": 0, "marked_overdue": 0}
-
-    tickets = TicketChatbot.objects.filter(
-        resolution_due_at__isnull=False,
-        resolution_due_at__lt=now,
-    ).exclude(current_status__status_code__in=CLOSED_STATUS_CODES)
-
-    for ticket in tickets:
-        result["checked"] += 1
-
-        if (
-            ticket.sla_status == TicketChatbot.SLA_OVERDUE
-            and ticket.breached_at
-        ):
-            continue
-
-        ticket.sla_status = TicketChatbot.SLA_OVERDUE
-        ticket.breached_at = ticket.breached_at or ticket.resolution_due_at
-        ticket.updated_at = now
-        ticket.save(
-            update_fields=["sla_status", "breached_at", "updated_at"]
-        )
-        result["marked_overdue"] += 1
-
-    return result
-
-
-# Ticket ở "Đã xong" quá số phút này thì tự đóng
+# Ticket ở "Đã xong (chờ đóng)" quá số phút này thì tự đóng
 AUTO_CLOSE_AFTER_MINUTES = 60
 
 # Ghi trong log để phân biệt với thao tác của người dùng thật
@@ -332,34 +300,17 @@ def _finalize_sla_tracking(ticket, now):
     tracking.save(update_fields=update_fields)
 
 
-def _write_chatbot_auto_close_log(ticket, from_label, now):
-    """Ghi vết auto-close cho ticket chatbot."""
-    from apps.chatbots.models import TicketChatbotActivityLog
-
-    TicketChatbotActivityLog.objects.create(
-        ticket=ticket,
-        action_type="UPDATE_STATUS",
-        action_name="Tự động đóng ticket",
-        old_value=from_label or "",
-        new_value=ticket.status_label or "",
-        created_by_user=None,
-        created_at=now,
-        note=AUTO_CLOSE_NOTE,
-    )
-
-
 def auto_close_done_tickets():
     """
-    Ticket ở 'Đã xong' (DONE_WAIT_CLOSE) quá 1 tiếng → tự chuyển 'Đã đóng' (CLOSED).
+    Ticket ở 'Đã xong (chờ đóng)' (DONE_WAIT_CLOSE) quá 1 tiếng → tự chuyển
+    'Đã đóng' (CLOSED) và khoá sửa.
     Mốc đếm là completed_at; sửa ticket khi đang Đã xong sẽ dời mốc này.
-    Áp cho cả ticket thường lẫn ticket chatbot.
     """
-    from apps.chatbots.models import TicketChatbot
     from apps.tickets.models import Ticket, TicketStatus
 
     now = timezone.now()
     threshold = now - timedelta(minutes=AUTO_CLOSE_AFTER_MINUTES)
-    result = {"normal_closed": 0, "chatbot_closed": 0}
+    result = {"normal_closed": 0}
 
     closed_status = TicketStatus.objects.filter(
         status_code=TicketStatusCode.CLOSED
@@ -397,35 +348,6 @@ def auto_close_done_tickets():
 
         result["normal_closed"] += 1
 
-    # ── Ticket chatbot: mốc done_at nằm ngay trên ticket ──
-    chatbot = (
-        TicketChatbot.objects.select_related("current_status")
-        .filter(current_status__status_code=TicketStatusCode.DONE_WAIT_CLOSE)
-        .filter(done_at__isnull=False, done_at__lt=threshold)
-    )
-
-    for ticket in chatbot:
-        from_label = ticket.status_label
-
-        ticket.current_status = closed_status
-
-        # Chốt kết luận SLA ngay lúc đóng, không để treo None
-        if ticket.sla_status != TicketChatbot.SLA_OVERDUE:
-            ticket.sla_status = (
-                TicketChatbot.SLA_OVERDUE
-                if ticket.is_sla_overdue
-                else TicketChatbot.SLA_ON_TIME
-            )
-
-        ticket.updated_at = now
-        ticket.save(
-            update_fields=["current_status", "sla_status", "updated_at"]
-        )
-
-        _write_chatbot_auto_close_log(ticket, from_label, now)
-
-        result["chatbot_closed"] += 1
-
     return result
 
 
@@ -449,13 +371,11 @@ def scan_sla_overdue_task(self):
 
     try:
         normal = scan_normal_tickets()
-        chatbot = scan_chatbot_tickets()
         auto_closed = auto_close_done_tickets()
 
         return {
             "status": "SUCCESS",
             "normal_tickets": normal,
-            "chatbot_tickets": chatbot,
             "auto_closed": auto_closed,
         }
     finally:

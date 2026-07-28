@@ -69,9 +69,14 @@ export const TICKET_STATUS_PILL: Record<string, string> = {
   Mở: "bg-rose-600 text-white",
   "Tiếp nhận": "bg-sky-100 text-sky-700",
   "Đang xử lý": "bg-violet-100 text-violet-700",
+  "Đã xong (chờ đóng)": "bg-teal-100 text-teal-700",
+  "Đã đóng": "bg-emerald-100 text-emerald-700",
+  "Đã hủy": "bg-rose-100 text-rose-700",
+
+  // Nhãn cũ: lịch sử ticket lưu chuỗi nhãn tại thời điểm đổi trạng thái, nên
+  // các dòng ghi trước khi đổi tên vẫn cần tô đúng màu.
   "Đã xong": "bg-teal-100 text-teal-700",
   "Chờ đóng": "bg-orange-100 text-orange-700",
-  "Đã đóng": "bg-emerald-100 text-emerald-700",
 };
 
 export const DEFAULT_TICKET_STATUS_PILL = "bg-slate-100 text-slate-600";

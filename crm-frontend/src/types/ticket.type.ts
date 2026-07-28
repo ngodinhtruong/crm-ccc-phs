@@ -318,14 +318,20 @@ export type TicketDetail = TicketListItem & {
     is_locked_for_amend?: boolean;
 };
 
-/** Mã trạng thái luồng ticket thường */
+/**
+ * Mã trạng thái ticket thường.
+ *
+ * 5 mã đầu là vòng đời tuần tự. CANCELLED không phải một bước trong đó mà là
+ * lối ra riêng — chọn được ở phần Thông tin chung, nhưng không nằm trên thanh
+ * tiến trình (xem TICKET_STATUS_FLOW).
+ */
 export type TicketStatusCode =
     | "CREATED"
     | "ACCEPTED"
     | "PROCESSING"
     | "DONE_WAIT_CLOSE"
-    | "PENDING_CLOSE"
     | "CLOSED"
+    | "CANCELLED"
 
 /** Một dòng lịch sử thay đổi ticket. */
 export type TicketHistoryItem = {
