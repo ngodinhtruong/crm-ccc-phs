@@ -10,8 +10,9 @@ import {
   DateRangeFilter,
   FilterSelect,
   SearchInput,
+  CccPeriodControls,
 } from "@/components/common";
-import { ChartViewMode } from "./CccDashboardUtils";
+import { ChartViewMode, GranularityMode, CompareMode } from "./CccDashboardUtils";
 import { useCccDashboard } from "@/hooks/useCccDashboard";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
 import { CccDashboardChartSkeleton } from "./CccDashboardChartSkeleton";
@@ -352,6 +353,8 @@ export function CccDashboardPage() {
   const dashboard = useCccDashboard();
   const [filterOpen, setFilterOpen] = useState(false);
   const [globalViewMode, setGlobalViewMode] = useState<ChartViewMode>("TREND_OVER_TIME");
+  const [granularity, setGranularity] = useState<GranularityMode>("MONTH");
+  const [compareMode, setCompareMode] = useState<CompareMode>("NONE");
   const [globalMonth, setGlobalMonth] = useState<string>("");
 
   const report = dashboard.data?.report;
@@ -391,7 +394,14 @@ export function CccDashboardPage() {
         { label: "Dashboard Ticket" },
       ]}
       rightAction={
-        <div className="relative flex items-center gap-2">
+        <div className="relative flex flex-wrap items-center gap-2">
+          <CccPeriodControls
+            granularity={granularity}
+            onGranularityChange={setGranularity}
+            compareMode={compareMode}
+            onCompareModeChange={setCompareMode}
+          />
+
           <Link
             href="/tickets"
             className="flex h-8 items-center gap-1 rounded border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50"
@@ -466,8 +476,6 @@ export function CccDashboardPage() {
               </div>
             </div>
 
-
-
             {dashboard.fetching && dashboard.data && (
               <span className="inline-flex shrink-0 items-center gap-2 rounded-md bg-sky-50 px-3 py-1.5 text-xs font-medium text-sky-700 ring-1 ring-sky-100">
                 <RefreshCw size={13} className="animate-spin" />
@@ -477,9 +485,7 @@ export function CccDashboardPage() {
           </div>
         </div>
 
-
         {dashboard.error && <ErrorBlock message={dashboard.error} />}
-
 
         {dashboard.loading && !dashboard.data && <LoadingBlock />}
 
@@ -494,15 +500,16 @@ export function CccDashboardPage() {
 
         {dashboard.data && (
           <>
-            {/* <TicketTabSummary dashboard={dashboard} /> */}
             <CccDashboardCharts
               charts={dashboard.data.charts}
               globalViewMode={globalViewMode}
+              granularity={granularity}
+              compareMode={compareMode}
             />
           </>
         )}
-
       </div>
     </DashboardLayout>
   );
 }
+

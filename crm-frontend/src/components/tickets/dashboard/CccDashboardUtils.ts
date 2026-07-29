@@ -141,6 +141,35 @@ export function ensureFiniteNumber(value?: number | null) {
 }
 
 export type ChartViewMode = "TREND_OVER_TIME" | "TOTAL_OVERALL";
+export type GranularityMode = "MONTH" | "QUARTER" | "YEAR";
+export type CompareMode = "NONE" | "YOY" | "QOQ";
+
+export function parsePeriodDate(periodKey?: string | null): Date | null {
+  if (!periodKey) return null;
+  const match = String(periodKey).match(/(\d{4})[-/](\d{1,2})/);
+  if (match) {
+    return new Date(parseInt(match[1], 10), parseInt(match[2], 10) - 1, 1);
+  }
+  const date = new Date(periodKey);
+  if (!Number.isNaN(date.getTime())) return date;
+  return null;
+}
+
+export function getQuarterLabel(date: Date): string {
+  const q = Math.floor(date.getMonth() / 3) + 1;
+  return `Q${q}/${date.getFullYear()}`;
+}
+
+export function getYearLabel(date: Date): string {
+  return `${date.getFullYear()}`;
+}
+
+export function calculateGrowthRate(currentVal: number, compareVal: number): number | null {
+  if (compareVal === 0) {
+    return currentVal > 0 ? 100 : 0;
+  }
+  return Number((((currentVal - compareVal) / compareVal) * 100).toFixed(1));
+}
 
 export function pivot100PercentStacked<T>(
   items: T[],
@@ -216,3 +245,4 @@ export function filterDataByMonth<T>(
   if (!targetMonth) return items;
   return items.filter((item) => getMonth(item) === targetMonth);
 }
+

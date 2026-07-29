@@ -32,12 +32,18 @@ import {
 } from "@/types/ccc-dashboard.type";
 import {
   ChartViewMode,
+  GranularityMode,
+  CompareMode,
   aggregateTotalOverall,
   formatDays,
   formatNumber,
   getMonthLabel,
   pivot100PercentStacked,
   rootCauseLabel,
+  parsePeriodDate,
+  getQuarterLabel,
+  getYearLabel,
+  calculateGrowthRate,
 } from "./CccDashboardUtils";
 
 const COLORS = [
@@ -214,19 +220,93 @@ function pivotByMonth<T>(
   };
 }
 
+function getPeriodLabelFromItem(item: any, granularity: GranularityMode): string {
+  const rawKey = item.month_key || item.period_label || item.month_label || item.month_str || item.month || "";
+  const parsedDate = parsePeriodDate(rawKey);
+
+  if (granularity === "QUARTER" && parsedDate) {
+    return getQuarterLabel(parsedDate);
+  }
+  if (granularity === "YEAR" && parsedDate) {
+    return getYearLabel(parsedDate);
+  }
+  return getMonthLabel(item);
+}
+
+function aggregateMonthlyDataByGranularity(
+  rawList: any[],
+  granularity: GranularityMode,
+  compareMode: CompareMode
+) {
+  const periodMap = new Map<string, { label: string; total: number; processed: number; cancelled: number; sortKey: string }>();
+
+  for (const item of rawList) {
+    const label = getPeriodLabelFromItem(item, granularity);
+    const rawKey = item.month_key || item.period_label || item.month_label || item.month_str || item.month || "";
+
+    if (!periodMap.has(label)) {
+      periodMap.set(label, { label, total: 0, processed: 0, cancelled: 0, sortKey: String(rawKey) });
+    }
+
+    const rec = periodMap.get(label)!;
+    rec.total += item.total || 0;
+    rec.processed += item.processed ?? item.resolved ?? 0;
+    rec.cancelled += item.cancelled || 0;
+  }
+
+  const periodList = Array.from(periodMap.values());
+
+  if (compareMode === "NONE" && granularity === "MONTH") {
+    return periodList.map((p) => ({
+      ...p,
+      growth_processed: null as number | null,
+    }));
+  }
+
+  return periodList.map((p, index) => {
+    let compareItem: typeof p | undefined;
+    if (compareMode === "QOQ" && index > 0) {
+      compareItem = periodList[index - 1];
+    } else if (compareMode === "YOY") {
+      const parts = p.label.split("/");
+      if (parts.length === 2) {
+        const year = parseInt(parts[1], 10);
+        if (!isNaN(year)) {
+          const targetPrevLabel = `${parts[0]}/${year - 1}`;
+          compareItem = periodList.find((x) => x.label === targetPrevLabel);
+        }
+      }
+    }
+
+    const compareProcessed = compareItem ? compareItem.processed : 0;
+    const growthProcessed = compareItem ? calculateGrowthRate(p.processed, compareProcessed) : null;
+
+    return {
+      ...p,
+      compare_label: compareItem ? compareItem.label : "",
+      compare_processed: compareProcessed,
+      growth_processed: growthProcessed,
+    };
+  });
+}
+
 /* ====================================================================
  * 1. TỔNG QUAN KẾT QUẢ TICKET
  * ==================================================================== */
 function TicketResultChartCard({
   charts,
   globalViewMode,
+  granularity = "MONTH",
+  compareMode = "NONE",
 }: {
   charts: CccCharts;
   globalViewMode?: ChartViewMode;
+  granularity?: GranularityMode;
+  compareMode?: CompareMode;
 }) {
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
 
-  const rawData = useMemo(() => {
+  const rawMonthly = useMemo(() => {
     return (charts.report_monthly_processing || []).map((item) => ({
       ...item,
       label: getMonthLabel(item),
@@ -236,23 +316,27 @@ function TicketResultChartCard({
     }));
   }, [charts.report_monthly_processing]);
 
+  const chartData = useMemo(() => {
+    return aggregateMonthlyDataByGranularity(rawMonthly, granularity, compareMode);
+  }, [rawMonthly, granularity, compareMode]);
+
   const monthDonutData = useMemo(() => {
     if (!selectedMonth) return [];
-    const monthItem = rawData.find((d) => isSameMonth(d, selectedMonth));
+    const monthItem = rawMonthly.find((d) => isSameMonth(d, selectedMonth));
     if (!monthItem) return [];
     return [
       { name: "Ticket đã xử lý", value: monthItem.processed, color: "#10b981" },
       { name: "Spam / Đã hủy", value: monthItem.cancelled, color: "#ef4444" },
     ];
-  }, [rawData, selectedMonth]);
+  }, [rawMonthly, selectedMonth]);
 
-  if (isEmpty(rawData)) {
+  if (isEmpty(rawMonthly)) {
     return <EmptyState message="Không có dữ liệu kết quả xử lý ticket." />;
   }
 
-  const totalsSum = rawData.reduce((acc, curr) => acc + curr.total, 0);
-  const processedSum = rawData.reduce((acc, curr) => acc + curr.processed, 0);
-  const cancelledSum = rawData.reduce((acc, curr) => acc + curr.cancelled, 0);
+  const totalsSum = rawMonthly.reduce((acc, curr) => acc + curr.total, 0);
+  const processedSum = rawMonthly.reduce((acc, curr) => acc + curr.processed, 0);
+  const cancelledSum = rawMonthly.reduce((acc, curr) => acc + curr.cancelled, 0);
   const processedRate = totalsSum > 0 ? ((processedSum / totalsSum) * 100).toFixed(1) : "0";
 
   const handleChartClick = (state: any) => {
@@ -260,6 +344,11 @@ function TicketResultChartCard({
       setSelectedMonth(state.activeLabel);
     }
   };
+
+  const isAggregatedOrCompared = granularity !== "MONTH" || compareMode !== "NONE";
+
+  const periodLabelText = granularity === "QUARTER" ? "theo Quý" : granularity === "YEAR" ? "theo Năm" : "theo Tháng";
+  const compareLabelText = compareMode === "YOY" ? " (So sánh Cùng kỳ Năm trước - YoY)" : compareMode === "QOQ" ? " (So sánh Kỳ liền trước - QoQ)" : "";
 
   return (
     <div className="space-y-4">
@@ -286,11 +375,13 @@ function TicketResultChartCard({
         title={
           selectedMonth
             ? `Kết quả xử lý Ticket - ${selectedMonth}`
-            : "Xu hướng & Kết quả xử lý Ticket"
+            : `Xu hướng & Kết quả xử lý Ticket ${periodLabelText}${compareLabelText}`
         }
         description={
           selectedMonth
-            ? "Nhấp đúp hoặc bấm nút 'Quay lại' để xem xu hướng tất cả các tháng"
+            ? "Nhấp đúp hoặc bấm nút 'Quay lại' để xem xu hướng tất cả các kỳ"
+            : isAggregatedOrCompared
+            ? "Biểu đồ cột ghép nhóm so sánh sản lượng ticket xử lý giữa kỳ hiện tại và kỳ đối chiếu"
             : "Nhấp đúp vào cột tháng bất kỳ để xem biểu đồ Donut chi tiết của tháng đó"
         }
         headerRight={
@@ -300,7 +391,7 @@ function TicketResultChartCard({
               onClick={() => setSelectedMonth(null)}
               className="flex items-center gap-1.5 rounded-md bg-sky-50 px-2.5 py-1 text-xs font-bold text-sky-700 hover:bg-sky-100 ring-1 ring-sky-200 transition-all shadow-2xs"
             >
-              ← Quay lại các tháng
+              ← Quay lại các kỳ
             </button>
           ) : undefined
         }
@@ -338,9 +429,52 @@ function TicketResultChartCard({
                   }}
                 />
               </PieChart>
+            ) : isAggregatedOrCompared ? (
+              <BarChart data={chartData} margin={{ top: 20, right: 20, left: 10, bottom: 10 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis dataKey="label" tick={{ fontSize: 11, fontWeight: 600 }} />
+                <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                <Tooltip content={<ValueTooltip />} />
+                <Legend wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
+                <Bar dataKey="processed" name="Đã xử lý (Kỳ này)" fill="#10b981" radius={[4, 4, 0, 0]} barSize={24} isAnimationActive={false}>
+                  <LabelList
+                    dataKey="processed"
+                    position="top"
+                    content={(props: any) => {
+                      const { x, y, width, value, index } = props;
+                      if (!value && value !== 0) return null;
+                      const item = chartData[index];
+                      const growth = item?.growth_processed;
+                      let text = formatNumber(value);
+                      if (growth !== null && growth !== undefined) {
+                        const arrow = growth >= 0 ? "▲" : "▼";
+                        text += ` (${arrow}${growth}%)`;
+                      }
+                      return (
+                        <text
+                          x={Number(x) + Number(width) / 2}
+                          y={Number(y) - 6}
+                          fill="#10b981"
+                          textAnchor="middle"
+                          fontSize={10}
+                          fontWeight={700}
+                        >
+                          {text}
+                        </text>
+                      );
+                    }}
+                  />
+                </Bar>
+                {compareMode !== "NONE" && (
+                  <Bar dataKey="compare_processed" name={`Đã xử lý (${compareMode === "YOY" ? "Cùng kỳ năm trước" : "Kỳ liền trước"})`} fill="#94a3b8" radius={[4, 4, 0, 0]} barSize={24} isAnimationActive={false}>
+                    <LabelList dataKey="compare_processed" position="top" style={{ fontSize: 10, fill: "#64748b", fontWeight: 600 }} formatter={(val: any) => (val ? formatNumber(Number(val)) : "")} />
+                  </Bar>
+                )}
+                <Bar dataKey="cancelled" name="Spam / Đã hủy" fill="#ef4444" radius={[4, 4, 0, 0]} barSize={24} isAnimationActive={false} />
+              </BarChart>
             ) : (
               <ComposedChart
-                data={rawData}
+                data={chartData}
                 onDoubleClick={handleChartClick}
                 onClick={handleChartClick}
                 className="cursor-pointer"
@@ -375,7 +509,17 @@ function TicketResultChartCard({
 /* ====================================================================
  * 2. PHÂN TÍCH THEO NGUỒN TIẾP NHẬN
  * ==================================================================== */
-function SourceDonutChartCard({ items, globalViewMode }: { items: any[]; globalViewMode?: ChartViewMode }) {
+function SourceDonutChartCard({
+  items,
+  globalViewMode,
+  granularity = "MONTH",
+  compareMode = "NONE",
+}: {
+  items: any[];
+  globalViewMode?: ChartViewMode;
+  granularity?: GranularityMode;
+  compareMode?: CompareMode;
+}) {
   const chartData = useMemo(() => {
     const raw = aggregateTotalOverall(items, getSourceName, (item) => (item.processed ?? item.resolved ?? 0) + (item.cancelled || 0));
     const totalSum = raw.reduce((acc, curr) => acc + curr.value, 0);
@@ -427,41 +571,48 @@ function SourceDonutChartCard({ items, globalViewMode }: { items: any[]; globalV
   );
 }
 
-function SourceTrendChartCard({ items, globalViewMode }: { items: any[]; globalViewMode?: ChartViewMode }) {
+function SourceTrendChartCard({
+  items,
+  globalViewMode,
+  granularity = "MONTH",
+  compareMode = "NONE",
+}: {
+  items: any[];
+  globalViewMode?: ChartViewMode;
+  granularity?: GranularityMode;
+  compareMode?: CompareMode;
+}) {
   const [selectedMonth, setSelectedMonth] = useState<string>("ALL");
 
   const pivotData = useMemo(() => {
-    const monthMap = new Map<string, string>();
+    const periodMap = new Map<string, string>();
     for (const item of items) {
-      const key = String(item.month_key || item.period_label || item.month_label || "");
-      const label = item.month_label || item.period_label || key;
-      if (key) monthMap.set(key, label);
+      const label = getPeriodLabelFromItem(item, granularity);
+      if (label) periodMap.set(label, label);
     }
 
-    const sortedMonthKeys = Array.from(monthMap.keys()).sort().slice(-5);
-    const recentMonthLabels = sortedMonthKeys.map((k) => monthMap.get(k)!);
+    const recentPeriodLabels = Array.from(periodMap.keys()).slice(-5);
 
     const sourceMap = new Map<string, Record<string, any>>();
     for (const item of items) {
-      const key = String(item.month_key || item.period_label || item.month_label || "");
-      if (!sortedMonthKeys.includes(key)) continue;
+      const periodLabel = getPeriodLabelFromItem(item, granularity);
+      if (!recentPeriodLabels.includes(periodLabel)) continue;
 
       const source = getSourceName(item);
-      const monthLabel = item.month_label || item.period_label || key;
       const value = item.processed ?? item.resolved ?? 0;
 
       if (!sourceMap.has(source)) {
         sourceMap.set(source, { source });
       }
       const record = sourceMap.get(source)!;
-      record[monthLabel] = (record[monthLabel] || 0) + value;
+      record[periodLabel] = (record[periodLabel] || 0) + value;
     }
 
     return {
-      monthDimensions: recentMonthLabels,
+      monthDimensions: recentPeriodLabels,
       rows: Array.from(sourceMap.values()),
     };
-  }, [items]);
+  }, [items, granularity]);
 
   const displayedMonths = useMemo(() => {
     if (selectedMonth === "ALL") return pivotData.monthDimensions;
@@ -531,14 +682,24 @@ function SourceTrendChartCard({ items, globalViewMode }: { items: any[]; globalV
   );
 }
 
-function SourceAnalysisCharts({ charts, globalViewMode }: { charts: CccCharts; globalViewMode?: ChartViewMode }) {
+function SourceAnalysisCharts({
+  charts,
+  globalViewMode,
+  granularity = "MONTH",
+  compareMode = "NONE",
+}: {
+  charts: CccCharts;
+  globalViewMode?: ChartViewMode;
+  granularity?: GranularityMode;
+  compareMode?: CompareMode;
+}) {
   const items = charts.report_source || [];
   if (isEmpty(items)) return <EmptyState message="Không có dữ liệu phân tích theo nguồn." />;
 
   return (
     <div className="grid gap-4 xl:grid-cols-12">
       <SourceDonutChartCard items={items} globalViewMode={globalViewMode} />
-      <SourceTrendChartCard items={items} globalViewMode={globalViewMode} />
+      <SourceTrendChartCard items={items} globalViewMode={globalViewMode} granularity={granularity} compareMode={compareMode} />
     </div>
   );
 }
@@ -546,7 +707,17 @@ function SourceAnalysisCharts({ charts, globalViewMode }: { charts: CccCharts; g
 /* ====================================================================
  * 3. PHÂN TÍCH THEO DANH MỤC
  * ==================================================================== */
-function CategoryProcessedChartCard({ items, globalViewMode }: { items: any[]; globalViewMode?: ChartViewMode }) {
+function CategoryProcessedChartCard({
+  items,
+  globalViewMode,
+  granularity = "MONTH",
+  compareMode = "NONE",
+}: {
+  items: any[];
+  globalViewMode?: ChartViewMode;
+  granularity?: GranularityMode;
+  compareMode?: CompareMode;
+}) {
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
 
   const processedPivot = useMemo(
@@ -554,10 +725,10 @@ function CategoryProcessedChartCard({ items, globalViewMode }: { items: any[]; g
       pivotByMonth(
         items,
         getCategoryName,
-        (i) => i.month_label || i.period_label || String(i.month_key || ""),
+        (i) => getPeriodLabelFromItem(i, granularity),
         (i) => i.processed ?? i.resolved ?? 0
       ),
-    [items]
+    [items, granularity]
   );
 
   const monthDonutData = useMemo(() => {
@@ -577,12 +748,12 @@ function CategoryProcessedChartCard({ items, globalViewMode }: { items: any[]; g
       title={
         selectedMonth
           ? `Tỷ trọng Ticket đã xử lý - ${selectedMonth}`
-          : "Ticket đã xử lý theo Danh mục"
+          : `Ticket đã xử lý theo Danh mục ${granularity === "QUARTER" ? "(Theo Quý)" : granularity === "YEAR" ? "(Theo Năm)" : ""}`
       }
       description={
         selectedMonth
-          ? "Nhấp đúp vào biểu đồ hoặc bấm nút 'Quay lại' để xem tất cả các tháng"
-          : "Nhấp đúp vào cột tháng bất kỳ để xem biểu đồ Donut chi tiết của tháng đó"
+          ? "Nhấp đúp vào biểu đồ hoặc bấm nút 'Quay lại' để xem tất cả các kỳ"
+          : "Nhấp đúp vào cột kỳ bất kỳ để xem biểu đồ Donut chi tiết của kỳ đó"
       }
       headerRight={
         selectedMonth ? (
@@ -591,7 +762,7 @@ function CategoryProcessedChartCard({ items, globalViewMode }: { items: any[]; g
             onClick={() => setSelectedMonth(null)}
             className="flex items-center gap-1.5 rounded-md bg-sky-50 px-2.5 py-1 text-xs font-bold text-sky-700 hover:bg-sky-100 ring-1 ring-sky-200 transition-all shadow-2xs"
           >
-            ← Quay lại các tháng
+            ← Quay lại các kỳ
           </button>
         ) : undefined
       }
@@ -654,7 +825,17 @@ function CategoryProcessedChartCard({ items, globalViewMode }: { items: any[]; g
   );
 }
 
-function CategoryCancelledChartCard({ items, globalViewMode }: { items: any[]; globalViewMode?: ChartViewMode }) {
+function CategoryCancelledChartCard({
+  items,
+  globalViewMode,
+  granularity = "MONTH",
+  compareMode = "NONE",
+}: {
+  items: any[];
+  globalViewMode?: ChartViewMode;
+  granularity?: GranularityMode;
+  compareMode?: CompareMode;
+}) {
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
 
   const cancelledPivot = useMemo(
@@ -662,10 +843,10 @@ function CategoryCancelledChartCard({ items, globalViewMode }: { items: any[]; g
       pivotByMonth(
         items,
         getCategoryName,
-        (i) => i.month_label || i.period_label || String(i.month_key || ""),
+        (i) => getPeriodLabelFromItem(i, granularity),
         (i) => i.cancelled || 0
       ),
-    [items]
+    [items, granularity]
   );
 
   const monthDonutData = useMemo(() => {
@@ -685,12 +866,12 @@ function CategoryCancelledChartCard({ items, globalViewMode }: { items: any[]; g
       title={
         selectedMonth
           ? `Tỷ trọng Spam / Đã hủy - ${selectedMonth}`
-          : "Spam / Đã hủy theo Danh mục"
+          : `Spam / Đã hủy theo Danh mục ${granularity === "QUARTER" ? "(Theo Quý)" : granularity === "YEAR" ? "(Theo Năm)" : ""}`
       }
       description={
         selectedMonth
-          ? "Nhấp đúp vào biểu đồ hoặc bấm nút 'Quay lại' để xem tất cả các tháng"
-          : "Nhấp đúp vào cột tháng bất kỳ để xem biểu đồ Donut chi tiết của tháng đó"
+          ? "Nhấp đúp vào biểu đồ hoặc bấm nút 'Quay lại' để xem tất cả các kỳ"
+          : "Nhấp đúp vào cột kỳ bất kỳ để xem biểu đồ Donut chi tiết của kỳ đó"
       }
       headerRight={
         selectedMonth ? (
@@ -699,7 +880,7 @@ function CategoryCancelledChartCard({ items, globalViewMode }: { items: any[]; g
             onClick={() => setSelectedMonth(null)}
             className="flex items-center gap-1.5 rounded-md bg-sky-50 px-2.5 py-1 text-xs font-bold text-sky-700 hover:bg-sky-100 ring-1 ring-sky-200 transition-all shadow-2xs"
           >
-            ← Quay lại các tháng
+            ← Quay lại các kỳ
           </button>
         ) : undefined
       }
@@ -762,14 +943,24 @@ function CategoryCancelledChartCard({ items, globalViewMode }: { items: any[]; g
   );
 }
 
-function CategoryAnalysisCharts({ charts, globalViewMode }: { charts: CccCharts; globalViewMode?: ChartViewMode }) {
+function CategoryAnalysisCharts({
+  charts,
+  globalViewMode,
+  granularity = "MONTH",
+  compareMode = "NONE",
+}: {
+  charts: CccCharts;
+  globalViewMode?: ChartViewMode;
+  granularity?: GranularityMode;
+  compareMode?: CompareMode;
+}) {
   const items = charts.report_category || [];
   if (isEmpty(items)) return <EmptyState message="Không có dữ liệu phân tích theo danh mục." />;
 
   return (
     <div className="grid gap-4 xl:grid-cols-2">
-      <CategoryProcessedChartCard items={items} globalViewMode={globalViewMode} />
-      <CategoryCancelledChartCard items={items} globalViewMode={globalViewMode} />
+      <CategoryProcessedChartCard items={items} globalViewMode={globalViewMode} granularity={granularity} compareMode={compareMode} />
+      <CategoryCancelledChartCard items={items} globalViewMode={globalViewMode} granularity={granularity} compareMode={compareMode} />
     </div>
   );
 }
@@ -777,18 +968,54 @@ function CategoryAnalysisCharts({ charts, globalViewMode }: { charts: CccCharts;
 /* ====================================================================
  * 4. PHÂN TÍCH ĐƠN VỊ XỬ LÝ
  * ==================================================================== */
-function UnitProcessedChartCard({ items, globalViewMode }: { items: any[]; globalViewMode?: ChartViewMode }) {
+function aggregateUnitDataByGranularity(items: any[], granularity: GranularityMode) {
+  const map = new Map<string, { month_label: string; cs_processed: number; related_processed: number; cs_cancelled: number; related_cancelled: number }>();
+
+  for (const item of items) {
+    const label = getPeriodLabelFromItem(item, granularity);
+    if (!map.has(label)) {
+      map.set(label, {
+        month_label: label,
+        cs_processed: 0,
+        related_processed: 0,
+        cs_cancelled: 0,
+        related_cancelled: 0,
+      });
+    }
+    const rec = map.get(label)!;
+    rec.cs_processed += item.cs_processed || 0;
+    rec.related_processed += item.related_processed || 0;
+    rec.cs_cancelled += item.cs_cancelled || 0;
+    rec.related_cancelled += item.related_cancelled || 0;
+  }
+
+  return Array.from(map.values());
+}
+
+function UnitProcessedChartCard({
+  items,
+  globalViewMode,
+  granularity = "MONTH",
+  compareMode = "NONE",
+}: {
+  items: any[];
+  globalViewMode?: ChartViewMode;
+  granularity?: GranularityMode;
+  compareMode?: CompareMode;
+}) {
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+
+  const aggregatedItems = useMemo(() => aggregateUnitDataByGranularity(items, granularity), [items, granularity]);
 
   const monthDonutData = useMemo(() => {
     if (!selectedMonth) return [];
-    const item = items.find((i) => isSameMonth(i, selectedMonth));
+    const item = aggregatedItems.find((i) => isSameMonth(i, selectedMonth));
     if (!item) return [];
     return [
       { name: "TT.CSKH trực tiếp xử lý", value: item.cs_processed || 0, color: "#10b981" },
       { name: "Chuyển PBLQ phối hợp", value: item.related_processed || 0, color: "#f59e0b" },
     ];
-  }, [items, selectedMonth]);
+  }, [aggregatedItems, selectedMonth]);
 
   const handleChartClick = (state: any) => {
     if (state && state.activeLabel) {
@@ -801,12 +1028,12 @@ function UnitProcessedChartCard({ items, globalViewMode }: { items: any[]; globa
       title={
         selectedMonth
           ? `Ticket đã xử lý theo Đơn vị - ${selectedMonth}`
-          : "Ticket đã xử lý theo Đơn vị"
+          : `Ticket đã xử lý theo Đơn vị ${granularity === "QUARTER" ? "(Theo Quý)" : granularity === "YEAR" ? "(Theo Năm)" : ""}`
       }
       description={
         selectedMonth
-          ? "Nhấp đúp vào biểu đồ hoặc bấm nút 'Quay lại' để xem tất cả các tháng"
-          : "Nhấp đúp vào cột tháng bất kỳ để xem biểu đồ Donut chi tiết của tháng đó"
+          ? "Nhấp đúp vào biểu đồ hoặc bấm nút 'Quay lại' để xem tất cả các kỳ"
+          : "Nhấp đúp vào cột kỳ bất kỳ để xem biểu đồ Donut chi tiết của kỳ đó"
       }
       headerRight={
         selectedMonth ? (
@@ -815,7 +1042,7 @@ function UnitProcessedChartCard({ items, globalViewMode }: { items: any[]; globa
             onClick={() => setSelectedMonth(null)}
             className="flex items-center gap-1.5 rounded-md bg-sky-50 px-2.5 py-1 text-xs font-bold text-sky-700 hover:bg-sky-100 ring-1 ring-sky-200 transition-all shadow-2xs"
           >
-            ← Quay lại các tháng
+            ← Quay lại các kỳ
           </button>
         ) : undefined
       }
@@ -855,7 +1082,7 @@ function UnitProcessedChartCard({ items, globalViewMode }: { items: any[]; globa
             </PieChart>
           ) : (
             <BarChart
-              data={items}
+              data={aggregatedItems}
               onDoubleClick={handleChartClick}
               onClick={handleChartClick}
               className="cursor-pointer"
@@ -879,18 +1106,30 @@ function UnitProcessedChartCard({ items, globalViewMode }: { items: any[]; globa
   );
 }
 
-function UnitCancelledChartCard({ items, globalViewMode }: { items: any[]; globalViewMode?: ChartViewMode }) {
+function UnitCancelledChartCard({
+  items,
+  globalViewMode,
+  granularity = "MONTH",
+  compareMode = "NONE",
+}: {
+  items: any[];
+  globalViewMode?: ChartViewMode;
+  granularity?: GranularityMode;
+  compareMode?: CompareMode;
+}) {
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+
+  const aggregatedItems = useMemo(() => aggregateUnitDataByGranularity(items, granularity), [items, granularity]);
 
   const monthDonutData = useMemo(() => {
     if (!selectedMonth) return [];
-    const item = items.find((i) => isSameMonth(i, selectedMonth));
+    const item = aggregatedItems.find((i) => isSameMonth(i, selectedMonth));
     if (!item) return [];
     return [
       { name: "TT.CSKH ghi nhận", value: item.cs_cancelled || 0, color: "#0097cf" },
       { name: "PBLQ ghi nhận", value: item.related_cancelled || 0, color: "#ef4444" },
     ];
-  }, [items, selectedMonth]);
+  }, [aggregatedItems, selectedMonth]);
 
   const handleChartClick = (state: any) => {
     if (state && state.activeLabel) {
@@ -903,12 +1142,12 @@ function UnitCancelledChartCard({ items, globalViewMode }: { items: any[]; globa
       title={
         selectedMonth
           ? `Spam / Hủy theo Đơn vị - ${selectedMonth}`
-          : "Spam / Đã hủy theo Đơn vị xử lý"
+          : `Spam / Đã hủy theo Đơn vị xử lý ${granularity === "QUARTER" ? "(Theo Quý)" : granularity === "YEAR" ? "(Theo Năm)" : ""}`
       }
       description={
         selectedMonth
-          ? "Nhấp đúp vào biểu đồ hoặc bấm nút 'Quay lại' để xem tất cả các tháng"
-          : "Nhấp đúp vào cột tháng bất kỳ để xem biểu đồ Donut chi tiết của tháng đó"
+          ? "Nhấp đúp vào biểu đồ hoặc bấm nút 'Quay lại' để xem tất cả các kỳ"
+          : "Nhấp đúp vào cột kỳ bất kỳ để xem biểu đồ Donut chi tiết của kỳ đó"
       }
       headerRight={
         selectedMonth ? (
@@ -917,7 +1156,7 @@ function UnitCancelledChartCard({ items, globalViewMode }: { items: any[]; globa
             onClick={() => setSelectedMonth(null)}
             className="flex items-center gap-1.5 rounded-md bg-sky-50 px-2.5 py-1 text-xs font-bold text-sky-700 hover:bg-sky-100 ring-1 ring-sky-200 transition-all shadow-2xs"
           >
-            ← Quay lại các tháng
+            ← Quay lại các kỳ
           </button>
         ) : undefined
       }
@@ -957,7 +1196,7 @@ function UnitCancelledChartCard({ items, globalViewMode }: { items: any[]; globa
             </PieChart>
           ) : (
             <BarChart
-              data={items}
+              data={aggregatedItems}
               onDoubleClick={handleChartClick}
               onClick={handleChartClick}
               className="cursor-pointer"
@@ -981,14 +1220,24 @@ function UnitCancelledChartCard({ items, globalViewMode }: { items: any[]; globa
   );
 }
 
-function UnitAnalysisCharts({ charts, globalViewMode }: { charts: CccCharts; globalViewMode?: ChartViewMode }) {
+function UnitAnalysisCharts({
+  charts,
+  globalViewMode,
+  granularity = "MONTH",
+  compareMode = "NONE",
+}: {
+  charts: CccCharts;
+  globalViewMode?: ChartViewMode;
+  granularity?: GranularityMode;
+  compareMode?: CompareMode;
+}) {
   const items = charts.report_unit || [];
   if (isEmpty(items)) return <EmptyState message="Không có dữ liệu phân tích theo đơn vị xử lý." />;
 
   return (
     <div className="grid gap-4 xl:grid-cols-2">
-      <UnitProcessedChartCard items={items} globalViewMode={globalViewMode} />
-      <UnitCancelledChartCard items={items} globalViewMode={globalViewMode} />
+      <UnitProcessedChartCard items={items} globalViewMode={globalViewMode} granularity={granularity} compareMode={compareMode} />
+      <UnitCancelledChartCard items={items} globalViewMode={globalViewMode} granularity={granularity} compareMode={compareMode} />
     </div>
   );
 }
@@ -1000,8 +1249,8 @@ function SingleTimeChartCard({
   title,
   items,
   globalViewMode,
-  currentLabel = "Tháng hiện tại",
-  previousLabel = "Tháng trước",
+  currentLabel = "Kỳ hiện tại",
+  previousLabel = "Kỳ so sánh",
 }: {
   title: string;
   items: CccDashboardReportTimeCategoryItem[];
@@ -1045,13 +1294,24 @@ function SingleTimeChartCard({
   );
 }
 
-function TimeAnalysisCharts({ charts, globalViewMode }: { charts: CccCharts; globalViewMode?: ChartViewMode }) {
+function TimeAnalysisCharts({
+  charts,
+  globalViewMode,
+  granularity = "MONTH",
+  compareMode = "NONE",
+}: {
+  charts: CccCharts;
+  globalViewMode?: ChartViewMode;
+  granularity?: GranularityMode;
+  compareMode?: CompareMode;
+}) {
   const time = charts.report_time;
+  const previousLabel = compareMode === "YOY" ? "Cùng kỳ năm trước" : compareMode === "QOQ" ? "Kỳ liền trước" : "Kỳ trước";
 
   return (
     <div className="grid gap-4 xl:grid-cols-2">
-      <SingleTimeChartCard title="Thời gian trung bình CS xử lý tiếp nhận" items={time?.cs_by_category || []} globalViewMode={globalViewMode} />
-      <SingleTimeChartCard title="Thời gian trung bình phối hợp CS & PBLQ" items={time?.related_by_category || []} globalViewMode={globalViewMode} />
+      <SingleTimeChartCard title="Thời gian trung bình CS xử lý tiếp nhận" items={time?.cs_by_category || []} globalViewMode={globalViewMode} previousLabel={previousLabel} />
+      <SingleTimeChartCard title="Thời gian trung bình phối hợp CS & PBLQ" items={time?.related_by_category || []} globalViewMode={globalViewMode} previousLabel={previousLabel} />
     </div>
   );
 }
@@ -1150,27 +1410,41 @@ function SlaCategoryOverdueChartCard({ category, globalViewMode }: { category: a
   );
 }
 
-function SlaUnitOverdueTableCard({ unitMonth, globalViewMode }: { unitMonth: any[]; globalViewMode?: ChartViewMode }) {
+function SlaUnitOverdueTableCard({ unitMonth, globalViewMode, granularity = "MONTH" }: { unitMonth: any[]; globalViewMode?: ChartViewMode; granularity?: GranularityMode }) {
+  const displayItems = useMemo(() => {
+    if (granularity === "MONTH") return unitMonth;
+    const map = new Map<string, { month_label: string; unit_name: string; overdue: number }>();
+    for (const item of unitMonth) {
+      const pLabel = getPeriodLabelFromItem(item, granularity);
+      const key = `${pLabel}-${item.unit_name}`;
+      if (!map.has(key)) {
+        map.set(key, { month_label: pLabel, unit_name: item.unit_name, overdue: 0 });
+      }
+      map.get(key)!.overdue += item.overdue || 0;
+    }
+    return Array.from(map.values());
+  }, [unitMonth, granularity]);
+
   return (
     <ChartCard
       title="Thống kê Ticket Trễ hạn theo Đơn vị"
       description="Bảng theo dõi chi tiết số lượng ticket trễ hạn phân bổ theo từng đơn vị xử lý"
     >
-      {isEmpty(unitMonth) ? (
+      {isEmpty(displayItems) ? (
         <EmptyState message="Không có tác vụ PBLQ trễ hạn trong khoảng thời gian này." />
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-left text-xs">
             <thead className="bg-slate-50 text-slate-700">
               <tr>
-                <th className="px-4 py-2.5 font-bold">Tháng</th>
+                <th className="px-4 py-2.5 font-bold">Kỳ</th>
                 <th className="px-4 py-2.5 font-bold">Đơn vị xử lý</th>
                 <th className="px-4 py-2.5 text-right font-bold">Số ticket trễ hạn</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {unitMonth.map((item, index) => (
-                <tr key={`${item.month_key}-${item.unit_name}-${index}`} className="hover:bg-slate-50/80">
+              {displayItems.map((item, index) => (
+                <tr key={`${item.month_label}-${item.unit_name}-${index}`} className="hover:bg-slate-50/80">
                   <td className="px-4 py-2.5 font-semibold text-slate-700">{item.month_label}</td>
                   <td className="px-4 py-2.5 text-slate-600">{item.unit_name}</td>
                   <td className="px-4 py-2.5 text-right font-bold text-rose-600">{formatNumber(item.overdue)}</td>
@@ -1184,7 +1458,17 @@ function SlaUnitOverdueTableCard({ unitMonth, globalViewMode }: { unitMonth: any
   );
 }
 
-function SlaCharts({ charts, globalViewMode }: { charts: CccCharts; globalViewMode?: ChartViewMode }) {
+function SlaCharts({
+  charts,
+  globalViewMode,
+  granularity = "MONTH",
+  compareMode = "NONE",
+}: {
+  charts: CccCharts;
+  globalViewMode?: ChartViewMode;
+  granularity?: GranularityMode;
+  compareMode?: CompareMode;
+}) {
   const sla = charts.report_sla;
   if (!sla) return <EmptyState message="Không có dữ liệu SLA." />;
 
@@ -1192,7 +1476,7 @@ function SlaCharts({ charts, globalViewMode }: { charts: CccCharts; globalViewMo
     <div className="grid gap-4 xl:grid-cols-2">
       <SlaGaugeChartCard monthly={sla.monthly || []} globalViewMode={globalViewMode} />
       <SlaCategoryOverdueChartCard category={sla.overdue_by_category || []} globalViewMode={globalViewMode} />
-      <SlaUnitOverdueTableCard unitMonth={sla.overdue_by_unit_month || []} globalViewMode={globalViewMode} />
+      <SlaUnitOverdueTableCard unitMonth={sla.overdue_by_unit_month || []} globalViewMode={globalViewMode} granularity={granularity} />
     </div>
   );
 }
@@ -1304,7 +1588,17 @@ function EmployeeTimeChartCard({ itemsSorted, globalViewMode }: { itemsSorted: a
   );
 }
 
-function EmployeeCharts({ charts, globalViewMode }: { charts: CccCharts; globalViewMode?: ChartViewMode }) {
+function EmployeeCharts({
+  charts,
+  globalViewMode,
+  granularity = "MONTH",
+  compareMode = "NONE",
+}: {
+  charts: CccCharts;
+  globalViewMode?: ChartViewMode;
+  granularity?: GranularityMode;
+  compareMode?: CompareMode;
+}) {
   const rawItems = charts.report_employee || [];
   const itemsSorted = useMemo(() => [...rawItems].sort((a, b) => (b.processed || 0) - (a.processed || 0)), [rawItems]);
 
@@ -1321,7 +1615,17 @@ function EmployeeCharts({ charts, globalViewMode }: { charts: CccCharts; globalV
 /* ====================================================================
  * 8. NHÓM LỖI PHÁT SINH NHIỀU
  * ==================================================================== */
-function RootCausePieCard({ charts, globalViewMode }: { charts: CccCharts; globalViewMode?: ChartViewMode }) {
+function RootCausePieCard({
+  charts,
+  globalViewMode,
+  granularity = "MONTH",
+  compareMode = "NONE",
+}: {
+  charts: CccCharts;
+  globalViewMode?: ChartViewMode;
+  granularity?: GranularityMode;
+  compareMode?: CompareMode;
+}) {
   const data = useMemo(
     () =>
       (charts.root_cause_breakdown || []).map((item) => ({
@@ -1381,41 +1685,46 @@ function RootCausePieCard({ charts, globalViewMode }: { charts: CccCharts; globa
 export const CccDashboardCharts = memo(function CccDashboardCharts({
   charts,
   globalViewMode = "TREND_OVER_TIME",
+  granularity = "MONTH",
+  compareMode = "NONE",
 }: {
   charts: CccCharts;
   globalViewMode?: ChartViewMode;
+  granularity?: GranularityMode;
+  compareMode?: CompareMode;
 }) {
   return (
     <div className="space-y-6">
-      <TicketResultChartCard charts={charts} globalViewMode={globalViewMode} />
+      <TicketResultChartCard charts={charts} globalViewMode={globalViewMode} granularity={granularity} compareMode={compareMode} />
 
       <LazyDashboardSection minHeight={400}>
-        <SourceAnalysisCharts charts={charts} globalViewMode={globalViewMode} />
+        <SourceAnalysisCharts charts={charts} globalViewMode={globalViewMode} granularity={granularity} compareMode={compareMode} />
       </LazyDashboardSection>
 
       <LazyDashboardSection minHeight={420}>
-        <CategoryAnalysisCharts charts={charts} globalViewMode={globalViewMode} />
+        <CategoryAnalysisCharts charts={charts} globalViewMode={globalViewMode} granularity={granularity} compareMode={compareMode} />
       </LazyDashboardSection>
 
       <LazyDashboardSection minHeight={400}>
-        <UnitAnalysisCharts charts={charts} globalViewMode={globalViewMode} />
+        <UnitAnalysisCharts charts={charts} globalViewMode={globalViewMode} granularity={granularity} compareMode={compareMode} />
       </LazyDashboardSection>
 
       <LazyDashboardSection minHeight={400}>
-        <TimeAnalysisCharts charts={charts} globalViewMode={globalViewMode} />
+        <TimeAnalysisCharts charts={charts} globalViewMode={globalViewMode} granularity={granularity} compareMode={compareMode} />
       </LazyDashboardSection>
 
       <LazyDashboardSection minHeight={480}>
-        <SlaCharts charts={charts} globalViewMode={globalViewMode} />
+        <SlaCharts charts={charts} globalViewMode={globalViewMode} granularity={granularity} compareMode={compareMode} />
       </LazyDashboardSection>
 
       <LazyDashboardSection minHeight={420}>
-        <EmployeeCharts charts={charts} globalViewMode={globalViewMode} />
+        <EmployeeCharts charts={charts} globalViewMode={globalViewMode} granularity={granularity} compareMode={compareMode} />
       </LazyDashboardSection>
 
       <LazyDashboardSection minHeight={320}>
-        <RootCausePieCard charts={charts} globalViewMode={globalViewMode} />
+        <RootCausePieCard charts={charts} globalViewMode={globalViewMode} granularity={granularity} compareMode={compareMode} />
       </LazyDashboardSection>
     </div>
   );
 });
+
