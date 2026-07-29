@@ -334,7 +334,7 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--branch-code",
-            default="CHATBOT_DEMO",
+            default="HS_Q7",
             help="Mã chi nhánh dùng cho dữ liệu demo.",
         )
         parser.add_argument(
@@ -348,7 +348,7 @@ class Command(BaseCommand):
         extra_sessions = options["extra_sessions"]
         months = options["months"]
         seed = options["seed"]
-        branch_code = str(options["branch_code"] or "CHATBOT_DEMO").strip()
+        branch_code = str(options["branch_code"] or "HS_Q7").strip()
 
         if count < 0:
             raise CommandError("--count phải lớn hơn hoặc bằng 0.")
@@ -429,18 +429,19 @@ class Command(BaseCommand):
     def _ensure_master_data(self, branch_code):
         now = timezone.now()
 
-        branch, _ = Branch.objects.update_or_create(
-            branch_code=branch_code,
-            defaults={
-                "branch_name": "Chi nhánh Demo Chatbot",
-                "address": "Dữ liệu dùng cho môi trường phát triển",
-                "status": "ACTIVE",
-                "updated_at": now,
-            },
-        )
-        if branch.created_at is None:
-            branch.created_at = now
-            branch.save(update_fields=["created_at"])
+        branch = Branch.objects.filter(branch_code=branch_code).first()
+        if not branch:
+            branch = Branch.objects.filter(status="ACTIVE").first()
+        if not branch:
+            branch, _ = Branch.objects.get_or_create(
+                branch_code="HS_Q7",
+                defaults={
+                    "branch_name": "Hội sở Quận 7",
+                    "address": "Quận 7, TP.HCM",
+                    "status": "ACTIVE",
+                    "updated_at": now,
+                },
+            )
 
         customer_type, _ = CustomerType.objects.update_or_create(
             type_code="INDIVIDUAL",

@@ -1,0 +1,75 @@
+@startuml
+skinparam backgroundColor transparent
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam activity {
+  BackgroundColor #F8F9FA
+  BorderColor #495057
+  DiamondBackgroundColor #FFF3BF
+  DiamondBorderColor #E67700
+  StartColor #2B8A3E
+  EndColor #C92A2A
+  BarColor #495057
+  FontColor #212529
+}
+skinparam ArrowColor #495057
+skinparam NoteBackgroundColor #FFF9DB
+skinparam NoteBorderColor #E67700
+
+title Activity 10 - Khởi tạo, cấu hình và kích hoạt kỳ KPI
+
+|KPI Admin|
+start
+:Chọn tháng, năm và hồ sơ KPI;
+
+|Frontend Next.js|
+:Gửi yêu cầu lấy / tạo kỳ KPI;
+
+|Backend KPI|
+if (Kỳ KPI đã tồn tại?) then (Có)
+  :Trả kỳ hiện có;
+else (Không)
+  :Tạo kỳ KPI trạng thái DRAFT;
+  :Khởi tạo Profile mặc định;
+  :Khởi tạo Section, Group và Metric;
+  :Khởi tạo Gate Config và Reward Tier;
+endif
+
+|KPI Admin|
+:Cấu hình metric, trọng số, gate và mức thưởng;
+:Bấm lưu cấu hình;
+
+|Backend KPI|
+:Kiểm tra kỳ có ở trạng thái DRAFT không;
+if (Được phép sửa?) then (Có)
+else (Không)
+  :Trả lỗi kỳ đã khóa / đóng;
+  stop
+endif
+:Kiểm tra tổng trọng số và cấu trúc metric;
+if (Cấu hình hợp lệ?) then (Có)
+  :Lưu cấu hình;
+else (Không)
+  :Trả danh sách lỗi cấu hình;
+  |Frontend Next.js|
+  :Hiển thị lỗi và yêu cầu chỉnh sửa;
+  stop
+endif
+
+|KPI Admin|
+:Bấm kích hoạt kỳ KPI;
+
+|Backend KPI|
+:Kiểm tra lại cấu hình và quyền kích hoạt;
+if (Đủ điều kiện kích hoạt?) then (Có)
+  :Chuyển trạng thái kỳ sang ACTIVE;
+  :Ghi người kích hoạt và thời điểm;
+else (Không)
+  :Giữ trạng thái DRAFT và trả lỗi;
+  stop
+endif
+
+|Frontend Next.js|
+:Hiển thị kỳ KPI đang hoạt động;
+stop
+@enduml

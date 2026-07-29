@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { X } from "lucide-react";
+import { useEscapeKey } from "@/hooks/useEscapeKey";
 
 export type BreachReasonOption = {
   id: number;
@@ -24,6 +25,7 @@ export function SlaBreachReasonModal({
   onClose: () => void;
   onSubmit: (reasonId: number, note: string) => void;
 }) {
+  useEscapeKey(onClose);
   const [reasonId, setReasonId] = useState<number | null>(
     reasons[0]?.id ?? null
   );
@@ -107,7 +109,7 @@ export function SlaBreachReasonModal({
             onClick={handleSubmit}
             className="rounded-lg bg-emerald-500 px-6 py-2 text-xs font-semibold text-white transition hover:bg-emerald-600 disabled:opacity-60"
           >
-            {saving ? "Đang lưu..." : "Lưu"}
+            {saving ? "Đang xử lý..." : "Xác nhận"}
           </button>
           <button
             type="button"

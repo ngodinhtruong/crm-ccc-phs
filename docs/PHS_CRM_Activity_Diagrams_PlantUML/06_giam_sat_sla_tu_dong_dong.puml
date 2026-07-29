@@ -1,0 +1,65 @@
+@startuml
+skinparam backgroundColor transparent
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam activity {
+  BackgroundColor #F8F9FA
+  BorderColor #495057
+  DiamondBackgroundColor #FFF3BF
+  DiamondBorderColor #E67700
+  StartColor #2B8A3E
+  EndColor #C92A2A
+  BarColor #495057
+  FontColor #212529
+}
+skinparam ArrowColor #495057
+skinparam NoteBackgroundColor #FFF9DB
+skinparam NoteBorderColor #E67700
+
+title Activity 06 - Quét SLA, cảnh báo quá hạn và tự đóng Ticket
+
+|Celery Beat|
+start
+:Kích hoạt task quét SLA định kỳ;
+
+|Celery Worker|
+:Thử lấy distributed lock;
+if (Task khác đang chạy?) then (Có)
+  :Bỏ qua lần quét;
+  stop
+else (Không)
+endif
+
+|Backend SLA|
+:Lấy các SLA Tracking chưa hoàn tất;
+while (Còn Ticket cần kiểm tra?) is (Có)
+  :Tính số phút quá hạn;
+  if (Đã quá hạn?) then (Có)
+    :Đánh dấu SLA = OVERDUE;
+    :Ghi thời điểm breached_at;
+    :Tạo cảnh báo quá hạn;
+    if (Quá hạn >= 72 giờ?) then (Có)
+      :Tạo cảnh báo mức nghiêm trọng;
+    else (Không)
+    endif
+    :Duyệt các Escalation Rule phù hợp;
+    :Xác định người nhận;
+    :Tạo Ticket Reminder / Notification;
+  else (Không)
+  endif
+endwhile (Không)
+
+|Backend SLA|
+:Lấy Ticket ở DONE_WAIT_CLOSE quá thời gian chờ;
+while (Còn Ticket cần tự đóng?) is (Có)
+  :Chuyển trạng thái sang CLOSED;
+  :Đóng Process Log và Assignment;
+  :Ghi Activity Log tự động;
+  :Hoàn tất SLA Tracking;
+endwhile (Không)
+
+|Celery Worker|
+:Giải phóng distributed lock;
+:Trả thống kê checked / overdue / alert / auto-closed;
+stop
+@enduml

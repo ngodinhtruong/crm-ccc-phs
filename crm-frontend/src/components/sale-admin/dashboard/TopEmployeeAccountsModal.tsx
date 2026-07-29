@@ -10,6 +10,8 @@ import {
 } from "@/components/sale-admin/dashboard/SaleAdminDashboardUtils";
 import { SaAdminTopEmployeeRow } from "@/types/sale-admin-dashboard.type";
 
+import { useEscapeKey } from "@/hooks/useEscapeKey";
+
 export function TopEmployeeAccountsModal({
   employee,
   onClose,
@@ -17,6 +19,8 @@ export function TopEmployeeAccountsModal({
   employee: SaAdminTopEmployeeRow | null;
   onClose: () => void;
 }) {
+  useEscapeKey(onClose, Boolean(employee));
+
   if (!employee) return null;
 
   return (

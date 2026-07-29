@@ -1,0 +1,69 @@
+@startuml
+skinparam backgroundColor transparent
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam activity {
+  BackgroundColor #F8F9FA
+  BorderColor #495057
+  DiamondBackgroundColor #FFF3BF
+  DiamondBorderColor #E67700
+  StartColor #2B8A3E
+  EndColor #C92A2A
+  BarColor #495057
+  FontColor #212529
+}
+skinparam ArrowColor #495057
+skinparam NoteBackgroundColor #FFF9DB
+skinparam NoteBorderColor #E67700
+
+title Activity 01 - Đăng nhập và điều hướng theo quyền
+
+|Người dùng|
+start
+:Nhập tên đăng nhập và mật khẩu;
+:Bấm **Đăng nhập**;
+
+|Frontend Next.js|
+:Kiểm tra dữ liệu bắt buộc;
+if (Dữ liệu hợp lệ?) then (Có)
+  :Gửi yêu cầu đăng nhập;
+else (Không)
+  :Hiển thị lỗi nhập liệu;
+  stop
+endif
+
+|Backend Django|
+:Xác thực tài khoản;
+if (Thông tin đăng nhập đúng?) then (Có)
+  :Tạo access token và refresh token;
+  :Trả token cho frontend;
+else (Không)
+  :Trả lỗi xác thực;
+  |Frontend Next.js|
+  :Hiển thị thông báo đăng nhập thất bại;
+  stop
+endif
+
+|Frontend Next.js|
+:Lưu token;
+:Gọi API lấy thông tin người dùng hiện tại;
+
+|Backend Django|
+:Lấy role, permission, scope và nhóm nghiệp vụ;
+:Trả hồ sơ người dùng;
+
+|Frontend Next.js|
+if (Có quyền truy cập hệ thống?) then (Có)
+  if (Nhóm nghiệp vụ chính?) then (CCC / System)
+    :Điều hướng Ticket Dashboard / Workspace;
+  elseif (Sale Admin) then (SA)
+    :Điều hướng Sale Admin Dashboard;
+  else (KPI)
+    :Điều hướng KPI cá nhân / KPI Admin;
+  endif
+else (Không)
+  :Xóa token;
+  :Hiển thị lỗi không có quyền truy cập;
+endif
+stop
+@enduml

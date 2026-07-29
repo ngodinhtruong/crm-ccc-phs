@@ -104,7 +104,7 @@ export function DashboardLayout({
             </aside>
 
             <section className={`min-h-screen pt-14 ${contentClassName}`}>
-                <div className="flex h-11 items-center justify-between border-b border-slate-200 bg-white px-4">
+                <div className="sticky top-[56px] z-20 flex h-11 items-center justify-between border-b border-slate-200 bg-white/95 px-4 backdrop-blur-sm shadow-xs">
                     <div className="flex items-center gap-3">
                         <Breadcrumbs items={breadcrumbs || []} />
 

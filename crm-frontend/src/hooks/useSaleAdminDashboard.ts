@@ -18,6 +18,17 @@ function toDateInputValue(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
+function last5MonthsRange() {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth() - 4, 1);
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+  return {
+    dateFrom: toDateInputValue(start),
+    dateTo: toDateInputValue(end),
+  };
+}
+
 function currentMonthRange() {
   const now = new Date();
   const start = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -40,6 +51,65 @@ function monthRangeFromDate(dateFrom: string, offset: number) {
   };
 }
 
+function isLastDayOfMonth(dateStr: string): boolean {
+  const d = new Date(`${dateStr}T00:00:00`);
+  if (isNaN(d.getTime())) return false;
+  const nextDay = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);
+  return nextDay.getDate() === 1;
+}
+
+function shiftDateByMonths(dateStr: string, monthOffset: number, keepEndOfMonth = false): string {
+  const d = new Date(`${dateStr}T00:00:00`);
+  if (isNaN(d.getTime())) return dateStr;
+
+  if (keepEndOfMonth) {
+    const targetMonthStart = new Date(d.getFullYear(), d.getMonth() + monthOffset, 1);
+    const targetMonthEnd = new Date(targetMonthStart.getFullYear(), targetMonthStart.getMonth() + 1, 0);
+    return toDateInputValue(targetMonthEnd);
+  }
+
+  const targetDate = new Date(d.getFullYear(), d.getMonth() + monthOffset, d.getDate());
+  if (targetDate.getMonth() !== (d.getMonth() + monthOffset + 1200) % 12) {
+    const lastDayOfTargetMonth = new Date(d.getFullYear(), d.getMonth() + monthOffset + 1, 0);
+    return toDateInputValue(lastDayOfTargetMonth);
+  }
+  return toDateInputValue(targetDate);
+}
+
+function getSingleMonthRange(referenceDateStr: string, offset: number) {
+  const d = new Date(`${referenceDateStr}T00:00:00`);
+  const ref = isNaN(d.getTime()) ? new Date() : d;
+  const start = new Date(ref.getFullYear(), ref.getMonth() + offset, 1);
+  const end = new Date(ref.getFullYear(), ref.getMonth() + offset + 1, 0);
+
+  return {
+    dateFrom: toDateInputValue(start),
+    dateTo: toDateInputValue(end),
+  };
+}
+
+function getShiftedRange(dateFrom: string, dateTo: string, offset: number) {
+  if (offset === 0) {
+    return { dateFrom, dateTo };
+  }
+
+  const fromDate = new Date(`${dateFrom}T00:00:00`);
+  const toDate = new Date(`${dateTo}T00:00:00`);
+
+  if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) {
+    return monthRangeFromDate(dateFrom, offset);
+  }
+
+  const isToLastDay = isLastDayOfMonth(dateTo);
+  const shiftedFrom = shiftDateByMonths(dateFrom, offset, false);
+  const shiftedTo = shiftDateByMonths(dateTo, offset, isToLastDay);
+
+  return {
+    dateFrom: shiftedFrom,
+    dateTo: shiftedTo,
+  };
+}
+
 function yearFromDate(value: string) {
   return String(new Date(`${value}T00:00:00`).getFullYear());
 }
@@ -50,9 +120,10 @@ function monthFromDate(value: string) {
 
 export function useSaleAdminDashboard() {
   const router = useRouter();
-  const defaultRange = currentMonthRange();
+  const defaultRange = last5MonthsRange();
 
   const [data, setData] = useState<SaAdminDashboardResponse | null>(null);
+  const [historyData, setHistoryData] = useState<SaAdminDashboardResponse[]>([]);
   const [dateFrom, setDateFrom] = useState(defaultRange.dateFrom);
   const [dateTo, setDateTo] = useState(defaultRange.dateTo);
   const [branch, setBranch] = useState("");
@@ -93,10 +164,39 @@ export function useSaleAdminDashboard() {
 
       setError("");
 
-      const response = await saleAdminDashboardService.getDashboard(customParams);
+      const targetFrom = customParams.date_from || dateFrom;
+      const targetTo = customParams.date_to || dateTo;
+      const monthOffsets = [-4, -3, -2, -1, 0];
+
+      const multiMonthParams = monthOffsets.map((offset) => {
+        if (offset === 0) {
+          return {
+            ...customParams,
+            year: yearFromDate(targetFrom),
+            month: monthFromDate(targetFrom),
+            date_from: targetFrom,
+            date_to: targetTo,
+          };
+        }
+
+        const range = getSingleMonthRange(targetTo, offset);
+        return {
+          ...customParams,
+          year: yearFromDate(range.dateFrom),
+          month: monthFromDate(range.dateFrom),
+          date_from: range.dateFrom,
+          date_to: range.dateTo,
+        };
+      });
+
+      const responses = await Promise.all(
+        multiMonthParams.map((p) => saleAdminDashboardService.getDashboard(p))
+      );
 
       if (mountedRef.current && requestId === requestIdRef.current) {
-        setData(response);
+        setHistoryData(responses);
+        const currentTargetResponse = responses[responses.length - 1];
+        setData(currentTargetResponse || null);
       }
     } catch (err) {
       if (mountedRef.current && requestId === requestIdRef.current) {
@@ -119,7 +219,7 @@ export function useSaleAdminDashboard() {
   };
 
   const clearFilter = () => {
-    const nextRange = currentMonthRange();
+    const nextRange = last5MonthsRange();
     const nextParams = {
       year: yearFromDate(nextRange.dateFrom),
       month: monthFromDate(nextRange.dateFrom),
@@ -157,8 +257,11 @@ export function useSaleAdminDashboard() {
     const safeMonth = Number(month || 1);
     const start = new Date(safeYear, safeMonth - 1, 1);
     const end = new Date(safeYear, safeMonth, 0);
-    setDateFrom(toDateInputValue(start));
-    setDateTo(toDateInputValue(end));
+    const df = toDateInputValue(start);
+    const dt = toDateInputValue(end);
+    setDateFrom(df);
+    setDateTo(dt);
+    void loadDashboard({ ...params, year: String(safeYear), month: String(safeMonth), date_from: df, date_to: dt });
   };
 
   const setMonth = (value: string) => {
@@ -166,8 +269,11 @@ export function useSaleAdminDashboard() {
     const safeMonth = Number(value || 1);
     const start = new Date(safeYear, safeMonth - 1, 1);
     const end = new Date(safeYear, safeMonth, 0);
-    setDateFrom(toDateInputValue(start));
-    setDateTo(toDateInputValue(end));
+    const df = toDateInputValue(start);
+    const dt = toDateInputValue(end);
+    setDateFrom(df);
+    setDateTo(dt);
+    void loadDashboard({ ...params, year: String(safeYear), month: String(safeMonth), date_from: df, date_to: dt });
   };
 
   useEffect(() => {
@@ -212,6 +318,7 @@ export function useSaleAdminDashboard() {
 
   return {
     data,
+    historyData,
     year,
     setYear,
     month,

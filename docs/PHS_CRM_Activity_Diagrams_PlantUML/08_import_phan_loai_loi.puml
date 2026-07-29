@@ -1,0 +1,88 @@
+@startuml
+skinparam backgroundColor transparent
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam activity {
+  BackgroundColor #F8F9FA
+  BorderColor #495057
+  DiamondBackgroundColor #FFF3BF
+  DiamondBorderColor #E67700
+  StartColor #2B8A3E
+  EndColor #C92A2A
+  BarColor #495057
+  FontColor #212529
+}
+skinparam ArrowColor #495057
+skinparam NoteBackgroundColor #FFF9DB
+skinparam NoteBorderColor #E67700
+
+title Activity 08 - Import và phân loại lỗi bên ngoài
+
+|Người dùng|
+start
+if (Nguồn dữ liệu?) then (Nhập thủ công)
+  :Nhập ngày nhận, ngày hoàn thành, nguồn, thiết bị,
+kết quả xử lý và nội dung;
+else (Excel)
+  :Chọn file Excel;
+  :Chọn tự động phân loại hoặc chỉ import;
+endif
+
+|Frontend Next.js|
+:Kiểm tra định dạng cơ bản;
+:Gửi dữ liệu / multipart file;
+
+|Backend Import|
+:Kiểm tra quyền import / tạo lỗi;
+if (Có quyền?) then (Có)
+else (Không)
+  :Trả lỗi 403;
+  stop
+endif
+
+if (Nguồn = Excel?) then (Có)
+  :Đọc workbook và tìm cột theo header;
+  :Tạo Import Batch;
+  while (Còn dòng dữ liệu?) is (Có)
+    :Chuẩn hóa ngày giờ và nội dung;
+    :Kiểm tra trường bắt buộc;
+    if (Dòng hợp lệ?) then (Có)
+      :Tạo ExternalErrorRecord chờ phân loại;
+    else (Không)
+      :Ghi dòng bị bỏ qua và lý do;
+    endif
+  endwhile (Không)
+else (Không)
+  :Chuẩn hóa dữ liệu thủ công;
+  :Tạo ExternalErrorRecord;
+endif
+
+if (Bật tự động phân loại?) then (Có)
+  |Bộ phân loại AI|
+  :Làm sạch và che dữ liệu nhạy cảm;
+  :Phân loại nhóm lỗi và mã lỗi;
+  :Phân loại nhóm nguyên nhân;
+  :Trả nhãn và độ tin cậy;
+  |Backend Import|
+  if (Kết quả đủ tin cậy?) then (Có)
+    :Đặt trạng thái CLASSIFIED;
+  else (Không)
+    :Đặt trạng thái NEED_REVIEW;
+  endif
+else (Không)
+  :Đặt trạng thái chờ phân loại;
+endif
+
+|Người dùng|
+:Kiểm tra kết quả;
+if (Đồng ý kết quả?) then (Có)
+  :Xác nhận mã lỗi và nguyên nhân;
+else (Không)
+  :Chọn lại danh mục hoặc yêu cầu phân loại lại;
+endif
+
+|Backend Import|
+:Lưu người xác nhận và thời điểm xác nhận;
+:Xóa cache dashboard liên quan;
+stop
+@enduml

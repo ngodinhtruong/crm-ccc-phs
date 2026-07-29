@@ -125,3 +125,4 @@ def invalidate_external_error_dashboard_cache() -> int:
         )
         cache.set(CACHE_VERSION_KEY, next_version, timeout=None)
         return next_version
+

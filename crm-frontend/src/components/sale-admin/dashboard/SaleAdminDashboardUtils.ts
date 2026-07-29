@@ -142,16 +142,27 @@ export function isFullMonthRange(dateFrom?: string, dateTo?: string) {
 }
 
 export function getDateRangeLabel(dateFrom?: string, dateTo?: string, fallback?: string | null) {
-  if (fallback) return fallback;
-
-  if (!dateFrom || !dateTo) return "-";
-
-  if (isFullMonthRange(dateFrom, dateTo)) {
+  if (dateFrom && dateTo) {
     const from = new Date(`${dateFrom}T00:00:00`);
-    return `T${from.getMonth() + 1}/${from.getFullYear()}`;
+    const to = new Date(`${dateTo}T00:00:00`);
+
+    if (!isNaN(from.getTime()) && !isNaN(to.getTime())) {
+      const isFromStart = from.getDate() === 1;
+      const isToEnd = new Date(to.getFullYear(), to.getMonth(), to.getDate() + 1).getDate() === 1;
+
+      if (isFromStart && isToEnd) {
+        if (from.getMonth() === to.getMonth() && from.getFullYear() === to.getFullYear()) {
+          return `T${from.getMonth() + 1}/${from.getFullYear()}`;
+        }
+        return `T${from.getMonth() + 1}/${from.getFullYear()} - T${to.getMonth() + 1}/${to.getFullYear()}`;
+      }
+
+      return `${formatDateLabel(dateFrom)} - ${formatDateLabel(dateTo)}`;
+    }
   }
 
-  return `${formatDateLabel(dateFrom)} - ${formatDateLabel(dateTo)}`;
+  if (fallback) return fallback;
+  return "-";
 }
 
 export function getPeriodLabel(month?: string | number, year?: string | number) {

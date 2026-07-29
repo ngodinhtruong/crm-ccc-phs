@@ -1,0 +1,80 @@
+@startuml
+skinparam backgroundColor transparent
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam activity {
+  BackgroundColor #F8F9FA
+  BorderColor #495057
+  DiamondBackgroundColor #FFF3BF
+  DiamondBorderColor #E67700
+  StartColor #2B8A3E
+  EndColor #C92A2A
+  BarColor #495057
+  FontColor #212529
+}
+skinparam ArrowColor #495057
+skinparam NoteBackgroundColor #FFF9DB
+skinparam NoteBorderColor #E67700
+
+title Activity 02 - Tạo người dùng và cấp quyền truy cập
+
+|Quản trị viên|
+start
+:Mở màn hình tạo người dùng;
+:Chọn nhân viên có sẵn hoặc nhập nhân viên mới;
+:Nhập username, email và mật khẩu;
+:Chọn nhóm nghiệp vụ, role và phạm vi truy cập;
+
+|Frontend Next.js|
+:Kiểm tra trường bắt buộc;
+if (Dữ liệu hợp lệ?) then (Có)
+  :Gửi yêu cầu tạo người dùng;
+else (Không)
+  :Hiển thị lỗi nhập liệu;
+  stop
+endif
+
+|Backend Django|
+:Kiểm tra quyền quản trị tài khoản;
+if (Có quyền?) then (Có)
+else (Không)
+  :Trả lỗi 403;
+  |Frontend Next.js|
+  :Hiển thị không có quyền;
+  stop
+endif
+
+|Backend Django|
+:Kiểm tra username và email trùng;
+if (Đã tồn tại?) then (Có)
+  :Trả lỗi dữ liệu trùng;
+  |Frontend Next.js|
+  :Hiển thị lỗi;
+  stop
+else (Không)
+endif
+
+|Backend Django|
+if (Chọn nhân viên có sẵn?) then (Có)
+  :Liên kết User với Employee;
+else (Không)
+  :Tạo Employee mới;
+  :Liên kết User với Employee;
+endif
+:Tạo tài khoản User;
+:Tạo UserRole;
+if (Scope = BRANCH / MULTI_BRANCH?) then (Có)
+  :Tạo các bản ghi BranchAccess;
+else (Không)
+endif
+if (Có permission riêng?) then (Có)
+  :Gán permission bổ sung;
+else (Không)
+endif
+:Ghi nhận thông tin tạo tài khoản;
+:Trả kết quả thành công;
+
+|Frontend Next.js|
+:Hiển thị tài khoản vừa tạo;
+stop
+@enduml

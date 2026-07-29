@@ -3,6 +3,8 @@
 import { ReactNode } from "react";
 import { X } from "lucide-react";
 
+import { useEscapeKey } from "@/hooks/useEscapeKey";
+
 export function KpiConfigModal({
   title,
   description,
@@ -14,6 +16,7 @@ export function KpiConfigModal({
   children: ReactNode;
   onClose: () => void;
 }) {
+  useEscapeKey(onClose);
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-900/50 px-4">
       <div className="max-h-[88vh] w-full max-w-3xl overflow-hidden rounded-lg bg-white shadow-xl">

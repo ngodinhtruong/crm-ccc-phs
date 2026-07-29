@@ -10,7 +10,8 @@ import {
 } from "lucide-react";
 
 import { DashboardLayout } from "@/layouts/DashboardLayout";
-import { AccessDenied } from "@/components/common";
+import { AccessDenied, CccPeriodControls } from "@/components/common";
+import { ChartViewMode, GranularityMode, CompareMode } from "@/components/tickets/dashboard/CccDashboardUtils";
 import { PermissionCode, useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { useSaleAdminDashboard } from "@/hooks/useSaleAdminDashboard";
 import {
@@ -106,6 +107,8 @@ export function SaleAdminDashboardPage() {
   const authz = useCurrentUserPermissions();
   const dashboard = useSaleAdminDashboard();
   const [filterOpen, setFilterOpen] = useState(false);
+  const [granularity, setGranularity] = useState<GranularityMode>("MONTH");
+  const [compareMode, setCompareMode] = useState<CompareMode>("QOQ");
 
   const activeFilterCount = useMemo(
     () => getSaleAdminActiveFilterCount(dashboard),
@@ -159,15 +162,21 @@ export function SaleAdminDashboardPage() {
         },
       ]}
       rightAction={
-        <div className="relative flex items-center gap-2">
+        <div className="relative flex flex-wrap items-center gap-2">
+          <CccPeriodControls
+            granularity={granularity}
+            onGranularityChange={setGranularity}
+            compareMode={compareMode}
+            onCompareModeChange={setCompareMode}
+          />
+
           <button
             type="button"
             onClick={() => setFilterOpen((value) => !value)}
-            className={`relative flex h-8 items-center gap-1 rounded-md border px-3 text-xs font-semibold transition ${
-              filterOpen || activeFilterCount > 0
+            className={`relative flex h-8 items-center gap-1 rounded-md border px-3 text-xs font-semibold transition ${filterOpen || activeFilterCount > 0
                 ? "border-[#0097cf] bg-sky-50 text-[#007ead]"
                 : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
-            }`}
+              }`}
           >
             <SlidersHorizontal size={15} />
             Bộ lọc
@@ -214,29 +223,7 @@ export function SaleAdminDashboardPage() {
               </div>
 
               <div className="flex flex-col gap-3 xl:items-end">
-                <div className="flex items-center gap-2 self-start rounded-lg border border-slate-200 bg-white px-2 py-1.5 shadow-sm xl:self-auto">
-                  <button
-                    type="button"
-                    onClick={dashboard.previousMonth}
-                    disabled={dashboard.backgroundRefreshing}
-                    className="flex h-7 w-7 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 disabled:opacity-50"
-                    title="Tháng trước"
-                  >
-                    <ChevronLeft size={16} />
-                  </button>
-                  <span className="min-w-[180px] text-center text-sm font-bold text-slate-800">
-                    {periodLabel}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={dashboard.nextMonth}
-                    disabled={dashboard.backgroundRefreshing}
-                    className="flex h-7 w-7 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 disabled:opacity-50"
-                    title="Tháng sau"
-                  >
-                    <ChevronRight size={16} />
-                  </button>
-                </div>
+
                 <p className="text-xs text-slate-500">
                   Cập nhật: {formatDateTime(dashboard.data?.generated_at)}
                 </p>
@@ -256,7 +243,12 @@ export function SaleAdminDashboardPage() {
 
         {dashboard.data && (
           <>
-            <AdminOverviewCards items={cards} />
+            <AdminOverviewCards
+              items={cards}
+              compareMode={compareMode}
+              granularity={granularity}
+              historyData={dashboard.historyData}
+            />
 
             <div className="grid grid-cols-1 gap-4 2xl:grid-cols-12">
               <div className="2xl:col-span-6">
@@ -264,6 +256,7 @@ export function SaleAdminDashboardPage() {
                   rows={dashboard.data.top_employees}
                   month={dashboard.month}
                   year={dashboard.year}
+                  periodLabel={periodLabel}
                 />
               </div>
 
@@ -272,6 +265,7 @@ export function SaleAdminDashboardPage() {
                   rows={dashboard.data.top_accounts}
                   month={dashboard.month}
                   year={dashboard.year}
+                  periodLabel={periodLabel}
                 />
               </div>
 
@@ -281,52 +275,68 @@ export function SaleAdminDashboardPage() {
                   totalRow={dashboard.data.branch_total}
                   month={dashboard.month}
                   year={dashboard.year}
+                  periodLabel={periodLabel}
                 />
               </div>
 
               <div className="2xl:col-span-6">
                 <FeeByBranchChart
                   rows={dashboard.data.fee_by_branch}
+                  historyData={dashboard.historyData}
                   month={dashboard.month}
                   year={dashboard.year}
                   periodLabel={periodLabel}
                   previousLabel={previousLabel}
+                  granularity={granularity}
+                  compareMode={compareMode}
                 />
               </div>
 
               <div className="2xl:col-span-6">
                 <TopEmployeeChart
                   rows={dashboard.data.top_employees.slice(0, 8)}
+                  historyData={dashboard.historyData}
                   month={dashboard.month}
                   year={dashboard.year}
                   periodLabel={periodLabel}
+                  granularity={granularity}
+                  compareMode={compareMode}
                 />
               </div>
 
               <div className="2xl:col-span-4">
                 <ProductFeeChart
                   rows={dashboard.data.product_fee}
+                  historyData={dashboard.historyData}
                   month={dashboard.month}
                   year={dashboard.year}
                   periodLabel={periodLabel}
+                  granularity={granularity}
+                  compareMode={compareMode}
                 />
               </div>
 
               <div className="2xl:col-span-4">
                 <IcpDistributionChart
                   rows={dashboard.data.icp_distribution}
+                  historyData={dashboard.historyData}
                   month={dashboard.month}
                   year={dashboard.year}
                   periodLabel={periodLabel}
+                  granularity={granularity}
+                  compareMode={compareMode}
                 />
               </div>
 
               <div className="2xl:col-span-4">
                 <CustomerGroupDistributionPanel
                   rows={dashboard.data.customer_group_distribution}
+                  historyData={dashboard.historyData}
                   month={dashboard.month}
                   year={dashboard.year}
                   periodLabel={periodLabel}
+                  granularity={granularity}
+                  compareMode={compareMode}
                 />
               </div>
             </div>

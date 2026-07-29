@@ -1,0 +1,65 @@
+@startuml
+skinparam backgroundColor transparent
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam activity {
+  BackgroundColor #F8F9FA
+  BorderColor #495057
+  DiamondBackgroundColor #FFF3BF
+  DiamondBorderColor #E67700
+  StartColor #2B8A3E
+  EndColor #C92A2A
+  BarColor #495057
+  FontColor #212529
+}
+skinparam ArrowColor #495057
+skinparam NoteBackgroundColor #FFF9DB
+skinparam NoteBorderColor #E67700
+
+title Activity 12 - Tính điểm, tổng hợp và xếp hạng KPI
+
+|Hệ thống / Người chấm|
+start
+:Chọn kỳ KPI, Profile và nhân viên;
+
+|Backend KPI|
+:Lấy Metric và Target của nhân viên;
+while (Còn Metric cần tính?) is (Có)
+  if (Loại Metric?) then (Tự động)
+    |Nguồn dữ liệu nghiệp vụ|
+    :Tổng hợp SA Record / Transaction / dữ liệu liên quan;
+    |Backend KPI|
+    :Tính Actual Value;
+  else (Thủ công)
+    |Người chấm|
+    :Nhập Actual Value / Score và ghi chú;
+    |Backend KPI|
+    :Kiểm tra quyền chấm và scope;
+  endif
+  :Áp dụng công thức tính điểm Metric;
+  :Giới hạn điểm theo cấu hình nếu có;
+  :Lưu KPI User Metric Result;
+endwhile (Không)
+
+|Backend KPI|
+:Tổng hợp điểm Metric thành Group;
+:Tổng hợp Group thành Section;
+:Tính kết quả Gate;
+if (Không đạt Gate bắt buộc?) then (Có)
+  :Áp dụng giới hạn / điều chỉnh điểm thưởng;
+else (Không)
+endif
+:Tính Total Score;
+:Xác định Reward Tier;
+:Lưu KPI User Summary;
+
+|Backend KPI|
+:Lấy Summary của các nhân viên cùng kỳ / Profile;
+:Sắp xếp theo Total Score;
+:Xử lý đồng hạng theo quy tắc hệ thống;
+:Trả bảng xếp hạng;
+
+|Frontend Next.js|
+:Hiển thị KPI cá nhân, chi tiết điểm và ranking;
+stop
+@enduml

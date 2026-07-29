@@ -1,0 +1,86 @@
+@startuml
+skinparam backgroundColor transparent
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam activity {
+  BackgroundColor #F8F9FA
+  BorderColor #495057
+  DiamondBackgroundColor #FFF3BF
+  DiamondBorderColor #E67700
+  StartColor #2B8A3E
+  EndColor #C92A2A
+  BarColor #495057
+  FontColor #212529
+}
+skinparam ArrowColor #495057
+skinparam NoteBackgroundColor #FFF9DB
+skinparam NoteBorderColor #E67700
+
+title Activity 04 - Tạo Ticket thủ công
+
+|Nhân viên CCC|
+start
+:Mở màn hình tạo Ticket;
+:Chọn khách hàng / doanh nghiệp;
+:Chọn tài khoản liên quan;
+:Nhập tiêu đề, nội dung và nguồn tiếp nhận;
+:Chọn danh mục, mức ưu tiên, SLA và đơn vị xử lý;
+:Chọn nhân viên xử lý nếu cần;
+
+|Frontend Next.js|
+:Kiểm tra dữ liệu bắt buộc;
+if (Dữ liệu hợp lệ?) then (Có)
+  :Gửi yêu cầu tạo Ticket;
+else (Không)
+  :Hiển thị lỗi nhập liệu;
+  stop
+endif
+
+|Backend Django|
+:Kiểm tra permission TICKET_CREATE;
+if (Có quyền?) then (Có)
+else (Không)
+  :Trả lỗi 403;
+  |Frontend Next.js|
+  :Hiển thị không có quyền;
+  stop
+endif
+
+|Backend Django|
+:Kiểm tra khách hàng, tài khoản, đơn vị và nhân viên;
+if (Tham chiếu hợp lệ?) then (Có)
+else (Không)
+  :Trả lỗi nghiệp vụ;
+  |Frontend Next.js|
+  :Hiển thị lỗi;
+  stop
+endif
+
+|Cơ sở dữ liệu|
+:Sinh mã Ticket;
+:Tạo Ticket với trạng thái CREATED;
+:Tạo TicketProcessLog;
+:Tạo TicketActivityLog;
+if (Có nhân viên được phân công?) then (Có)
+  :Tạo TicketAssignment hiện hành;
+else (Không)
+  :Ticket nằm trong hàng chờ;
+endif
+if (Có SLA Policy?) then (Có)
+  :Tạo SLA Tracking;
+  :Tạo các SLA Task theo đơn vị xử lý;
+else (Không)
+endif
+
+|Backend Django|
+if (Có người được phân công?) then (Có)
+  :Tạo thông báo phân công;
+else (Không)
+endif
+:Trả Ticket vừa tạo;
+
+|Frontend Next.js|
+:Hiển thị thông báo thành công;
+:Chuyển đến trang chi tiết Ticket;
+stop
+@enduml

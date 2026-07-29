@@ -32,7 +32,6 @@ SECRET_KEY = 'django-insecure-zn^@^qr1ft*$d)2k9dwyc9m8czs)r)l@^rc8+0@o&5rd$mfpoi
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
 
 
 # Application definition
@@ -189,35 +188,20 @@ CHATBOT_SYNC_LOOKBACK_MINUTES = int(os.getenv("CHATBOT_SYNC_LOOKBACK_MINUTES", 3
 
 
 ALLOWED_HOSTS = [
-    "localhost",
-    "127.0.0.1",
-    "192.168.200.133",
-    "192.168.2.16",
-    "13.215.176.236",
-    "92.168.200.194",
-    "192.168.200.112",
-    "172.31.0.1"
+    host.strip()
+    for host in os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+    if host.strip()
 ]
 
-
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://192.168.200.133:3000",
-    "http://192.168.2.16:3000",
-    "http://13.215.176.236:3000",
-    "http://192.168.200.194:3000",
-    "http://192.168.200.112:3000",
-    "http://172.31.0.1:3000"
+    origin.strip()
+    for origin in os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",")
+    if origin.strip()
 ]
 
 CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://192.168.200.133:3000",
-    "http://192.168.2.16:3000",
-    "http://13.215.176.236:3000",
-    "http://192.168.200.194:3000",
-    "http://192.168.200.112:3000",
-    "http://172.31.0.1:3000"
+    origin.strip()
+    for origin in os.getenv("CSRF_TRUSTED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",")
+    if origin.strip()
 ]
+

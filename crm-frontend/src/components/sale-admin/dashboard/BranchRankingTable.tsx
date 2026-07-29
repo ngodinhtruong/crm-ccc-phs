@@ -65,11 +65,13 @@ export function BranchRankingTable({
   totalRow,
   month,
   year,
+  periodLabel,
 }: {
   rows: SaAdminBranchRankingRow[];
   totalRow?: SaAdminBranchRankingRow | null;
   month?: string | number;
   year?: string | number;
+  periodLabel?: string;
 }) {
   const visibleRows = rows.slice(0, 12);
 
@@ -77,7 +79,9 @@ export function BranchRankingTable({
     <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <div className="flex min-h-14 flex-col gap-2 border-b border-slate-100 bg-slate-50/70 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h2 className="text-sm font-bold text-slate-800">Xếp hạng Chi nhánh · {getPeriodLabel(month, year)}</h2>
+          <h2 className="text-sm font-bold text-slate-800">
+            Xếp hạng Chi nhánh · {periodLabel || getPeriodLabel(month, year)}
+          </h2>
           <p className="mt-0.5 text-xs text-slate-500">Phí GD · TK kích hoạt · KH tiềm năng · MoM</p>
         </div>
         <div className="flex items-center gap-2 text-[11px] text-slate-500">

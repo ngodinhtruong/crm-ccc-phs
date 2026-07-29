@@ -6,6 +6,8 @@ import { useUserCreate } from "@/hooks/useUserCreate";
 
 import { FieldLabel, ReadonlyValue } from "./UserCreateFormControls";
 
+import { useEscapeKey } from "@/hooks/useEscapeKey";
+
 type UserCreateController = ReturnType<typeof useUserCreate>;
 
 export function UserCreateSuccessDialog({
@@ -13,6 +15,8 @@ export function UserCreateSuccessDialog({
 }: {
   create: UserCreateController;
 }) {
+  useEscapeKey(create.goToUserList, Boolean(create.createdUser));
+
   if (!create.createdUser) return null;
 
   const defaultPassword =

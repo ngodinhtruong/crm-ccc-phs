@@ -3,6 +3,7 @@
 import { X } from "lucide-react";
 
 import { KpiPeriodMetricItem } from "@/types/kpi.type";
+import { useEscapeKey } from "@/hooks/useEscapeKey";
 
 function EmptyText({ children }: { children?: string | null }) {
   if (!children) {
@@ -64,6 +65,8 @@ export function KpiMetricDetailModal({
   metric: KpiPeriodMetricItem | null;
   onClose: () => void;
 }) {
+  useEscapeKey(onClose, Boolean(metric));
+
   if (!metric) return null;
 
   return (

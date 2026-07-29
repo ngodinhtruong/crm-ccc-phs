@@ -1,0 +1,94 @@
+@startuml
+skinparam backgroundColor transparent
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam activity {
+  BackgroundColor #F8F9FA
+  BorderColor #495057
+  DiamondBackgroundColor #FFF3BF
+  DiamondBorderColor #E67700
+  StartColor #2B8A3E
+  EndColor #C92A2A
+  BarColor #495057
+  FontColor #212529
+}
+skinparam ArrowColor #495057
+skinparam NoteBackgroundColor #FFF9DB
+skinparam NoteBorderColor #E67700
+
+title Activity 05 - Tiếp nhận, phân công và xử lý Ticket
+
+|Nhân viên / Quản lý|
+start
+:Mở chi tiết Ticket;
+
+|Backend Django|
+:Kiểm tra scope và quyền xem Ticket;
+if (Được phép truy cập?) then (Có)
+else (Không)
+  :Trả lỗi 403 / 404;
+  stop
+endif
+
+|Nhân viên / Quản lý|
+if (Ticket chưa có người xử lý?) then (Có)
+  :Nhận Ticket hoặc chọn người xử lý;
+  |Backend Django|
+  :Đóng assignment hiện hành nếu có;
+  :Tạo assignment mới;
+  :Ghi Activity Log và gửi thông báo;
+else (Không)
+endif
+
+|Nhân viên / Quản lý|
+if (Cần chuyển đơn vị / chi nhánh?) then (Có)
+  :Chọn đơn vị, chi nhánh và người nhận mới;
+  |Backend Django|
+  :Cập nhật đơn vị xử lý;
+  :Đóng assignment cũ và tạo assignment mới;
+  :Cập nhật SLA theo đơn vị;
+  :Gửi thông báo chuyển Ticket;
+else (Không)
+endif
+
+|Nhân viên / Quản lý|
+:Nhập nội dung xử lý / giải pháp / ghi chú;
+:Chọn trạng thái tiếp theo;
+
+|Backend Django|
+:Kiểm tra chuyển trạng thái hợp lệ;
+if (Trạng thái đích?) then (ACCEPTED)
+  :Ghi nhận thời điểm tiếp nhận;
+elseif (PROCESSING)
+  :Ghi nhận bắt đầu xử lý;
+elseif (DONE_WAIT_CLOSE)
+  :Ghi nhận hoàn tất xử lý;
+elseif (CLOSED)
+  :Kiểm tra Ticket có quá SLA không;
+  if (Quá SLA và chưa có lý do?) then (Có)
+    :Yêu cầu nhập lý do quá hạn;
+    stop
+  else (Không)
+    :Đóng Ticket;
+    :Đóng Process Log và Assignment;
+    :Hoàn tất SLA Tracking;
+  endif
+else (CANCELLED)
+  :Hủy Ticket;
+  :Đóng Process Log và Assignment;
+endif
+
+|Cơ sở dữ liệu|
+:Cập nhật Ticket;
+:Tạo Process Log mới;
+:Tạo Activity Log;
+:Cập nhật SLA Tracking;
+
+|Backend Django|
+:Gửi thông báo thay đổi trạng thái;
+:Trả Ticket mới nhất;
+
+|Frontend Next.js|
+:Cập nhật giao diện và lịch sử xử lý;
+stop
+@enduml

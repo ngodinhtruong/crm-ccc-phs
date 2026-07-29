@@ -12,6 +12,14 @@ function toDateInputValue(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
+function last5MonthsRange() {
+  const now = new Date();
+  return {
+    from: toDateInputValue(new Date(now.getFullYear(), now.getMonth() - 4, 1)),
+    to: toDateInputValue(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
+  };
+}
+
 function currentMonthRange() {
   const now = new Date();
   return {
@@ -28,16 +36,16 @@ function previousMonthRange() {
   };
 }
 
-function isCurrentMonthRange(dateFrom: string, dateTo: string) {
-  const current = currentMonthRange();
-  return dateFrom === current.from && dateTo === current.to;
+function isDefault5MonthsRange(dateFrom: string, dateTo: string) {
+  const def = last5MonthsRange();
+  return dateFrom === def.from && dateTo === def.to;
 }
 
 export function getSaleAdminActiveFilterCount(dashboard: SaleAdminDashboardController) {
   let count = 0;
 
   if (dashboard.branch) count += 1;
-  if (!isCurrentMonthRange(dashboard.dateFrom, dashboard.dateTo)) count += 1;
+  if (!isDefault5MonthsRange(dashboard.dateFrom, dashboard.dateTo)) count += 1;
 
   return count;
 }
@@ -72,7 +80,7 @@ export function AdminDashboardFilters({
         <div>
           <h2 className="text-sm font-bold text-slate-800">Bộ lọc Báo cáo Sale Admin</h2>
           <p className="mt-0.5 text-xs leading-5 text-slate-500">
-            Chọn khoảng thời gian dạng lịch range. Mặc định là từ đầu tháng đến cuối tháng hiện tại.
+            Chọn khoảng thời gian dạng lịch range. Mặc định là 5 tháng gần nhất.
           </p>
         </div>
 
@@ -116,8 +124,15 @@ export function AdminDashboardFilters({
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
+            onClick={() => setRange(last5MonthsRange())}
+            className="h-8 rounded-full border border-sky-300 bg-sky-100 px-3 text-[11px] font-bold text-[#007ead] hover:bg-sky-200"
+          >
+            5 tháng gần nhất (Mặc định)
+          </button>
+          <button
+            type="button"
             onClick={() => setRange(currentMonthRange())}
-            className="h-8 rounded-full border border-sky-200 bg-sky-50 px-3 text-[11px] font-semibold text-[#007ead] hover:bg-sky-100"
+            className="h-8 rounded-full border border-slate-200 bg-white px-3 text-[11px] font-semibold text-slate-600 hover:bg-slate-50"
           >
             Tháng hiện tại
           </button>

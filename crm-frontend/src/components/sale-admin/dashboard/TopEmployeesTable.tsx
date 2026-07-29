@@ -28,10 +28,12 @@ export function TopEmployeesTable({
   rows,
   month,
   year,
+  periodLabel,
 }: {
   rows: SaAdminTopEmployeeRow[];
   month?: string | number;
   year?: string | number;
+  periodLabel?: string;
 }) {
   const [keyword, setKeyword] = useState("");
   const [selectedEmployee, setSelectedEmployee] = useState<SaAdminTopEmployeeRow | null>(null);
@@ -65,7 +67,9 @@ export function TopEmployeesTable({
       <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="flex min-h-14 flex-col gap-3 border-b border-slate-100 bg-slate-50/70 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-slate-800">Top Nhân viên kích hoạt TK · {getPeriodLabel(month, year)}</h2>
+            <h2 className="text-sm font-semibold text-slate-800">
+              Top Nhân viên kích hoạt TK · {periodLabel || getPeriodLabel(month, year)}
+            </h2>
             <p className="mt-0.5 text-xs text-slate-500">Click để xem danh sách tài khoản đã kích hoạt</p>
           </div>
           <div className="flex flex-wrap items-center gap-3">

@@ -6,6 +6,7 @@ import { ArrowRight, Clock, User, X } from "lucide-react";
 import { ticketApi } from "@/apis/ticket.api";
 import { TicketHistoryItem } from "@/types/ticket.type";
 import { formatDateTime } from "@/utils/date.util";
+import { useEscapeKey } from "@/hooks/useEscapeKey";
 
 const ACTION_LABEL: Record<string, string> = {
   CREATE: "Tạo ticket",
@@ -85,6 +86,7 @@ export function TicketHistoryModal({
   fetchHistory?: (id: number) => Promise<TicketHistoryItem[]>;
   onClose: () => void;
 }) {
+  useEscapeKey(onClose);
   const [items, setItems] = useState<TicketHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");

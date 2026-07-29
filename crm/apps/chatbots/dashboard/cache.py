@@ -54,3 +54,4 @@ def get_or_build_dashboard_section(section, filter_signature, builder):
     value = builder()
     cache.set(key, value, timeout=SECTION_TTLS.get(section, 120))
     return value
+
