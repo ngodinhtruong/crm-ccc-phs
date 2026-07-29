@@ -3,13 +3,13 @@
 from datetime import datetime, time, timedelta
 
 from django.db.models import Q
+from django.db.models.functions import ExtractHour
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 
 from apps.chatbots.dashboard.periods import (
     ALL_GRANULARITIES,
     DASHBOARD_TIMEZONE,
-    comparison_bounds,
     granularity_for_range,
     series_bounds,
 )
@@ -93,7 +93,13 @@ class ChatbotDashboardFilterMixin:
         return None, None, None
 
     def apply_hour_filter(self, queryset, date_field):
-        """Lọc theo khung giờ. Tách riêng vì biểu đồ so sánh cũng cần dùng."""
+        """
+        Lọc theo khung giờ. Tách riêng vì biểu đồ so sánh cũng cần dùng.
+
+        Phải tự annotate ExtractHour với tzinfo thay vì dùng lookup
+        ``__hour__gte`` sẵn có: lookup đó tách giờ theo ``settings.TIME_ZONE``
+        (đang là UTC), nên chọn 8h-17h thực ra lọc ra 15h-24h giờ Việt Nam.
+        """
         start_hour = self.get_int_param("start_hour")
         end_hour = self.get_int_param("end_hour")
 
@@ -107,18 +113,19 @@ class ChatbotDashboardFilterMixin:
         if not valid_hours:
             return queryset
 
+        queryset = queryset.annotate(
+            _local_hour=ExtractHour(date_field, tzinfo=DASHBOARD_TIMEZONE)
+        )
+
         # Khung giờ vắt qua nửa đêm (vd 22h -> 2h) thì phải dùng OR.
         if start_hour <= end_hour:
             return queryset.filter(
-                **{
-                    f"{date_field}__hour__gte": start_hour,
-                    f"{date_field}__hour__lte": end_hour,
-                }
+                _local_hour__gte=start_hour,
+                _local_hour__lte=end_hour,
             )
 
         return queryset.filter(
-            Q(**{f"{date_field}__hour__gte": start_hour})
-            | Q(**{f"{date_field}__hour__lte": end_hour})
+            Q(_local_hour__gte=start_hour) | Q(_local_hour__lte=end_hour)
         )
 
     def filter_by_period(self, queryset, date_field):
@@ -163,14 +170,6 @@ class ChatbotDashboardFilterMixin:
             queryset = queryset.filter(started_at__lt=hi)
 
         return self.apply_hour_filter(queryset, "started_at")
-
-    def get_comparison_summaries(self, granularity):
-        """Queryset cho biểu đồ so sánh kỳ (nới ra trọn kỳ cha)."""
-        start_at, end_at = self.get_focus_bounds()
-
-        return self._summaries_in_bounds(
-            *comparison_bounds(granularity, start=start_at, end=end_at)
-        )
 
     def get_series_summaries(self, granularity):
         """

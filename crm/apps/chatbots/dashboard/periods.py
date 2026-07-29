@@ -25,6 +25,10 @@ from django.db.models.functions import (
 )
 from django.utils import timezone
 
+# Múi giờ nghiệp vụ. Chỉ áp dụng cho dashboard chatbot nên không đụng tới
+# cách các module khác (ticket, KPI, SLA) đang hiển thị thời gian.
+DASHBOARD_TIMEZONE = ZoneInfo("Asia/Ho_Chi_Minh")
+
 GRANULARITY_DAY = "day"
 GRANULARITY_WEEK = "week"
 GRANULARITY_MONTH = "month"
@@ -49,29 +53,6 @@ GRANULARITY_LABELS = {
     GRANULARITY_YEAR: "Năm",
 }
 
-# Mốc của biểu đồ so sánh, suy từ mốc của biểu đồ chính.
-#
-# Giữ nguyên mốc là chính: chọn quý thì so quý với quý, chọn năm thì so năm
-# với năm, xem theo ngày thì so ngày với ngày. Riêng THÁNG gộp lên QUÝ, vì
-# xem 12 tháng mà so từng tháng thì quá vụn — cái người đọc báo cáo cần ở
-# mức đó là "quý này so với quý trước".
-COMPARISON_GRANULARITY = {
-    GRANULARITY_DAY: GRANULARITY_WEEK,
-    GRANULARITY_WEEK: GRANULARITY_MONTH,
-    GRANULARITY_MONTH: GRANULARITY_QUARTER,
-    GRANULARITY_QUARTER: GRANULARITY_YEAR,
-    GRANULARITY_YEAR: GRANULARITY_YEAR,
-}
-
-# Thứ tự dò khi tìm kỳ lịch mà bộ lọc trùng khít.
-_COMPARISON_LADDER = (
-    GRANULARITY_DAY,
-    GRANULARITY_WEEK,
-    GRANULARITY_MONTH,
-    GRANULARITY_QUARTER,
-    GRANULARITY_YEAR,
-)
-
 # Kỳ cha của từng mốc — khoảng được nới ra khi bộ lọc quá hẹp.
 PARENT_GRANULARITY = {
     GRANULARITY_DAY: GRANULARITY_WEEK,
@@ -82,26 +63,8 @@ PARENT_GRANULARITY = {
     GRANULARITY_YEAR: None,
 }
 
-COMPARISON_YEARS = 5
-
-
-def comparison_granularity(granularity, start=None, end=None):
-    """
-    Mốc của biểu đồ so sánh.
-
-    Bộ lọc trùng khít đúng một kỳ lịch thì so sánh theo chính kỳ đó, để đặt
-    cạnh các kỳ ngang hàng — lọc một ngày so với các ngày trong tuần, lọc trọn
-    tháng so với các tháng, trọn quý so với các quý, trọn năm so với các năm.
-
-    Bộ lọc lệch khỏi ranh giới lịch (01 -> 15, hay "5 tháng gần đây") thì
-    không có kỳ ngang hàng tự nhiên, nên lùi về quy tắc thô hơn mốc chính một
-    bậc: xem theo ngày so theo tuần, xem theo tháng so theo quý.
-    """
-    for candidate in _COMPARISON_LADDER:
-        if covers_whole_period(candidate, start, end):
-            return candidate
-
-    return COMPARISON_GRANULARITY[normalize_granularity(granularity)]
+# Mốc năm không có kỳ cha nên lấy N năm gần nhất làm khoảng so sánh.
+COMPARISON_YEARS = 2
 
 # Ngưỡng suy ra mốc từ độ dài khoảng lọc (đơn vị: ngày, đã tính cả 2 đầu).
 #   <= 31   -> ngày   (lọc trong một tháng, ví dụ 01 -> 15)
@@ -132,9 +95,6 @@ def granularity_for_range(span_days):
 
     return GRANULARITY_YEAR
 
-# Múi giờ nghiệp vụ. Chỉ áp dụng cho dashboard chatbot nên không đụng tới
-# cách các module khác (ticket, KPI, SLA) đang hiển thị thời gian.
-DASHBOARD_TIMEZONE = ZoneInfo("Asia/Ho_Chi_Minh")
 
 _TRUNC_BY_GRANULARITY = {
     GRANULARITY_DAY: TruncDate,
@@ -274,43 +234,6 @@ def period_bounds(granularity, moment):
     return start, end
 
 
-def shift_years(value, years):
-    """
-    Lùi/tiến một mốc thời gian đúng ``years`` năm.
-
-    29/02 của năm nhuận không tồn tại ở năm thường nên lùi về 28/02, thay vì
-    để ``replace`` ném ValueError và làm hỏng cả response.
-    """
-    local = _as_local(value)
-
-    try:
-        return local.replace(year=local.year + years)
-    except ValueError:
-        return local.replace(year=local.year + years, day=28)
-
-
-def comparison_bounds(granularity, start=None, end=None, reference=None):
-    """
-    Khoảng nửa mở ``[lo, hi)`` cho biểu đồ so sánh kỳ.
-
-    Bộ lọc hẹp thì không có gì để so — lọc đúng một ngày mà gom theo ngày chỉ
-    ra một cột. Nên khoảng được nới ra trọn kỳ cha: xem theo ngày thì so với
-    cả tuần chứa ngày đó, xem theo tháng/quý thì so các quý trong trọn năm.
-    Mốc năm không có kỳ cha nên lấy ``COMPARISON_YEARS`` năm gần nhất.
-
-    Tham số ``granularity`` là mốc của biểu đồ CHÍNH; hàm tự quy ra mốc so
-    sánh nên phía gọi không phải nhớ bảng tra.
-
-    ``end`` là mốc loại trừ (nửa mở) nên phải lùi lại một nhịp trước khi tìm
-    kỳ cha, không thì lọc hết 31/12 sẽ bị kéo sang năm sau.
-    """
-    lo_ref, hi_ref = _reference_bounds(start, end, reference)
-
-    return _parent_bounds(
-        comparison_granularity(granularity, start=start, end=end), lo_ref, hi_ref
-    )
-
-
 def _reference_bounds(start, end, reference=None):
     """
     Hai mốc dùng để dò kỳ cha.
@@ -327,17 +250,27 @@ def _reference_bounds(start, end, reference=None):
 
 
 def _parent_bounds(granularity, lo_ref, hi_ref):
-    """Khoảng nửa mở của (các) kỳ cha bao trọn ``lo_ref`` .. ``hi_ref``."""
+    """
+    Khoảng nửa mở của (các) kỳ cha bao trọn ``lo_ref`` .. ``hi_ref``.
+
+    ``granularity`` là mốc của các cột sẽ vẽ, không phải mốc cha.
+    """
     if granularity == GRANULARITY_YEAR:
         last_year = hi_ref.year
-        return (
-            _make_local(last_year - COMPARISON_YEARS + 1, 1, 1),
-            _make_local(last_year + 1, 1, 1),
-        )
+        lo = _make_local(last_year - COMPARISON_YEARS + 1, 1, 1)
+        hi = _make_local(last_year + 1, 1, 1)
+    else:
+        parent = PARENT_GRANULARITY[granularity]
+        lo = period_start(parent, lo_ref)
+        hi = period_bounds(parent, hi_ref)[1]
 
-    parent = PARENT_GRANULARITY[granularity]
+    # Cắt phần tương lai: nới khoảng ra là để có kỳ ngang hàng làm nền so
+    # sánh, mà kỳ chưa tới thì luôn bằng 0 và kéo % tăng giảm về -100%.
+    # Chặn ở cuối kỳ hiện tại chứ không phải đúng lúc này, để kỳ đang chạy
+    # vẫn hiện đủ (hôm nay vẫn là một cột trọn vẹn).
+    current_period_end = period_bounds(granularity, timezone.now())[1]
 
-    return period_start(parent, lo_ref), period_bounds(parent, hi_ref)[1]
+    return lo, min(hi, current_period_end)
 
 
 def spans_single_period(granularity, start, end):
@@ -348,24 +281,6 @@ def spans_single_period(granularity, start, end):
     lo_ref, hi_ref = _reference_bounds(start, end)
 
     return period_start(granularity, lo_ref) == period_start(granularity, hi_ref)
-
-
-def covers_whole_period(granularity, start, end):
-    """
-    Bộ lọc có trùng khít đúng một kỳ lịch không.
-
-    Khác ``spans_single_period`` ở chỗ đòi hỏi phủ TRỌN kỳ chứ không chỉ nằm
-    lọt trong kỳ: 01 -> 15/07 nằm trong tháng 7 nhưng không phủ trọn tháng 7,
-    nên không được coi là "lọc theo tháng".
-    """
-    if start is None or end is None:
-        return False
-
-    lo = _as_local(start)
-    hi = _as_local(end)
-    period_lo, period_hi = period_bounds(granularity, lo)
-
-    return lo == period_lo and hi == period_hi
 
 
 def iter_periods(granularity, lo, hi):
@@ -401,14 +316,3 @@ def series_bounds(granularity, start=None, end=None, reference=None):
         return start, end
 
     return _parent_bounds(granularity, *_reference_bounds(start, end, reference))
-
-
-def same_period_last_year(granularity, moment):
-    """
-    Kỳ cùng loại của năm trước.
-
-    Tính lại mốc đầu kỳ sau khi lùi năm thay vì lùi thẳng ``start``: với tuần,
-    ngày 01/07 năm nay và năm trước rơi vào thứ khác nhau nên phải chuẩn hóa
-    lại về đầu tuần thì hai khoảng mới cùng độ dài và cùng kiểu.
-    """
-    return period_bounds(granularity, shift_years(moment, -1))

@@ -15,6 +15,9 @@ STATE_STEP_CLOSED = "closed"
 # Nhãn hiển thị khi câu hỏi chưa được chatbot gán category
 UNCATEGORIZED_LABEL = "Chưa phân loại"
 
+# Nhãn hiển thị khi phiên không xác định được kênh
+UNKNOWN_CHANNEL_LABEL = "KHÁC"
+
 
 def normalize_question_type(value):
     return str(value or "").strip().upper()
@@ -31,6 +34,16 @@ def normalize_category(value):
 
 def category_label(value):
     return normalize_category(value) or UNCATEGORIZED_LABEL
+
+
+def channel_label(value):
+    """
+    Nhãn kênh chat, viết hoa.
+
+    Chuẩn hóa để "zalo", "Zalo" và " ZALO " gộp về cùng một nhóm trên biểu đồ
+    thay vì thành ba cột riêng.
+    """
+    return str(value or "").strip().upper() or UNKNOWN_CHANNEL_LABEL
 
 
 def is_spam_question(question_type):
