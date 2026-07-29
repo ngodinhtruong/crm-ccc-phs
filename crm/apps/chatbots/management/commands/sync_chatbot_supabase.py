@@ -3,7 +3,6 @@ from django.core.management.base import BaseCommand
 from django.utils.dateparse import parse_datetime
 from supabase import create_client
 
-from apps.branches.models import Branch
 from apps.chatbots.models import (
     ChatbotChatLog,
     ChatbotCskhRequest,
@@ -13,6 +12,7 @@ from apps.chatbots.models import (
 from apps.chatbots.services import (
     create_crm_tickets_from_chatbot,
     rebuild_chatbot_session_summaries,
+    resolve_default_branch,
 )
 
 BATCH_SIZE = 1000
@@ -43,10 +43,62 @@ def parse_dt(value):
     return parse_datetime(str(value))
 
 
-def get_session_id(row, external_id):
-    session_id = str(get_value(row, "session_id", "sessionID", "sessionId") or "").strip()
+def get_session_id(row):
+    """session_id thô của một dòng; rỗng nghĩa là dòng không gắn được vào phiên."""
+    return str(get_value(row, "session_id", "sessionID", "sessionId") or "").strip()
 
-    return session_id or f"{ORPHAN_SESSION_PREFIX}-{external_id}"
+
+# Ba bảng nguồn chỉ khác nhau ở model đích, cột thời gian và vài cột riêng —
+# phần còn lại (phân trang, mốc sync, gom session, cập nhật cursor) giống hệt
+# nhau nên mô tả bằng dữ liệu và dùng chung một vòng nhập.
+SYNC_SOURCES = (
+    {
+        "name": "xpro_chat_logs",
+        "label": "Chat logs",
+        "table_setting": "SUPABASE_XPRO_CHAT_TABLE",
+        "model": ChatbotChatLog,
+        "order_column": "created_at",
+        "time_keys": ("created_at", "create_at"),
+        # Chat log không có session_id vẫn nhập, xem như một phiên riêng.
+        "allow_orphan_session": True,
+        "extra_fields": lambda row: {
+            "question": get_value(row, "question"),
+            "answer": get_value(row, "answer"),
+            "questionType": get_value(row, "questionType", "question_type"),
+            "category": get_value(row, "category", "categories"),
+        },
+    },
+    {
+        "name": "cskh_state",
+        "label": "CSKH states",
+        "table_setting": "SUPABASE_CSKH_STATE_TABLE",
+        "model": ChatbotState,
+        "order_column": "updated_at",
+        "time_keys": ("updated_at", "updatedAt", "created_at"),
+        # State/Request không có session_id thì vô nghĩa: không biết gắn vào
+        # phiên nào để tính ra nhóm xử lý.
+        "allow_orphan_session": False,
+        "extra_fields": lambda row: {
+            "step": get_value(row, "step"),
+            "reason": get_value(row, "reason"),
+        },
+    },
+    {
+        "name": "cskh_requests",
+        "label": "CSKH requests",
+        "table_setting": "SUPABASE_CSKH_REQUESTS_TABLE",
+        "model": ChatbotCskhRequest,
+        "order_column": "created_at",
+        "time_keys": ("created_at", "create_at"),
+        "allow_orphan_session": False,
+        "extra_fields": lambda row: {
+            "contact_info": get_value(row, "contact_info"),
+            "contact_type": get_value(row, "contact_type"),
+            "reason": get_value(row, "reason"),
+            "status": get_value(row, "status"),
+        },
+    },
+)
 
 
 class Command(BaseCommand):
@@ -91,14 +143,10 @@ class Command(BaseCommand):
         client = create_client(supabase_url, supabase_key)
         full = options["full"]
 
-        chat_table = settings.SUPABASE_XPRO_CHAT_TABLE
-        state_table = settings.SUPABASE_CSKH_STATE_TABLE
-        request_table = settings.SUPABASE_CSKH_REQUESTS_TABLE
-
         affected_sessions = set()
-        affected_sessions |= self.sync_chat_logs(client, chat_table, full)
-        affected_sessions |= self.sync_states(client, state_table, full)
-        affected_sessions |= self.sync_requests(client, request_table, full)
+
+        for source in SYNC_SOURCES:
+            affected_sessions |= self.sync_source(client, source, full)
 
         if affected_sessions:
             self.stdout.write(
@@ -109,18 +157,7 @@ class Command(BaseCommand):
             self.stdout.write("Không có phiên nào thay đổi.")
 
         if options["create_tickets"]:
-            branch_code = options["branch_code"]
-
-            branch_code = branch_code or getattr(
-                settings,
-                "CHATBOT_DEFAULT_BRANCH_CODE",
-                None,
-            )
-
-            if branch_code:
-                default_branch = Branch.objects.filter(branch_code=branch_code).first()
-            else:
-                default_branch = Branch.objects.order_by("id").first()
+            default_branch = resolve_default_branch(options["branch_code"])
 
             if not default_branch:
                 raise RuntimeError("Chưa có chi nhánh nào. Hãy tạo Branch trước.")
@@ -151,14 +188,6 @@ class Command(BaseCommand):
 
         return rows
 
-    def load_rows(self, source_name, client, table_name, time_column, full):
-        cursor, _ = ChatbotSyncCursor.objects.get_or_create(source_name=source_name)
-        since = None if full else cursor.last_synced_at
-
-        rows = self.fetch_incremental(client, table_name, time_column, since=since)
-
-        return rows, cursor
-
     def save_cursor(self, cursor, max_dt, row_count):
         if max_dt:
             cursor.last_synced_at = max_dt
@@ -168,11 +197,17 @@ class Command(BaseCommand):
         cursor.error_message = ""
         cursor.save()
 
-    def sync_chat_logs(self, client, table_name, full):
-        rows, cursor = self.load_rows(
-            "xpro_chat_logs", client, table_name, "created_at", full
+    def sync_source(self, client, source, full):
+        """Nhập một bảng nguồn, trả về tập session_id vừa đụng tới."""
+        cursor, _ = ChatbotSyncCursor.objects.get_or_create(source_name=source["name"])
+        rows = self.fetch_incremental(
+            client,
+            getattr(settings, source["table_setting"]),
+            source["order_column"],
+            since=None if full else cursor.last_synced_at,
         )
 
+        model = source["model"]
         sessions = set()
         max_dt = cursor.last_synced_at
 
@@ -183,21 +218,25 @@ class Command(BaseCommand):
                 continue
 
             external_id = str(external_id)
-            session_id = get_session_id(row, external_id)
-            dt = parse_dt(get_value(row, "created_at", "create_at"))
+            session_id = get_session_id(row)
 
-            ChatbotChatLog.objects.update_or_create(
+            if not session_id:
+                if not source["allow_orphan_session"]:
+                    continue
+
+                session_id = f"{ORPHAN_SESSION_PREFIX}-{external_id}"
+
+            dt = parse_dt(get_value(row, *source["time_keys"]))
+
+            model.objects.update_or_create(
                 external_id=external_id,
                 defaults={
                     "session_id": session_id,
                     "user_id": get_value(row, "user_id", "user_ID", "userId"),
                     "channel": get_value(row, "channel"),
-                    "question": get_value(row, "question"),
-                    "answer": get_value(row, "answer"),
-                    "questionType": get_value(row, "questionType", "question_type"),
-                    "category": get_value(row, "category", "categories"),
                     "external_created_at": dt,
                     "raw_payload": row,
+                    **source["extra_fields"](row),
                 },
             )
 
@@ -207,93 +246,6 @@ class Command(BaseCommand):
                 max_dt = dt
 
         self.save_cursor(cursor, max_dt, len(rows))
-        self.stdout.write(f"Chat logs: {len(rows)}")
-
-        return sessions
-
-    def sync_states(self, client, table_name, full):
-        rows, cursor = self.load_rows(
-            "cskh_state", client, table_name, "updated_at", full
-        )
-
-        sessions = set()
-        max_dt = cursor.last_synced_at
-
-        for row in rows:
-            external_id = get_value(row, "id", "external_id")
-            session_id = str(
-                get_value(row, "session_id", "sessionID", "sessionId") or ""
-            ).strip()
-
-            # State/Request không có session_id thì vô nghĩa, không gắn được vào phiên nào
-            if external_id is None or not session_id:
-                continue
-
-            dt = parse_dt(get_value(row, "updated_at", "updatedAt", "created_at"))
-
-            ChatbotState.objects.update_or_create(
-                external_id=str(external_id),
-                defaults={
-                    "session_id": session_id,
-                    "user_id": get_value(row, "user_id", "user_ID", "userId"),
-                    "channel": get_value(row, "channel"),
-                    "step": get_value(row, "step"),
-                    "reason": get_value(row, "reason"),
-                    "external_created_at": dt,
-                    "raw_payload": row,
-                },
-            )
-
-            sessions.add(session_id)
-
-            if dt and (not max_dt or dt > max_dt):
-                max_dt = dt
-
-        self.save_cursor(cursor, max_dt, len(rows))
-        self.stdout.write(f"CSKH states: {len(rows)}")
-
-        return sessions
-
-    def sync_requests(self, client, table_name, full):
-        rows, cursor = self.load_rows(
-            "cskh_requests", client, table_name, "created_at", full
-        )
-
-        sessions = set()
-        max_dt = cursor.last_synced_at
-
-        for row in rows:
-            external_id = get_value(row, "id", "external_id")
-            session_id = str(
-                get_value(row, "session_id", "sessionID", "sessionId") or ""
-            ).strip()
-
-            if external_id is None or not session_id:
-                continue
-
-            dt = parse_dt(get_value(row, "created_at", "create_at"))
-
-            ChatbotCskhRequest.objects.update_or_create(
-                external_id=str(external_id),
-                defaults={
-                    "session_id": session_id,
-                    "user_id": get_value(row, "user_id", "user_ID", "userId"),
-                    "channel": get_value(row, "channel"),
-                    "contact_info": get_value(row, "contact_info"),
-                    "contact_type": get_value(row, "contact_type"),
-                    "reason": get_value(row, "reason"),
-                    "status": get_value(row, "status"),
-                    "external_created_at": dt,
-                    "raw_payload": row,
-                },
-            )
-
-            sessions.add(session_id)
-
-            if dt and (not max_dt or dt > max_dt):
-                max_dt = dt
-
-        self.save_cursor(cursor, max_dt, len(rows))
-        self.stdout.write(f"CSKH requests: {len(rows)}")
+        self.stdout.write(f"{source['label']}: {len(rows)}")
 
         return sessions

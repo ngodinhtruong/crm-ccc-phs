@@ -130,3 +130,29 @@
     @apply font-sans;
   }
 }
+
+/*
+ * Trang không chuyển động.
+ *
+ * Dashboard chatbot vẽ hơn 20 biểu đồ trên cùng một trang; mỗi hiệu ứng
+ * chuyển cảnh là một lượt tính lại layout trên hàng trăm phần tử SVG, nên
+ * trang giật rõ khi đổi bộ lọc. Tắt ở đây thay vì gỡ từng class vì các thẻ
+ * dùng chung (ExpandableChartCard, TablePagination) còn được 12 trang khác
+ * dùng — bỏ hiệu ứng trong chính component sẽ đổi luôn những trang đó.
+ *
+ * Không đụng `animate-spin`: biểu tượng đang tải mà đứng im thì trông như
+ * treo, và nó cũng không phải thứ làm chậm trang.
+ */
+.no-motion,
+.no-motion *,
+.no-motion *::before,
+.no-motion *::after {
+  transition: none !important;
+  animation-duration: 0s !important;
+  animation-delay: 0s !important;
+  scroll-behavior: auto !important;
+}
+
+.no-motion .animate-spin {
+  animation: spin 1s linear infinite !important;
+}

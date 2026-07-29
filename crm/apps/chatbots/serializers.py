@@ -1,12 +1,7 @@
 from rest_framework import serializers
 
 from apps.chatbots.constants import UNCATEGORIZED_LABEL
-from apps.chatbots.models import (
-    ChatbotChatLog,
-    ChatbotCskhRequest,
-    ChatbotSessionSummary,
-    ChatbotState,
-)
+from apps.chatbots.models import ChatbotChatLog, ChatbotSessionSummary
 
 
 class ChatbotSessionTicketFieldsMixin(serializers.Serializer):
@@ -125,10 +120,6 @@ class ChatbotSessionDetailSerializer(
         fields = "__all__"
 
 
-# Alias tương thích cho code ngoài app đang import tên serializer cũ.
-ChatbotSessionSummarySerializer = ChatbotSessionDetailSerializer
-
-
 class ChatbotChatLogSerializer(serializers.ModelSerializer):
     class Meta:
         model = ChatbotChatLog
@@ -143,18 +134,6 @@ class ChatbotChatLogSerializer(serializers.ModelSerializer):
             "category",
             "external_created_at",
         ]
-
-
-class ChatbotStateSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ChatbotState
-        fields = "__all__"
-
-
-class ChatbotCskhRequestSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ChatbotCskhRequest
-        fields = "__all__"
 
 
 class ChatbotFAQReportSerializer(serializers.Serializer):

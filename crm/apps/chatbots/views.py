@@ -15,7 +15,6 @@ from apps.chatbots.dashboard.constants import (
     SECTION_COMPARISON,
     SECTION_OPERATIONS,
     SECTION_QUICK_LISTS,
-    SECTION_SLA,
     SECTION_SUMMARY,
     SECTION_TOPICS,
     SECTION_TRAFFIC,
@@ -67,19 +66,17 @@ class ChatbotDashboardOverviewAPIView(ChatbotDashboardFilterMixin, APIView):
             logs,
             # Biểu đồ so sánh cần các kỳ ngang hàng nên nhìn rộng hơn bộ lọc;
             # các biểu đồ còn lại vẫn bám đúng khoảng người dùng chọn.
-            comparison_summaries=self.get_comparison_summaries(granularity),
             series_summaries=self.get_series_summaries(granularity),
             focus_bounds=self.get_focus_bounds(),
         )
         signature = self.get_filter_signature(granularity=granularity)
 
         builders = {
-            SECTION_SUMMARY: aggregator.build_summary_section,
+            SECTION_SUMMARY: lambda: aggregator.build_summary_section(granularity),
             SECTION_TOPICS: lambda: aggregator.build_topics_section(granularity),
             SECTION_TRAFFIC: lambda: aggregator.build_traffic_section(granularity),
             SECTION_OPERATIONS: lambda: aggregator.build_operations_section(granularity),
             SECTION_COMPARISON: lambda: aggregator.build_comparison_section(granularity),
-            SECTION_SLA: aggregator.build_sla_section,
             SECTION_QUICK_LISTS: aggregator.build_quick_lists_section,
         }
 

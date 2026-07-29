@@ -1,8 +1,8 @@
 from collections import defaultdict
 from inspect import signature
 
+from django.conf import settings
 from django.db import transaction
-
 from django.utils import timezone
 
 from apps.chatbots.constants import (
@@ -368,6 +368,28 @@ def find_customer_by_contact(contact_type, contact_info):
         return Customer.objects.filter(phone=contact_info).first(), None
 
     return None, None
+
+
+def resolve_default_branch(branch_code=None):
+    """
+    Chi nhánh xử lý mặc định cho ticket sinh từ chatbot.
+
+    Thứ tự: mã truyền vào -> ``CHATBOT_DEFAULT_BRANCH_CODE`` -> chi nhánh đầu
+    tiên. Trả None nếu hệ thống chưa có chi nhánh nào; phía gọi tự quyết định
+    báo lỗi vì ``Ticket.handling_branch`` là NOT NULL.
+    """
+    from apps.branches.models import Branch
+
+    branch_code = branch_code or getattr(
+        settings,
+        "CHATBOT_DEFAULT_BRANCH_CODE",
+        None,
+    )
+
+    if branch_code:
+        return Branch.objects.filter(branch_code=branch_code).first()
+
+    return Branch.objects.order_by("id").first()
 
 
 def get_default_sla_policy():

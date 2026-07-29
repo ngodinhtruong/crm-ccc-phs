@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import {
   Area,
-  AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
@@ -12,8 +11,6 @@ import {
   Legend,
   Line,
   LineChart,
-  Pie,
-  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -24,25 +21,27 @@ import {
 import { EmptyState } from "@/components/chatbot-dashboard/EmptyState";
 import { FunnelChartComponent } from "@/components/chatbot-dashboard/charts/FunnelChartComponent";
 import { PeriodComparisonChart } from "@/components/chatbot-dashboard/charts/PeriodComparisonChart";
-import { ExpandableChartCard as ChartCard } from "@/components/common";
-import { GRANULARITY_OPTIONS } from "@/constants/chatbot-dashboard.constant";
+import {
+  ExpandableChartCard as ChartCard,
+  PeriodDrilldownBackButton,
+  PeriodDrilldownDonut,
+  usePeriodDrilldown,
+  type DrilldownSlice,
+} from "@/components/common";
 import type {
   CategoryCccRateItem,
   CccMultiMonthTopicsData,
   ChannelPerformanceItem,
   ChatbotFaqItem,
   ChatbotOverviewResponse,
-  CustomerLinkageData,
   FunnelStepItem,
-  GranularityChoice,
+  HourlyPeakByPeriodData,
   HourlyPeakItem,
+  OutcomeByPeriod,
   TimeSeriesOutcomeItem,
 } from "@/types/chatbot-dashboard.type";
 
 export type ChatbotOverviewCharts = ChatbotOverviewResponse["charts"];
-// Khai báo gốc nằm ở types/chatbot-dashboard.type.ts; giữ alias này để các
-// component đang import từ đây không phải sửa.
-export type GranularityMode = GranularityChoice;
 
 const COLORS = [
   "#0097cf", // Primary PHS Sky Blue
@@ -71,44 +70,25 @@ function ValueTooltip({ active, payload, label }: any) {
       {label && <div className="mb-1.5 font-bold text-slate-800">{label}</div>}
       <div className="space-y-1">
         {payload.map((item: any, index: number) => (
-          <div key={`${item.dataKey || item.name}-${index}`} className="flex items-center justify-between gap-4">
+          <div
+            key={`${item.dataKey || item.name}-${index}`}
+            className="flex items-center justify-between gap-4"
+          >
             <div className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color || item.fill }} />
+              <span
+                className="h-2 w-2 rounded-full"
+                style={{ backgroundColor: item.color || item.fill }}
+              />
               <span className="text-slate-600">{item.name}</span>
             </div>
             <span className="font-bold text-slate-900">
-              {typeof item.value === "number" ? formatNumber(item.value) : item.value}
+              {typeof item.value === "number"
+                ? formatNumber(item.value)
+                : item.value}
             </span>
           </div>
         ))}
       </div>
-    </div>
-  );
-}
-
-function GranularitySelector({
-  value,
-  onChange,
-}: {
-  value: GranularityMode;
-  onChange: (mode: GranularityMode) => void;
-}) {
-  return (
-    <div className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-100 p-0.5 shadow-xs">
-      {GRANULARITY_OPTIONS.map((opt) => (
-        <button
-          key={opt.key}
-          type="button"
-          onClick={() => onChange(opt.key)}
-          className={`cursor-pointer px-2.5 py-1 text-xs font-bold rounded-md transition-all duration-200 ${
-            value === opt.key
-              ? "bg-[#00713d] text-white shadow-xs"
-              : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
-          }`}
-        >
-          {opt.label}
-        </button>
-      ))}
     </div>
   );
 }
@@ -118,12 +98,8 @@ function GranularitySelector({
  * ==================================================================== */
 function AutomationTrendChartCard({
   data,
-  granularity = "month",
-  onGranularityChange,
 }: {
   data?: TimeSeriesOutcomeItem[] | null;
-  granularity?: GranularityMode;
-  onGranularityChange?: (mode: GranularityMode) => void;
 }) {
   const chartData = useMemo(() => {
     if (Array.isArray(data) && data.length > 0) return data;
@@ -153,68 +129,99 @@ function AutomationTrendChartCard({
     .filter((row) => row.is_current)
     .map((row) => row.label);
 
+  const { selectedPeriod, openPeriod, closePeriod } = usePeriodDrilldown();
+
+  const drilldownSlices = useMemo(
+    () =>
+      outcomeSlicesFromRow(
+        chartData.find((row) => row.label === selectedPeriod),
+      ),
+    [chartData, selectedPeriod],
+  );
+
   return (
     <ChartCard
-      title="Xu hướng Tự động hóa & Phân loại Xử lý (Bot tự xử lý vs Chuyển CCC)"
-      description={
-        hasContextPeriods
-          ? `Đang xem ${focusedLabels.join(", ")} — các kỳ làm mờ xung quanh là nền so sánh.`
-          : "Trục hoành: Chuỗi thời gian | Vùng Xanh: Bot tự xử lý (BOT_DONE) | Cột Vàng: Chuyển CCC (CCC)"
+      title={
+        selectedPeriod
+          ? `Xu hướng Tự động hóa & Phân loại Xử lý — ${selectedPeriod}`
+          : "Xu hướng Tự động hóa & Phân loại Xử lý (Bot tự xử lý vs Chuyển CCC)"
       }
+      description={drilldownHint(
+        selectedPeriod,
+        hasContextPeriods
+          ? `Đang xem ${focusedLabels.join(", ")} — các kỳ làm mờ xung quanh là nền so sánh`
+          : "Vùng Xanh: Bot tự xử lý | Cột Vàng: Chuyển CCC",
+      )}
       headerRight={
-        onGranularityChange && (
-          <GranularitySelector value={granularity} onChange={onGranularityChange} />
-        )
+        selectedPeriod ? (
+          <PeriodDrilldownBackButton onClick={closePeriod} />
+        ) : undefined
       }
       className="xl:col-span-12"
     >
       <div className="h-[320px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart
-            data={chartData}
-            margin={{ top: 15, right: 25, left: 0, bottom: 15 }}
-          >
-            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-            <XAxis dataKey="label" tick={{ fontSize: 11, fontWeight: 600, fill: "#334155" }} />
-            <YAxis tick={{ fontSize: 11, fill: "#64748b" }} allowDecimals={false} />
-            <Tooltip content={<ValueTooltip />} />
-            <Legend wrapperStyle={{ fontSize: 11, paddingTop: 6 }} />
-            <Area
-              type="monotone"
-              dataKey="bot_done"
-              name="Bot tự xử lý (BOT_DONE)"
-              fill="#00713d"
-              stroke="#00713d"
-              fillOpacity={0.2}
-              strokeWidth={2.5}
-              isAnimationActive={false}
-            />
-            <Bar
-              dataKey="ccc"
-              name="Chuyển CCC (CCC)"
-              fill="#f59e0b"
-              radius={[4, 4, 0, 0]}
-              barSize={24}
-              isAnimationActive={false}
+        {selectedPeriod ? (
+          <PeriodDrilldownDonut
+            data={drilldownSlices}
+            colorOf={outcomeColorOf}
+            onExit={closePeriod}
+          />
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart
+              data={chartData}
+              margin={{ top: 15, right: 25, left: 0, bottom: 15 }}
+              onClick={openPeriod}
+              className="cursor-pointer"
             >
-              {/* Khi backend nới dữ liệu ra kỳ cha (vd lọc "hôm nay" -> vẽ cả
-                  tuần), các kỳ nền được làm mờ để kỳ đang xem nổi lên. */}
-              {hasContextPeriods &&
-                chartData.map((row) => (
-                  <Cell
-                    key={row.date}
-                    fillOpacity={row.is_current ? 1 : 0.35}
-                  />
-                ))}
-              <LabelList
-                dataKey="ccc"
-                position="top"
-                style={{ fontSize: 10, fill: "#b45309", fontWeight: 700 }}
-                formatter={(val: any) => (val && Number(val) > 0 ? val : "")}
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis
+                dataKey="label"
+                tick={{ fontSize: 11, fontWeight: 600, fill: "#334155" }}
               />
-            </Bar>
-          </ComposedChart>
-        </ResponsiveContainer>
+              <YAxis
+                tick={{ fontSize: 11, fill: "#64748b" }}
+                allowDecimals={false}
+              />
+              <Tooltip content={<ValueTooltip />} />
+              <Legend wrapperStyle={{ fontSize: 11, paddingTop: 6 }} />
+              <Area
+                type="monotone"
+                dataKey="bot_done"
+                name="Bot tự xử lý (BOT_DONE)"
+                fill="#00713d"
+                stroke="#00713d"
+                fillOpacity={0.2}
+                strokeWidth={2.5}
+                isAnimationActive={false}
+              />
+              <Bar
+                dataKey="ccc"
+                name="Chuyển CCC (CCC)"
+                fill="#f59e0b"
+                radius={[4, 4, 0, 0]}
+                barSize={24}
+                isAnimationActive={false}
+              >
+                {/* Khi backend nới dữ liệu ra kỳ cha (vd lọc "hôm nay" -> vẽ cả
+                  tuần), các kỳ nền được làm mờ để kỳ đang xem nổi lên. */}
+                {hasContextPeriods &&
+                  chartData.map((row) => (
+                    <Cell
+                      key={row.date}
+                      fillOpacity={row.is_current ? 1 : 0.35}
+                    />
+                  ))}
+                <LabelList
+                  dataKey="ccc"
+                  position="top"
+                  style={{ fontSize: 10, fill: "#b45309", fontWeight: 700 }}
+                  formatter={(val: any) => (val && Number(val) > 0 ? val : "")}
+                />
+              </Bar>
+            </ComposedChart>
+          </ResponsiveContainer>
+        )}
       </div>
     </ChartCard>
   );
@@ -250,42 +257,80 @@ function SessionTrendLineChartCard({
     return fallback;
   }, [data]);
 
+  const { selectedPeriod, openPeriod, closePeriod } = usePeriodDrilldown();
+
+  const drilldownSlices = useMemo(
+    () =>
+      outcomeSlicesFromRow(
+        chartData.find((row) => row.label === selectedPeriod),
+      ),
+    [chartData, selectedPeriod],
+  );
+
   return (
     <ChartCard
-      title="📈 1. Xu hướng Session theo Thời gian"
-      description="Chatbot đang được sử dụng nhiều hay ít theo thời gian?"
-      className="xl:col-span-8"
+      title={
+        selectedPeriod
+          ? `📈 1. Xu hướng Session — ${selectedPeriod}`
+          : "📈 1. Xu hướng Session theo Thời gian"
+      }
+      description={drilldownHint(
+        selectedPeriod,
+        "Chatbot đang được sử dụng nhiều hay ít theo thời gian?",
+      )}
+      headerRight={
+        selectedPeriod ? (
+          <PeriodDrilldownBackButton onClick={closePeriod} />
+        ) : undefined
+      }
+      className="xl:col-span-6"
     >
       <div className="h-[320px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart
-            data={chartData}
-            margin={{ top: 15, right: 25, left: 0, bottom: 15 }}
-          >
-            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-            <XAxis dataKey="label" tick={{ fontSize: 11, fontWeight: 600, fill: "#334155" }} />
-            <YAxis tick={{ fontSize: 11, fill: "#64748b" }} allowDecimals={false} />
-            <Tooltip content={<ValueTooltip />} />
-            <Legend wrapperStyle={{ fontSize: 11, paddingTop: 6 }} />
-            <Line
-              type="monotone"
-              dataKey="total"
-              name="Tổng số Session"
-              stroke="#0097cf"
-              strokeWidth={3}
-              dot={{ r: 4, fill: "#0097cf" }}
-              activeDot={{ r: 6 }}
-              isAnimationActive={false}
+        {selectedPeriod ? (
+          <PeriodDrilldownDonut
+            data={drilldownSlices}
+            colorOf={outcomeColorOf}
+            onExit={closePeriod}
+          />
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart
+              data={chartData}
+              margin={{ top: 15, right: 25, left: 0, bottom: 15 }}
+              onClick={openPeriod}
+              className="cursor-pointer"
             >
-              <LabelList
-                dataKey="total"
-                position="top"
-                style={{ fontSize: 10, fill: "#0097cf", fontWeight: 700 }}
-                formatter={(val: any) => (val && Number(val) > 0 ? val : "")}
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis
+                dataKey="label"
+                tick={{ fontSize: 11, fontWeight: 600, fill: "#334155" }}
               />
-            </Line>
-          </LineChart>
-        </ResponsiveContainer>
+              <YAxis
+                tick={{ fontSize: 11, fill: "#64748b" }}
+                allowDecimals={false}
+              />
+              <Tooltip content={<ValueTooltip />} />
+              <Legend wrapperStyle={{ fontSize: 11, paddingTop: 6 }} />
+              <Line
+                type="monotone"
+                dataKey="total"
+                name="Tổng số Session"
+                stroke="#0097cf"
+                strokeWidth={3}
+                dot={{ r: 4, fill: "#0097cf" }}
+                activeDot={{ r: 6 }}
+                isAnimationActive={false}
+              >
+                <LabelList
+                  dataKey="total"
+                  position="top"
+                  style={{ fontSize: 10, fill: "#0097cf", fontWeight: 700 }}
+                  formatter={(val: any) => (val && Number(val) > 0 ? val : "")}
+                />
+              </Line>
+            </LineChart>
+          </ResponsiveContainer>
+        )}
       </div>
     </ChartCard>
   );
@@ -294,77 +339,191 @@ function SessionTrendLineChartCard({
 /* ====================================================================
  * 🍩 2. KẾT QUẢ XỬ LÝ PHIÊN CHAT (DONUT CHART)
  * ==================================================================== */
-function OutcomeDonutChartCard({
-  processClassification,
-}: {
-  processClassification?: any[] | null;
-}) {
-  const chartData = useMemo(() => {
-    if (Array.isArray(processClassification) && processClassification.length > 0) {
-      return processClassification.map((item) => {
-        let color = "#64748b";
-        if (item.code === "BOT_DONE") color = "#00713d";
-        if (item.code === "CCC") color = "#f59e0b";
-        if (item.code === "PENDING") color = "#0284c7";
-        if (item.code === "SPAM") color = "#ef4444";
-        return {
-          name: item.name || item.label,
-          value: item.session_count || item.value || 0,
-          color,
-        };
-      });
-    }
-    return [
-      { name: "Chatbot tự xử lý (BOT_DONE)", value: 0, color: "#00713d" },
-      { name: "Chuyển CCC xử lý (CCC)", value: 0, color: "#f59e0b" },
-      { name: "Chờ thông tin KH (PENDING)", value: 0, color: "#0284c7" },
-      { name: "Câu hỏi rác (SPAM)", value: 0, color: "#ef4444" },
-    ];
-  }, [processClassification]);
+/**
+ * Kết quả xử lý phiên theo kỳ.
+ *
+ * Thay cho biểu đồ tròn: tròn chỉ nói được tỷ trọng của cả kỳ gộp, không cho
+ * thấy nhóm nào đang tăng hay giảm qua từng tháng/quý/năm.
+ */
+const OUTCOME_SERIES_COLORS: Record<string, string> = {
+  "Chatbot tự xử lý": "#00713d",
+  "Chuyển CCC xử lý": "#f59e0b",
+  "Chờ thông tin khách hàng": "#0284c7",
+  "Câu hỏi rác": "#ef4444",
+};
 
-  const total = chartData.reduce((acc, curr) => acc + curr.value, 0);
+type ChartViewMode = "DEFAULT" | "TIME";
+
+/**
+ * Đầu thẻ biểu đồ: nút quay lại (khi đang xem chi tiết một cột) và nút chuyển
+ * giữa xem gộp / xem theo kỳ.
+ *
+ * Trước đây khối nút này được chép nguyên văn ở 5 thẻ.
+ */
+function ChartModeHeader({
+  viewMode,
+  onChange,
+  onBack,
+}: {
+  viewMode: ChartViewMode;
+  onChange: (mode: ChartViewMode) => void;
+  onBack?: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      {onBack && <PeriodDrilldownBackButton onClick={onBack} />}
+
+      <div className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-100 p-0.5 shadow-2xs">
+        {(["DEFAULT", "TIME"] as const).map((mode) => (
+          <button
+            key={mode}
+            type="button"
+            onClick={() => onChange(mode)}
+            className={`cursor-pointer px-2.5 py-1 text-xs font-bold rounded-md transition-all ${
+              viewMode === mode
+                ? "bg-[#00713d] text-white shadow-xs"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            {mode === "DEFAULT" ? "Tổng quan" : "📅 Theo thời gian"}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Mô tả nhắc người dùng bấm vào cột, đổi theo việc đang xem chi tiết hay chưa. */
+function drilldownHint(selected: string | null, overview: string) {
+  return selected
+    ? "Nhấp đúp vào biểu đồ hoặc bấm 'Quay lại' để xem tất cả các cột"
+    : `${overview} — bấm vào cột bất kỳ để xem chi tiết kèm số liệu`;
+}
+
+/** Một dòng dữ liệu -> các phần của donut, bỏ phần bằng 0 cho đỡ rối vành. */
+function slicesFromRow(row: any, keys: string[]): DrilldownSlice[] {
+  if (!row) return [];
+
+  return keys
+    .map((name) => ({ name, value: Number(row[name]) || 0 }))
+    .filter((item) => item.value > 0);
+}
+
+// Bốn nhóm xử lý trong `time_series_outcomes`: tên cột khác tên hiển thị.
+const OUTCOME_FIELDS = [
+  { field: "bot_done", name: "Chatbot tự xử lý" },
+  { field: "ccc", name: "Chuyển CCC xử lý" },
+  { field: "pending", name: "Chờ thông tin khách hàng" },
+  { field: "spam", name: "Câu hỏi rác" },
+] as const;
+
+function outcomeSlicesFromRow(row: any): DrilldownSlice[] {
+  if (!row) return [];
+
+  return OUTCOME_FIELDS.map(({ field, name }) => ({
+    name,
+    value: Number(row[field]) || 0,
+  })).filter((item) => item.value > 0);
+}
+
+const outcomeColorOf = (name: string) =>
+  OUTCOME_SERIES_COLORS[name] || "#64748b";
+
+/**
+ * Màu của một kỳ trong donut phải trùng màu cột của chính kỳ đó.
+ *
+ * Tra theo vị trí trong danh sách kỳ gốc chứ không theo thứ tự phần trong
+ * donut: phần bằng 0 đã bị loại nên hai thứ tự đó lệch nhau.
+ */
+function periodColorOf(periodLabels: string[]) {
+  return (name: string) =>
+    COLORS[Math.max(0, periodLabels.indexOf(name)) % COLORS.length];
+}
+
+function OutcomeByPeriodChartCard({ data }: { data?: OutcomeByPeriod | null }) {
+  const rows = useMemo(() => data?.data || [], [data]);
+  const series = useMemo(() => data?.series || [], [data]);
+
+  const { selectedPeriod, openPeriod, closePeriod } = usePeriodDrilldown();
+
+  const drilldownSlices = useMemo(
+    () =>
+      slicesFromRow(
+        rows.find((row) => row.label === selectedPeriod),
+        series,
+      ),
+    [rows, selectedPeriod, series],
+  );
 
   return (
     <ChartCard
-      title="🍩 2. Kết quả Xử lý Phiên Chat"
-      description="Chatbot đang tự xử lý thành công được bao nhiêu %? (BOT_DONE / CCC / PENDING / SPAM)"
-      className="xl:col-span-4"
+      title={
+        selectedPeriod
+          ? `📊 2. Kết quả Xử lý Phiên Chat — ${selectedPeriod}`
+          : "📊 2. Kết quả Xử lý Phiên Chat theo kỳ"
+      }
+      description={drilldownHint(
+        selectedPeriod,
+        "Mỗi kỳ một cột, chia đoạn theo nhóm xử lý",
+      )}
+      headerRight={
+        selectedPeriod ? (
+          <PeriodDrilldownBackButton onClick={closePeriod} />
+        ) : undefined
+      }
+      className="xl:col-span-6"
     >
-      <div className="h-[320px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie
-              data={chartData}
-              dataKey="value"
-              nameKey="name"
-              cx="50%"
-              cy="50%"
-              innerRadius={55}
-              outerRadius={85}
-              paddingAngle={3}
-              isAnimationActive={false}
-              label={({ percent }) =>
-                percent && percent >= 0.02
-                  ? `${(percent * 100).toFixed(1)}%`
-                  : ""
-              }
-            >
-              {chartData.map((entry, index) => (
-                <Cell key={index} fill={entry.color} />
-              ))}
-            </Pie>
-            <Tooltip content={<ValueTooltip />} />
-            <Legend
-              wrapperStyle={{ fontSize: 11 }}
-              formatter={(value: string, entry: any) => {
-                const item = entry.payload;
-                const pct = total > 0 ? ((item.value / total) * 100).toFixed(1) : "0";
-                return `${value}: ${formatNumber(item.value)} (${pct}%)`;
-              }}
+      {rows.length === 0 ? (
+        <EmptyState message="Chưa có dữ liệu kết quả xử lý." />
+      ) : (
+        <div className="h-[320px]">
+          {selectedPeriod ? (
+            <PeriodDrilldownDonut
+              data={drilldownSlices}
+              colorOf={outcomeColorOf}
+              onExit={closePeriod}
             />
-          </PieChart>
-        </ResponsiveContainer>
-      </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={rows}
+                margin={{ top: 15, right: 20, left: 0, bottom: 10 }}
+                onClick={openPeriod}
+                className="cursor-pointer"
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis
+                  dataKey="label"
+                  tick={{ fontSize: 11, fontWeight: 600, fill: "#334155" }}
+                />
+                <YAxis
+                  tick={{ fontSize: 11, fill: "#64748b" }}
+                  allowDecimals={false}
+                />
+                <Tooltip
+                  content={<ValueTooltip />}
+                  cursor={{ fill: "#f8fafc" }}
+                />
+                <Legend wrapperStyle={{ fontSize: 11, paddingTop: 6 }} />
+
+                {series.map((name, index) => (
+                  <Bar
+                    key={name}
+                    dataKey={name}
+                    name={name}
+                    stackId="outcome"
+                    fill={OUTCOME_SERIES_COLORS[name] || "#64748b"}
+                    radius={
+                      index === series.length - 1 ? [4, 4, 0, 0] : undefined
+                    }
+                    isAnimationActive={false}
+                  />
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      )}
     </ChartCard>
   );
 }
@@ -384,7 +543,15 @@ function CustomCategoryAxisTick({ x, y, payload }: any) {
 
   return (
     <g transform={`translate(${x},${y})`}>
-      <text x={0} y={0} dy={12} textAnchor="middle" fill="#334155" fontSize={11} fontWeight={600}>
+      <text
+        x={0}
+        y={0}
+        dy={12}
+        textAnchor="middle"
+        fill="#334155"
+        fontSize={11}
+        fontWeight={600}
+      >
         {formatted}
       </text>
     </g>
@@ -401,7 +568,9 @@ function TopCategoryHorizontalBarCard({
   data?: any[] | null;
   multiMonthData?: CccMultiMonthTopicsData | null;
 }) {
-  const [viewMode, setViewMode] = useState<"DEFAULT" | "TIME">("DEFAULT");
+  // Mặc định xem theo kỳ để khớp mốc đang chọn trên thanh công cụ; muốn xem
+  // xếp hạng gộp cả kỳ thì bấm nút chuyển.
+  const [viewMode, setViewMode] = useState<"DEFAULT" | "TIME">("TIME");
 
   const defaultChartData = useMemo(() => {
     if (Array.isArray(data) && data.length > 0) {
@@ -426,6 +595,24 @@ function TopCategoryHorizontalBarCard({
 
   const monthLabels = timeSeriesData.month_labels;
 
+  const { selectedPeriod, openPeriod, closePeriod } = usePeriodDrilldown();
+
+  const changeViewMode = (mode: ChartViewMode) => {
+    closePeriod();
+    setViewMode(mode);
+  };
+
+  const drilldownSlices = useMemo(
+    () =>
+      slicesFromRow(
+        timeSeriesData.data_by_category.find(
+          (row: any) => row.label === selectedPeriod,
+        ),
+        monthLabels,
+      ),
+    [monthLabels, selectedPeriod, timeSeriesData],
+  );
+
   return (
     <ChartCard
       title="📊 3. Top Category Khách hàng Hỏi nhiều nhất"
@@ -435,94 +622,105 @@ function TopCategoryHorizontalBarCard({
           : "Trục hoành: Các chủ đề nghiệp vụ | Biến động theo thời gian (phụ thuộc bộ lọc)"
       }
       headerRight={
-        <div className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-100 p-0.5 shadow-2xs">
-          <button
-            type="button"
-            onClick={() => setViewMode("DEFAULT")}
-            className={`cursor-pointer px-2.5 py-1 text-xs font-bold rounded-md transition-all ${
-              viewMode === "DEFAULT"
-                ? "bg-[#00713d] text-white shadow-xs"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
-          >
-            Tổng quan
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode("TIME")}
-            className={`cursor-pointer px-2.5 py-1 text-xs font-bold rounded-md transition-all ${
-              viewMode === "TIME"
-                ? "bg-[#00713d] text-white shadow-xs"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
-          >
-            📅 Theo thời gian
-          </button>
-        </div>
+        <ChartModeHeader
+          viewMode={viewMode}
+          onChange={changeViewMode}
+          onBack={selectedPeriod ? closePeriod : undefined}
+        />
       }
       className="xl:col-span-6"
     >
       <div className="h-[330px]">
-        <ResponsiveContainer width="100%" height="100%">
-          {viewMode === "DEFAULT" ? (
-            <BarChart
-              layout="vertical"
-              data={defaultChartData}
-              margin={{ top: 10, right: 45, left: 20, bottom: 5 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis type="number" tick={{ fontSize: 11, fill: "#64748b" }} allowDecimals={false} />
-              <YAxis
-                type="category"
-                dataKey="name"
-                tickFormatter={(val: string) => formatLabelByWords(val, 6)}
-                tick={{ fontSize: 11, fontWeight: 600, fill: "#1e293b" }}
-                width={140}
-              />
-              <Tooltip content={<ValueTooltip />} />
-              <Bar dataKey="value" name="Số lượt hỏi" fill="#0097cf" radius={[0, 4, 4, 0]} barSize={20} isAnimationActive={false}>
-                <LabelList
-                  dataKey="value"
-                  position="right"
-                  style={{ fontSize: 11, fill: "#0284c7", fontWeight: 700 }}
-                  formatter={(val: any) => (val && Number(val) > 0 ? val : "")}
+        {selectedPeriod ? (
+          <PeriodDrilldownDonut
+            data={drilldownSlices}
+            colorOf={periodColorOf(monthLabels)}
+            onExit={closePeriod}
+          />
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            {viewMode === "DEFAULT" ? (
+              <BarChart
+                layout="vertical"
+                onClick={openPeriod}
+                className="cursor-pointer"
+                data={defaultChartData}
+                margin={{ top: 10, right: 45, left: 20, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis
+                  type="number"
+                  tick={{ fontSize: 11, fill: "#64748b" }}
+                  allowDecimals={false}
                 />
-              </Bar>
-            </BarChart>
-          ) : (
-            <BarChart
-              data={timeSeriesData.data_by_category}
-              margin={{ top: 20, right: 25, left: -10, bottom: 35 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis
-                dataKey="label"
-                interval={0}
-                tick={<CustomCategoryAxisTick />}
-              />
-              <YAxis tick={{ fontSize: 11, fill: "#64748b" }} allowDecimals={false} />
-              <Tooltip content={<ValueTooltip />} />
-              <Legend wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
-              {monthLabels.map((mLabel, idx) => (
+                <YAxis
+                  type="category"
+                  dataKey="name"
+                  tickFormatter={(val: string) => formatLabelByWords(val, 6)}
+                  tick={{ fontSize: 11, fontWeight: 600, fill: "#1e293b" }}
+                  width={140}
+                />
+                <Tooltip content={<ValueTooltip />} />
                 <Bar
-                  key={mLabel}
-                  dataKey={mLabel}
-                  name={mLabel}
-                  fill={COLORS[idx % COLORS.length]}
-                  radius={[4, 4, 0, 0]}
+                  dataKey="value"
+                  name="Số lượt hỏi"
+                  fill="#0097cf"
+                  radius={[0, 4, 4, 0]}
+                  barSize={20}
                   isAnimationActive={false}
                 >
                   <LabelList
-                    dataKey={mLabel}
-                    position="top"
-                    style={{ fontSize: 9, fill: "#334155", fontWeight: 700 }}
-                    formatter={(val: any) => (val && Number(val) > 0 ? val : "")}
+                    dataKey="value"
+                    position="right"
+                    style={{ fontSize: 11, fill: "#0284c7", fontWeight: 700 }}
+                    formatter={(val: any) =>
+                      val && Number(val) > 0 ? val : ""
+                    }
                   />
                 </Bar>
-              ))}
-            </BarChart>
-          )}
-        </ResponsiveContainer>
+              </BarChart>
+            ) : (
+              <BarChart
+                onClick={openPeriod}
+                className="cursor-pointer"
+                data={timeSeriesData.data_by_category}
+                margin={{ top: 20, right: 25, left: -10, bottom: 35 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis
+                  dataKey="label"
+                  interval={0}
+                  tick={<CustomCategoryAxisTick />}
+                />
+                <YAxis
+                  tick={{ fontSize: 11, fill: "#64748b" }}
+                  allowDecimals={false}
+                />
+                <Tooltip content={<ValueTooltip />} />
+                <Legend wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
+                {monthLabels.map((mLabel, idx) => (
+                  <Bar
+                    key={mLabel}
+                    dataKey={mLabel}
+                    name={mLabel}
+                    fill={COLORS[idx % COLORS.length]}
+                    radius={[4, 4, 0, 0]}
+                    isAnimationActive={false}
+                  >
+                    <LabelList
+                      dataKey={mLabel}
+                      position="top"
+                      style={{ fontSize: 9, fill: "#334155", fontWeight: 700 }}
+                      formatter={(val: any) =>
+                        val && Number(val) > 0 ? val : ""
+                      }
+                    />
+                  </Bar>
+                ))}
+              </BarChart>
+            )}
+          </ResponsiveContainer>
+        )}
       </div>
     </ChartCard>
   );
@@ -538,7 +736,9 @@ function CategoryCccRateHorizontalBarCard({
   data?: CategoryCccRateItem[] | null;
   multiMonthData?: CccMultiMonthTopicsData | null;
 }) {
-  const [viewMode, setViewMode] = useState<"DEFAULT" | "TIME">("DEFAULT");
+  // Mặc định xem theo kỳ để khớp mốc đang chọn trên thanh công cụ; muốn xem
+  // xếp hạng gộp cả kỳ thì bấm nút chuyển.
+  const [viewMode, setViewMode] = useState<"DEFAULT" | "TIME">("TIME");
 
   const defaultChartData = useMemo(() => {
     if (Array.isArray(data) && data.length > 0) {
@@ -565,6 +765,24 @@ function CategoryCccRateHorizontalBarCard({
 
   const monthLabels = timeSeriesData.month_labels;
 
+  const { selectedPeriod, openPeriod, closePeriod } = usePeriodDrilldown();
+
+  const changeViewMode = (mode: ChartViewMode) => {
+    closePeriod();
+    setViewMode(mode);
+  };
+
+  const drilldownSlices = useMemo(
+    () =>
+      slicesFromRow(
+        timeSeriesData.data_by_category.find(
+          (row: any) => row.label === selectedPeriod,
+        ),
+        monthLabels,
+      ),
+    [monthLabels, selectedPeriod, timeSeriesData],
+  );
+
   return (
     <ChartCard
       title="📊 4. Số lượt Chuyển CCC theo Category"
@@ -574,94 +792,105 @@ function CategoryCccRateHorizontalBarCard({
           : "Trục hoành: Các chủ đề nghiệp vụ | Số lượt chuyển CCC theo thời gian (phụ thuộc bộ lọc)"
       }
       headerRight={
-        <div className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-100 p-0.5 shadow-2xs">
-          <button
-            type="button"
-            onClick={() => setViewMode("DEFAULT")}
-            className={`cursor-pointer px-2.5 py-1 text-xs font-bold rounded-md transition-all ${
-              viewMode === "DEFAULT"
-                ? "bg-[#00713d] text-white shadow-xs"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
-          >
-            Tổng quan
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode("TIME")}
-            className={`cursor-pointer px-2.5 py-1 text-xs font-bold rounded-md transition-all ${
-              viewMode === "TIME"
-                ? "bg-[#00713d] text-white shadow-xs"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
-          >
-            📅 Theo thời gian
-          </button>
-        </div>
+        <ChartModeHeader
+          viewMode={viewMode}
+          onChange={changeViewMode}
+          onBack={selectedPeriod ? closePeriod : undefined}
+        />
       }
       className="xl:col-span-6"
     >
       <div className="h-[330px]">
-        <ResponsiveContainer width="100%" height="100%">
-          {viewMode === "DEFAULT" ? (
-            <BarChart
-              layout="vertical"
-              data={defaultChartData}
-              margin={{ top: 10, right: 45, left: 20, bottom: 5 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis type="number" tick={{ fontSize: 11, fill: "#64748b" }} allowDecimals={false} />
-              <YAxis
-                type="category"
-                dataKey="name"
-                tickFormatter={(val: string) => formatLabelByWords(val, 6)}
-                tick={{ fontSize: 11, fontWeight: 600, fill: "#1e293b" }}
-                width={140}
-              />
-              <Tooltip content={<ValueTooltip />} />
-              <Bar dataKey="ccc" name="Số lượt chuyển CCC" fill="#f59e0b" radius={[0, 4, 4, 0]} barSize={20} isAnimationActive={false}>
-                <LabelList
-                  dataKey="ccc"
-                  position="right"
-                  style={{ fontSize: 11, fill: "#b45309", fontWeight: 700 }}
-                  formatter={(val: any) => (val && Number(val) > 0 ? val : "")}
+        {selectedPeriod ? (
+          <PeriodDrilldownDonut
+            data={drilldownSlices}
+            colorOf={periodColorOf(monthLabels)}
+            onExit={closePeriod}
+          />
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            {viewMode === "DEFAULT" ? (
+              <BarChart
+                layout="vertical"
+                onClick={openPeriod}
+                className="cursor-pointer"
+                data={defaultChartData}
+                margin={{ top: 10, right: 45, left: 20, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis
+                  type="number"
+                  tick={{ fontSize: 11, fill: "#64748b" }}
+                  allowDecimals={false}
                 />
-              </Bar>
-            </BarChart>
-          ) : (
-            <BarChart
-              data={timeSeriesData.data_by_category}
-              margin={{ top: 20, right: 25, left: -10, bottom: 35 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis
-                dataKey="label"
-                interval={0}
-                tick={<CustomCategoryAxisTick />}
-              />
-              <YAxis tick={{ fontSize: 11, fill: "#64748b" }} allowDecimals={false} />
-              <Tooltip content={<ValueTooltip />} />
-              <Legend wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
-              {monthLabels.map((mLabel, idx) => (
+                <YAxis
+                  type="category"
+                  dataKey="name"
+                  tickFormatter={(val: string) => formatLabelByWords(val, 6)}
+                  tick={{ fontSize: 11, fontWeight: 600, fill: "#1e293b" }}
+                  width={140}
+                />
+                <Tooltip content={<ValueTooltip />} />
                 <Bar
-                  key={mLabel}
-                  dataKey={mLabel}
-                  name={mLabel}
-                  fill={COLORS[idx % COLORS.length]}
-                  radius={[4, 4, 0, 0]}
+                  dataKey="ccc"
+                  name="Số lượt chuyển CCC"
+                  fill="#f59e0b"
+                  radius={[0, 4, 4, 0]}
+                  barSize={20}
                   isAnimationActive={false}
                 >
                   <LabelList
-                    dataKey={mLabel}
-                    position="top"
-                    style={{ fontSize: 9, fill: "#334155", fontWeight: 700 }}
-                    formatter={(val: any) => (val && Number(val) > 0 ? val : "")}
+                    dataKey="ccc"
+                    position="right"
+                    style={{ fontSize: 11, fill: "#b45309", fontWeight: 700 }}
+                    formatter={(val: any) =>
+                      val && Number(val) > 0 ? val : ""
+                    }
                   />
                 </Bar>
-              ))}
-            </BarChart>
-          )}
-        </ResponsiveContainer>
+              </BarChart>
+            ) : (
+              <BarChart
+                onClick={openPeriod}
+                className="cursor-pointer"
+                data={timeSeriesData.data_by_category}
+                margin={{ top: 20, right: 25, left: -10, bottom: 35 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis
+                  dataKey="label"
+                  interval={0}
+                  tick={<CustomCategoryAxisTick />}
+                />
+                <YAxis
+                  tick={{ fontSize: 11, fill: "#64748b" }}
+                  allowDecimals={false}
+                />
+                <Tooltip content={<ValueTooltip />} />
+                <Legend wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
+                {monthLabels.map((mLabel, idx) => (
+                  <Bar
+                    key={mLabel}
+                    dataKey={mLabel}
+                    name={mLabel}
+                    fill={COLORS[idx % COLORS.length]}
+                    radius={[4, 4, 0, 0]}
+                    isAnimationActive={false}
+                  >
+                    <LabelList
+                      dataKey={mLabel}
+                      position="top"
+                      style={{ fontSize: 9, fill: "#334155", fontWeight: 700 }}
+                      formatter={(val: any) =>
+                        val && Number(val) > 0 ? val : ""
+                      }
+                    />
+                  </Bar>
+                ))}
+              </BarChart>
+            )}
+          </ResponsiveContainer>
+        )}
       </div>
     </ChartCard>
   );
@@ -687,28 +916,137 @@ function ChatbotFunnelChartCard({ data }: { data?: FunnelStepItem[] | null }) {
 /* ====================================================================
  * 🕒 6. SESSION THEO KHUNG GIỜ TRONG NGÀY (HOURLY PEAK)
  * ==================================================================== */
-function HourlyPeakChartCard({ data }: { data?: HourlyPeakItem[] | null }) {
+function HourlyPeakChartCard({
+  data,
+  multiPeriodData,
+}: {
+  data?: HourlyPeakItem[] | null;
+  multiPeriodData?: HourlyPeakByPeriodData | null;
+}) {
+  // Mặc định xem theo kỳ để khớp mốc đang chọn trên thanh công cụ; muốn xem
+  // khung giờ gộp cả kỳ thì bấm nút chuyển.
+  const [viewMode, setViewMode] = useState<"DEFAULT" | "TIME">("TIME");
+
   const chartData = useMemo(() => {
     if (Array.isArray(data) && data.length > 0) return data;
     return [];
   }, [data]);
 
+  const timeSeriesData = useMemo(() => {
+    if (multiPeriodData && multiPeriodData.data?.length > 0) {
+      return multiPeriodData;
+    }
+    return { period_labels: [], data: [] };
+  }, [multiPeriodData]);
+
+  const periodLabels = timeSeriesData.period_labels;
+
+  const { selectedPeriod, openPeriod, closePeriod } = usePeriodDrilldown();
+
+  const changeViewMode = (mode: ChartViewMode) => {
+    closePeriod();
+    setViewMode(mode);
+  };
+
+  const drilldownSlices = useMemo(
+    () =>
+      slicesFromRow(
+        timeSeriesData.data.find((row: any) => row.label === selectedPeriod),
+        periodLabels,
+      ),
+    [periodLabels, selectedPeriod, timeSeriesData],
+  );
+
   return (
     <ChartCard
       title="🕒 6. Session theo Khung Giờ trong Ngày (0h - 23h)"
-      description="Xác định các khoảng thời gian bùng nổ lượng chat để chủ động bố trí nhân sự CCC"
+      description={
+        viewMode === "DEFAULT"
+          ? "Xác định các khoảng thời gian bùng nổ lượng chat để chủ động bố trí nhân sự CCC"
+          : "Mỗi kỳ một đường: xem giờ cao điểm dịch chuyển thế nào giữa các kỳ (phụ thuộc bộ lọc)"
+      }
+      headerRight={
+        <ChartModeHeader
+          viewMode={viewMode}
+          onChange={changeViewMode}
+          onBack={selectedPeriod ? closePeriod : undefined}
+        />
+      }
       className="xl:col-span-6"
     >
       <div className="h-[320px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={chartData} margin={{ top: 15, right: 15, left: -15, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-            <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#334155" }} interval={1} />
-            <YAxis tick={{ fontSize: 11, fill: "#64748b" }} allowDecimals={false} />
-            <Tooltip content={<ValueTooltip />} />
-            <Bar dataKey="count" name="Số lượt chat" fill="#00713d" radius={[4, 4, 0, 0]} isAnimationActive={false} />
-          </BarChart>
-        </ResponsiveContainer>
+        {selectedPeriod ? (
+          <PeriodDrilldownDonut
+            data={drilldownSlices}
+            colorOf={periodColorOf(periodLabels)}
+            onExit={closePeriod}
+          />
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            {viewMode === "DEFAULT" ? (
+              <BarChart
+                onClick={openPeriod}
+                className="cursor-pointer"
+                data={chartData}
+                margin={{ top: 15, right: 15, left: -15, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis
+                  dataKey="label"
+                  tick={{ fontSize: 10, fill: "#334155" }}
+                  interval={1}
+                />
+                <YAxis
+                  tick={{ fontSize: 11, fill: "#64748b" }}
+                  allowDecimals={false}
+                />
+                <Tooltip content={<ValueTooltip />} />
+                <Bar
+                  dataKey="count"
+                  name="Số lượt chat"
+                  fill="#00713d"
+                  radius={[4, 4, 0, 0]}
+                  isAnimationActive={false}
+                />
+              </BarChart>
+            ) : (
+              <LineChart
+                onClick={openPeriod}
+                className="cursor-pointer"
+                data={timeSeriesData.data}
+                margin={{ top: 15, right: 15, left: -15, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis
+                  dataKey="label"
+                  tick={{ fontSize: 10, fill: "#334155" }}
+                  interval={1}
+                />
+                <YAxis
+                  tick={{ fontSize: 11, fill: "#64748b" }}
+                  allowDecimals={false}
+                />
+                <Tooltip content={<ValueTooltip />} />
+                <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
+                {periodLabels.map((pLabel, idx) => (
+                  <Line
+                    key={pLabel}
+                    type="monotone"
+                    dataKey={pLabel}
+                    name={pLabel}
+                    stroke={COLORS[idx % COLORS.length]}
+                    strokeWidth={2}
+                    // 24 điểm nhân số kỳ: vẽ chấm ở mọi điểm sẽ rối, chỉ hiện
+                    // chấm khi rê chuột vào.
+                    dot={false}
+                    activeDot={{ r: 4 }}
+                    isAnimationActive={false}
+                  />
+                ))}
+              </LineChart>
+            )}
+          </ResponsiveContainer>
+        )}
       </div>
     </ChartCard>
   );
@@ -720,7 +1058,14 @@ function CustomYAxisReasonTick({ x, y, payload }: any) {
 
   return (
     <g transform={`translate(${x},${y})`}>
-      <text x={-6} y={4} textAnchor="end" fill="#1e293b" fontSize={11} fontWeight={600}>
+      <text
+        x={-6}
+        y={4}
+        textAnchor="end"
+        fill="#1e293b"
+        fontSize={11}
+        fontWeight={600}
+      >
         {formatted}
       </text>
     </g>
@@ -737,7 +1082,9 @@ function TopReasonHorizontalBarCard({
   data?: any[] | null;
   multiPeriodData?: CccMultiMonthTopicsData | null;
 }) {
-  const [viewMode, setViewMode] = useState<"DEFAULT" | "TIME">("DEFAULT");
+  // Mặc định xem theo kỳ để khớp mốc đang chọn trên thanh công cụ; muốn xem
+  // xếp hạng gộp cả kỳ thì bấm nút chuyển.
+  const [viewMode, setViewMode] = useState<"DEFAULT" | "TIME">("TIME");
 
   const defaultChartData = useMemo(() => {
     if (Array.isArray(data) && data.length > 0) {
@@ -762,104 +1109,174 @@ function TopReasonHorizontalBarCard({
 
   const monthLabels = timeSeriesData.month_labels;
 
+  const { selectedPeriod, openPeriod, closePeriod } = usePeriodDrilldown();
+
+  const changeViewMode = (mode: ChartViewMode) => {
+    closePeriod();
+    setViewMode(mode);
+  };
+
+  const drilldownSlices = useMemo(
+    () =>
+      slicesFromRow(
+        timeSeriesData.data_by_category.find(
+          (row: any) => row.label === selectedPeriod,
+        ),
+        monthLabels,
+      ),
+    [monthLabels, selectedPeriod, timeSeriesData],
+  );
+
+  // Lý do chuyển CCC là câu dài, in thẳng lên trục hoành thì các nhãn đè lên
+  // nhau và bị cắt. Đánh mã LD1..LDn cho trục, câu đầy đủ đưa xuống chú thích
+  // ngay dưới biểu đồ (và vẫn hiện nguyên văn trong tooltip).
+  const reasonLegend = useMemo(
+    () =>
+      timeSeriesData.data_by_category.map((row: any, index: number) => ({
+        code: `LD${index + 1}`,
+        label: String(row.label ?? ""),
+      })),
+    [timeSeriesData],
+  );
+
+  const reasonCodeByLabel = useMemo(
+    () => new Map(reasonLegend.map((item) => [item.label, item.code])),
+    [reasonLegend],
+  );
+
   return (
     <ChartCard
       title="📊 7. Top Lý do Chuyển CCC"
       description={
         viewMode === "DEFAULT"
           ? "Dựa vào trường reason để tìm điểm nghẽn và cải tiến kịch bản Chatbot"
-          : "Trục hoành: Các lý do chuyển CCC | Biến động theo thời gian (phụ thuộc bộ lọc)"
+          : "Trục hoành: Mã lý do (xem chú thích dưới biểu đồ) | Biến động theo thời gian (phụ thuộc bộ lọc)"
       }
       headerRight={
-        <div className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-100 p-0.5 shadow-2xs">
-          <button
-            type="button"
-            onClick={() => setViewMode("DEFAULT")}
-            className={`cursor-pointer px-2.5 py-1 text-xs font-bold rounded-md transition-all ${
-              viewMode === "DEFAULT"
-                ? "bg-[#00713d] text-white shadow-xs"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
-          >
-            Tổng quan
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode("TIME")}
-            className={`cursor-pointer px-2.5 py-1 text-xs font-bold rounded-md transition-all ${
-              viewMode === "TIME"
-                ? "bg-[#00713d] text-white shadow-xs"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
-          >
-            📅 Theo thời gian
-          </button>
-        </div>
+        <ChartModeHeader
+          viewMode={viewMode}
+          onChange={changeViewMode}
+          onBack={selectedPeriod ? closePeriod : undefined}
+        />
       }
       className="xl:col-span-6"
     >
-      <div className="h-[330px]">
-        <ResponsiveContainer width="100%" height="100%">
-          {viewMode === "DEFAULT" ? (
-            <BarChart
-              layout="vertical"
-              data={defaultChartData}
-              margin={{ top: 10, right: 45, left: 10, bottom: 5 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis type="number" tick={{ fontSize: 11, fill: "#64748b" }} allowDecimals={false} />
-              <YAxis
-                type="category"
-                dataKey="name"
-                interval={0}
-                tick={<CustomYAxisReasonTick />}
-                width={180}
-              />
-              <Tooltip content={<ValueTooltip />} />
-              <Bar dataKey="value" name="Số phiên" fill="#8b5cf6" radius={[0, 4, 4, 0]} barSize={18} isAnimationActive={false}>
-                <LabelList
-                  dataKey="value"
-                  position="right"
-                  style={{ fontSize: 11, fill: "#6d28d9", fontWeight: 700 }}
-                  formatter={(val: any) => (val && Number(val) > 0 ? val : "")}
+      {/* Chế độ theo thời gian nhường bớt chiều cao cho phần chú thích mã lý
+          do ở dưới, để thẻ không cao hơn các biểu đồ đứng cạnh. */}
+      <div className={viewMode === "DEFAULT" ? "h-[330px]" : "h-[236px]"}>
+        {selectedPeriod ? (
+          <PeriodDrilldownDonut
+            data={drilldownSlices}
+            colorOf={periodColorOf(monthLabels)}
+            onExit={closePeriod}
+          />
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            {viewMode === "DEFAULT" ? (
+              <BarChart
+                layout="vertical"
+                onClick={openPeriod}
+                className="cursor-pointer"
+                data={defaultChartData}
+                margin={{ top: 10, right: 45, left: 10, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis
+                  type="number"
+                  tick={{ fontSize: 11, fill: "#64748b" }}
+                  allowDecimals={false}
                 />
-              </Bar>
-            </BarChart>
-          ) : (
-            <BarChart
-              data={timeSeriesData.data_by_category}
-              margin={{ top: 25, right: 25, left: -10, bottom: 45 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis
-                dataKey="label"
-                interval={0}
-                tick={<CustomCategoryAxisTick />}
-              />
-              <YAxis tick={{ fontSize: 11, fill: "#64748b" }} allowDecimals={false} />
-              <Tooltip content={<ValueTooltip />} />
-              <Legend wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
-              {monthLabels.map((mLabel, idx) => (
+                <YAxis
+                  type="category"
+                  dataKey="name"
+                  interval={0}
+                  tick={<CustomYAxisReasonTick />}
+                  width={180}
+                />
+                <Tooltip content={<ValueTooltip />} />
                 <Bar
-                  key={mLabel}
-                  dataKey={mLabel}
-                  name={mLabel}
-                  fill={COLORS[idx % COLORS.length]}
-                  radius={[4, 4, 0, 0]}
+                  dataKey="value"
+                  name="Số phiên"
+                  fill="#8b5cf6"
+                  radius={[0, 4, 4, 0]}
+                  barSize={18}
                   isAnimationActive={false}
                 >
                   <LabelList
-                    dataKey={mLabel}
-                    position="top"
-                    style={{ fontSize: 9, fill: "#334155", fontWeight: 700 }}
-                    formatter={(val: any) => (val && Number(val) > 0 ? val : "")}
+                    dataKey="value"
+                    position="right"
+                    style={{ fontSize: 11, fill: "#6d28d9", fontWeight: 700 }}
+                    formatter={(val: any) =>
+                      val && Number(val) > 0 ? val : ""
+                    }
                   />
                 </Bar>
-              ))}
-            </BarChart>
-          )}
-        </ResponsiveContainer>
+              </BarChart>
+            ) : (
+              <BarChart
+                onClick={openPeriod}
+                className="cursor-pointer"
+                data={timeSeriesData.data_by_category}
+                margin={{ top: 25, right: 25, left: -10, bottom: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                {/* Vẫn bind theo `label` để tooltip đọc được nguyên văn lý do;
+                  chỉ phần chữ vẽ lên trục mới rút thành mã. */}
+                <XAxis
+                  dataKey="label"
+                  interval={0}
+                  tickFormatter={(value: string) =>
+                    reasonCodeByLabel.get(value) ?? value
+                  }
+                  tick={{ fontSize: 11, fontWeight: 700, fill: "#334155" }}
+                />
+                <YAxis
+                  tick={{ fontSize: 11, fill: "#64748b" }}
+                  allowDecimals={false}
+                />
+                <Tooltip content={<ValueTooltip />} />
+                <Legend wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
+                {monthLabels.map((mLabel, idx) => (
+                  <Bar
+                    key={mLabel}
+                    dataKey={mLabel}
+                    name={mLabel}
+                    fill={COLORS[idx % COLORS.length]}
+                    radius={[4, 4, 0, 0]}
+                    isAnimationActive={false}
+                  >
+                    <LabelList
+                      dataKey={mLabel}
+                      position="top"
+                      style={{ fontSize: 9, fill: "#334155", fontWeight: 700 }}
+                      formatter={(val: any) =>
+                        val && Number(val) > 0 ? val : ""
+                      }
+                    />
+                  </Bar>
+                ))}
+              </BarChart>
+            )}
+          </ResponsiveContainer>
+        )}
       </div>
+
+      {viewMode === "TIME" && reasonLegend.length > 0 && (
+        // Một cột: lý do dài 20-60 ký tự, chia hai cột thì lại bị cắt đúng
+        // như khi in thẳng lên trục.
+        <dl className="mt-2 space-y-0.5 border-t border-slate-100 pt-2 text-[11px] leading-snug">
+          {reasonLegend.map((item) => (
+            <div key={item.code} className="flex gap-2">
+              <dt className="w-9 shrink-0 font-bold text-slate-900">
+                {item.code}
+              </dt>
+              <dd className="truncate text-slate-600" title={item.label}>
+                {item.label}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
     </ChartCard>
   );
 }
@@ -874,7 +1291,9 @@ function ChannelPerformanceBarCard({
   data?: ChannelPerformanceItem[] | null;
   multiPeriodData?: CccMultiMonthTopicsData | null;
 }) {
-  const [viewMode, setViewMode] = useState<"DEFAULT" | "TIME">("DEFAULT");
+  // Mặc định xem theo kỳ để khớp mốc đang chọn trên thanh công cụ; muốn xem
+  // xếp hạng gộp cả kỳ thì bấm nút chuyển.
+  const [viewMode, setViewMode] = useState<"DEFAULT" | "TIME">("TIME");
 
   const defaultChartData = useMemo(() => {
     if (Array.isArray(data) && data.length > 0) return data;
@@ -894,6 +1313,24 @@ function ChannelPerformanceBarCard({
 
   const monthLabels = timeSeriesData.month_labels;
 
+  const { selectedPeriod, openPeriod, closePeriod } = usePeriodDrilldown();
+
+  const changeViewMode = (mode: ChartViewMode) => {
+    closePeriod();
+    setViewMode(mode);
+  };
+
+  const drilldownSlices = useMemo(
+    () =>
+      slicesFromRow(
+        timeSeriesData.data_by_category.find(
+          (row: any) => row.label === selectedPeriod,
+        ),
+        monthLabels,
+      ),
+    [monthLabels, selectedPeriod, timeSeriesData],
+  );
+
   return (
     <ChartCard
       title="📊 Hiệu quả theo Channel (Web / App / Zalo / Facebook)"
@@ -903,93 +1340,118 @@ function ChannelPerformanceBarCard({
           : "Trục hoành: Các kênh giao tiếp | Số phiên theo thời gian (phụ thuộc bộ lọc)"
       }
       headerRight={
-        <div className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-100 p-0.5 shadow-2xs">
-          <button
-            type="button"
-            onClick={() => setViewMode("DEFAULT")}
-            className={`cursor-pointer px-2.5 py-1 text-xs font-bold rounded-md transition-all ${
-              viewMode === "DEFAULT"
-                ? "bg-[#00713d] text-white shadow-xs"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
-          >
-            Tổng quan
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode("TIME")}
-            className={`cursor-pointer px-2.5 py-1 text-xs font-bold rounded-md transition-all ${
-              viewMode === "TIME"
-                ? "bg-[#00713d] text-white shadow-xs"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
-          >
-            📅 Theo thời gian
-          </button>
-        </div>
+        <ChartModeHeader
+          viewMode={viewMode}
+          onChange={changeViewMode}
+          onBack={selectedPeriod ? closePeriod : undefined}
+        />
       }
       className="xl:col-span-6"
     >
       <div className="h-[330px]">
-        <ResponsiveContainer width="100%" height="100%">
-          {viewMode === "DEFAULT" ? (
-            <BarChart data={defaultChartData} margin={{ top: 20, right: 25, left: 0, bottom: 15 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis dataKey="name" tick={{ fontSize: 11, fontWeight: 600, fill: "#334155" }} />
-              <YAxis tick={{ fontSize: 11, fill: "#64748b" }} allowDecimals={false} />
-              <Tooltip content={<ValueTooltip />} />
-              <Legend wrapperStyle={{ fontSize: 11, paddingTop: 6 }} />
-              <Bar dataKey="bot_done" name="Bot xử lý (phiên)" fill="#00713d" radius={[4, 4, 0, 0]} barSize={22} isAnimationActive={false}>
-                <LabelList
-                  dataKey="bot_done"
-                  position="top"
-                  style={{ fontSize: 9, fill: "#00713d", fontWeight: 700 }}
-                  formatter={(val: any) => (val && Number(val) > 0 ? val : "")}
+        {selectedPeriod ? (
+          <PeriodDrilldownDonut
+            data={drilldownSlices}
+            colorOf={periodColorOf(monthLabels)}
+            onExit={closePeriod}
+          />
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            {viewMode === "DEFAULT" ? (
+              <BarChart
+                onClick={openPeriod}
+                className="cursor-pointer"
+                data={defaultChartData}
+                margin={{ top: 20, right: 25, left: 0, bottom: 15 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis
+                  dataKey="name"
+                  tick={{ fontSize: 11, fontWeight: 600, fill: "#334155" }}
                 />
-              </Bar>
-              <Bar dataKey="ccc" name="Chuyển CCC (phiên)" fill="#f59e0b" radius={[4, 4, 0, 0]} barSize={22} isAnimationActive={false}>
-                <LabelList
-                  dataKey="ccc"
-                  position="top"
-                  style={{ fontSize: 9, fill: "#b45309", fontWeight: 700 }}
-                  formatter={(val: any) => (val && Number(val) > 0 ? val : "")}
+                <YAxis
+                  tick={{ fontSize: 11, fill: "#64748b" }}
+                  allowDecimals={false}
                 />
-              </Bar>
-            </BarChart>
-          ) : (
-            <BarChart
-              data={timeSeriesData.data_by_category}
-              margin={{ top: 20, right: 25, left: -10, bottom: 35 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis
-                dataKey="label"
-                interval={0}
-                tick={<CustomCategoryAxisTick />}
-              />
-              <YAxis tick={{ fontSize: 11, fill: "#64748b" }} allowDecimals={false} />
-              <Tooltip content={<ValueTooltip />} />
-              <Legend wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
-              {monthLabels.map((mLabel, idx) => (
+                <Tooltip content={<ValueTooltip />} />
+                <Legend wrapperStyle={{ fontSize: 11, paddingTop: 6 }} />
                 <Bar
-                  key={mLabel}
-                  dataKey={mLabel}
-                  name={mLabel}
-                  fill={COLORS[idx % COLORS.length]}
+                  dataKey="bot_done"
+                  name="Bot xử lý (phiên)"
+                  fill="#00713d"
                   radius={[4, 4, 0, 0]}
+                  barSize={22}
                   isAnimationActive={false}
                 >
                   <LabelList
-                    dataKey={mLabel}
+                    dataKey="bot_done"
                     position="top"
-                    style={{ fontSize: 9, fill: "#334155", fontWeight: 700 }}
-                    formatter={(val: any) => (val && Number(val) > 0 ? val : "")}
+                    style={{ fontSize: 9, fill: "#00713d", fontWeight: 700 }}
+                    formatter={(val: any) =>
+                      val && Number(val) > 0 ? val : ""
+                    }
                   />
                 </Bar>
-              ))}
-            </BarChart>
-          )}
-        </ResponsiveContainer>
+                <Bar
+                  dataKey="ccc"
+                  name="Chuyển CCC (phiên)"
+                  fill="#f59e0b"
+                  radius={[4, 4, 0, 0]}
+                  barSize={22}
+                  isAnimationActive={false}
+                >
+                  <LabelList
+                    dataKey="ccc"
+                    position="top"
+                    style={{ fontSize: 9, fill: "#b45309", fontWeight: 700 }}
+                    formatter={(val: any) =>
+                      val && Number(val) > 0 ? val : ""
+                    }
+                  />
+                </Bar>
+              </BarChart>
+            ) : (
+              <BarChart
+                onClick={openPeriod}
+                className="cursor-pointer"
+                data={timeSeriesData.data_by_category}
+                margin={{ top: 20, right: 25, left: -10, bottom: 35 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis
+                  dataKey="label"
+                  interval={0}
+                  tick={<CustomCategoryAxisTick />}
+                />
+                <YAxis
+                  tick={{ fontSize: 11, fill: "#64748b" }}
+                  allowDecimals={false}
+                />
+                <Tooltip content={<ValueTooltip />} />
+                <Legend wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
+                {monthLabels.map((mLabel, idx) => (
+                  <Bar
+                    key={mLabel}
+                    dataKey={mLabel}
+                    name={mLabel}
+                    fill={COLORS[idx % COLORS.length]}
+                    radius={[4, 4, 0, 0]}
+                    isAnimationActive={false}
+                  >
+                    <LabelList
+                      dataKey={mLabel}
+                      position="top"
+                      style={{ fontSize: 9, fill: "#334155", fontWeight: 700 }}
+                      formatter={(val: any) =>
+                        val && Number(val) > 0 ? val : ""
+                      }
+                    />
+                  </Bar>
+                ))}
+              </BarChart>
+            )}
+          </ResponsiveContainer>
+        )}
       </div>
     </ChartCard>
   );
@@ -1023,9 +1485,16 @@ function TopFaqTableCard({ faqs }: { faqs?: ChatbotFaqItem[] | null }) {
           <tbody className="divide-y divide-slate-100">
             {list.length > 0 ? (
               list.map((item, idx) => (
-                <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
-                  <td className="py-2.5 px-4 font-semibold text-slate-500">{idx + 1}</td>
-                  <td className="py-2.5 px-4 font-bold text-slate-800">{item.category}</td>
+                <tr
+                  key={idx}
+                  className="hover:bg-slate-50/80 transition-colors"
+                >
+                  <td className="py-2.5 px-4 font-semibold text-slate-500">
+                    {idx + 1}
+                  </td>
+                  <td className="py-2.5 px-4 font-bold text-slate-800">
+                    {item.category}
+                  </td>
                   <td className="py-2.5 px-4 font-extrabold text-sky-700 text-right">
                     {formatNumber(item.hit_count)}
                   </td>
@@ -1036,7 +1505,10 @@ function TopFaqTableCard({ faqs }: { faqs?: ChatbotFaqItem[] | null }) {
               ))
             ) : (
               <tr>
-                <td colSpan={4} className="py-6 text-center text-slate-400 font-medium">
+                <td
+                  colSpan={4}
+                  className="py-6 text-center text-slate-400 font-medium"
+                >
                   Chưa có dữ liệu câu hỏi phổ biến
                 </td>
               </tr>
@@ -1053,23 +1525,15 @@ function TopFaqTableCard({ faqs }: { faqs?: ChatbotFaqItem[] | null }) {
  * ==================================================================== */
 export function ChatbotDashboardCharts({
   charts,
-  granularity = "month",
-  onGranularityChange,
   faqs,
 }: {
   charts: ChatbotOverviewCharts;
-  granularity?: GranularityMode;
-  onGranularityChange?: (mode: GranularityMode) => void;
   faqs?: ChatbotFaqItem[];
 }) {
   return (
     <div className="space-y-6">
       {/* SECTION 1: XU HƯỚNG TỰ ĐỘNG HÓA (BOT TỰ XỬ LÝ VS CHUYỂN CCC) */}
-      <AutomationTrendChartCard
-        data={charts.time_series_outcomes}
-        granularity={granularity}
-        onGranularityChange={onGranularityChange}
-      />
+      <AutomationTrendChartCard data={charts.time_series_outcomes} />
 
       {/* SECTION 1B: SO SÁNH KỲ (kỳ này với kỳ liền trước) */}
       <div className="grid gap-4 xl:grid-cols-12">
@@ -1079,7 +1543,7 @@ export function ChatbotDashboardCharts({
       {/* SECTION 2: XU HƯỚNG SESSION & KẾT QUẢ XỬ LÝ */}
       <div className="grid gap-4 xl:grid-cols-12">
         <SessionTrendLineChartCard data={charts.time_series_outcomes} />
-        <OutcomeDonutChartCard processClassification={charts.process_classification} />
+        <OutcomeByPeriodChartCard data={charts.outcome_by_period} />
       </div>
 
       {/* SECTION 3: PHÂN TÍCH CATEGORY & TỶ LỆ CHUYỂN CCC */}
@@ -1097,7 +1561,10 @@ export function ChatbotDashboardCharts({
       {/* SECTION 4: FUNNEL CHUYỂN ĐỔI & HOURLY PEAK */}
       <div className="grid gap-4 xl:grid-cols-12">
         <ChatbotFunnelChartCard data={charts.chat_funnel} />
-        <HourlyPeakChartCard data={charts.hourly_peak} />
+        <HourlyPeakChartCard
+          data={charts.hourly_peak}
+          multiPeriodData={charts.hourly_peak_multi_period}
+        />
       </div>
 
       {/* SECTION 5: PHÂN TÍCH LÝ DO & HIỆU QUẢ CHANNEL */}

@@ -42,98 +42,106 @@ export function ChatbotDashboardPage() {
           </button>
         }
       >
-        <DashboardToolbar
-          filters={dashboard.filters}
-          activeTab={dashboard.activeTab}
-          onFilterChange={dashboard.updateFilter}
-          onApply={dashboard.refresh}
-          onClear={dashboard.clearFilters}
-          onQuickPreset={dashboard.applyQuickPreset}
-        />
+        {/*
+          `no-motion` tắt mọi hiệu ứng chuyển cảnh bên trong dashboard — xem
+          chú thích của class trong globals.css. Chỉ bọc phần nội dung, không
+          bọc DashboardLayout: khung ngoài có sidebar trượt ra trượt vào, mất
+          hiệu ứng thì panel nhảy giật.
 
-        <DashboardTabs
-          activeTab={dashboard.activeTab}
-          onChange={dashboard.changeTab}
-        />
+          `contents` để lớp bọc này không tạo hộp riêng, giữ nguyên khoảng
+          cách dọc mà layout cha đang áp cho từng khối con.
+        */}
+        <div className="no-motion contents">
+          <DashboardToolbar
+            filters={dashboard.filters}
+            activeTab={dashboard.activeTab}
+            effectiveGranularity={dashboard.effectiveGranularity}
+            onFilterChange={dashboard.updateFilter}
+            onApply={dashboard.applyFilters}
+            onClear={dashboard.clearFilters}
+            onQuickPreset={dashboard.applyQuickPreset}
+            onGranularityChange={dashboard.changeGranularity}
+          />
 
-        {/* KPI + hàng chờ cần xử lý: chỉ hiển thị ở tab Tổng quan */}
-        {dashboard.activeTab === "overview" && dashboard.overview && (
-          <>
-            <KpiCards
-              summary={dashboard.overview.summary}
-              onOpenTickets={dashboard.openTicketsFromOverview}
-            />
+          <DashboardTabs
+            activeTab={dashboard.activeTab}
+            onChange={dashboard.changeTab}
+          />
 
-            <PendingTicketsPanel
-              rows={dashboard.overview.quick_lists.latest_ccc_tickets}
-              total={
-                dashboard.overview.quick_lists.pending_ticket_total ??
-                dashboard.overview.quick_lists.latest_ccc_tickets.length
-              }
-            />
-          </>
-        )}
+          {/* KPI + hàng chờ cần xử lý: chỉ hiển thị ở tab Tổng quan */}
+          {dashboard.activeTab === "overview" && dashboard.overview && (
+            <>
+              <KpiCards
+                summary={dashboard.overview.summary}
+                onOpenTickets={dashboard.openTicketsFromOverview}
+              />
 
-        {dashboard.error && (
-          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
-            {dashboard.error}
-          </div>
-        )}
-
-        {dashboard.loading && (
-          <div className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-500 shadow-sm">
-            Đang tải dữ liệu...
-          </div>
-        )}
-
-        {!dashboard.loading &&
-          !dashboard.error &&
-          dashboard.activeTab === "overview" &&
-          dashboard.overview && (
-            <OverviewTab
-              overview={dashboard.overview}
-              onOpenTickets={dashboard.openTicketsFromOverview}
-              granularity={dashboard.filters.granularity || "auto"}
-              onGranularityChange={dashboard.changeGranularity}
-            />
+              <PendingTicketsPanel
+                rows={dashboard.overview.quick_lists.latest_ccc_tickets}
+                total={
+                  dashboard.overview.quick_lists.pending_ticket_total ??
+                  dashboard.overview.quick_lists.latest_ccc_tickets.length
+                }
+              />
+            </>
           )}
 
-        {!dashboard.loading &&
-          !dashboard.error &&
-          dashboard.activeTab === "tickets" && (
-            <TicketsTab
-              tickets={dashboard.tickets}
-              count={dashboard.ticketCount}
-              title={dashboard.ticketPanelTitle}
-              status={dashboard.ticketStatus}
-              keyword={dashboard.ticketKeyword}
-              category={dashboard.ticketCategory}
-              onStatusChange={dashboard.changeTicketStatus}
-              onKeywordChange={dashboard.setTicketKeyword}
-              onSearch={dashboard.searchTickets}
-              onClearPreset={dashboard.clearTicketFilters}
-              onOpenSession={dashboard.setSelectedSession}
-            />
+          {dashboard.error && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+              {dashboard.error}
+            </div>
           )}
 
-        {!dashboard.loading &&
-          !dashboard.error &&
-          dashboard.activeTab === "faqs" && (
-            <FaqTab
-              faqs={dashboard.faqs}
-              count={dashboard.faqCount}
-              keyword={dashboard.faqKeyword}
-              onKeywordChange={dashboard.setFaqKeyword}
-              onSearch={dashboard.searchFaqs}
-            />
+          {dashboard.loading && (
+            <div className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-500 shadow-sm">
+              Đang tải dữ liệu...
+            </div>
           )}
+
+          {!dashboard.loading &&
+            !dashboard.error &&
+            dashboard.activeTab === "overview" &&
+            dashboard.overview && <OverviewTab overview={dashboard.overview} />}
+
+          {!dashboard.loading &&
+            !dashboard.error &&
+            dashboard.activeTab === "tickets" && (
+              <TicketsTab
+                tickets={dashboard.tickets}
+                count={dashboard.ticketCount}
+                title={dashboard.ticketPanelTitle}
+                status={dashboard.ticketStatus}
+                keyword={dashboard.ticketKeyword}
+                category={dashboard.ticketCategory}
+                onStatusChange={dashboard.changeTicketStatus}
+                onKeywordChange={dashboard.setTicketKeyword}
+                onSearch={dashboard.searchTickets}
+                onClearPreset={dashboard.clearTicketFilters}
+                onOpenSession={dashboard.setSelectedSession}
+              />
+            )}
+
+          {!dashboard.loading &&
+            !dashboard.error &&
+            dashboard.activeTab === "faqs" && (
+              <FaqTab
+                faqs={dashboard.faqs}
+                count={dashboard.faqCount}
+                keyword={dashboard.faqKeyword}
+                onKeywordChange={dashboard.setFaqKeyword}
+                onSearch={dashboard.searchFaqs}
+              />
+            )}
+        </div>
       </DashboardLayout>
 
       {dashboard.selectedSession && (
-        <ConversationModal
-          session={dashboard.selectedSession}
-          onClose={() => dashboard.setSelectedSession(null)}
-        />
+        <div className="no-motion contents">
+          <ConversationModal
+            session={dashboard.selectedSession}
+            onClose={() => dashboard.setSelectedSession(null)}
+          />
+        </div>
       )}
     </>
   );

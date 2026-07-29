@@ -1,23 +1,28 @@
 import { GranularityChoice, OutcomeCode } from "@/types/chatbot-dashboard.type";
 
+/** Nhãn của mọi mốc, kể cả mốc không có nút bấm (ngày/tuần). */
+export const GRANULARITY_LABELS: Record<GranularityChoice, string> = {
+  auto: "Tự động",
+  day: "Ngày",
+  week: "Tuần",
+  month: "Tháng",
+  quarter: "Quý",
+  year: "Năm",
+};
+
 /**
- * Bộ chọn mốc thời gian dùng chung cho mọi biểu đồ.
+ * Nút chọn mốc trên thanh công cụ — chỉ ba mốc dài kỳ.
  *
- * "Tự động" để backend suy mốc từ độ dài khoảng lọc: lọc trong một tháng thì
- * xem theo ngày, lọc trọn năm thì xem theo tháng, lọc nhiều năm thì xem theo
- * năm. Các mốc còn lại là ép thủ công.
+ * Ngày và tuần vẫn chạy bình thường nhưng chỉ đến từ bộ lọc nâng cao: người
+ * dùng chọn khoảng nào thì backend tự suy mốc theo khoảng đó. Không mở nút
+ * riêng để tránh bấm "Ngày" trên khoảng 2 năm rồi ra 700 cột.
  */
-export const GRANULARITY_OPTIONS: {
-  key: GranularityChoice;
-  label: string;
-}[] = [
-  { key: "auto", label: "Tự động" },
-  { key: "day", label: "Ngày" },
-  { key: "week", label: "Tuần" },
-  { key: "month", label: "Tháng" },
-  { key: "quarter", label: "Quý" },
-  { key: "year", label: "Năm" },
-];
+const GRANULARITY_BUTTONS: GranularityChoice[] = ["month", "quarter", "year"];
+
+export const GRANULARITY_OPTIONS = GRANULARITY_BUTTONS.map((key) => ({
+  key,
+  label: GRANULARITY_LABELS[key],
+}));
 
 export const CHATBOT_TICKET_STATUS_OPTIONS: {
   value: OutcomeCode;

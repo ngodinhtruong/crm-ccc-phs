@@ -9,5 +9,6 @@ export { UserAssigneeCombobox } from "./UserAssigneeCombobox";
 export * from "./AccessDenied";
 export * from "./ChartViewModeControls";
 export * from "./ExpandableChartCard";
+export * from "./PeriodDrilldown";
 export * from "./TablePagination";
 export * from "./table-filters";

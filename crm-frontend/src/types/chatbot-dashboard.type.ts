@@ -54,6 +54,21 @@ export type PeriodComparisonItem = {
   growth_percent: number | null;
 };
 
+/**
+ * Kết quả xử lý phiên chia theo kỳ — thay cho biểu đồ tròn.
+ *
+ * Mỗi phần tử `data` có `label`, `is_current` và một khóa cho từng nhãn trong
+ * `series` (ví dụ "Chatbot tự xử lý": 142), nên vẽ thẳng bằng stacked bar.
+ */
+export type OutcomeByPeriod = {
+  series: string[];
+  data: ({
+    key: string;
+    label: string;
+    is_current: boolean;
+  } & Record<string, number | string | boolean>)[];
+};
+
 export type PeriodComparison = {
   granularity: GranularityMode;
   granularity_label: string;
@@ -73,10 +88,6 @@ export type SummaryBucket = {
 export type ChartItem = {
   name: string;
   value: number;
-};
-
-export type ProcessChartItem = SummaryBucket & {
-  name: string;
 };
 
 export type ChatbotTicketItem = {
@@ -128,19 +139,6 @@ export type ChatbotFaqItem = {
   latest_at?: string | null;
 };
 
-export type ChatbotMonthlyTicketItem = {
-  month: string;
-  month_key: string;
-  month_label: string;
-  count: number;
-};
-
-export type ChatbotSeriesItem = {
-  key: string;
-  label: string;
-  count: number;
-};
-
 export type TimeSeriesOutcomeItem = {
   date: string;
   label: string;
@@ -158,25 +156,10 @@ export type TimeSeriesOutcomeItem = {
   bot_done_rate: number;
 };
 
-export type CustomerLinkageData = {
-  total: number;
-  linked: number;
-  unlinked: number;
-  linked_rate: number;
-  items: Array<{ name: string; value: number; color: string }>;
-};
-
 export type CccMultiMonthTopicsData = {
   month_labels: string[];
   top_categories: string[];
-  data_by_month: Array<Record<string, any>>;
   data_by_category: Array<Record<string, any>>;
-};
-
-export type TopicStackedOutcomesData = {
-  month_labels: string[];
-  top_categories: string[];
-  data: Array<Record<string, any>>;
 };
 
 export type CategoryCccRateItem = {
@@ -196,6 +179,15 @@ export type HourlyPeakItem = {
   hour: number;
   label: string;
   count: number;
+};
+
+/**
+ * Khung giờ trong ngày tách theo kỳ: 24 dòng cố định, mỗi kỳ là một khóa động
+ * trên dòng (ví dụ `{ hour: 14, label: "14:00", "T07/2026": 90 }`).
+ */
+export type HourlyPeakByPeriodData = {
+  period_labels: string[];
+  data: Array<Record<string, any>>;
 };
 
 export type ChannelPerformanceItem = {
@@ -223,26 +215,20 @@ export type ChatbotOverviewResponse = {
   };
 
   charts: {
-    process_classification: ProcessChartItem[];
-    ccc_issue_pie?: ChartItem[];
+    outcome_by_period?: OutcomeByPeriod;
     period_comparison?: PeriodComparison;
     topic_bar: ChartItem[];
-    monthly_chatbot_tickets: ChatbotMonthlyTicketItem[];
-    daily_chatbot_tickets: ChatbotSeriesItem[];
-    hourly_chatbot_tickets: ChatbotSeriesItem[];
     channel_distribution: ChartItem[];
     ticket_status_distribution: ChartItem[];
 
     time_series_outcomes?: TimeSeriesOutcomeItem[];
-    customer_linkage?: CustomerLinkageData;
     ccc_multi_month_topics?: CccMultiMonthTopicsData;
-    topic_stacked_outcomes?: TopicStackedOutcomesData;
     all_topic_multi_month?: CccMultiMonthTopicsData;
-    category_ccc_rate_multi_month?: CccMultiMonthTopicsData;
 
     category_ccc_rate?: CategoryCccRateItem[];
     chat_funnel?: FunnelStepItem[];
     hourly_peak?: HourlyPeakItem[];
+    hourly_peak_multi_period?: HourlyPeakByPeriodData;
     top_reasons?: ChartItem[];
     top_reasons_multi_period?: CccMultiMonthTopicsData;
     channel_performance?: ChannelPerformanceItem[];
@@ -250,9 +236,9 @@ export type ChatbotOverviewResponse = {
   };
 
   quick_lists: {
-    /** Ticket chatbot đang Mở và chưa ai nhận — 5 dòng mới nhất. */
+    /** Ticket chatbot đang Mở và chưa ai nhận — lô mới nhất, tối đa 50 dòng. */
     latest_ccc_tickets: ChatbotTicketItem[];
-    /** Tổng số ticket chưa tiếp nhận (không giới hạn 5 dòng hiển thị). */
+    /** Tổng số ticket chưa tiếp nhận trên toàn hàng chờ. */
     pending_ticket_total?: number;
     top_faqs: ChatbotFaqItem[];
   };

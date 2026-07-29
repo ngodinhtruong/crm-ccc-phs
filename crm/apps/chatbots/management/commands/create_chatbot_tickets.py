@@ -1,9 +1,10 @@
-from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
-from apps.branches.models import Branch
 from apps.chatbots.models import ChatbotSessionSummary
-from apps.chatbots.services import create_crm_tickets_from_chatbot
+from apps.chatbots.services import (
+    create_crm_tickets_from_chatbot,
+    resolve_default_branch,
+)
 
 
 class Command(BaseCommand):
@@ -21,16 +22,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        branch_code = options["branch_code"] or getattr(
-            settings,
-            "CHATBOT_DEFAULT_BRANCH_CODE",
-            None,
-        )
-
-        if branch_code:
-            default_branch = Branch.objects.filter(branch_code=branch_code).first()
-        else:
-            default_branch = Branch.objects.order_by("id").first()
+        default_branch = resolve_default_branch(options["branch_code"])
 
         if default_branch is None:
             raise CommandError(

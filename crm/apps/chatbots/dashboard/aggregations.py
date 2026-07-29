@@ -1,24 +1,24 @@
 """Các truy vấn aggregate nhỏ, độc lập theo section của dashboard chatbot."""
 
-from django.db.models import (
-    Count,
-    Max,
-    Q,
-    Sum,
-)
+from django.db.models import Count, Max, Q, Sum
 from django.db.models.functions import ExtractHour
 
-from apps.chatbots.constants import SPAM_QUESTION_TYPES, UNCATEGORIZED_LABEL
+from apps.chatbots.constants import (
+    SPAM_QUESTION_TYPES,
+    UNCATEGORIZED_LABEL,
+    category_label,
+    channel_label,
+)
 from apps.chatbots.dashboard.periods import (
+    DASHBOARD_TIMEZONE,
     GRANULARITY_LABELS,
-    comparison_bounds,
-    comparison_granularity,
     iter_periods,
     normalize_granularity,
     period_bounds,
     period_key,
     period_label,
     period_trunc,
+    series_bounds,
 )
 from apps.chatbots.models import ChatbotSessionSummary
 from apps.chatbots.serializers import ChatbotSessionQuickSerializer
@@ -28,7 +28,31 @@ OUTCOME_BOT_DONE = ChatbotSessionSummary.OUTCOME_BOT_DONE
 OUTCOME_CCC = ChatbotSessionSummary.OUTCOME_CCC
 OUTCOME_SPAM = ChatbotSessionSummary.OUTCOME_SPAM
 OUTCOME_PENDING = ChatbotSessionSummary.OUTCOME_PENDING
+
 TOPIC_OUTCOMES = (OUTCOME_BOT_DONE, OUTCOME_CCC)
+
+# Bốn nhóm xử lý phiên: mã trong DB -> tên cột đếm -> nhãn hiển thị.
+# Một bảng duy nhất để KPI, biểu đồ theo kỳ và biểu đồ so sánh không trôi
+# nhãn khác nhau; thêm nhóm mới chỉ phải khai báo ở đây.
+OUTCOME_SERIES = (
+    (OUTCOME_BOT_DONE, "bot_done", "Chatbot tự xử lý"),
+    (OUTCOME_CCC, "ccc", "Chuyển CCC xử lý"),
+    (OUTCOME_PENDING, "pending", "Chờ thông tin khách hàng"),
+    (OUTCOME_SPAM, "spam", "Câu hỏi rác"),
+)
+
+
+def outcome_counts():
+    """Bộ annotate đếm số phiên của từng nhóm xử lý."""
+    return {
+        field: Count("id", filter=Q(outcome_type=code))
+        for code, field, _label in OUTCOME_SERIES
+    }
+
+
+def _outcome_values(row):
+    """Bốn cột đếm của một dòng, kỳ không có phiên nào thì về 0."""
+    return {field: row.get(field) or 0 for _code, field, _label in OUTCOME_SERIES}
 
 
 class ChatbotDashboardAggregator:
@@ -36,701 +60,78 @@ class ChatbotDashboardAggregator:
         self,
         summaries,
         logs,
-        comparison_summaries=None,
         series_summaries=None,
         focus_bounds=(None, None),
     ):
         self.summaries = summaries
         self.logs = logs
 
-        # Ba phạm vi khác nhau, cố ý:
-        #   summaries            - đúng bộ lọc (KPI, donut, phễu, khung giờ...)
-        #   series_summaries     - nới ra kỳ cha KHI bộ lọc chỉ gói một kỳ
-        #   comparison_summaries - luôn nới ra kỳ cha để có kỳ ngang hàng
-        # Không truyền thì tất cả rơi về đúng bộ lọc.
-        self.comparison_summaries = (
-            summaries if comparison_summaries is None else comparison_summaries
-        )
+        # Hai phạm vi, cố ý khác nhau:
+        #   summaries        - đúng bộ lọc (phễu, khung giờ, bảng FAQ)
+        #   series_summaries - nới ra kỳ cha KHI bộ lọc chỉ gói đúng một kỳ,
+        #                      dùng cho mọi biểu đồ có trục thời gian
+        # Không truyền thì cả hai rơi về đúng bộ lọc.
         self.series_summaries = (
             summaries if series_summaries is None else series_summaries
         )
         self.focus_bounds = focus_bounds
+        self._outcome_rows_cache = {}
 
     @staticmethod
     def rate(value, total, digits=2):
         return round(value / total * 100, digits) if total else 0.0
 
-    def build_summary_section(self):
-        data = self.summaries.aggregate(
-            total_messages=Sum("msg_count_total"),
-            total_sessions=Count("id"),
-            bot_done_messages=Sum("msg_count_bot_done"),
-            bot_done_sessions=Count("id", filter=Q(outcome_type=OUTCOME_BOT_DONE)),
-            ccc_messages=Sum("msg_count_ccc"),
-            ccc_sessions=Count("id", filter=Q(outcome_type=OUTCOME_CCC)),
-            pending_messages=Sum("msg_count_pending"),
-            pending_sessions=Count("id", filter=Q(outcome_type=OUTCOME_PENDING)),
-            spam_messages=Sum("msg_count_spam"),
-            spam_sessions=Count("id", filter=Q(outcome_type=OUTCOME_SPAM)),
-        )
-        total_messages = data["total_messages"] or 0
-        total_sessions = data["total_sessions"] or 0
-
-        def bucket(code, label, message_key, session_key):
-            value = data[message_key] or 0
-            session_cnt = data[session_key] or 0
-            return {
-                "code": code,
-                "label": label,
-                "value": value,
-                "session_count": session_cnt,
-                "rate": self.rate(session_cnt, total_sessions),
-            }
-
-        bot_done = bucket(
-            OUTCOME_BOT_DONE,
-            "Chatbot tự xử lý",
-            "bot_done_messages",
-            "bot_done_sessions",
-        )
-        ccc = bucket(
-            OUTCOME_CCC,
-            "Chuyển CCC xử lý",
-            "ccc_messages",
-            "ccc_sessions",
-        )
-        pending = bucket(
-            OUTCOME_PENDING,
-            "Chờ thông tin khách hàng",
-            "pending_messages",
-            "pending_sessions",
-        )
-        spam = bucket(
-            OUTCOME_SPAM,
-            "Câu hỏi rác",
-            "spam_messages",
-            "spam_sessions",
-        )
-
-        total_received = {
-            "code": "ALL",
-            "label": "Tổng tiếp nhận",
-            "value": total_messages,
-            "session_count": total_sessions,
-            "rate": 100.0 if total_messages else 0.0,
-        }
-        process_classification = [
-            {"name": item["label"], **item}
-            for item in (bot_done, ccc, pending, spam)
-        ]
-
-        return {
-            "summary": {
-                "total_received": total_received,
-                "bot_done": bot_done,
-                "ccc": ccc,
-                "spam": spam,
-                "pending": pending,
-            },
-            "charts": {"process_classification": process_classification},
-        }
-
-    def _build_time_series_by_category(
-        self, summaries_qs, mode="total", granularity="month"
-    ):
-        granularity = normalize_granularity(granularity)
-        trunc_fn = period_trunc(granularity)
-
-        rows = list(
-            summaries_qs.filter(started_at__isnull=False)
-            .annotate(period=trunc_fn)
-            .values("period", "dashboard_category")
-            .annotate(
-                cnt=Count("id"),
-                ccc_cnt=Count("id", filter=Q(outcome_type=OUTCOME_CCC)),
-            )
-            .order_by("period")
-        )
-
-        def label(cat):
-            return cat or UNCATEGORIZED_LABEL
-
-        period_map = {}
-        cat_totals = {}
-        matrix = {}
-
-        for r in rows:
-            p = r["period"]
-            if not p:
-                continue
-
-            p_key = period_key(granularity, p)
-            p_label = period_label(granularity, p)
-
-            period_map[p_key] = p_label
-            cat_name = label(r["dashboard_category"])
-            cnt = r["cnt"] or 0
-            ccc_cnt = r["ccc_cnt"] or 0
-
-            cat_totals[cat_name] = cat_totals.get(cat_name, 0) + cnt
-
-            if mode == "ccc":
-                val = ccc_cnt
-            elif mode == "ccc_rate":
-                val = self.rate(ccc_cnt, cnt, digits=1)
-            else:
-                val = cnt
-
-            matrix[(p_key, cat_name)] = val
-
-        sorted_cats = [
-            cat for cat, _ in sorted(cat_totals.items(), key=lambda x: x[1], reverse=True)
-        ][:6]
-
-        if not sorted_cats:
-            sorted_cats = [UNCATEGORIZED_LABEL]
-
-        periods_sorted = sorted(period_map.keys())
-        month_labels = [period_map[k] for k in periods_sorted]
-
-        data_by_category = []
-        for cat in sorted_cats:
-            item = {"label": cat, "category": cat}
-            for k in periods_sorted:
-                p_label = period_map[k]
-                item[p_label] = matrix.get((k, cat), 0 if mode != "ccc_rate" else 0.0)
-            data_by_category.append(item)
-
-        data_by_month = []
-        for k in periods_sorted:
-            p_label = period_map[k]
-            item = {"label": p_label, "key": k}
-            for cat in sorted_cats:
-                item[cat] = matrix.get((k, cat), 0 if mode != "ccc_rate" else 0.0)
-            data_by_month.append(item)
-
-        return {
-            "month_labels": month_labels,
-            "top_categories": sorted_cats,
-            "data_by_month": data_by_month,
-            "data_by_category": data_by_category,
-        }
-
-    def build_multi_month_ccc_topics(self, granularity="month"):
-        return self._build_time_series_by_category(
-            self.summaries, mode="ccc", granularity=granularity
-        )
-
-    def build_multi_month_all_topics(self, granularity="month"):
-        return self._build_time_series_by_category(
-            self.summaries, mode="total", granularity=granularity
-        )
-
-    def build_multi_month_ccc_rate(self, granularity="month"):
-        return self._build_time_series_by_category(
-            self.summaries, mode="ccc_rate", granularity=granularity
-        )
-
-    def build_topic_outcomes(self, granularity="month"):
+    # ------------------------------------------------------------------
+    # Khung dùng chung cho các biểu đồ có trục thời gian
+    # ------------------------------------------------------------------
+    def _outcome_rows(self, granularity):
         """
-        Chủ đề x nhóm xử lý theo từng kỳ.
+        Số phiên theo từng nhóm xử lý, cho mỗi kỳ trong cửa sổ chuỗi thời gian.
 
-        Trước đây hàm này bỏ qua ``self.summaries`` và tự truy vấn lại toàn
-        bảng với cửa sổ cứng "5 tháng gần nhất tính từ now()", nên người dùng
-        lọc kỳ nào cũng thấy đúng 5 tháng đó. Giờ dùng chung queryset đã lọc
-        và lấy danh sách kỳ từ chính dữ liệu.
+        Ba biểu đồ — chuỗi thời gian, so sánh kỳ, kết quả xử lý theo kỳ — cần
+        đúng một phép đếm này và chỉ khác cách trình bày. Nhớ lại kết quả để
+        một request dựng cả ba section chỉ chạy một truy vấn thay vì ba.
+
+        Trả về danh sách ``(base, row)``. ``base`` giữ phần chung khóa/nhãn/có
+        đang nằm trong bộ lọc không; ``row`` rỗng ở kỳ không có phiên nào — kỳ
+        trống vẫn phải hiện thành cột 0, nếu không người đọc tưởng trục thiếu
+        kỳ (bấm "Năm" mà năm chưa có dữ liệu thì biến mất khỏi biểu đồ).
         """
         granularity = normalize_granularity(granularity)
-        trunc_fn = period_trunc(granularity)
 
-        rows = list(
-            self.summaries.filter(
-                started_at__isnull=False,
-                outcome_type__in=TOPIC_OUTCOMES,
+        if granularity in self._outcome_rows_cache:
+            return self._outcome_rows_cache[granularity]
+
+        by_key = {
+            period_key(granularity, row["period"]): row
+            for row in (
+                self.series_summaries.filter(started_at__isnull=False)
+                .annotate(period=period_trunc(granularity))
+                .values("period")
+                .annotate(total=Count("id"), **outcome_counts())
             )
-            .annotate(period=trunc_fn)
-            .values("period", "dashboard_category", "outcome_type")
-            .annotate(cnt=Count("id"))
-            .order_by("period")
-        )
-
-        def label(cat):
-            return cat or UNCATEGORIZED_LABEL
-
-        period_map = {}
-        cat_totals = {}
-        period_outcome_map = {}
-
-        for r in rows:
-            p = r["period"]
-            if not p:
-                continue
-
-            p_key = period_key(granularity, p)
-            period_map[p_key] = period_label(granularity, p)
-
-            cat_name = label(r["dashboard_category"])
-            cnt = r["cnt"] or 0
-
-            cat_totals[cat_name] = cat_totals.get(cat_name, 0) + cnt
-            period_outcome_map[(p_key, cat_name, r["outcome_type"])] = cnt
-
-        sorted_cats = [
-            cat for cat, _ in sorted(cat_totals.items(), key=lambda x: x[1], reverse=True)
-        ][:5]
-
-        if not sorted_cats:
-            sorted_cats = [UNCATEGORIZED_LABEL]
-
-        periods_sorted = sorted(period_map.keys())
-
-        data = []
-        for p_key in periods_sorted:
-            item = {"label": period_map[p_key], "key": p_key}
-            for cat in sorted_cats:
-                item[f"{cat} - Bot"] = period_outcome_map.get(
-                    (p_key, cat, OUTCOME_BOT_DONE), 0
-                )
-                item[f"{cat} - CCC"] = period_outcome_map.get(
-                    (p_key, cat, OUTCOME_CCC), 0
-                )
-            data.append(item)
-
-        return {
-            "month_labels": [period_map[k] for k in periods_sorted],
-            "top_categories": sorted_cats,
-            "data": data,
-        }
-
-    def build_topics_section(self, granularity="month"):
-        rows = list(
-            self.summaries.values("dashboard_category").annotate(
-                all_total=Count("id"),
-                topic_total=Count("id", filter=Q(outcome_type__in=TOPIC_OUTCOMES)),
-                ccc=Count("id", filter=Q(outcome_type=OUTCOME_CCC)),
-                bot_done=Count("id", filter=Q(outcome_type=OUTCOME_BOT_DONE)),
-            )
-        )
-
-        def label(row):
-            return row["dashboard_category"] or UNCATEGORIZED_LABEL
-
-        topic_bar = [
-            {"name": label(row), "value": row["topic_total"]}
-            for row in sorted(rows, key=lambda item: item["topic_total"], reverse=True)
-            if row["topic_total"]
-        ]
-
-        ccc_multi_month_topics = self.build_multi_month_ccc_topics(granularity=granularity)
-        topic_stacked_outcomes = self.build_topic_outcomes(granularity=granularity)
-        all_topic_multi_month = self.build_multi_month_all_topics(granularity=granularity)
-        category_ccc_rate_multi_month = self.build_multi_month_ccc_rate(granularity=granularity)
-
-        return {
-            "charts": {
-                "topic_bar": topic_bar,
-                "ccc_multi_month_topics": ccc_multi_month_topics,
-                "topic_stacked_outcomes": topic_stacked_outcomes,
-                "all_topic_multi_month": all_topic_multi_month,
-                "category_ccc_rate_multi_month": category_ccc_rate_multi_month,
-            }
-        }
-
-    @staticmethod
-    def _period_rows(summaries, granularity):
-        """Đếm phiên theo kỳ trên đúng queryset đã lọc."""
-        granularity = normalize_granularity(granularity)
-
-        rows = (
-            summaries.filter(started_at__isnull=False)
-            .annotate(period=period_trunc(granularity))
-            .values("period")
-            .annotate(count=Count("id"))
-            .order_by("period")
-        )
-        return [
-            {
-                "key": period_key(granularity, row["period"]),
-                "label": period_label(granularity, row["period"]),
-                "count": row["count"],
-            }
-            for row in rows
             if row["period"]
-        ]
-
-    @classmethod
-    def _monthly_rows(cls, summaries):
-        return [
-            {
-                "month": row["key"],
-                "month_key": row["key"],
-                "month_label": row["label"],
-                "count": row["count"],
-            }
-            for row in cls._period_rows(summaries, "month")
-        ]
-
-    @classmethod
-    def _daily_rows(cls, summaries):
-        return cls._period_rows(summaries, "day")
-
-    def _time_series_rows(self, granularity):
-        """
-        Chuỗi thời gian chính của dashboard.
-
-        Nhánh ``month`` trước đây bỏ qua ``self.summaries`` và tự dựng lại
-        queryset với cửa sổ cứng 5 tháng gần nhất, khiến mọi bộ lọc bị vô
-        hiệu ở mốc tháng. Giờ chạy trên ``series_summaries`` — bằng đúng bộ
-        lọc, chỉ nới ra kỳ cha khi bộ lọc gói gọn trong một kỳ.
-        """
-        granularity = normalize_granularity(granularity)
-        trunc_fn = period_trunc(granularity)
-
-        rows = (
-            self.series_summaries.filter(started_at__isnull=False)
-            .annotate(period=trunc_fn)
-            .values("period")
-            .annotate(
-                total=Count("id"),
-                bot_done=Count("id", filter=Q(outcome_type=OUTCOME_BOT_DONE)),
-                ccc=Count("id", filter=Q(outcome_type=OUTCOME_CCC)),
-                pending=Count("id", filter=Q(outcome_type=OUTCOME_PENDING)),
-                spam=Count("id", filter=Q(outcome_type=OUTCOME_SPAM)),
-            )
-            .order_by("period")
-        )
-        result = []
-
-        for row in rows:
-            period = row["period"]
-            if not period:
-                continue
-
-            result.append(
-                {
-                    "date": period_key(granularity, period),
-                    "label": period_label(granularity, period),
-                    # Kỳ nằm trong bộ lọc; các kỳ còn lại chỉ là nền so sánh.
-                    "is_current": self._is_in_focus(granularity, period),
-                    "total": row["total"],
-                    "bot_done": row["bot_done"],
-                    "ccc": row["ccc"],
-                    "pending": row["pending"],
-                    "spam": row["spam"],
-                    "bot_done_rate": self.rate(
-                        row["bot_done"], row["total"], digits=1
-                    ),
-                }
-            )
-
-        return granularity, result
-
-    def build_traffic_section(self, granularity="day"):
-        granularity, time_series = self._time_series_rows(granularity)
-
-        if granularity == "day":
-            daily = [
-                {"key": row["date"], "label": row["label"], "count": row["total"]}
-                for row in time_series
-            ]
-            monthly = self._monthly_rows(self.summaries)
-        elif granularity == "month":
-            monthly = [
-                {
-                    "month": row["date"],
-                    "month_key": row["date"],
-                    "month_label": row["label"],
-                    "count": row["total"],
-                }
-                for row in time_series
-            ]
-            daily = self._daily_rows(self.summaries)
-        else:
-            monthly = self._monthly_rows(self.summaries)
-            daily = self._daily_rows(self.summaries)
-
-        channel_rows = (
-            self.summaries.values("channel")
-            .annotate(value=Count("id"))
-            .order_by("-value")
-        )
-        channel_distribution = [
-            {
-                "name": row["channel"].upper() if row["channel"] else "Khác",
-                "value": row["value"],
-            }
-            for row in channel_rows
-        ]
-
-        return {
-            "charts": {
-                "monthly_chatbot_tickets": monthly,
-                "daily_chatbot_tickets": daily,
-                "channel_distribution": channel_distribution,
-                "time_series_outcomes": time_series,
-            }
         }
 
-    def _customer_linkage(self):
-        values = self.summaries.aggregate(
-            total=Count("id"),
-            linked=Count(
-                "id",
-                filter=(
-                    Q(ticket__account_link_status="LINKED")
-                    | Q(contact_info__isnull=False, contact_info__gt="")
-                ),
-                distinct=True,
-            ),
-        )
-        total = values["total"] or 0
-        linked = min(total, values["linked"] or 0)
-        unlinked = max(0, total - linked)
-        return {
-            "total": total,
-            "linked": linked,
-            "unlinked": unlinked,
-            "linked_rate": self.rate(linked, total, digits=1),
-            "items": [
-                {"name": "Đã định danh KH", "value": linked, "color": "#0ea5e9"},
-                {"name": "Chưa khớp thông tin", "value": unlinked, "color": "#94a3b8"},
-            ],
-        }
+        window_lo, window_hi = series_bounds(granularity, *self.focus_bounds)
+        rows = []
 
-    def _category_ccc_rate(self):
-        rows = list(
-            self.summaries.values("dashboard_category").annotate(
-                total=Count("id"),
-                ccc=Count("id", filter=Q(outcome_type=OUTCOME_CCC)),
+        for period in iter_periods(granularity, window_lo, window_hi):
+            key = period_key(granularity, period)
+            rows.append(
+                (
+                    {
+                        "key": key,
+                        "label": period_label(granularity, period),
+                        # Kỳ nằm trong bộ lọc; kỳ còn lại chỉ là nền so sánh.
+                        "is_current": self._is_in_focus(granularity, period),
+                    },
+                    by_key.get(key) or {},
+                )
             )
-        )
-        res = []
-        for r in rows:
-            cat = r["dashboard_category"] or UNCATEGORIZED_LABEL
-            tot = r["total"] or 0
-            ccc = r["ccc"] or 0
-            rate = self.rate(ccc, tot, digits=1)
-            if tot > 0:
-                res.append({"name": cat, "total": tot, "ccc": ccc, "rate": rate})
-        return sorted(res, key=lambda x: x["rate"], reverse=True)
 
-    def _chat_funnel(self):
-        agg = self.summaries.aggregate(
-            s1=Count("id"),
-            s2=Count("id", filter=Q(outcome_type__in=[OUTCOME_CCC, OUTCOME_PENDING])),
-            s3=Count("id", filter=Q(has_cskh_state=True)),
-            s4=Count("id", filter=Q(has_cskh_request=True)),
-            s5=Count("id", filter=Q(ticket__isnull=False)),
-            s6=Count(
-                "id",
-                filter=Q(
-                    ticket__current_status__status_code__in=[
-                        TicketStatusCode.DONE_WAIT_CLOSE,
-                        TicketStatusCode.CLOSED,
-                    ]
-                ),
-            ),
-        )
-        steps = [
-            {"step": 1, "name": "1. Tổng Session", "count": agg["s1"] or 0},
-            {"step": 2, "name": "2. BOT không xử lý được", "count": agg["s2"] or 0},
-            {"step": 3, "name": "3. Hỏi xin thông tin KH", "count": agg["s3"] or 0},
-            {"step": 4, "name": "4. KH đã cung cấp thông tin", "count": agg["s4"] or 0},
-            {"step": 5, "name": "5. Tạo Ticket thành công", "count": agg["s5"] or 0},
-            {"step": 6, "name": "6. CCC đã xử lý xong", "count": agg["s6"] or 0},
-        ]
-        return steps
-
-    def _hourly_peak(self):
-        rows = (
-            self.summaries.filter(started_at__isnull=False)
-            .annotate(hour=ExtractHour("started_at"))
-            .values("hour")
-            .annotate(count=Count("id"))
-            .order_by("hour")
-        )
-        hour_map = {r["hour"]: r["count"] for r in rows if r["hour"] is not None}
-        return [
-            {"hour": h, "label": f"{h:02d}:00", "count": hour_map.get(h, 0)}
-            for h in range(24)
-        ]
-
-    def _top_reasons(self):
-        rows = (
-            self.summaries.exclude(reason__isnull=True)
-            .exclude(reason__exact="")
-            .values("reason")
-            .annotate(count=Count("id"))
-            .order_by("-count")[:6]
-        )
-        return [{"name": r["reason"], "value": r["count"]} for r in rows]
-
-    def _channel_performance(self):
-        rows = (
-            self.summaries.values("channel")
-            .annotate(
-                total=Count("id"),
-                bot_done=Count("id", filter=Q(outcome_type=OUTCOME_BOT_DONE)),
-                ccc=Count("id", filter=Q(outcome_type=OUTCOME_CCC)),
-            )
-            .order_by("-total")
-        )
-        res = []
-        for r in rows:
-            ch = (r["channel"] or "KHÁC").upper()
-            tot = r["total"] or 0
-            bot = r["bot_done"] or 0
-            ccc = r["ccc"] or 0
-            res.append(
-                {
-                    "name": ch,
-                    "total": tot,
-                    "bot_done": bot,
-                    "ccc": ccc,
-                    "bot_done_rate": self.rate(bot, tot, digits=1),
-                    "ccc_rate": self.rate(ccc, tot, digits=1),
-                }
-            )
-        return res
-
-    def build_multi_period_reasons(self, granularity="month"):
-        granularity = normalize_granularity(granularity)
-        trunc_fn = period_trunc(granularity)
-
-        qs = self.summaries.filter(started_at__isnull=False).exclude(reason__isnull=True).exclude(reason__exact="")
-        rows = list(
-            qs.annotate(period=trunc_fn)
-            .values("period", "reason")
-            .annotate(cnt=Count("id"))
-            .order_by("period")
-        )
-
-        period_map = {}
-        reason_totals = {}
-        matrix = {}
-
-        for r in rows:
-            p = r["period"]
-            if not p:
-                continue
-            p_key = period_key(granularity, p)
-            p_label = period_label(granularity, p)
-
-            period_map[p_key] = p_label
-            r_name = r["reason"]
-            cnt = r["cnt"] or 0
-
-            reason_totals[r_name] = reason_totals.get(r_name, 0) + cnt
-            matrix[(p_key, r_name)] = cnt
-
-        sorted_reasons = [
-            r for r, _ in sorted(reason_totals.items(), key=lambda x: x[1], reverse=True)
-        ][:6]
-
-        if not sorted_reasons:
-            sorted_reasons = ["Chưa có dữ liệu"]
-
-        periods_sorted = sorted(period_map.keys())
-        month_labels = [period_map[k] for k in periods_sorted]
-
-        data_by_category = []
-        for r_name in sorted_reasons:
-            item = {"label": r_name, "category": r_name}
-            for k in periods_sorted:
-                p_label = period_map[k]
-                item[p_label] = matrix.get((k, r_name), 0)
-            data_by_category.append(item)
-
-        return {
-            "month_labels": month_labels,
-            "top_categories": sorted_reasons,
-            "data_by_category": data_by_category,
-        }
-
-    def build_multi_period_channels(self, granularity="month"):
-        granularity = normalize_granularity(granularity)
-        trunc_fn = period_trunc(granularity)
-
-        qs = self.summaries.filter(started_at__isnull=False)
-        rows = list(
-            qs.annotate(period=trunc_fn)
-            .values("period", "channel")
-            .annotate(
-                total=Count("id"),
-                bot_done=Count("id", filter=Q(outcome_type=OUTCOME_BOT_DONE)),
-                ccc=Count("id", filter=Q(outcome_type=OUTCOME_CCC)),
-            )
-            .order_by("period")
-        )
-
-        period_map = {}
-        channel_totals = {}
-        matrix = {}
-
-        for r in rows:
-            p = r["period"]
-            if not p:
-                continue
-            p_key = period_key(granularity, p)
-            p_label = period_label(granularity, p)
-
-            period_map[p_key] = p_label
-            ch = (r["channel"] or "KHÁC").upper()
-            cnt = r["total"] or 0
-
-            channel_totals[ch] = channel_totals.get(ch, 0) + cnt
-            matrix[(p_key, ch)] = cnt
-
-        sorted_channels = [
-            ch for ch, _ in sorted(channel_totals.items(), key=lambda x: x[1], reverse=True)
-        ][:6]
-
-        if not sorted_channels:
-            sorted_channels = ["WEB PORTAL", "MOBILE APP", "ZALO OA", "FACEBOOK"]
-
-        periods_sorted = sorted(period_map.keys())
-        month_labels = [period_map[k] for k in periods_sorted]
-
-        data_by_category = []
-        for ch in sorted_channels:
-            item = {"label": ch, "category": ch}
-            for k in periods_sorted:
-                p_label = period_map[k]
-                item[p_label] = matrix.get((k, ch), 0)
-            data_by_category.append(item)
-
-        return {
-            "month_labels": month_labels,
-            "top_categories": sorted_channels,
-            "data_by_category": data_by_category,
-        }
-
-    def build_operations_section(self, granularity="month"):
-        status_counts = self.summaries.filter(
-            outcome_type=OUTCOME_CCC, ticket__isnull=False
-        ).values("ticket__current_status__status_name").annotate(value=Count("id"))
-
-        status_rows = list(status_counts)
-        status_distribution = [
-            {
-                "name": row["ticket__current_status__status_name"] or "Chưa phân loại",
-                "value": row["value"],
-            }
-            for row in status_rows
-        ]
-        return {
-            "charts": {
-                "ticket_status_distribution": status_distribution,
-                "customer_linkage": self._customer_linkage(),
-                "category_ccc_rate": self._category_ccc_rate(),
-                "chat_funnel": self._chat_funnel(),
-                "hourly_peak": self._hourly_peak(),
-                "top_reasons": self._top_reasons(),
-                "top_reasons_multi_period": self.build_multi_period_reasons(granularity),
-                "channel_performance": self._channel_performance(),
-                "channel_performance_multi_period": self.build_multi_period_channels(granularity),
-            }
-        }
+        self._outcome_rows_cache[granularity] = rows
+        return rows
 
     def _is_in_focus(self, granularity, period):
         """Kỳ này có nằm trong khoảng người dùng đang lọc không."""
@@ -749,87 +150,505 @@ class ChatbotDashboardAggregator:
 
         return True
 
-    def build_comparison_section(self, granularity="month"):
+    def _period_matrix(
+        self,
+        granularity,
+        queryset,
+        dimension,
+        *,
+        label_of,
+        fallback,
+        value_field="total",
+        limit=6,
+    ):
         """
-        Biểu đồ so sánh kỳ: các kỳ ngang hàng đặt cạnh nhau.
+        Khung chung cho nhóm biểu đồ "top N nhóm qua từng kỳ".
 
-        Mốc do ``comparison_granularity`` quyết định từ chính khoảng đang lọc:
-        lọc trùng khít một kỳ lịch thì so theo kỳ đó (trọn năm so các năm,
-        trọn quý so các quý, một ngày so các ngày trong tuần), lọc lệch ranh
-        giới thì lùi về mốc thô hơn mốc chính một bậc.
+        Ba biểu đồ (chủ đề, chủ đề chuyển CCC, lý do, kênh) chỉ khác nhau ở cột
+        gom nhóm và cách đặt tên nhóm, nên dùng chung một hàm thay vì chép lại
+        vòng dựng ma trận ở mỗi chỗ.
 
-        Nguồn dữ liệu là ``comparison_summaries`` — khoảng đã nới ra trọn kỳ
-        cha, vì nếu chỉ lấy đúng bộ lọc thì lọc một ngày sẽ ra đúng một cột,
-        không so được với gì.
+        Cộng dồn khi nhiều giá trị thô rơi vào cùng một nhãn — NULL và "" đều
+        ra "Chưa phân loại", "zalo" và "Zalo" đều ra "ZALO". Bản cũ gán đè nên
+        chỉ giữ lại dòng cuối và làm mất phiên của các dòng trước.
         """
-        focus_start, focus_end = self.focus_bounds
-
-        # comparison_bounds() tự quy mốc chính -> mốc so sánh, nên phải giữ
-        # nguyên mốc CHÍNH khi gọi nó. Truyền mốc đã quy vào sẽ bị quy lần
-        # thứ hai và nới cửa sổ rộng gấp bội (lọc 15 ngày ra 52 cột tuần).
-        window_lo, window_hi = comparison_bounds(
-            granularity, start=focus_start, end=focus_end
-        )
-        granularity = comparison_granularity(
-            granularity, start=focus_start, end=focus_end
-        )
+        granularity = normalize_granularity(granularity)
 
         rows = (
-            self.comparison_summaries.filter(started_at__isnull=False)
+            queryset.filter(started_at__isnull=False)
             .annotate(period=period_trunc(granularity))
-            .values("period")
+            .values("period", dimension)
             .annotate(
                 total=Count("id"),
-                bot_done=Count("id", filter=Q(outcome_type=OUTCOME_BOT_DONE)),
                 ccc=Count("id", filter=Q(outcome_type=OUTCOME_CCC)),
-                pending=Count("id", filter=Q(outcome_type=OUTCOME_PENDING)),
-                spam=Count("id", filter=Q(outcome_type=OUTCOME_SPAM)),
             )
             .order_by("period")
         )
 
-        by_key = {
-            period_key(granularity, row["period"]): row
-            for row in rows
-            if row["period"]
+        period_labels = {}
+        group_totals = {}
+        matrix = {}
+
+        for row in rows:
+            if not row["period"]:
+                continue
+
+            key = period_key(granularity, row["period"])
+            period_labels[key] = period_label(granularity, row["period"])
+
+            name = label_of(row[dimension])
+            group_totals[name] = group_totals.get(name, 0) + (row["total"] or 0)
+            matrix[(key, name)] = matrix.get((key, name), 0) + (row[value_field] or 0)
+
+        top_groups = [
+            name
+            for name, _total in sorted(
+                group_totals.items(), key=lambda item: item[1], reverse=True
+            )
+        ][:limit] or list(fallback)
+
+        keys = sorted(period_labels)
+
+        return {
+            "month_labels": [period_labels[key] for key in keys],
+            "top_categories": top_groups,
+            "data_by_category": [
+                {
+                    "label": name,
+                    "category": name,
+                    **{
+                        period_labels[key]: matrix.get((key, name), 0)
+                        for key in keys
+                    },
+                }
+                for name in top_groups
+            ],
         }
 
-        # Trục phải đủ kỳ kể cả kỳ không có phiên nào: tuần luôn 7 ngày, năm
-        # luôn 4 quý. Thiếu cột 0 thì người đọc tưởng tuần chỉ có 5 ngày.
+    # ------------------------------------------------------------------
+    # Section: summary
+    # ------------------------------------------------------------------
+    def build_summary_section(self, granularity="month"):
+        data = self.summaries.aggregate(
+            total_messages=Sum("msg_count_total"),
+            total_sessions=Count("id"),
+            **{
+                f"{field}_messages": Sum(f"msg_count_{field}")
+                for _code, field, _label in OUTCOME_SERIES
+            },
+            **{
+                f"{field}_sessions": Count("id", filter=Q(outcome_type=code))
+                for code, field, _label in OUTCOME_SERIES
+            },
+        )
+
+        total_messages = data["total_messages"] or 0
+        total_sessions = data["total_sessions"] or 0
+
+        buckets = {}
+
+        for code, field, label in OUTCOME_SERIES:
+            session_count = data[f"{field}_sessions"] or 0
+            buckets[field] = {
+                "code": code,
+                "label": label,
+                "value": data[f"{field}_messages"] or 0,
+                "session_count": session_count,
+                "rate": self.rate(session_count, total_sessions),
+            }
+
+        return {
+            "summary": {
+                "total_received": {
+                    "code": "ALL",
+                    "label": "Tổng tiếp nhận",
+                    "value": total_messages,
+                    "session_count": total_sessions,
+                    "rate": 100.0 if total_messages else 0.0,
+                },
+                **buckets,
+            },
+            "charts": {
+                "outcome_by_period": self.build_outcome_by_period(granularity),
+            },
+        }
+
+    def build_outcome_by_period(self, granularity="month"):
+        """
+        Kết quả xử lý phiên chia theo kỳ.
+
+        Thay cho biểu đồ tròn: tròn chỉ nói được tỷ trọng của cả kỳ gộp, không
+        cho thấy nhóm nào đang tăng hay giảm qua từng tháng/quý/năm.
+        """
+        return {
+            "series": [label for _code, _field, label in OUTCOME_SERIES],
+            "data": [
+                {
+                    **base,
+                    **{
+                        label: row.get(field) or 0
+                        for _code, field, label in OUTCOME_SERIES
+                    },
+                }
+                for base, row in self._outcome_rows(granularity)
+            ],
+        }
+
+    # ------------------------------------------------------------------
+    # Section: topics
+    # ------------------------------------------------------------------
+    def build_multi_month_all_topics(self, granularity="month"):
+        return self._period_matrix(
+            granularity,
+            self.summaries,
+            "dashboard_category",
+            label_of=category_label,
+            fallback=(UNCATEGORIZED_LABEL,),
+        )
+
+    def build_multi_month_ccc_topics(self, granularity="month"):
+        return self._period_matrix(
+            granularity,
+            self.summaries,
+            "dashboard_category",
+            label_of=category_label,
+            fallback=(UNCATEGORIZED_LABEL,),
+            value_field="ccc",
+        )
+
+    def build_topics_section(self, granularity="month"):
+        totals = {}
+
+        for row in self.summaries.values("dashboard_category").annotate(
+            topic_total=Count("id", filter=Q(outcome_type__in=TOPIC_OUTCOMES)),
+        ):
+            name = category_label(row["dashboard_category"])
+            totals[name] = totals.get(name, 0) + (row["topic_total"] or 0)
+
+        topic_bar = [
+            {"name": name, "value": value}
+            for name, value in sorted(
+                totals.items(), key=lambda item: item[1], reverse=True
+            )
+            if value
+        ]
+
+        return {
+            "charts": {
+                "topic_bar": topic_bar,
+                "ccc_multi_month_topics": self.build_multi_month_ccc_topics(
+                    granularity
+                ),
+                "all_topic_multi_month": self.build_multi_month_all_topics(
+                    granularity
+                ),
+            }
+        }
+
+    # ------------------------------------------------------------------
+    # Section: traffic
+    # ------------------------------------------------------------------
+    def _time_series_rows(self, granularity):
+        """
+        Chuỗi thời gian chính của dashboard.
+
+        Nhánh ``month`` trước đây bỏ qua ``self.summaries`` và tự dựng lại
+        queryset với cửa sổ cứng 5 tháng gần nhất, khiến mọi bộ lọc bị vô hiệu
+        ở mốc tháng. Giờ chạy trên cùng khung với biểu đồ so sánh.
+        """
+        rows = []
+
+        for base, row in self._outcome_rows(granularity):
+            total = row.get("total") or 0
+            rows.append(
+                {
+                    "date": base["key"],
+                    "label": base["label"],
+                    "is_current": base["is_current"],
+                    "total": total,
+                    **_outcome_values(row),
+                    "bot_done_rate": self.rate(
+                        row.get("bot_done") or 0, total, digits=1
+                    ),
+                }
+            )
+
+        return rows
+
+    def build_traffic_section(self, granularity="day"):
+        channels = {}
+
+        for row in self.summaries.values("channel").annotate(value=Count("id")):
+            name = channel_label(row["channel"])
+            channels[name] = channels.get(name, 0) + (row["value"] or 0)
+
+        return {
+            "charts": {
+                "channel_distribution": [
+                    {"name": name, "value": value}
+                    for name, value in sorted(
+                        channels.items(), key=lambda item: item[1], reverse=True
+                    )
+                ],
+                "time_series_outcomes": self._time_series_rows(granularity),
+            }
+        }
+
+    # ------------------------------------------------------------------
+    # Section: operations
+    # ------------------------------------------------------------------
+    def _category_ccc_rate(self):
+        merged = {}
+
+        for row in self.summaries.values("dashboard_category").annotate(
+            total=Count("id"),
+            ccc=Count("id", filter=Q(outcome_type=OUTCOME_CCC)),
+        ):
+            name = category_label(row["dashboard_category"])
+            item = merged.setdefault(name, {"name": name, "total": 0, "ccc": 0})
+            item["total"] += row["total"] or 0
+            item["ccc"] += row["ccc"] or 0
+
+        return sorted(
+            (
+                {**item, "rate": self.rate(item["ccc"], item["total"], digits=1)}
+                for item in merged.values()
+                if item["total"]
+            ),
+            key=lambda item: item["rate"],
+            reverse=True,
+        )
+
+    def _chat_funnel(self):
+        agg = self.summaries.aggregate(
+            s1=Count("id"),
+            s2=Count("id", filter=Q(outcome_type__in=[OUTCOME_CCC, OUTCOME_PENDING])),
+            s3=Count("id", filter=Q(has_cskh_state=True)),
+            s4=Count("id", filter=Q(has_cskh_request=True)),
+            s5=Count("id", filter=Q(ticket__isnull=False)),
+            s6=Count(
+                "id",
+                filter=Q(
+                    ticket__current_status__status_code__in=[
+                        TicketStatusCode.DONE_WAIT_CLOSE,
+                        TicketStatusCode.CLOSED,
+                    ]
+                ),
+            ),
+        )
+
+        names = (
+            "1. Tổng Session",
+            "2. BOT không xử lý được",
+            "3. Hỏi xin thông tin KH",
+            "4. KH đã cung cấp thông tin",
+            "5. Tạo Ticket thành công",
+            "6. CCC đã xử lý xong",
+        )
+
+        return [
+            {"step": step, "name": name, "count": agg[f"s{step}"] or 0}
+            for step, name in enumerate(names, start=1)
+        ]
+
+    # Không có tzinfo thì ExtractHour tách giờ theo settings.TIME_ZONE (UTC),
+    # làm biểu đồ khung giờ lệch 7 tiếng so với giờ Việt Nam.
+    _LOCAL_HOUR = ExtractHour("started_at", tzinfo=DASHBOARD_TIMEZONE)
+
+    def _hourly_peak(self):
+        rows = (
+            self.summaries.filter(started_at__isnull=False)
+            .annotate(hour=self._LOCAL_HOUR)
+            .values("hour")
+            .annotate(count=Count("id"))
+        )
+        hour_map = {row["hour"]: row["count"] for row in rows if row["hour"] is not None}
+
+        return [
+            {"hour": hour, "label": f"{hour:02d}:00", "count": hour_map.get(hour, 0)}
+            for hour in range(24)
+        ]
+
+    def build_hourly_peak_by_period(self, granularity="month"):
+        """
+        Khung giờ trong ngày, tách thành một đường cho mỗi kỳ.
+
+        Biểu đồ cột gộp cả kỳ chỉ nói được giờ cao điểm chung; tách theo kỳ mới
+        thấy giờ cao điểm dịch chuyển ra sao giữa các tháng/quý/năm.
+
+        Trục hoành luôn đủ 24 giờ kể cả giờ không có phiên nào — khung giờ là
+        trục cố định, thiếu điểm thì đường bị nối tắt qua và đọc sai cao điểm.
+        """
+        granularity = normalize_granularity(granularity)
+
+        rows = (
+            self.summaries.filter(started_at__isnull=False)
+            .annotate(period=period_trunc(granularity), hour=self._LOCAL_HOUR)
+            .values("period", "hour")
+            .annotate(count=Count("id"))
+            .order_by("period")
+        )
+
+        period_labels = {}
+        matrix = {}
+
+        for row in rows:
+            if not row["period"] or row["hour"] is None:
+                continue
+
+            key = period_key(granularity, row["period"])
+            period_labels[key] = period_label(granularity, row["period"])
+            matrix[(row["hour"], key)] = (
+                matrix.get((row["hour"], key), 0) + (row["count"] or 0)
+            )
+
+        keys = sorted(period_labels)
+
+        return {
+            "period_labels": [period_labels[key] for key in keys],
+            "data": [
+                {
+                    "hour": hour,
+                    "label": f"{hour:02d}:00",
+                    **{
+                        period_labels[key]: matrix.get((hour, key), 0)
+                        for key in keys
+                    },
+                }
+                for hour in range(24)
+            ],
+        }
+
+    def _top_reasons(self, limit=6):
+        rows = (
+            self._with_reason()
+            .values("reason")
+            .annotate(count=Count("id"))
+            .order_by("-count")[:limit]
+        )
+
+        return [{"name": row["reason"], "value": row["count"]} for row in rows]
+
+    def _with_reason(self):
+        """Phiên có ghi lý do chuyển CCC."""
+        return self.summaries.exclude(reason__isnull=True).exclude(reason__exact="")
+
+    def build_multi_period_reasons(self, granularity="month"):
+        return self._period_matrix(
+            granularity,
+            self._with_reason(),
+            "reason",
+            label_of=lambda value: value,
+            fallback=("Chưa có dữ liệu",),
+        )
+
+    def _channel_performance(self):
+        merged = {}
+
+        for row in self.summaries.values("channel").annotate(
+            total=Count("id"),
+            bot_done=Count("id", filter=Q(outcome_type=OUTCOME_BOT_DONE)),
+            ccc=Count("id", filter=Q(outcome_type=OUTCOME_CCC)),
+        ):
+            name = channel_label(row["channel"])
+            item = merged.setdefault(
+                name, {"name": name, "total": 0, "bot_done": 0, "ccc": 0}
+            )
+
+            for field in ("total", "bot_done", "ccc"):
+                item[field] += row[field] or 0
+
+        return [
+            {
+                **item,
+                "bot_done_rate": self.rate(item["bot_done"], item["total"], digits=1),
+                "ccc_rate": self.rate(item["ccc"], item["total"], digits=1),
+            }
+            for item in sorted(
+                merged.values(), key=lambda item: item["total"], reverse=True
+            )
+        ]
+
+    def build_multi_period_channels(self, granularity="month"):
+        return self._period_matrix(
+            granularity,
+            self.summaries,
+            "channel",
+            label_of=channel_label,
+            fallback=("WEB PORTAL", "MOBILE APP", "ZALO OA", "FACEBOOK"),
+        )
+
+    def build_operations_section(self, granularity="month"):
+        status_distribution = [
+            {
+                "name": row["ticket__current_status__status_name"] or "Chưa phân loại",
+                "value": row["value"],
+            }
+            for row in self.summaries.filter(
+                outcome_type=OUTCOME_CCC, ticket__isnull=False
+            )
+            .values("ticket__current_status__status_name")
+            .annotate(value=Count("id"))
+        ]
+
+        return {
+            "charts": {
+                "ticket_status_distribution": status_distribution,
+                "category_ccc_rate": self._category_ccc_rate(),
+                "chat_funnel": self._chat_funnel(),
+                "hourly_peak": self._hourly_peak(),
+                "hourly_peak_multi_period": self.build_hourly_peak_by_period(
+                    granularity
+                ),
+                "top_reasons": self._top_reasons(),
+                "top_reasons_multi_period": self.build_multi_period_reasons(granularity),
+                "channel_performance": self._channel_performance(),
+                "channel_performance_multi_period": self.build_multi_period_channels(
+                    granularity
+                ),
+            }
+        }
+
+    # ------------------------------------------------------------------
+    # Section: comparison
+    # ------------------------------------------------------------------
+    def build_comparison_section(self, granularity="month"):
+        """
+        Biểu đồ so sánh kỳ: các kỳ ngang hàng đặt cạnh nhau kèm % tăng giảm.
+
+        Mốc so sánh đúng bằng mốc đang chọn — bấm Tháng thì so tháng với tháng,
+        bấm Quý thì so quý với quý, bấm Năm thì so năm với năm. Dùng chung
+        ``_outcome_rows`` với biểu đồ chuỗi thời gian nên hai biểu đồ luôn nói
+        về cùng một tập kỳ, chỉ khác cách trình bày.
+        """
+        granularity = normalize_granularity(granularity)
+
         items = []
         previous = None
 
-        for period in iter_periods(granularity, window_lo, window_hi):
-            row = by_key.get(period_key(granularity, period)) or {}
-
+        for base, row in self._outcome_rows(granularity):
             total = row.get("total") or 0
             prev_total = previous["total"] if previous else None
 
-            item = {
-                "key": period_key(granularity, period),
-                "label": period_label(granularity, period),
-                # Cột ứng với khoảng đang lọc, để frontend tô nổi bật.
-                "is_current": self._is_in_focus(granularity, period),
-                "total": total,
-                "bot_done": row.get("bot_done") or 0,
-                "ccc": row.get("ccc") or 0,
-                "pending": row.get("pending") or 0,
-                "spam": row.get("spam") or 0,
-                "ccc_rate": self.rate(row.get("ccc") or 0, total, digits=1),
-                "prev_label": previous["label"] if previous else None,
-                "prev_total": prev_total,
-                # Kỳ đầu tiên không có gì để so nên để None, không phải 0:
-                # frontend cần phân biệt "không so được" với "không đổi".
-                "delta": None if prev_total is None else total - prev_total,
-                "growth_percent": (
-                    self.rate(total - prev_total, prev_total, digits=1)
-                    if prev_total
-                    else None
-                ),
-            }
-
-            items.append(item)
-            previous = {"label": item["label"], "total": total}
+            items.append(
+                {
+                    **base,
+                    "total": total,
+                    **_outcome_values(row),
+                    "ccc_rate": self.rate(row.get("ccc") or 0, total, digits=1),
+                    "prev_label": previous["label"] if previous else None,
+                    "prev_total": prev_total,
+                    # Kỳ đầu tiên không có gì để so nên để None, không phải 0:
+                    # frontend cần phân biệt "không so được" với "không đổi".
+                    "delta": None if prev_total is None else total - prev_total,
+                    "growth_percent": (
+                        self.rate(total - prev_total, prev_total, digits=1)
+                        if prev_total
+                        else None
+                    ),
+                }
+            )
+            previous = {"label": base["label"], "total": total}
 
         return {
             "charts": {
@@ -841,13 +660,11 @@ class ChatbotDashboardAggregator:
             }
         }
 
-    def build_sla_section(self):
-        return {
-            "charts": {}
-        }
-
+    # ------------------------------------------------------------------
+    # Section: quick_lists
+    # ------------------------------------------------------------------
     def _top_faqs(self, limit=5):
-        rows = (
+        return list(
             self.logs.exclude(questionType__in=SPAM_QUESTION_TYPES)
             .exclude(category__isnull=True)
             .exclude(category__exact="")
@@ -859,7 +676,11 @@ class ChatbotDashboardAggregator:
             )
             .order_by("-hit_count", "-latest_at")[:limit]
         )
-        return list(rows)
+
+    # Bảng "Vấn đề cần CCC xử lý" cuộn và phân trang ngay tại chỗ nên cần sẵn
+    # một lô, không phải đúng 5 dòng. Vẫn có trần để payload overview không
+    # phình theo hàng chờ; tổng thật luôn nằm ở pending_ticket_total.
+    PENDING_TICKET_LIMIT = 50
 
     def build_quick_lists_section(self):
         pending_queryset = self.summaries.filter(
@@ -867,28 +688,29 @@ class ChatbotDashboardAggregator:
             ticket__current_status__status_code=TicketStatusCode.CREATED,
             ticket__owner_user__isnull=True,
         )
-        pending_total = pending_queryset.count()
-        latest = pending_queryset.select_related(
-            "ticket",
-            "ticket__current_status",
-        ).only(
-            "id",
-            "session_id",
-            "dashboard_category",
-            "reason",
-            "last_question",
-            "started_at",
-            "ticket_id",
-            "ticket__ticket_code",
-            "ticket__account_link_status",
-            "ticket__current_status__status_name",
-        ).order_by("-started_at", "-id")[:5]
+        latest = (
+            pending_queryset.select_related("ticket", "ticket__current_status")
+            .only(
+                "id",
+                "session_id",
+                "dashboard_category",
+                "reason",
+                "last_question",
+                "started_at",
+                "ticket_id",
+                "ticket__ticket_code",
+                "ticket__account_link_status",
+                "ticket__current_status__status_name",
+            )
+            .order_by("-started_at", "-id")[: self.PENDING_TICKET_LIMIT]
+        )
+
         return {
             "quick_lists": {
                 "latest_ccc_tickets": ChatbotSessionQuickSerializer(
                     latest, many=True
                 ).data,
-                "pending_ticket_total": pending_total,
-                "top_faqs": self._top_faqs(limit=5),
+                "pending_ticket_total": pending_queryset.count(),
+                "top_faqs": self._top_faqs(),
             }
         }

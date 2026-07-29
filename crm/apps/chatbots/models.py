@@ -1,11 +1,12 @@
-from django.conf import settings
 from django.db import models
+
 from apps.common.models import TimeStampedModel
+
 
 class ChatbotChatLog(TimeStampedModel):
     # external_id dùng để lưu cột id (bigint) từ Supabase kéo về
     external_id = models.CharField(max_length=100, unique=True)
-    session_id = models.CharField(max_length=100, db_index=True)
+    session_id = models.CharField(max_length=100)
     user_id = models.CharField(max_length=100, null=True, blank=True)
     channel = models.CharField(max_length=50, null=True, blank=True)
 
@@ -33,7 +34,7 @@ class ChatbotChatLog(TimeStampedModel):
 class ChatbotState(TimeStampedModel):
     # external_id dùng để lưu cột id (bigint) từ Supabase
     external_id = models.CharField(max_length=100, unique=True)
-    session_id = models.CharField(max_length=100, db_index=True)
+    session_id = models.CharField(max_length=100)
     user_id = models.CharField(max_length=100, null=True, blank=True) # Trong DB của bạn cột này là NO NULL
     channel = models.CharField(max_length=50, null=True, blank=True)
 
@@ -59,7 +60,7 @@ class ChatbotState(TimeStampedModel):
 class ChatbotCskhRequest(TimeStampedModel):
     # external_id dùng để lưu cột id (bigint) từ Supabase
     external_id = models.CharField(max_length=100, unique=True)
-    session_id = models.CharField(max_length=100, db_index=True)
+    session_id = models.CharField(max_length=100)
     user_id = models.CharField(max_length=100, null=True, blank=True)
     channel = models.CharField(max_length=50, null=True, blank=True)
 
@@ -115,11 +116,7 @@ class ChatbotSessionSummary(TimeStampedModel):
     # Chủ đề của phiên, lấy từ cột category của xpro_chat_logs
     dashboard_category = models.CharField(max_length=255, null=True, blank=True)
 
-    outcome_type = models.CharField(
-        max_length=50,
-        choices=OUTCOME_CHOICES,
-        db_index=True,
-    )
+    outcome_type = models.CharField(max_length=50, choices=OUTCOME_CHOICES)
 
     # Số lượt hỏi trong phiên, tách theo cách phiên được xử lý
     msg_count_total = models.IntegerField(default=0)
@@ -155,7 +152,6 @@ class ChatbotSessionSummary(TimeStampedModel):
     class Meta:
         db_table = "chatbot_session_summaries"
         indexes = [
-            models.Index(fields=["session_id"]),
             models.Index(fields=["dashboard_category"]),
             models.Index(fields=["outcome_type"]),
             models.Index(fields=["started_at"]),
