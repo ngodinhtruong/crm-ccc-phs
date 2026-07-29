@@ -1,12 +1,18 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, Inbox } from "lucide-react";
 
+import { TablePagination } from "@/components/common/TablePagination";
 import { ticketStatusPillClass } from "@/constants/chatbot-dashboard.constant";
 import { ChatbotTicketItem } from "@/types/chatbot-dashboard.type";
 import { formatDateTime } from "@/utils/date.util";
 import { shortText } from "@/utils/text.util";
+
+const PAGE_SIZES = [5, 10, 20] as const;
+const DEFAULT_PAGE_SIZE = 10;
+const COLUMN_COUNT = 7;
 
 /**
  * Hàng chờ ticket chatbot chưa ai xử lý — hiển thị ở tab Tổng quan.
@@ -14,6 +20,15 @@ import { shortText } from "@/utils/text.util";
  * Ticket vào đây khi đang ở trạng thái "Mở" và chưa có người nhận
  * (owner_user = null). Đổi tông màu theo việc còn hay hết việc để nhìn
  * là biết ngay có cần hành động không.
+ *
+ * Cuộn trong khung cố định + phân trang tại chỗ, giống bảng "Ticket chưa xử
+ * lý" của dashboard CCC. Dùng chung ``TablePagination``; phần bảng thì không
+ * dùng lại được vì cột ở đây là Session / Chủ đề / Nội dung của phiên chat,
+ * khác hẳn bảng ticket bên kia.
+ *
+ * ``total`` là tổng thật trên toàn hàng chờ, còn ``rows`` chỉ là lô backend
+ * gửi kèm overview — nên phân trang chạy trên ``rows`` và phần chênh được nói
+ * rõ ở đầu bảng thay vì lờ đi.
  */
 export function PendingTicketsPanel({
   rows,
@@ -25,6 +40,24 @@ export function PendingTicketsPanel({
   const router = useRouter();
   const hasPending = total > 0;
 
+  const [requestedPage, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
+
+  const totalPages = rows.length === 0 ? 0 : Math.ceil(rows.length / pageSize);
+
+  // Bộ lọc đổi làm danh sách ngắn lại thì trang đang đứng có thể vượt quá số
+  // trang còn lại và bảng sẽ trống trơn. Kẹp lúc đọc thay vì đồng bộ ngược
+  // vào state trong useEffect — cách kia render thừa một lượt với bảng rỗng.
+  const page = Math.min(requestedPage, Math.max(1, totalPages));
+
+  const visibleRows = useMemo(
+    () => rows.slice((page - 1) * pageSize, page * pageSize),
+    [page, pageSize, rows]
+  );
+
+  const fromRecord = rows.length === 0 ? 0 : (page - 1) * pageSize + 1;
+  const toRecord = Math.min(page * pageSize, rows.length);
+
   return (
     <div
       className={`overflow-hidden rounded-2xl border bg-white shadow-sm ${
@@ -33,9 +66,7 @@ export function PendingTicketsPanel({
     >
       <div
         className={`flex flex-wrap items-center justify-between gap-3 border-b px-4 py-4 ${
-          hasPending
-            ? "border-rose-100 bg-rose-50"
-            : "border-slate-100 bg-white"
+          hasPending ? "border-rose-100 bg-rose-50" : "border-slate-100 bg-white"
         }`}
       >
         <div className="flex items-center gap-3">
@@ -74,50 +105,52 @@ export function PendingTicketsPanel({
 
         {total > rows.length && (
           <span className="text-xs text-slate-500">
-            Hiển thị {rows.length} mới nhất trên tổng {total}
+            Đang tải {rows.length} mới nhất trên tổng {total}
           </span>
         )}
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="max-h-[256px] overflow-auto overscroll-contain">
         <table className="w-full min-w-[720px] text-left text-xs">
-          <thead>
-            <tr className="h-10 border-b bg-slate-50 text-slate-600">
-              <th className="px-3 font-semibold"></th>
+          <thead className="sticky top-0 z-10 border-b bg-slate-50 text-slate-600 shadow-sm">
+            <tr className="h-10">
+              <th className="w-12 px-3 font-semibold" />
               <th className="px-3 font-semibold">Mã ticket</th>
               <th className="px-3 font-semibold">Session</th>
               <th className="px-3 font-semibold">Chủ đề</th>
               <th className="px-3 font-semibold">Nội dung</th>
               <th className="px-3 font-semibold">Trạng thái</th>
               <th className="px-3 font-semibold">Ngày</th>
-              <th className="px-3 font-semibold" />
             </tr>
           </thead>
 
           <tbody>
-            {rows.length === 0 && (
+            {visibleRows.length === 0 && (
               <tr>
-                <td colSpan={7} className="h-20 text-center text-slate-500">
+                <td
+                  colSpan={COLUMN_COUNT}
+                  className="h-20 text-center text-slate-500"
+                >
                   Không có ticket nào đang chờ tiếp nhận.
                 </td>
               </tr>
             )}
 
-            {rows.map((item) => (
+            {visibleRows.map((item) => (
               <tr
                 key={item.id}
                 className="h-12 border-b border-slate-100 hover:bg-slate-50"
               >
-                <td className="px-3 font-semibold text-sky-600">
+                <td className="px-3">
                   {item.ticket_chatbot_id && (
                     <button
                       type="button"
                       onClick={() =>
-                        router.push(
-                          `/tickets/${item.ticket_chatbot_id}`
-                        )
+                        router.push(`/tickets/${item.ticket_chatbot_id}`)
                       }
                       className="flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-600 transition hover:bg-white"
+                      aria-label="Xem chi tiết ticket"
+                      title="Xem chi tiết ticket"
                     >
                       <Eye size={12} />
                     </button>
@@ -125,10 +158,6 @@ export function PendingTicketsPanel({
                 </td>
                 <td className="px-3 font-semibold text-sky-600">
                   {item.ticket_chatbot_code || item.ticket_code || "-"}
-                  
-
-                  
-
                 </td>
                 <td className="px-3 font-mono text-[11px] text-slate-600">
                   {shortText(item.session_id, 12)}
@@ -149,13 +178,30 @@ export function PendingTicketsPanel({
                 <td className="px-3 whitespace-nowrap">
                   {formatDateTime(item.started_at)}
                 </td>
-                <td className="px-3">
-                  
-                </td>
               </tr>
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div className="border-t border-slate-200 px-4 py-3">
+        <TablePagination
+          fromRecord={fromRecord}
+          toRecord={toRecord}
+          count={rows.length}
+          page={page}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          pageSizeOptions={PAGE_SIZES}
+          onPageSizeChange={(value) => {
+            setPageSize(value);
+            setPage(1);
+          }}
+          onPrevious={() => setPage((current) => Math.max(1, current - 1))}
+          onNext={() =>
+            setPage((current) => Math.min(totalPages || current, current + 1))
+          }
+        />
       </div>
     </div>
   );

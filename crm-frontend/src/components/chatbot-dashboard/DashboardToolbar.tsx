@@ -3,26 +3,33 @@
 import { useState } from "react";
 import { Bot, CalendarRange, Filter, X } from "lucide-react";
 
+import { GranularitySelector } from "@/components/chatbot-dashboard/GranularitySelector";
 import type { QuickPreset } from "@/hooks/useChatbotDashboard";
 import {
   ActiveTab,
   ChatbotDashboardFilters,
+  GranularityChoice,
+  GranularityMode,
 } from "@/types/chatbot-dashboard.type";
 
 export function DashboardToolbar({
   filters,
   activeTab,
+  effectiveGranularity,
   onFilterChange,
   onApply,
   onClear,
   onQuickPreset,
+  onGranularityChange,
 }: {
   filters: ChatbotDashboardFilters;
   activeTab: ActiveTab;
+  effectiveGranularity?: GranularityMode;
   onFilterChange: (key: keyof ChatbotDashboardFilters, value: string) => void;
   onApply: () => void;
   onClear: () => void;
   onQuickPreset: (preset: QuickPreset) => void;
+  onGranularityChange: (mode: GranularityChoice) => void;
 }) {
   const [filterOpen, setFilterOpen] = useState(false);
 
@@ -52,22 +59,8 @@ export function DashboardToolbar({
         </div>
 
         <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-          {/* Hook đã hỗ trợ sẵn 4 preset, trước đây chỉ mới lộ ra một cái. */}
-          <QuickPresetButton
-            label="Hôm nay"
-            onClick={() => onQuickPreset("TODAY")}
-          />
-
-          <QuickPresetButton
-            label="Tuần này"
-            onClick={() => onQuickPreset("THIS_WEEK")}
-          />
-
-          <QuickPresetButton
-            label="Tháng này"
-            onClick={() => onQuickPreset("THIS_MONTH")}
-          />
-
+          {/* Hôm nay / Tuần này / Tháng này đã bỏ: khoảng thời gian đến từ
+              nút Tháng-Quý-Năm bên dưới hoặc bộ lọc nâng cao. */}
           <QuickPresetButton
             label="5 tháng gần đây"
             onClick={() => onQuickPreset("LAST_5_MONTHS")}
@@ -94,6 +87,16 @@ export function DashboardToolbar({
             Xóa lọc
           </button>
         </div>
+      </div>
+
+      {/* Mốc thời gian nằm chung thanh công cụ với bộ lọc kỳ: đổi một chỗ là
+          toàn bộ biểu đồ đổi theo, thay vì nằm rải trong từng thẻ biểu đồ. */}
+      <div className="mt-3 border-t border-slate-100 pt-3">
+        <GranularitySelector
+          value={filters.granularity || "auto"}
+          effective={effectiveGranularity}
+          onChange={onGranularityChange}
+        />
       </div>
 
       {filterOpen && (

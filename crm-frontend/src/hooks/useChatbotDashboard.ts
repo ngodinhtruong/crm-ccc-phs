@@ -13,15 +13,22 @@ import {
   ChatbotOverviewResponse,
   ChatbotTicketItem,
   GranularityChoice,
+  GranularityMode,
   OutcomeCode,
   TicketListParams,
   TicketOpenOptions,
 } from "@/types/chatbot-dashboard.type";
 import { normalizeFilters } from "@/utils/chatbot-filter.util";
-import { formatDateInput, getStartOfWeek } from "@/utils/date.util";
+import { formatDateInput } from "@/utils/date.util";
 import { getErrorMessage } from "@/utils/error.util";
 
-export type QuickPreset = "TODAY" | "THIS_WEEK" | "THIS_MONTH" | "LAST_5_MONTHS";
+/**
+ * Preset ngày còn lại duy nhất.
+ *
+ * Hôm nay / Tuần này / Tháng này đã bỏ: khoảng thời gian giờ đến từ nút
+ * Tháng-Quý-Năm hoặc bộ lọc nâng cao, ba preset đó chỉ gây trùng vai.
+ */
+export type QuickPreset = "LAST_5_MONTHS";
 
 const PAGE_SIZE = 50;
 const DEFAULT_PANEL_TITLE = "Tất cả phiên chatbot";
@@ -33,34 +40,42 @@ const DEFAULT_TICKET_STATUS: OutcomeCode = "CCC";
 /** Chu kỳ tự làm mới dashboard: 2 phút. */
 const AUTO_REFRESH_MS = 120_000;
 
-/**
- * Khoảng ngày của preset. Dùng start_date/end_date để tránh đá nhau với
- * year/month.
- *
- * TODAY / THIS_WEEK / THIS_MONTH trả về kỳ TRỌN VẸN (không cắt ở hôm nay) để
- * backend nhận ra bộ lọc trùng khít một kỳ lịch và chọn đúng mốc so sánh:
- * trọn tuần thì so các tuần, trọn tháng thì so các tháng.
- */
-function getPresetFilters(preset: QuickPreset): ChatbotDashboardFilters {
+/** Khoảng của preset "5 tháng gần đây": từ đầu tháng cách đây 4 tháng tới nay. */
+function getPresetFilters(): ChatbotDashboardFilters {
   const now = new Date();
 
-  let start = new Date(now.getFullYear(), now.getMonth(), 1);
-  let end = now;
-
-  if (preset === "TODAY") {
-    start = now;
-  } else if (preset === "THIS_WEEK") {
-    start = getStartOfWeek(now);
-    end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6);
-  } else if (preset === "THIS_MONTH") {
-    end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  } else if (preset === "LAST_5_MONTHS") {
-    start = new Date(now.getFullYear(), now.getMonth() - 4, 1);
-  }
+  const start = new Date(now.getFullYear(), now.getMonth() - 4, 1);
+  const end = now;
 
   return {
     start_date: formatDateInput(start),
     end_date: formatDateInput(end),
+  };
+}
+
+/** Bấm "Năm" thì so mấy năm gần nhất. Khớp với COMPARISON_YEARS của backend. */
+const YEAR_SPAN = 2;
+
+/** Trạng thái mặc định của trang: xem theo tháng, từ đầu năm tới hiện tại. */
+const DEFAULT_GRANULARITY: GranularityMode = "month";
+
+/**
+ * Khoảng thời gian đi kèm mỗi mốc.
+ *
+ * Bấm "Tháng" là muốn xem các tháng trong năm nay tính tới hôm nay, bấm "Quý"
+ * là các quý trong năm nay, bấm "Năm" là mấy năm gần nhất. Nút mốc vì vậy đặt
+ * luôn khoảng chứ không chỉ đổi cách chia trục — nhờ đó KPI, donut, phễu,
+ * bảng FAQ... cũng đổi theo, không chỉ mấy biểu đồ chuỗi thời gian.
+ */
+function getGranularityFilters(
+  mode: GranularityMode
+): ChatbotDashboardFilters {
+  const now = new Date();
+  const startYear = mode === "year" ? now.getFullYear() - (YEAR_SPAN - 1) : now.getFullYear();
+
+  return {
+    start_date: formatDateInput(new Date(startYear, 0, 1)),
+    end_date: formatDateInput(now),
   };
 }
 
@@ -79,17 +94,23 @@ const EMPTY_FILTERS: ChatbotDashboardFilters = {
   granularity: "auto",
 };
 
+/** Bộ lọc lúc mở trang và sau khi bấm "Xóa lọc": xem theo tháng của năm nay. */
+function getDefaultFilters(): ChatbotDashboardFilters {
+  return {
+    ...EMPTY_FILTERS,
+    ...getGranularityFilters(DEFAULT_GRANULARITY),
+    granularity: DEFAULT_GRANULARITY,
+  };
+}
+
 export function useChatbotDashboard() {
   const router = useRouter();
 
   const [activeTab, setActiveTab] = useState<ActiveTab>("overview");
 
-  // Mở trang là xem tuần hiện tại: đủ 7 ngày nên các biểu đồ phân bổ (chủ đề,
-  // kênh, lý do, FAQ) có dữ liệu để đọc, mà vẫn sát thời điểm hiện tại.
-  const [filters, setFilters] = useState<ChatbotDashboardFilters>({
-    ...EMPTY_FILTERS,
-    ...getPresetFilters("THIS_WEEK"),
-  });
+  const [filters, setFilters] = useState<ChatbotDashboardFilters>(
+    getDefaultFilters()
+  );
 
   const [overview, setOverview] = useState<ChatbotOverviewResponse | null>(null);
 
@@ -230,16 +251,17 @@ export function useChatbotDashboard() {
     void loadData(undefined, nextTab);
   };
 
-  const applyQuickPreset = (preset: QuickPreset) => {
-    const nextFilters = { ...EMPTY_FILTERS, ...getPresetFilters(preset) };
+  /** Preset "5 tháng gần đây": khoảng lệch ranh giới năm nên để mốc tự động. */
+  const applyQuickPreset = () => {
+    const nextFilters = { ...EMPTY_FILTERS, ...getPresetFilters() };
 
     setFilters(nextFilters);
     void loadData(nextFilters);
   };
 
-  /** Xóa lọc = quay lại trạng thái mặc định của trang, tức là tuần này. */
+  /** Xóa lọc = quay lại mặc định: xem theo tháng, từ đầu năm tới hiện tại. */
   const clearFilters = () => {
-    const nextFilters = { ...EMPTY_FILTERS, ...getPresetFilters("THIS_WEEK") };
+    const nextFilters = getDefaultFilters();
 
     setFilters(nextFilters);
     void loadData(nextFilters);
@@ -248,11 +270,35 @@ export function useChatbotDashboard() {
   /**
    * Đổi mốc thời gian thủ công.
    *
-   * updateFilter chỉ đổi state chứ không tải lại, nên trước đây bấm đổi mốc
-   * không có tác dụng gì cho tới lần refresh kế tiếp.
+   * Mốc cụ thể kéo theo khoảng của nó và xóa bộ lọc nâng cao đang có, để
+   * toàn bộ dashboard nói về cùng một quãng thời gian. Riêng "Tự động" thì
+   * giữ nguyên khoảng đang xem và trả quyền chọn mốc cho backend.
    */
   const changeGranularity = (mode: GranularityChoice) => {
-    const nextFilters = { ...filters, granularity: mode };
+    const nextFilters: ChatbotDashboardFilters =
+      mode === "auto"
+        ? { ...filters, granularity: "auto" }
+        : {
+            ...EMPTY_FILTERS,
+            ...getGranularityFilters(mode),
+            granularity: mode,
+          };
+
+    setFilters(nextFilters);
+    void loadData(nextFilters);
+  };
+
+  /**
+   * Áp dụng bộ lọc nâng cao.
+   *
+   * Trả mốc về tự động: người dùng đã tự chỉ định khoảng nên mốc phải suy
+   * theo khoảng đó, không giữ lại mốc của lần bấm nút trước.
+   */
+  const applyFilters = () => {
+    const nextFilters: ChatbotDashboardFilters = {
+      ...filters,
+      granularity: "auto",
+    };
 
     setFilters(nextFilters);
     void loadData(nextFilters);
@@ -380,11 +426,15 @@ export function useChatbotDashboard() {
     filters,
     updateFilter,
     applyQuickPreset,
+    applyFilters,
     clearFilters,
     changeGranularity,
 
-    /** Mốc backend thực sự dùng — dùng để tô sáng nút đang chọn. */
-    effectiveGranularity: overview?.granularity || "month",
+    /**
+     * Mốc backend thực sự dùng. Để undefined khi chưa có response (vd vào
+     * thẳng tab Tickets) thay vì đoán "month" — nhãn sai còn tệ hơn không có.
+     */
+    effectiveGranularity: overview?.granularity,
     isAutoGranularity: (filters.granularity || "auto") === "auto",
 
     overview,
