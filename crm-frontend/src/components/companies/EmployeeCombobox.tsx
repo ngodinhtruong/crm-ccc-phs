@@ -36,7 +36,7 @@ export function EmployeeCombobox({
           onOpenChange(true);
         }}
         placeholder="Nhập tên, mã nhân viên, chi nhánh..."
-        className="h-9 w-full rounded border px-3 pr-9 text-xs outline-none focus:border-sky-400"
+        className="h-9 w-full rounded border px-3 pr-9 text-xs outline-none focus:border-emerald-500"
       />
 
       {value && (
@@ -65,7 +65,7 @@ export function EmployeeCombobox({
                   event.preventDefault();
                   onSelect(item);
                 }}
-                className="block w-full border-b px-3 py-2 text-left text-xs hover:bg-sky-50"
+                className="block w-full border-b px-3 py-2 text-left text-xs hover:bg-emerald-50"
               >
                 <div className="font-semibold text-slate-700">
                   {getCompanyOptionName(item, [

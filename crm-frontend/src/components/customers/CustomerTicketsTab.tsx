@@ -119,7 +119,7 @@ export function CustomerTicketsTab({ customerId }: { customerId: number }) {
 
         <div className="flex items-center gap-3 text-xs text-slate-500">
           <span className="inline-flex items-center gap-1">
-            <Headset size={12} className="text-sky-500" />
+            <Headset size={12} className="text-emerald-500" />
             CRM: <span className="font-bold text-slate-800">{crmCount}</span>
           </span>
           <span className="inline-flex items-center gap-1">
@@ -136,17 +136,17 @@ export function CustomerTicketsTab({ customerId }: { customerId: number }) {
       )}
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[950px] border-collapse text-left text-xs">
+        <table className="w-full min-w-[950px] border-collapse text-left text-sm">
           <thead>
             <tr className="h-10 border-b bg-[#f8fafc] text-slate-600">
-              <th className="w-[110px] px-3 font-semibold">Nguồn</th>
-              <th className="w-[140px] px-3 font-semibold">Mã ticket</th>
-              <th className="w-[230px] px-3 font-semibold">Tiêu đề</th>
-              <th className="w-[150px] px-3 font-semibold">Danh mục</th>
-              <th className="w-[130px] px-3 font-semibold">Tình trạng</th>
-              <th className="w-[100px] px-3 font-semibold">Ưu tiên</th>
-              <th className="w-[140px] px-3 font-semibold">Người xử lý</th>
-              <th className="w-[140px] px-3 font-semibold">Ngày tạo</th>
+              <th className="w-[110px] px-4 font-semibold">Nguồn</th>
+              <th className="w-[140px] px-4 font-semibold">Mã ticket</th>
+              <th className="w-[230px] px-4 font-semibold">Tiêu đề</th>
+              <th className="w-[150px] px-4 font-semibold">Danh mục</th>
+              <th className="w-[130px] px-4 font-semibold">Tình trạng</th>
+              <th className="w-[100px] px-4 font-semibold">Ưu tiên</th>
+              <th className="w-[140px] px-4 font-semibold">Người xử lý</th>
+              <th className="w-[140px] px-4 font-semibold">Ngày tạo</th>
             </tr>
           </thead>
 
@@ -173,30 +173,30 @@ export function CustomerTicketsTab({ customerId }: { customerId: number }) {
                   key={t.key}
                   onClick={() => openTicket(t)}
                   className={`h-12 cursor-pointer border-b border-slate-100 ${
-                    i % 2 === 0 ? "bg-white" : "bg-[#f8fafc]"
-                  } transition hover:bg-sky-50`}
+                    i % 2 === 0 ? "bg-white" : "bg-slate-50/60"
+                  } transition hover:bg-emerald-50`}
                 >
-                  <td className="px-3">
+                  <td className="px-4 text-slate-700">
                     {t.origin === "CHATBOT" ? (
                       <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-1 font-semibold text-violet-700">
                         <Bot size={11} />
                         Chatbot
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-1 font-semibold text-sky-700">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 font-semibold text-emerald-700">
                         <Headset size={11} />
                         CRM
                       </span>
                     )}
                   </td>
 
-                  <td className="px-3 font-semibold text-sky-600">
+                  <td className="px-4 font-semibold text-[#059669]">
                     {t.ticket_code}
                   </td>
-                  <td className="px-3">{t.title || "-"}</td>
-                  <td className="px-3">{t.category || "-"}</td>
+                  <td className="px-4 text-slate-700">{t.title || "-"}</td>
+                  <td className="px-4 text-slate-700">{t.category || "-"}</td>
 
-                  <td className="px-3">
+                  <td className="px-4 text-slate-700">
                     {t.status ? (
                       <span className="rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-700">
                         {t.status}
@@ -206,13 +206,13 @@ export function CustomerTicketsTab({ customerId }: { customerId: number }) {
                     )}
                   </td>
 
-                  <td className="px-3">{t.priority || "-"}</td>
-                  <td className="px-3">
+                  <td className="px-4 text-slate-700">{t.priority || "-"}</td>
+                  <td className="px-4 text-slate-700">
                     {t.handler || (
                       <span className="text-slate-400">Chưa nhận</span>
                     )}
                   </td>
-                  <td className="px-3 whitespace-nowrap">
+                  <td className="px-4 whitespace-nowrap">
                     {formatDateTime(t.created_at)}
                   </td>
                 </tr>

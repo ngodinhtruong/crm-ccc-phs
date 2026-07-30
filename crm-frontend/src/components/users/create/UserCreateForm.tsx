@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle, Info, Loader2 } from "lucide-react";
 
 import { useUserCreate } from "@/hooks/useUserCreate";
 
@@ -29,7 +29,7 @@ export function UserCreateForm({
         </div>
 
         {create.loadingMaster && (
-          <div className="flex items-center gap-2 border-b border-sky-100 bg-sky-50 px-5 py-3 text-xs font-medium text-sky-700">
+          <div className="flex items-center gap-2 border-b border-emerald-100 bg-emerald-50 px-5 py-3 text-xs font-medium text-emerald-700">
             <Loader2 className="animate-spin" size={15} />
             Đang tải chi nhánh, nhân viên, đơn vị tổ chức, trách nhiệm và vai trò...
           </div>
@@ -54,21 +54,27 @@ export function UserCreateForm({
           <UserEmployeeSection create={create} />
           <UserRoleAccessSection create={create} />
 
-          <div className="flex flex-col-reverse gap-2 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end">
+          <div className="flex items-center gap-2 border-b border-emerald-100 bg-emerald-50 px-5 py-3 text-xs font-medium text-emerald-700">
+            <Info size={16} />
+            <span>
+              Người dùng sau khi tạo sẽ nhận được thông tin tài khoản qua email để kích hoạt.
+            </span>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 px-5 py-4">
             <button
               type="button"
               onClick={create.cancel}
-              disabled={create.submitting}
-              className="h-10 rounded-md border border-slate-300 bg-white px-5 text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+              className="h-10 rounded-md border border-slate-300 bg-white px-4 text-xs font-bold text-slate-700 hover:bg-slate-50"
             >
-              Hủy
+              Hủy bỏ
             </button>
 
             <button
-              type="button"
+              type="submit"
               onClick={create.submit}
               disabled={create.submitting || create.loadingMaster}
-              className="flex h-10 items-center justify-center gap-2 rounded-md bg-sky-600 px-5 text-xs font-bold text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex h-10 items-center justify-center gap-2 rounded-md bg-emerald-600 px-5 text-xs font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {create.submitting && <Loader2 className="animate-spin" size={15} />}
               {create.submitting ? "Đang tạo người dùng..." : "Tạo người dùng"}

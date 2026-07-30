@@ -49,26 +49,26 @@ export function KpiTeamMemberTable({
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1050px] border-collapse text-left text-xs">
+        <table className="w-full min-w-[1050px] border-collapse text-left text-sm">
           <thead>
-            <tr className="h-10 border-b bg-white text-slate-700">
-              <th className="sticky left-0 z-20 w-[90px] bg-white px-3 font-semibold">
+            <tr className="h-11 border-b-2 border-slate-200 bg-slate-50 text-slate-700">
+              <th className="sticky left-0 z-20 w-[90px] bg-slate-50 px-4 font-semibold">
                 Thao tác
               </th>
-              <th className="w-[220px] px-3 font-semibold">Nhân viên</th>
-              <th className="w-[160px] px-3 font-semibold">Chi nhánh</th>
-              <th className="w-[120px] px-3 font-semibold">Bảng A</th>
-              <th className="w-[120px] px-3 font-semibold">Bảng B</th>
-              <th className="w-[120px] px-3 font-semibold">Tổng điểm</th>
-              <th className="w-[130px] px-3 font-semibold">Xếp hạng CN</th>
-              <th className="w-[160px] px-3 font-semibold">Điều kiện cổng</th>
-              <th className="w-[170px] px-3 font-semibold">Cập nhật</th>
+              <th className="w-[220px] px-4 font-semibold">Nhân viên</th>
+              <th className="w-[160px] px-4 font-semibold">Chi nhánh</th>
+              <th className="w-[120px] px-4 font-semibold">Bảng A</th>
+              <th className="w-[120px] px-4 font-semibold">Bảng B</th>
+              <th className="w-[120px] px-4 font-semibold">Tổng điểm</th>
+              <th className="w-[130px] px-4 font-semibold">Xếp hạng CN</th>
+              <th className="w-[160px] px-4 font-semibold">Điều kiện cổng</th>
+              <th className="w-[170px] px-4 font-semibold">Cập nhật</th>
             </tr>
           </thead>
 
           <tbody>
             {dashboard.teamMembers.map((member, index) => {
-              const rowBg = index % 2 === 0 ? "bg-white" : "bg-[#f8fafc]";
+              const rowBg = index % 2 === 0 ? "bg-white" : "bg-slate-50/60";
               const selected =
                 dashboard.scope === "BRANCH" &&
                 String(member.user) === dashboard.selectedUserId;
@@ -76,7 +76,7 @@ export function KpiTeamMemberTable({
               return (
                 <tr
                   key={member.id}
-                  className={`h-14 border-b border-slate-100 ${rowBg} hover:bg-sky-50 ${
+                  className={`h-[46px] border-b border-slate-200 ${rowBg} hover:bg-emerald-50 ${
                     selected ? "outline outline-1 outline-sky-300" : ""
                   }`}
                 >
@@ -85,27 +85,27 @@ export function KpiTeamMemberTable({
                       type="button"
                       title="Xem KPI SA"
                       onClick={() => dashboard.viewTeamMemberDashboard(member.user)}
-                      className="text-slate-400 hover:text-sky-600"
+                      className="text-slate-400 hover:text-[#059669]"
                     >
                       <Eye size={15} />
                     </button>
                   </td>
-                  <td className="px-3 font-semibold text-sky-600">
+                  <td className="px-4 font-semibold text-[#059669]">
                     {getMemberName(member)}
                   </td>
-                  <td className="px-3">{member.branch_name || "-"}</td>
-                  <td className="px-3">{formatNumber(member.manual_score)}</td>
-                  <td className="px-3">{formatNumber(member.auto_score)}</td>
-                  <td className="px-3 font-semibold text-slate-800">
+                  <td className="px-4 text-slate-700">{member.branch_name || "-"}</td>
+                  <td className="px-4 text-slate-700">{formatNumber(member.manual_score)}</td>
+                  <td className="px-4 text-slate-700">{formatNumber(member.auto_score)}</td>
+                  <td className="px-4 font-semibold text-slate-800">
                     {formatNumber(member.total_score)}
                   </td>
-                  <td className="px-3">
+                  <td className="px-4 text-slate-700">
                     {member.rank_branch ? `#${member.rank_branch}` : "-"}
                   </td>
-                  <td className="px-3">
+                  <td className="px-4 text-slate-700">
                     <GateBadge passed={member.all_gates_passed} />
                   </td>
-                  <td className="px-3 text-slate-500">
+                  <td className="px-4 text-slate-500">
                     {formatDateTime(member.calculated_at)}
                   </td>
                 </tr>

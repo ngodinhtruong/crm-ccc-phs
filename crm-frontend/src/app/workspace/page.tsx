@@ -57,7 +57,7 @@ export default function WorkspacePage() {
   }, [router]);
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#eef2f5] p-6">
+    <main className="flex min-h-screen items-center justify-center bg-[#f4fbf7] p-6">
       <div className="w-full max-w-md rounded-md border border-slate-200 bg-white p-6 text-center shadow-sm">
         <h1 className="text-base font-semibold text-slate-800">
           Đang chuyển đến trang chính
@@ -78,7 +78,7 @@ export default function WorkspacePage() {
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="mt-4 h-9 rounded bg-[#0097cf] px-4 text-xs font-semibold text-white hover:bg-[#0089bd]"
+              className="mt-4 h-9 rounded bg-[#10b981] px-4 text-xs font-semibold text-white hover:bg-[#059669]"
             >
               Thử lại
             </button>

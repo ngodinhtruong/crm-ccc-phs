@@ -8,7 +8,7 @@ const STEP_COLORS = [
   "#f59e0b", // 2. Bot unresolved (Amber)
   "#8b5cf6", // 3. Requested info (Purple)
   "#06b6d4", // 4. Provided info (Cyan)
-  "#00713d", // 5. Ticket created (Green)
+  "#10b981", // 5. Ticket created (Fresh Green)
   "#10b981", // 6. CCC processed (Emerald)
 ];
 

@@ -45,7 +45,7 @@ function TabButton({
       onClick={onClick}
       className={`h-10 rounded-xl px-5 text-sm font-semibold transition ${
         active
-          ? "bg-[#0097cf] text-white shadow-sm"
+          ? "bg-[#10b981] text-white shadow-sm"
           : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
       }`}
     >

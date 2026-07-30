@@ -98,14 +98,14 @@ export function KpiAdminRankingTab({ admin }: { admin: KpiAdminController }) {
         <table className="w-full min-w-[1120px] border-collapse text-left text-sm">
           <thead>
             <tr className="h-11 border-b bg-[#f8fafc] text-slate-700">
-              <th className="sticky left-0 z-20 w-[58px] bg-[#f8fafc] px-3 font-semibold" title="Xem chi tiết">
+              <th className="sticky left-0 z-20 w-[58px] bg-[#f8fafc] px-4 font-semibold" title="Xem chi tiết">
                 Xem
               </th>
-              <th className="w-[82px] px-3 font-semibold" title="Xếp hạng">Hạng</th>
-              <th className="sticky left-[58px] z-20 w-[230px] bg-[#f8fafc] px-3 font-semibold" title="Nhân viên">
+              <th className="w-[82px] px-4 font-semibold" title="Xếp hạng">Hạng</th>
+              <th className="sticky left-[58px] z-20 w-[230px] bg-[#f8fafc] px-4 font-semibold" title="Nhân viên">
                 NV
               </th>
-              <th className="w-[150px] px-3 font-semibold" title="Chi nhánh">CN</th>
+              <th className="w-[150px] px-4 font-semibold" title="Chi nhánh">CN</th>
               <th className="w-[78px] px-3 text-right font-semibold" title="Phần A">A</th>
               <th className="w-[78px] px-3 text-right font-semibold" title="Phần B">B</th>
               <th className="w-[92px] px-3 text-right font-semibold" title="Tổng KPI">Tổng</th>
@@ -142,11 +142,11 @@ export function KpiAdminRankingTab({ admin }: { admin: KpiAdminController }) {
                 const metricCodeMap = new Map(row.metrics.map((metric) => [metric.metric_code, metric]));
 
                 return (
-                  <tr key={row.user.id} className={index % 2 === 0 ? "bg-white" : "bg-[#f8fafc]"}>
+                  <tr key={row.user.id} className={index % 2 === 0 ? "bg-white" : "bg-slate-50/60"}>
                     <td className="sticky left-0 z-10 border-b bg-inherit px-3 py-3">
                       <Link
                         href={buildKpiHref(row, admin.selectedPeriodId)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded border border-sky-200 bg-white text-[#0097cf] hover:bg-sky-50"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded border border-emerald-200 bg-white text-[#059669] hover:bg-emerald-50"
                         title="Xem KPI cá nhân"
                       >
                         <Eye size={16} />

@@ -568,22 +568,6 @@ const panelTitleMap: Record<PanelKey, string> = {
   sa_system: "HỆ THỐNG",
 };
 
-const getPanelInnerWidthClass = (activePanel: PanelKey | null) => {
-  if (activePanel === "reports") {
-    return "min-w-[640px]";
-  }
-
-  return "min-w-[420px]";
-};
-
-const getPanelGridClass = (activePanel: PanelKey | null) => {
-  if (activePanel === "reports") {
-    return "grid-cols-2";
-  }
-
-  return "grid-cols-1";
-};
-
 const SA_OR_SUP_ROLE_CODES = new Set([
   "SA",
   "SA_STAFF",
@@ -727,11 +711,24 @@ export function MainNavigationDrawer({
   const [activePanel, setActivePanel] = useState<PanelKey | null>(null);
   const [activePanelWorkspace, setActivePanelWorkspace] =
     useState<WorkspaceCode | null>(null);
+  const [panelTop, setPanelTop] = useState(0);
 
   const admin = isGlobalAdmin(currentUser);
   const availableWorkspaces = getAvailableWorkspaces(currentUser, activeWorkspace);
   const canViewCccOnlyMenus = admin || availableWorkspaces.includes("CCC");
   const kpiDashboardUser = isSaleAdminKpiDashboardUser(currentUser);
+
+  const openPanel = (
+    panel: PanelKey,
+    workspace: WorkspaceCode,
+    anchor: HTMLElement
+  ) => {
+    const anchorRect = anchor.getBoundingClientRect();
+
+    setPanelTop(Math.max(8, anchorRect.top));
+    setActivePanel(panel);
+    setActivePanelWorkspace(workspace);
+  };
 
   const handleClose = () => {
     setActivePanel(null);
@@ -771,10 +768,10 @@ export function MainNavigationDrawer({
           setActivePanel(null);
           setActivePanelWorkspace(null);
         }}
-        className={`fixed left-0 top-0 z-50 flex h-screen bg-[#263747] text-white shadow-2xl transition-transform duration-300 ${open ? "translate-x-0" : "-translate-x-full"
+        className={`fixed left-0 top-0 z-50 h-screen w-[300px] bg-[#064e3b] text-white shadow-2xl transition-transform duration-300 ${open ? "translate-x-0" : "-translate-x-full"
           }`}
       >
-        <div className="h-screen w-[300px] overflow-y-auto border-r border-white/10 bg-[#263747]">
+        <div className="h-screen w-[300px] overflow-y-auto border-r border-white/10 bg-[#064e3b]">
           <div className="flex h-[56px] items-center justify-between border-b border-white/10 px-4">
             <button
               type="button"
@@ -792,8 +789,8 @@ export function MainNavigationDrawer({
           </div>
 
           <div className="border-b border-white/10 px-4 py-3">
-            <div className="rounded-md border border-white/10 bg-white/[0.04] px-3 py-2">
-              <div className="text-[10px] font-semibold uppercase tracking-wide text-white/40">
+            <div className="rounded-md border border-white/10 bg-white/[0.08] px-3 py-2">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-200">
                 Phân hệ được cấp quyền
               </div>
 
@@ -802,8 +799,8 @@ export function MainNavigationDrawer({
                   <span
                     key={workspace}
                     className={`rounded px-2 py-1 text-[11px] font-bold ${workspace === activeWorkspace
-                        ? "bg-[#b9d8e8] text-[#263747]"
-                        : "bg-white/10 text-white/70"
+                      ? "bg-[#10b981] text-white"
+                      : "bg-white/15 text-white/90"
                       }`}
                   >
                     {WORKSPACE_LABEL[workspace]}
@@ -811,7 +808,7 @@ export function MainNavigationDrawer({
                 ))}
               </div>
 
-              <div className="mt-1.5 text-[11px] text-white/45">
+              <div className="mt-1.5 text-[11px] text-emerald-100/80">
                 Hiển thị theo phân quyền, không cần chọn phân hệ.
               </div>
             </div>
@@ -820,7 +817,7 @@ export function MainNavigationDrawer({
           <nav className="py-3">
             {canViewCccOnlyMenus && (
               <div className="border-b border-white/10 pb-3">
-                <div className="px-5 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wide text-[#b9d8e8]">
+                <div className="px-5 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wide text-emerald-200">
                   CHUNG
                 </div>
 
@@ -842,23 +839,19 @@ export function MainNavigationDrawer({
 
                 <button
                   type="button"
-                  onPointerEnter={() => {
-                    setActivePanel("customers");
-                    setActivePanelWorkspace("CCC");
-                  }}
-                  onFocus={() => {
-                    setActivePanel("customers");
-                    setActivePanelWorkspace("CCC");
-                  }}
-                  onClick={() => {
-                    setActivePanel("customers");
-                    setActivePanelWorkspace("CCC");
-                  }}
-                  className={`flex h-[40px] w-full items-center gap-4 px-5 text-left transition hover:bg-white/10 ${
-                    activePanel === "customers" && activePanelWorkspace === "CCC"
+                  onPointerEnter={(event) =>
+                    openPanel("customers", "CCC", event.currentTarget)
+                  }
+                  onFocus={(event) =>
+                    openPanel("customers", "CCC", event.currentTarget)
+                  }
+                  onClick={(event) =>
+                    openPanel("customers", "CCC", event.currentTarget)
+                  }
+                  className={`flex h-[40px] w-full items-center gap-4 px-5 text-left transition hover:bg-white/10 ${activePanel === "customers" && activePanelWorkspace === "CCC"
                       ? "bg-white/10 text-white"
                       : "text-white/80"
-                  }`}
+                    }`}
                 >
                   <UsersRound size={27} className="shrink-0 text-white/70" />
 
@@ -919,7 +912,7 @@ export function MainNavigationDrawer({
 
               return (
                 <div key={workspace} className="pb-3">
-                  <div className="px-5 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wide text-[#b9d8e8]">
+                  <div className="px-5 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wide text-emerald-200">
                     {WORKSPACE_LABEL[workspace]}
                   </div>
 
@@ -933,10 +926,15 @@ export function MainNavigationDrawer({
                         <button
                           key={`${workspace}-${item.title}`}
                           type="button"
-                          onPointerEnter={() => {
-                            setActivePanel(item.panel!);
-                            setActivePanelWorkspace(workspace);
-                          }}
+                          onPointerEnter={(event) =>
+                            openPanel(item.panel!, workspace, event.currentTarget)
+                          }
+                          onFocus={(event) =>
+                            openPanel(item.panel!, workspace, event.currentTarget)
+                          }
+                          onClick={(event) =>
+                            openPanel(item.panel!, workspace, event.currentTarget)
+                          }
                           className={`flex h-[40px] w-full items-center gap-4 px-5 text-left transition hover:bg-white/10 ${isActive ? "bg-white/10 text-white" : "text-white/80"
                             }`}
                         >
@@ -976,79 +974,46 @@ export function MainNavigationDrawer({
           </nav>
         </div>
 
-        {activePanel && activePanelWorkspace && (
+        {activePanel && activePanelWorkspace && activeGroups.length > 0 && (
           <div
             onPointerEnter={() => {
-              // Giữ panel mở khi di chuyển chuột từ menu chính sang panel con.
+              // Giữ flyout mở khi di chuyển chuột từ menu cha sang menu con.
             }}
-            className={`h-screen shrink-0 overflow-y-auto overflow-x-hidden bg-[#263747] transition-[width,opacity] duration-200 ${
-              activePanel === "reports" ? "w-[640px]" : "w-[420px]"
-            }`}
+            className="absolute left-[300px] z-[60] w-[280px] overflow-y-auto rounded-r-lg border border-l-0 border-white/10 bg-[#065f46] p-2 shadow-2xl"
+            style={{
+              top: panelTop,
+              maxHeight: `calc(100vh - ${panelTop + 8}px)`,
+            }}
           >
-            <div className="min-w-0 px-6 py-6">
-              <>
-                <div className="mb-6 flex items-center justify-between border-b border-white/10 pb-4">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <Menu size={22} className="shrink-0 text-white/55" />
+            <div className="border-b border-white/10 px-3 py-2">
+              <div className="text-[10px] font-bold uppercase tracking-wide text-emerald-200">
+                {panelTitleMap[activePanel]}
+              </div>
+            </div>
 
-                    <div className="min-w-0">
-                      <div className="text-[10px] font-bold uppercase tracking-wide text-white/35">
-                        {WORKSPACE_LABEL[activePanelWorkspace]}
-                      </div>
-                      <h2 className="truncate text-[22px] font-semibold tracking-wide text-[#b9d8e8]">
-                        {panelTitleMap[activePanel]}
-                      </h2>
-                    </div>
-                  </div>
+            <div className="py-1">
+              {activeGroups.flatMap((group) =>
+                group.items.map((item, index) => {
+                  const Icon = item.icon;
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setActivePanel(null);
-                      setActivePanelWorkspace(null);
-                    }}
-                    className="rounded-md px-3 py-1.5 text-xs font-medium text-white/60 hover:bg-white/10 hover:text-white"
-                  >
-                    Thu gọn
-                  </button>
-                </div>
-
-                <div className={`grid gap-4 ${getPanelGridClass(activePanel)}`}>
-                  {activeGroups.map((group) => (
-                    <section
-                      key={group.title}
-                      className="min-w-0 rounded-lg border border-white/10 bg-white/[0.03] p-4"
+                  return (
+                    <Link
+                      key={`${group.title}-${item.href}-${index}`}
+                      href={item.href}
+                      onClick={() => handleNavigate(activePanelWorkspace)}
+                      className="group flex min-h-10 items-center gap-3 rounded-md px-3 py-2 text-white/80 transition hover:bg-white/10 hover:text-white"
                     >
-                      <h3 className="mb-4 text-[16px] font-semibold text-[#b9d8e8]">
-                        {group.title}
-                      </h3>
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white/[0.06] text-white/60 group-hover:bg-orange-500 group-hover:text-white">
+                        <Icon size={17} />
+                      </span>
 
-                      <div className="space-y-2">
-                        {group.items.map((item, index) => {
-                          const Icon = item.icon;
-
-                          return (
-                            <Link
-                              key={`${group.title}-${item.href}-${index}`}
-                              href={item.href}
-                              onClick={() => handleNavigate(activePanelWorkspace)}
-                              className="group flex min-h-10 items-center gap-3 rounded-md px-3 py-2 text-white/70 transition hover:bg-white/10 hover:text-white"
-                            >
-                              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white/5 text-white/55 group-hover:bg-orange-500 group-hover:text-white">
-                                <Icon size={17} />
-                              </span>
-
-                              <span className="min-w-0 flex-1 truncate text-[14px] font-semibold leading-5">
-                                {item.title}
-                              </span>
-                            </Link>
-                          );
-                        })}
-                      </div>
-                    </section>
-                  ))}
-                </div>
-              </>
+                      <span className="min-w-0 flex-1 text-[13px] font-semibold leading-5">
+                        {item.title}
+                      </span>
+                    </Link>
+                  );
+                })
+              )}
             </div>
           </div>
         )}

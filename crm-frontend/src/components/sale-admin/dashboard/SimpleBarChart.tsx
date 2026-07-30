@@ -48,7 +48,7 @@ function ChartTooltip({ active, payload }: { active?: boolean; payload?: Array<{
   return (
     <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs shadow-lg">
       <p className="mb-1 font-semibold text-slate-800">{row.label}</p>
-      <p className="text-[#0097cf]">
+      <p className="text-[#059669]">
         {row.currentLabel || "Hiện tại"}: <span className="font-semibold">{row.valueLabel}</span>
       </p>
       {row.secondValue !== undefined && (

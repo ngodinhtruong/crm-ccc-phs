@@ -122,7 +122,7 @@ export function TicketsTab({
           <button
             type="button"
             onClick={onSearch}
-            className="flex h-10 items-center gap-2 rounded-lg bg-[#0097cf] px-4 text-xs font-semibold text-white transition hover:bg-[#0089bd]"
+            className="flex h-10 items-center gap-2 rounded-lg bg-[#10b981] px-4 text-xs font-semibold text-white transition hover:bg-[#059669]"
           >
             <Search size={14} />
             Tìm kiếm
@@ -131,20 +131,20 @@ export function TicketsTab({
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1430px] border-collapse text-left text-xs">
+        <table className="w-full min-w-[1430px] border-collapse text-left text-sm">
           <thead>
             <tr className="h-11 border-b bg-white text-slate-700">
-              <th className="w-[150px] px-3 font-semibold">Mã ticket</th>
-              <th className="w-[130px] px-3 font-semibold">Trạng thái</th>
-              <th className="w-[190px] px-3 font-semibold">Session ID</th>
-              <th className="w-[150px] px-3 font-semibold">Thời gian</th>
-              <th className="w-[90px] px-3 font-semibold">Kênh</th>
-              <th className="w-[170px] px-3 font-semibold">Chủ đề</th>
-              <th className="w-[90px] px-3 font-semibold">Số lần chat</th>
-              <th className="w-[180px] px-3 font-semibold">Nhóm xử lý</th>
-              <th className="w-[160px] px-3 font-semibold">Thông tin KH</th>
-              <th className="w-[250px] px-3 font-semibold">Câu hỏi cuối</th>
-              <th className="w-[250px] px-3 font-semibold">Lý do chuyển CCC</th>
+              <th className="w-[150px] px-4 font-semibold">Mã ticket</th>
+              <th className="w-[130px] px-4 font-semibold">Trạng thái</th>
+              <th className="w-[190px] px-4 font-semibold">Session ID</th>
+              <th className="w-[150px] px-4 font-semibold">Thời gian</th>
+              <th className="w-[90px] px-4 font-semibold">Kênh</th>
+              <th className="w-[170px] px-4 font-semibold">Chủ đề</th>
+              <th className="w-[90px] px-4 font-semibold">Số lần chat</th>
+              <th className="w-[180px] px-4 font-semibold">Nhóm xử lý</th>
+              <th className="w-[160px] px-4 font-semibold">Thông tin KH</th>
+              <th className="w-[250px] px-4 font-semibold">Câu hỏi cuối</th>
+              <th className="w-[250px] px-4 font-semibold">Lý do chuyển CCC</th>
             </tr>
           </thead>
 
@@ -161,11 +161,11 @@ export function TicketsTab({
               <tr
                 key={item.id}
                 onClick={() => onOpenSession(item)}
-                className={`h-14 cursor-pointer border-b border-slate-100 ${
-                  index % 2 === 0 ? "bg-white" : "bg-[#f8fafc]"
+                className={`h-[46px] cursor-pointer border-b border-slate-200 ${
+                  index % 2 === 0 ? "bg-white" : "bg-slate-50/60"
                 } transition hover:bg-sky-50`}
               >
-                <td className="px-3">
+                <td className="px-4 text-slate-700">
                   <div className="flex items-center gap-2">
                     {item.ticket_code ? (
                       <span className="font-semibold text-sky-600">
@@ -193,7 +193,7 @@ export function TicketsTab({
                   </div>
                 </td>
 
-                <td className="px-3">
+                <td className="px-4 text-slate-700">
                   {item.ticket_chatbot_status ? (
                     <span
                       className={`whitespace-nowrap rounded-full px-2 py-1 text-[11px] font-semibold ${ticketStatusPillClass(
@@ -207,28 +207,28 @@ export function TicketsTab({
                   )}
                 </td>
 
-                <td className="px-3 font-mono text-[11px] text-slate-600">
+                <td className="px-4 font-mono text-[11px] text-slate-600">
                   {item.session_id}
                 </td>
 
-                <td className="px-3 whitespace-nowrap">
+                <td className="px-4 whitespace-nowrap">
                   {formatDateTime(item.started_at)}
                 </td>
 
-                <td className="px-3">{item.channel || "-"}</td>
-                <td className="px-3">{item.category_label || "-"}</td>
-                <td className="px-3">{item.msg_count_total ?? 0}</td>
+                <td className="px-4 text-slate-700">{item.channel || "-"}</td>
+                <td className="px-4 text-slate-700">{item.category_label || "-"}</td>
+                <td className="px-4 text-slate-700">{item.msg_count_total ?? 0}</td>
 
-                <td className="px-3">
+                <td className="px-4 text-slate-700">
                   <StatusPill
                     value={item.outcome_type}
                     label={item.outcome_label}
                   />
                 </td>
 
-                <td className="px-3">{item.contact_info || "-"}</td>
-                <td className="px-3">{shortText(item.last_question, 110)}</td>
-                <td className="px-3">{shortText(item.reason, 110)}</td>
+                <td className="px-4 text-slate-700">{item.contact_info || "-"}</td>
+                <td className="px-4 text-slate-700">{shortText(item.last_question, 110)}</td>
+                <td className="px-4 text-slate-700">{shortText(item.reason, 110)}</td>
               </tr>
             ))}
           </tbody>

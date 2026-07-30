@@ -175,7 +175,7 @@ export function statusBadgeClass(
 ): string {
   switch (status) {
     case "CLASSIFIED":
-      return "bg-sky-100 text-sky-700";
+      return "bg-emerald-100 text-emerald-700";
     case "CONFIRMED":
       return "bg-emerald-100 text-emerald-700";
     case "NEED_REVIEW":

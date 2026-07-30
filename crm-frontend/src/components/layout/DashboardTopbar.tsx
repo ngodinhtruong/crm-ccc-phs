@@ -60,14 +60,14 @@ export function DashboardTopbar({ onMenuClick }: DashboardTopbarProps) {
         "";
 
     return (
-        <header className="fixed left-0 right-0 top-0 z-40 h-14 border-b border-orange-500 bg-white shadow-sm">
+        <header className="fixed left-0 right-0 top-0 z-40 h-14 border-b border-[#10b981] bg-white shadow-sm">
             <div className="flex h-full items-center justify-between">
                 <div className="flex h-full items-center">
                     {/* icon sidebar width */}
                     <button
                         type="button"
                         onClick={onMenuClick}
-                        className="flex h-full w-10 items-center justify-center bg-[#263747] hover:bg-[#1d2c39]"
+                        className="flex h-full w-10 items-center justify-center bg-[#10b981] hover:bg-[#059669]"
                         aria-label="Open main menu"
                     >
                         <div className="space-y-1">

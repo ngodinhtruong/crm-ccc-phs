@@ -85,23 +85,23 @@ export function KpiRankingTable({
 }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[1450px] border-collapse text-left text-xs">
+      <table className="w-full min-w-[1450px] border-collapse text-left text-sm">
         <thead>
-          <tr className="h-10 border-b bg-white text-slate-700">
-            <th className="sticky left-0 z-20 w-[90px] bg-white px-3 font-semibold">
+          <tr className="h-11 border-b-2 border-slate-200 bg-slate-50 text-slate-700">
+            <th className="sticky left-0 z-20 w-[90px] bg-slate-50 px-4 font-semibold">
               Thao tác
             </th>
-            <th className="w-[90px] px-3 font-semibold">Hạng</th>
-            <th className="w-[240px] px-3 font-semibold">Nhân viên</th>
-            <th className="w-[180px] px-3 font-semibold">Chi nhánh</th>
-            <th className="w-[120px] px-3 font-semibold">Bảng A</th>
-            <th className="w-[120px] px-3 font-semibold">Bảng B</th>
-            <th className="w-[130px] px-3 font-semibold">Tổng điểm</th>
-            <th className="w-[150px] px-3 font-semibold">Phí GD</th>
-            <th className="w-[150px] px-3 font-semibold">Tái kích hoạt</th>
-            <th className="w-[170px] px-3 font-semibold">Điều kiện cổng</th>
-            <th className="w-[180px] px-3 font-semibold">Cổng chưa đạt</th>
-            <th className="w-[180px] px-3 font-semibold">Cập nhật</th>
+            <th className="w-[90px] px-4 font-semibold">Hạng</th>
+            <th className="w-[240px] px-4 font-semibold">Nhân viên</th>
+            <th className="w-[180px] px-4 font-semibold">Chi nhánh</th>
+            <th className="w-[120px] px-4 font-semibold">Bảng A</th>
+            <th className="w-[120px] px-4 font-semibold">Bảng B</th>
+            <th className="w-[130px] px-4 font-semibold">Tổng điểm</th>
+            <th className="w-[150px] px-4 font-semibold">Phí GD</th>
+            <th className="w-[150px] px-4 font-semibold">Tái kích hoạt</th>
+            <th className="w-[170px] px-4 font-semibold">Điều kiện cổng</th>
+            <th className="w-[180px] px-4 font-semibold">Cổng chưa đạt</th>
+            <th className="w-[180px] px-4 font-semibold">Cập nhật</th>
           </tr>
         </thead>
 
@@ -117,31 +117,31 @@ export function KpiRankingTable({
           {!loading &&
             !error &&
             items.map((item, index) => {
-              const rowBg = index % 2 === 0 ? "bg-white" : "bg-[#f8fafc]";
+              const rowBg = index % 2 === 0 ? "bg-white" : "bg-slate-50/60";
 
               return (
                 <tr
                   key={item.user}
-                  className={`h-14 border-b border-slate-100 ${rowBg} hover:bg-sky-50`}
+                  className={`h-[46px] border-b border-slate-200 ${rowBg} hover:bg-emerald-50`}
                 >
                   <td className={`sticky left-0 z-10 px-3 ${rowBg}`}>
                     <Link
                       href={buildKpiHref(item, selectedPeriodId)}
                       title="Xem KPI nhân viên"
-                      className="inline-flex h-8 w-8 items-center justify-center rounded text-slate-400 hover:bg-sky-50 hover:text-sky-600"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded text-slate-400 hover:bg-emerald-50 hover:text-[#059669]"
                     >
                       <Eye size={15} />
                     </Link>
                   </td>
 
-                  <td className="px-3">
+                  <td className="px-4 text-slate-700">
                     <RankBadge rank={item.rank} />
                   </td>
 
-                  <td className="px-3">
+                  <td className="px-4 text-slate-700">
                     <Link
                       href={buildKpiHref(item, selectedPeriodId)}
-                      className="font-semibold text-sky-600 hover:underline"
+                      className="font-semibold text-[#059669] hover:underline"
                     >
                       {getEmployeeName(item)}
                     </Link>
@@ -152,21 +152,21 @@ export function KpiRankingTable({
                     </div>
                   </td>
 
-                  <td className="px-3">{item.branch_name || "-"}</td>
-                  <td className="px-3 font-semibold">{formatNumber(item.manual_score)}</td>
-                  <td className="px-3 font-semibold">{formatNumber(item.auto_score)}</td>
-                  <td className="px-3 font-semibold text-slate-800">
+                  <td className="px-4 text-slate-700">{item.branch_name || "-"}</td>
+                  <td className="px-4 font-semibold">{formatNumber(item.manual_score)}</td>
+                  <td className="px-4 font-semibold">{formatNumber(item.auto_score)}</td>
+                  <td className="px-4 font-semibold text-slate-800">
                     {formatNumber(item.total_score)}
                   </td>
-                  <td className="px-3">{formatNumber(item.fee_value)}</td>
-                  <td className="px-3">{formatNumber(item.reactivated_accounts)}</td>
-                  <td className="px-3">
+                  <td className="px-4 text-slate-700">{formatNumber(item.fee_value)}</td>
+                  <td className="px-4 text-slate-700">{formatNumber(item.reactivated_accounts)}</td>
+                  <td className="px-4 text-slate-700">
                     <ScoreStatusBadge item={item} />
                   </td>
                   <td className="max-w-[180px] truncate px-3" title={getFailedGateText(item.failed_gate_codes)}>
                     {getFailedGateText(item.failed_gate_codes)}
                   </td>
-                  <td className="whitespace-nowrap px-3">
+                  <td className="px-4 text-slate-600">
                     {formatDateTime(item.calculated_at)}
                   </td>
                 </tr>

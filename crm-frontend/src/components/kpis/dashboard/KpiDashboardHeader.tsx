@@ -103,7 +103,7 @@ export function KpiDashboardHeader({
               type="button"
               onClick={dashboard.recalculate}
               disabled={dashboard.calculating || !dashboard.selectedPeriodId}
-              className="flex h-8 items-center gap-1 rounded bg-[#0097cf] px-3 text-xs font-semibold text-white shadow-sm hover:bg-[#0089bd] disabled:opacity-60"
+              className="flex h-8 items-center gap-1 rounded bg-[#10b981] px-3 text-xs font-semibold text-white shadow-sm hover:bg-[#059669] disabled:opacity-60"
             >
               <RotateCw size={14} />
               {dashboard.calculating ? "Đang tính..." : "Tính lại CRM"}

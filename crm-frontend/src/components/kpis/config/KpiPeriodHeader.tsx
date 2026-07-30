@@ -42,7 +42,7 @@ export function KpiHeaderActions({
         className={[
           "flex h-8 items-center gap-1.5 rounded border px-3 text-xs font-semibold transition-all",
           filterOpen
-            ? "border-[#0097cf] bg-sky-50 text-[#0097cf] shadow-sm"
+            ? "border-[#10b981] bg-emerald-50 text-[#059669] shadow-sm"
             : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50",
         ].join(" ")}
       >
@@ -54,7 +54,7 @@ export function KpiHeaderActions({
         type="button"
         onClick={config.reloadPeriodDetail}
         disabled={!config.selectedPeriodId || config.loadingDetail}
-        className="flex h-8 items-center gap-1 rounded border border-sky-300 bg-white px-3 text-xs font-semibold text-sky-600 hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex h-8 items-center gap-1 rounded border border-emerald-300 bg-white px-3 text-xs font-semibold text-[#059669] hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
       >
         <RefreshCw size={14} />
         Tải lại
@@ -65,7 +65,7 @@ export function KpiHeaderActions({
           <button
             type="button"
             onClick={onOpenCreate}
-            className="flex h-8 items-center gap-1 rounded bg-[#0097cf] px-3 text-xs font-semibold text-white shadow-sm hover:bg-[#0089bd]"
+            className="flex h-8 items-center gap-1 rounded bg-[#10b981] px-3 text-xs font-semibold text-white shadow-sm hover:bg-[#059669]"
           >
             <Plus size={14} />
             Thêm kỳ
@@ -186,7 +186,7 @@ export function KpiPeriodHeader({
         <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-md animate-in fade-in duration-150">
           <div className="flex items-center justify-between border-b bg-slate-50 px-4 py-2">
             <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
-              <Filter size={14} className="text-[#0097cf]" />
+              <Filter size={14} className="text-[#059669]" />
               Bộ lọc Cấu hình KPI
             </div>
             <button
@@ -223,7 +223,7 @@ export function KpiPeriodHeader({
               <select
                 value={config.selectedPeriodId}
                 onChange={(event) => config.setSelectedPeriodId(event.target.value)}
-                className="h-9 w-full rounded border border-slate-300 bg-white px-3 text-xs outline-none focus:border-sky-400"
+                className="h-9 w-full rounded border border-slate-300 bg-white px-3 text-xs outline-none focus:border-emerald-500"
               >
                 <option value="">Chọn kỳ KPI</option>
                 {config.periods.map((item) => (
@@ -242,7 +242,7 @@ export function KpiPeriodHeader({
                 value={config.selectedProfileId}
                 onChange={(event) => config.setSelectedProfileId(event.target.value)}
                 disabled={!config.periodDetail || config.profileRows.length === 0}
-                className="h-9 w-full rounded border border-slate-300 bg-white px-3 text-xs outline-none focus:border-sky-400 disabled:bg-slate-50"
+                className="h-9 w-full rounded border border-slate-300 bg-white px-3 text-xs outline-none focus:border-emerald-500 disabled:bg-slate-50"
               >
                 <option value="">Chọn bộ KPI</option>
                 {config.profileRows.map((item) => (
@@ -268,7 +268,7 @@ export function KpiPeriodHeader({
                 <input
                   value={year}
                   onChange={(event) => setYear(event.target.value)}
-                  className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400"
+                  className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-emerald-500"
                 />
               </ModalField>
             </div>
@@ -278,7 +278,7 @@ export function KpiPeriodHeader({
                 <input
                   value={month}
                   onChange={(event) => setMonth(event.target.value)}
-                  className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400"
+                  className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-emerald-500"
                 />
               </ModalField>
             </div>
@@ -305,7 +305,7 @@ export function KpiPeriodHeader({
               <button
                 type="button"
                 onClick={submitCreate}
-                className="h-9 rounded bg-[#0097cf] px-4 text-xs font-semibold text-white hover:bg-[#0089bd]"
+                className="h-9 rounded bg-[#10b981] px-4 text-xs font-semibold text-white hover:bg-[#059669]"
               >
                 Tạo kỳ
               </button>
@@ -326,7 +326,7 @@ export function KpiPeriodHeader({
                 <input
                   value={periodName}
                   onChange={(event) => setPeriodName(event.target.value)}
-                  className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400"
+                  className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-emerald-500"
                 />
               </ModalField>
             </div>
@@ -336,7 +336,7 @@ export function KpiPeriodHeader({
                 <select
                   value={status}
                   onChange={(event) => setStatus(event.target.value)}
-                  className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400"
+                  className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-emerald-500"
                 >
                   <option value="DRAFT">DRAFT</option>
                   <option value="ACTIVE">ACTIVE</option>
@@ -352,7 +352,7 @@ export function KpiPeriodHeader({
                   type="date"
                   value={startDate}
                   onChange={(event) => setStartDate(event.target.value)}
-                  className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400"
+                  className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-emerald-500"
                 />
               </ModalField>
             </div>
@@ -363,7 +363,7 @@ export function KpiPeriodHeader({
                   type="date"
                   value={endDate}
                   onChange={(event) => setEndDate(event.target.value)}
-                  className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400"
+                  className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-emerald-500"
                 />
               </ModalField>
             </div>
@@ -379,7 +379,7 @@ export function KpiPeriodHeader({
               <button
                 type="button"
                 onClick={submitEdit}
-                className="h-9 rounded bg-[#0097cf] px-4 text-xs font-semibold text-white hover:bg-[#0089bd]"
+                className="h-9 rounded bg-[#10b981] px-4 text-xs font-semibold text-white hover:bg-[#059669]"
               >
                 Lưu kỳ
               </button>

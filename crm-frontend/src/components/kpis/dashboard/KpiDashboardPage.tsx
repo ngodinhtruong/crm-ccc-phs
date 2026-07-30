@@ -122,7 +122,7 @@ export function KpiDashboardPage() {
                         className={[
                           "border-b-2 px-3 pb-3 text-xs font-semibold",
                           active
-                            ? "border-[#0097cf] text-[#0097cf]"
+                            ? "border-[#10b981] text-[#059669]"
                             : "border-transparent text-slate-500 hover:text-slate-800",
                         ].join(" ")}
                       >

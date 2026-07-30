@@ -389,7 +389,7 @@ function getActionLabel(value?: string | null) {
 
 function getActionClass(value?: string | null) {
     if (value === "CREATE") return "bg-emerald-100 text-emerald-700";
-    if (value === "UPDATE") return "bg-sky-100 text-sky-700";
+    if (value === "UPDATE") return "bg-emerald-100 text-emerald-700";
     if (value === "DELETE") return "bg-red-100 text-red-700";
     if (value === "IMPORT") return "bg-violet-100 text-violet-700";
 
@@ -487,17 +487,17 @@ function AuditHistoryTab({ recordId }: { recordId: string }) {
                 </div>
 
                 <div className="overflow-x-auto">
-                    <table className="w-full min-w-[2600px] border-collapse text-left text-xs">
+                    <table className="w-full min-w-[2600px] border-collapse text-left text-sm">
                         <thead>
-                            <tr className="h-10 border-b bg-white text-slate-700">
-                                <th className="w-[150px] px-3 font-semibold">Thời gian</th>
-                                <th className="w-[110px] px-3 font-semibold">Hành động</th>
-                                <th className="w-[260px] px-3 font-semibold">Lý do chỉnh sửa</th>
+                            <tr className="h-11 border-b-2 border-slate-200 bg-slate-50 text-slate-700">
+                                <th className="w-[150px] px-4 font-semibold">Thời gian</th>
+                                <th className="w-[110px] px-4 font-semibold">Hành động</th>
+                                <th className="w-[260px] px-4 font-semibold">Lý do chỉnh sửa</th>
 
                                 {auditColumns.map((column) => (
                                     <th
                                         key={column.label}
-                                        className={`${column.width} px-3 font-semibold`}
+                                        className={`${column.width} px-4 font-semibold`}
                                     >
                                         {column.label}
                                     </th>
@@ -508,19 +508,19 @@ function AuditHistoryTab({ recordId }: { recordId: string }) {
                         <tbody>
                             {audit.items.map((log, index) => {
                                 const snapshot = getAuditSnapshot(log);
-                                const rowBg = index % 2 === 0 ? "bg-white" : "bg-[#f8fafc]";
+                                const rowBg = index % 2 === 0 ? "bg-white" : "bg-slate-50/60";
                                 const reason = getAuditReason(log);
 
                                 return (
                                     <tr
                                         key={log.id}
-                                        className={`h-14 border-b border-slate-100 ${rowBg} align-top hover:bg-sky-50`}
+                                        className={`h-[46px] border-b border-slate-200 ${rowBg} align-top hover:bg-emerald-50`}
                                     >
-                                        <td className="px-3 py-3 whitespace-nowrap">
+                                        <td className="px-4 py-3 whitespace-nowrap">
                                             {formatDateTime(log.changed_at || log.created_at)}
                                         </td>
 
-                                        <td className="px-3 py-3">
+                                        <td className="px-4 py-3">
                                             <span
                                                 className={`inline-flex rounded px-2 py-1 text-[11px] font-semibold ${getActionClass(log.action_type)}`}
                                             >
@@ -619,7 +619,7 @@ export function SaRecordDetailPage({ recordId }: { recordId: string }) {
                     <button
                         type="button"
                         onClick={() => router.push(`/sale-admin/records/${recordId}/edit`)}
-                        className="flex h-8 items-center gap-1 rounded bg-[#0097cf] px-3 text-xs font-semibold text-white hover:bg-[#0089bd]"
+                        className="flex h-8 items-center gap-1 rounded bg-[#10b981] px-3 text-xs font-semibold text-white hover:bg-[#059669]"
                     >
                         <Edit size={15} />
                         Chỉnh sửa
@@ -660,7 +660,7 @@ export function SaRecordDetailPage({ recordId }: { recordId: string }) {
                             className={[
                                 "h-10 px-4 text-xs font-semibold",
                                 detail.activeTab === "info"
-                                    ? "border-b-2 border-[#0097cf] text-[#0097cf]"
+                                    ? "border-b-2 border-[#10b981] text-[#059669]"
                                     : "text-slate-500 hover:text-slate-700",
                             ].join(" ")}
                         >
@@ -673,7 +673,7 @@ export function SaRecordDetailPage({ recordId }: { recordId: string }) {
                             className={[
                                 "h-10 px-4 text-xs font-semibold",
                                 detail.activeTab === "audit"
-                                    ? "border-b-2 border-[#0097cf] text-[#0097cf]"
+                                    ? "border-b-2 border-[#10b981] text-[#059669]"
                                     : "text-slate-500 hover:text-slate-700",
                             ].join(" ")}
                         >

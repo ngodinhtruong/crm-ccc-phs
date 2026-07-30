@@ -60,7 +60,7 @@ export function FaqTab({
           <button
             type="button"
             onClick={onSearch}
-            className="flex h-10 items-center gap-2 rounded-lg bg-[#0097cf] px-4 text-xs font-semibold text-white transition hover:bg-[#0089bd]"
+            className="flex h-10 items-center gap-2 rounded-lg bg-[#10b981] px-4 text-xs font-semibold text-white transition hover:bg-[#059669]"
           >
             <Search size={14} />
             Tìm kiếm
@@ -69,15 +69,15 @@ export function FaqTab({
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[720px] border-collapse text-left text-xs">
+        <table className="w-full min-w-[720px] border-collapse text-left text-sm">
           <thead>
             <tr className="h-11 border-b bg-white text-slate-700">
-              <th className="w-[70px] px-3 font-semibold">STT</th>
-              <th className="px-3 font-semibold">Chủ đề</th>
-              <th className="w-[130px] px-3 font-semibold">Số lượt hỏi</th>
-              <th className="w-[110px] px-3 font-semibold">Số phiên</th>
-              <th className="w-[120px] px-3 font-semibold">Tỉ trọng</th>
-              <th className="w-[170px] px-3 font-semibold">Lần hỏi gần nhất</th>
+              <th className="w-[70px] px-4 font-semibold">STT</th>
+              <th className="px-4 font-semibold">Chủ đề</th>
+              <th className="w-[130px] px-4 font-semibold">Số lượt hỏi</th>
+              <th className="w-[110px] px-4 font-semibold">Số phiên</th>
+              <th className="w-[120px] px-4 font-semibold">Tỉ trọng</th>
+              <th className="w-[170px] px-4 font-semibold">Lần hỏi gần nhất</th>
             </tr>
           </thead>
 
@@ -93,31 +93,31 @@ export function FaqTab({
             {faqs.map((item, index) => (
               <tr
                 key={item.category}
-                className={`h-14 border-b border-slate-100 ${
-                  index % 2 === 0 ? "bg-white" : "bg-[#f8fafc]"
+                className={`h-[46px] border-b border-slate-200 ${
+                  index % 2 === 0 ? "bg-white" : "bg-slate-50/60"
                 } hover:bg-sky-50`}
               >
-                <td className="px-3">{index + 1}</td>
+                <td className="px-4 text-slate-700">{index + 1}</td>
 
-                <td className="px-3 font-medium text-slate-700">
+                <td className="px-4 font-medium text-slate-700">
                   {item.category}
                 </td>
 
-                <td className="px-3">
+                <td className="px-4 text-slate-700">
                   <span className="rounded-full bg-sky-100 px-3 py-1 font-semibold text-sky-700">
                     {item.hit_count}
                   </span>
                 </td>
 
-                <td className="px-3">{item.session_count}</td>
+                <td className="px-4 text-slate-700">{item.session_count}</td>
 
-                <td className="px-3 text-slate-600">
+                <td className="px-4 text-slate-600">
                   {totalHits
                     ? `${Math.round((item.hit_count / totalHits) * 100)}%`
                     : "-"}
                 </td>
 
-                <td className="px-3">{formatDateTime(item.latest_at)}</td>
+                <td className="px-4 text-slate-700">{formatDateTime(item.latest_at)}</td>
               </tr>
             ))}
           </tbody>

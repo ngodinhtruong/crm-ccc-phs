@@ -41,7 +41,7 @@ export function GeneralDashboardPage() {
           type="button"
           onClick={dashboard.reload}
           disabled={dashboard.loading}
-          className="flex h-8 items-center gap-1 rounded bg-[#0097cf] px-3 text-xs font-semibold text-white hover:bg-[#0089bd] disabled:opacity-50"
+          className="flex h-8 items-center gap-1 rounded bg-[#10b981] px-3 text-xs font-semibold text-white hover:bg-[#059669] disabled:opacity-50"
         >
           <RefreshCw size={15} className={dashboard.loading ? "animate-spin" : ""} />
           Làm mới

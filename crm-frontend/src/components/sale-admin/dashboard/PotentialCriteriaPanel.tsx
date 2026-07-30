@@ -56,9 +56,9 @@ export function PotentialCriteriaPanel({ criteria }: { criteria?: SaAdminCriteri
           </div>
         </div>
 
-        <div className="rounded-lg border border-sky-100 bg-sky-50 p-3">
-          <p className="mb-1 text-xs font-bold text-[#007ead]">Lưu ý</p>
-          <p className="text-xs leading-5 text-sky-700">
+        <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-3">
+          <p className="mb-1 text-xs font-bold text-[#059669]">Lưu ý</p>
+          <p className="text-xs leading-5 text-emerald-700">
             {criteria?.note || "Chuẩn giống tab Chất lượng của KPI Admin — KH có lệnh khớp bất kỳ lúc nào, không chỉ trong tháng."}
           </p>
         </div>

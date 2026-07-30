@@ -23,20 +23,20 @@ function totalFee(row: SaAdminBranchRankingRow) {
 function RankingRow({ row, index, isTotal = false }: { row: SaAdminBranchRankingRow; index: number; isTotal?: boolean }) {
   const rowClass = isTotal
     ? "border-t-2 border-slate-200 bg-slate-50 font-bold text-slate-900"
-    : `border-b border-slate-100 ${index % 2 === 0 ? "bg-white" : "bg-slate-50/40"} hover:bg-sky-50/70`;
+    : `border-b border-slate-100 ${index % 2 === 0 ? "bg-white" : "bg-slate-50/40"} hover:bg-emerald-50/70`;
 
   return (
     <tr className={`h-10 text-[11px] ${rowClass}`}>
-      <td className="sticky left-0 z-10 bg-inherit px-3 font-semibold text-slate-800">
+      <td className="sticky left-0 z-10 bg-inherit px-4 font-semibold text-slate-800">
         {isTotal ? "TOTAL" : row.branch_name}
       </td>
-      <td className="px-3 text-right text-slate-600">{formatNumber(row.total_calls)}</td>
-      <td className="px-3 text-right font-semibold text-emerald-600">{formatNumber(row.reactivated_accounts)}</td>
-      <td className="px-3 text-right font-semibold text-emerald-500">{formatNumber(row.potential_active_accounts)}</td>
-      <td className="px-2 text-right text-sky-600" title={formatMoney(moneyValue(row, "sa_transaction_value"))}>
+      <td className="px-4 text-right text-slate-600">{formatNumber(row.total_calls)}</td>
+      <td className="px-4 text-right font-semibold text-emerald-600">{formatNumber(row.reactivated_accounts)}</td>
+      <td className="px-4 text-right font-semibold text-emerald-500">{formatNumber(row.potential_active_accounts)}</td>
+      <td className="px-2 text-right text-emerald-600" title={formatMoney(moneyValue(row, "sa_transaction_value"))}>
         {formatCompactMoney(moneyValue(row, "sa_transaction_value"))}
       </td>
-      <td className="px-2 text-right font-semibold text-sky-700" title={formatMoney(moneyValue(row, "sa_transaction_fee"))}>
+      <td className="px-2 text-right font-semibold text-[#059669]" title={formatMoney(moneyValue(row, "sa_transaction_fee"))}>
         {formatCompactMoney(moneyValue(row, "sa_transaction_fee"))}
       </td>
       <td className="px-2 text-right text-orange-500" title={formatMoney(moneyValue(row, "broker_transaction_value"))}>
@@ -51,7 +51,7 @@ function RankingRow({ row, index, isTotal = false }: { row: SaAdminBranchRanking
       <td className="px-2 text-right font-bold text-amber-600" title={formatMoney(totalFee(row))}>
         {formatCompactMoney(totalFee(row))}
       </td>
-      <td className="px-3 text-center">
+      <td className="px-4 text-center">
         <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${getGrowthClass(row.mom_growth_percent)}`}>
           {formatPercent(row.mom_growth_percent)}
         </span>
@@ -89,7 +89,7 @@ export function BranchRankingTable({
             {formatNumber(rows.length)} chi nhánh
           </span>
           {rows.length > visibleRows.length && (
-            <span className="rounded-full bg-sky-50 px-2.5 py-1 font-semibold text-[#007ead] ring-1 ring-sky-100">
+            <span className="rounded-full bg-emerald-50 px-2.5 py-1 font-semibold text-[#059669] ring-1 ring-emerald-100">
               Hiển thị top {visibleRows.length}
             </span>
           )}
@@ -97,14 +97,14 @@ export function BranchRankingTable({
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1180px] border-collapse text-left text-xs">
+        <table className="w-full min-w-[1180px] border-collapse text-left text-sm">
           <thead>
             <tr className="border-b border-slate-100 bg-slate-50 text-[11px] text-slate-500">
               <th className="sticky left-0 z-20 w-[210px] bg-slate-50 px-3 py-2 text-left" rowSpan={2}>Chi nhánh</th>
               <th className="w-[80px] px-3 py-2 text-right" rowSpan={2}>Gọi</th>
               <th className="w-[90px] px-3 py-2 text-right" rowSpan={2}>TK<br />kích hoạt</th>
               <th className="w-[80px] px-3 py-2 text-right text-emerald-600" rowSpan={2}>KH<br />TN</th>
-              <th className="px-2 py-1.5 text-center text-sky-600" colSpan={2}>SA</th>
+              <th className="px-2 py-1.5 text-center text-[#059669]" colSpan={2}>SA</th>
               <th className="px-2 py-1.5 text-center text-orange-600" colSpan={2}>Môi giới</th>
               <th className="px-2 py-1.5 text-center text-slate-700" colSpan={2}>Tổng</th>
               <th className="w-[90px] px-3 py-2 text-center" rowSpan={2}>MoM</th>

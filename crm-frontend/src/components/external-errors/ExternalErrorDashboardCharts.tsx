@@ -335,7 +335,7 @@ function RecurringIssuesTable({ items }: { items: ExternalErrorRecurringIssue[] 
               </tr>
             )}
             {items.map((item, index) => (
-              <tr key={`${item.normalized_issue}-${index}`} className="border-b border-slate-100 hover:bg-sky-50">
+              <tr key={`${item.normalized_issue}-${index}`} className="border-b border-slate-100 hover:bg-emerald-50">
                 <td className="px-3 py-3 font-semibold text-slate-800">{item.normalized_issue}</td>
                 <td className="px-3 py-3 text-right font-bold text-slate-800">{formatNumber(item.count)}</td>
                 <td className="px-3 py-3 text-slate-600">{item.devices?.join(", ") || "-"}</td>

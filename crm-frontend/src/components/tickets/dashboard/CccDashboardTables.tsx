@@ -297,9 +297,9 @@ export function TicketListTable({
               <tr
                 key={item.id}
                 onClick={() => router.push(`/tickets/${item.id}`)}
-                className="h-11 cursor-pointer border-b border-slate-100 transition-colors hover:bg-sky-50"
+                className="h-11 cursor-pointer border-b border-slate-100 transition-colors hover:bg-emerald-50"
               >
-                <td className="px-3 py-3 font-semibold text-sky-600">
+                <td className="px-3 py-3 font-semibold text-[#059669]">
                   {item.ticket_code || `#${item.id}`}
                 </td>
                 <td className="px-3 py-3 text-slate-600">
@@ -356,7 +356,7 @@ export function TicketListTable({
         />
 
         {isServerPagination && loading && data && (
-          <p className="mt-2 text-[11px] text-sky-600">
+          <p className="mt-2 text-[11px] text-[#059669]">
             Đang cập nhật trang dữ liệu...
           </p>
         )}

@@ -29,7 +29,7 @@ function MetricCard({
   tone?: "sky" | "emerald" | "amber" | "red" | "violet" | "slate";
 }) {
   const toneClass = {
-    sky: "bg-sky-50 text-sky-600 ring-sky-100",
+    sky: "bg-emerald-50 text-emerald-600 ring-emerald-100",
     emerald: "bg-emerald-50 text-emerald-600 ring-emerald-100",
     amber: "bg-amber-50 text-amber-600 ring-amber-100",
     red: "bg-red-50 text-red-600 ring-red-100",

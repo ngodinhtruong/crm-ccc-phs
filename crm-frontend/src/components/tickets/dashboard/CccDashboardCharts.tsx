@@ -47,7 +47,7 @@ import {
 } from "./CccDashboardUtils";
 
 const COLORS = [
-  "#0097cf", // Primary PHS Sky Blue
+  "#10b981", // Bright Cool Emerald Green
   "#10b981", // Emerald Green
   "#f59e0b", // Amber / Warm Yellow
   "#ef4444", // Rose / Red
@@ -353,9 +353,9 @@ function TicketResultChartCard({
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div className="rounded-xl border border-sky-100 bg-gradient-to-br from-sky-50 to-white p-3.5 shadow-sm">
+        <div className="rounded-xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-white p-3.5 shadow-sm">
           <p className="text-[11px] font-medium text-slate-500">Tổng Ticket Tiếp Nhận</p>
-          <p className="mt-1 text-xl font-black text-sky-700">{formatNumber(totalsSum)}</p>
+          <p className="mt-1 text-xl font-black text-emerald-700">{formatNumber(totalsSum)}</p>
         </div>
         <div className="rounded-xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-white p-3.5 shadow-sm">
           <p className="text-[11px] font-medium text-slate-500">Tổng Ticket Đã Xử Lý</p>
@@ -389,7 +389,7 @@ function TicketResultChartCard({
             <button
               type="button"
               onClick={() => setSelectedMonth(null)}
-              className="flex items-center gap-1.5 rounded-md bg-sky-50 px-2.5 py-1 text-xs font-bold text-sky-700 hover:bg-sky-100 ring-1 ring-sky-200 transition-all shadow-2xs"
+              className="flex items-center gap-1.5 rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-bold text-[#059669] hover:bg-emerald-100 ring-1 ring-emerald-200 transition-all shadow-2xs"
             >
               ← Quay lại các kỳ
             </button>
@@ -481,8 +481,8 @@ function TicketResultChartCard({
               >
                 <defs>
                   <linearGradient id="totalGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#0097cf" stopOpacity={0.25} />
-                    <stop offset="95%" stopColor="#0097cf" stopOpacity={0.02} />
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.25} />
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0.02} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
@@ -490,7 +490,7 @@ function TicketResultChartCard({
                 <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
                 <Tooltip content={<ValueTooltip />} />
                 <Legend wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
-                <Area type="monotone" dataKey="total" name="Tổng ticket tiếp nhận" fill="url(#totalGradient)" stroke="#0097cf" strokeWidth={2} isAnimationActive={false} />
+                <Area type="monotone" dataKey="total" name="Tổng ticket tiếp nhận" fill="url(#totalGradient)" stroke="#10b981" strokeWidth={2} isAnimationActive={false} />
                 <Bar dataKey="processed" name="Đã xử lý" fill="#10b981" radius={[4, 4, 0, 0]} barSize={24} isAnimationActive={false}>
                   <LabelList dataKey="processed" position="top" style={{ fontSize: 10, fill: '#10b981', fontWeight: 700 }} formatter={(val: any) => (val && Number(val) > 0 ? val : "")} />
                 </Bar>
@@ -1126,7 +1126,7 @@ function UnitCancelledChartCard({
     const item = aggregatedItems.find((i) => isSameMonth(i, selectedMonth));
     if (!item) return [];
     return [
-      { name: "TT.CSKH ghi nhận", value: item.cs_cancelled || 0, color: "#0097cf" },
+      { name: "TT.CSKH ghi nhận", value: item.cs_cancelled || 0, color: "#10b981" },
       { name: "PBLQ ghi nhận", value: item.related_cancelled || 0, color: "#ef4444" },
     ];
   }, [aggregatedItems, selectedMonth]);
@@ -1206,7 +1206,7 @@ function UnitCancelledChartCard({
               <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
               <Tooltip content={<ValueTooltip />} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Bar dataKey="cs_cancelled" name="TT.CSKH ghi nhận" fill="#0097cf" radius={[4, 4, 0, 0]} isAnimationActive={false}>
+              <Bar dataKey="cs_cancelled" name="TT.CSKH ghi nhận" fill="#10b981" radius={[4, 4, 0, 0]} isAnimationActive={false}>
                 <LabelList dataKey="cs_cancelled" position="top" style={{ fontSize: 10, fill: '#475569', fontWeight: 600 }} />
               </Bar>
               <Bar dataKey="related_cancelled" name="PBLQ ghi nhận" fill="#ef4444" radius={[4, 4, 0, 0]} isAnimationActive={false}>
@@ -1326,7 +1326,7 @@ function SlaGaugeChartCard({ monthly, globalViewMode }: { monthly: any[]; global
   const slaComplianceRate = totalSla > 0 ? ((onTimeSla / totalSla) * 100).toFixed(1) : "0";
 
   const slaGaugeData = [
-    { name: "Đúng hạn (On-time)", value: onTimeSla, color: "#0097cf" },
+    { name: "Đúng hạn (On-time)", value: onTimeSla, color: "#10b981" },
     { name: "Trễ hạn (Overdue)", value: overdueSla, color: "#ef4444" },
   ];
 
@@ -1335,7 +1335,7 @@ function SlaGaugeChartCard({ monthly, globalViewMode }: { monthly: any[]; global
       title="Tỷ lệ Tuân thủ SLA"
       description="Đánh giá chất lượng cam kết thời gian đáp ứng"
       headerRight={
-        <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700 ring-1 ring-sky-200">
+        <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-[#059669] ring-1 ring-emerald-200">
           SLA Rate: {slaComplianceRate}%
         </span>
       }
@@ -1362,8 +1362,8 @@ function SlaGaugeChartCard({ monthly, globalViewMode }: { monthly: any[]; global
           </div>
 
           <div className="w-full space-y-2.5 sm:w-1/2">
-            <div className="rounded-lg border border-sky-100 bg-sky-50/50 p-3">
-              <div className="flex items-center justify-between text-xs font-semibold text-sky-800">
+            <div className="rounded-lg border border-emerald-100 bg-emerald-50/50 p-3">
+              <div className="flex items-center justify-between text-xs font-semibold text-emerald-800">
                 <span>Không trễ hạn</span>
                 <span>{formatNumber(onTimeSla)} ticket ({totalSla > 0 ? ((onTimeSla / totalSla) * 100).toFixed(1) : 0}%)</span>
               </div>
@@ -1398,7 +1398,7 @@ function SlaCategoryOverdueChartCard({ category, globalViewMode }: { category: a
               <YAxis dataKey="category_name" type="category" tick={{ fontSize: 10, fontWeight: 600 }} width={120} />
               <Tooltip content={<ValueTooltip />} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Bar dataKey="not_overdue" name="Không trễ hạn" fill="#0097cf" stackId="sla" isAnimationActive={false} />
+              <Bar dataKey="not_overdue" name="Không trễ hạn" fill="#10b981" stackId="sla" isAnimationActive={false} />
               <Bar dataKey="overdue" name="Trễ hạn" fill="#ef4444" stackId="sla" radius={[0, 4, 4, 0]} isAnimationActive={false}>
                 <LabelList dataKey="overdue" position="right" style={{ fontSize: 10, fill: '#ef4444', fontWeight: 700 }} formatter={(v: any) => (v && Number(v) > 0 ? v : "")} />
               </Bar>

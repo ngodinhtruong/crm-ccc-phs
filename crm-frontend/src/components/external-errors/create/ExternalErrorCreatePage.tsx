@@ -65,7 +65,7 @@ export function ExternalErrorCreatePage() {
               onChange={(event) =>
                 state.setField("receivedDate", event.target.value)
               }
-              className="h-9 w-full rounded border border-slate-300 bg-white px-3 text-xs outline-none focus:border-sky-400"
+              className="h-9 w-full rounded border border-slate-300 bg-white px-3 text-xs outline-none focus:border-emerald-500"
             />
           </FormField>
 
@@ -76,7 +76,7 @@ export function ExternalErrorCreatePage() {
               onChange={(event) =>
                 state.setField("completedDate", event.target.value)
               }
-              className="h-9 w-full rounded border border-slate-300 bg-white px-3 text-xs outline-none focus:border-sky-400"
+              className="h-9 w-full rounded border border-slate-300 bg-white px-3 text-xs outline-none focus:border-emerald-500"
             />
             <p className="mt-1 text-[11px] text-slate-400">
               Nếu chỉ có ngày, backend lưu lúc 23:59.
@@ -90,7 +90,7 @@ export function ExternalErrorCreatePage() {
                 state.setField("source", event.target.value)
               }
               placeholder="Hotline, Email, Zalo..."
-              className="h-9 w-full rounded border border-slate-300 bg-white px-3 text-xs outline-none focus:border-sky-400"
+              className="h-9 w-full rounded border border-slate-300 bg-white px-3 text-xs outline-none focus:border-emerald-500"
             />
           </FormField>
 
@@ -101,7 +101,7 @@ export function ExternalErrorCreatePage() {
                 state.setField("device", event.target.value)
               }
               placeholder="Android, iOS, Web..."
-              className="h-9 w-full rounded border border-slate-300 bg-white px-3 text-xs outline-none focus:border-sky-400"
+              className="h-9 w-full rounded border border-slate-300 bg-white px-3 text-xs outline-none focus:border-emerald-500"
             />
           </FormField>
 
@@ -112,12 +112,12 @@ export function ExternalErrorCreatePage() {
                 state.setField("result", event.target.value)
               }
               placeholder="Đã khắc phục, đang xử lý..."
-              className="h-9 w-full rounded border border-slate-300 bg-white px-3 text-xs outline-none focus:border-sky-400"
+              className="h-9 w-full rounded border border-slate-300 bg-white px-3 text-xs outline-none focus:border-emerald-500"
             />
           </FormField>
 
           <div className="flex items-end">
-            <label className="flex min-h-9 items-center gap-2 rounded-md border border-sky-200 bg-sky-50 px-3 text-xs text-sky-800">
+            <label className="flex min-h-9 items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 text-xs text-emerald-800">
               <input
                 type="checkbox"
                 checked={state.form.autoClassify}
@@ -141,7 +141,7 @@ export function ExternalErrorCreatePage() {
                 }
                 rows={7}
                 placeholder="Mô tả đầy đủ lỗi khách hàng hoặc hệ thống gặp phải..."
-                className="w-full rounded border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-sky-400"
+                className="w-full rounded border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-emerald-500"
               />
             </FormField>
           </div>
@@ -150,7 +150,7 @@ export function ExternalErrorCreatePage() {
             <button
               type="submit"
               disabled={!state.canSubmit || state.saving}
-              className="flex h-9 items-center gap-1 rounded bg-[#0097cf] px-4 text-xs font-semibold text-white hover:bg-[#0089bd] disabled:opacity-50"
+              className="flex h-9 items-center gap-1 rounded bg-[#10b981] px-4 text-xs font-semibold text-white hover:bg-[#059669] disabled:opacity-50"
             >
               <Save size={14} />
               {state.saving

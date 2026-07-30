@@ -29,58 +29,65 @@ export function KpiCards({
   onOpenTickets: (options: TicketOpenOptions) => void;
 }) {
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
-      <KpiCard
-        bucket={summary.total_received}
-        subtitle="Toàn bộ phiên tương tác trong kỳ"
-        icon={<Bot size={22} />}
-        iconClassName="bg-sky-100 text-sky-600"
-        showRate={false}
-        onClick={() =>
-          onOpenTickets({ title: "Tổng tiếp nhận", status: "ALL" })
-        }
-      />
+    /*
+      Luôn giữ 5 KPI trên cùng một hàng. Breakpoint cũ chỉ dùng 5 cột từ
+      `2xl` (>= 1536px), nên laptop 1366px bị chia thành 3 + 2 card.
+      Khi vùng nội dung hẹp hơn 840px, hàng KPI cuộn ngang thay vì wrap.
+    */
+    <div className="-mx-1 overflow-x-auto px-1 pb-1">
+      <div className="grid min-w-[840px] grid-cols-5 gap-2 xl:gap-3">
+        <KpiCard
+          bucket={summary.total_received}
+          subtitle="Toàn bộ phiên tương tác trong kỳ"
+          icon={<Bot size={18} />}
+          iconClassName="bg-sky-100 text-sky-600"
+          showRate={false}
+          onClick={() =>
+            onOpenTickets({ title: "Tổng tiếp nhận", status: "ALL" })
+          }
+        />
 
-      <KpiCard
-        bucket={summary.bot_done}
-        subtitle="Chatbot trả lời xong, không cần CCC"
-        icon={<UserRoundCheck size={22} />}
-        iconClassName="bg-emerald-100 text-emerald-600"
-        onClick={() =>
-          onOpenTickets({ title: "Chatbot tự xử lý", status: "BOT_DONE" })
-        }
-      />
+        <KpiCard
+          bucket={summary.bot_done}
+          subtitle="Chatbot trả lời xong, không cần CCC"
+          icon={<UserRoundCheck size={18} />}
+          iconClassName="bg-emerald-100 text-emerald-600"
+          onClick={() =>
+            onOpenTickets({ title: "Chatbot tự xử lý", status: "BOT_DONE" })
+          }
+        />
 
-      <KpiCard
-        bucket={summary.ccc}
-        subtitle="Đã xin được thông tin, tạo ticket"
-        icon={<Ticket size={22} />}
-        iconClassName="bg-amber-100 text-amber-600"
-        onClick={() =>
-          onOpenTickets({ title: "Chuyển CCC xử lý", status: "CCC" })
-        }
-      />
+        <KpiCard
+          bucket={summary.ccc}
+          subtitle="Đã xin được thông tin, tạo ticket"
+          icon={<Ticket size={18} />}
+          iconClassName="bg-amber-100 text-amber-600"
+          onClick={() =>
+            onOpenTickets({ title: "Chuyển CCC xử lý", status: "CCC" })
+          }
+        />
 
-      <KpiCard
-        bucket={summary.pending}
-        subtitle="Chatbot đã hỏi nhưng KH chưa cung cấp"
-        icon={<Clock size={22} />}
-        iconClassName="bg-sky-100 text-sky-600"
-        onClick={() =>
-          onOpenTickets({
-            title: "Chờ thông tin khách hàng",
-            status: "PENDING",
-          })
-        }
-      />
+        <KpiCard
+          bucket={summary.pending}
+          subtitle="Chatbot đã hỏi nhưng KH chưa cung cấp"
+          icon={<Clock size={18} />}
+          iconClassName="bg-sky-100 text-sky-600"
+          onClick={() =>
+            onOpenTickets({
+              title: "Chờ thông tin khách hàng",
+              status: "PENDING",
+            })
+          }
+        />
 
-      <KpiCard
-        bucket={summary.spam}
-        subtitle="Câu chào hỏi & không liên quan"
-        icon={<MessageSquareWarning size={22} />}
-        iconClassName="bg-rose-100 text-rose-600"
-        onClick={() => onOpenTickets({ title: "Câu hỏi rác", status: "SPAM" })}
-      />
+        <KpiCard
+          bucket={summary.spam}
+          subtitle="Câu chào hỏi & không liên quan"
+          icon={<MessageSquareWarning size={18} />}
+          iconClassName="bg-rose-100 text-rose-600"
+          onClick={() => onOpenTickets({ title: "Câu hỏi rác", status: "SPAM" })}
+        />
+      </div>
     </div>
   );
 }
@@ -104,30 +111,30 @@ function KpiCard({
     <button
       type="button"
       onClick={onClick}
-      className="group rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-lg"
+      className="group h-full min-w-0 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-md"
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="truncate text-xs font-semibold uppercase tracking-wide text-slate-400">
+          <div className="truncate text-[11px] font-semibold uppercase tracking-wide text-slate-400">
             {bucket.label}
           </div>
 
-          <div className="mt-3 flex items-baseline gap-1.5">
-            <span className="text-3xl font-bold text-slate-800">
+          <div className="mt-2 flex items-baseline gap-1">
+            <span className="text-2xl font-bold leading-none text-slate-800">
               {bucket.session_count}
             </span>
-            <span className="text-xs font-semibold text-slate-500">phiên</span>
+            <span className="text-[11px] font-semibold text-slate-500">phiên</span>
           </div>
         </div>
 
         <div
-          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${iconClassName}`}
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${iconClassName}`}
         >
           {icon}
         </div>
       </div>
 
-      <div className="mt-3 text-xs text-slate-500">
+      <div className="mt-2 line-clamp-2 text-[11px] leading-4 text-slate-500">
         {showRate && (
           <span className="font-semibold text-slate-700">
             {bucket.rate}% ·{" "}

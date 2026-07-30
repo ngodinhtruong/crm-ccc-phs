@@ -58,7 +58,7 @@ export function TextInput({
       placeholder={placeholder}
       className={[
         "h-9 w-full rounded-md border text-xs outline-none transition-colors px-3",
-        "focus:border-[#0097cf] focus:ring-2 focus:ring-[#0097cf]/20",
+        "focus:border-[#10b981] focus:ring-2 focus:ring-[#10b981]/20",
         readOnly
           ? "cursor-not-allowed border-slate-200 bg-slate-100 font-medium text-slate-600"
           : "border-slate-300 bg-white text-slate-800 placeholder:text-slate-400 hover:border-slate-400",
@@ -85,7 +85,7 @@ export function SelectInput({
       onChange={(event) => onChange(event.target.value)}
       className={[
         "h-9 w-full rounded-md border text-xs outline-none transition-colors px-3",
-        "focus:border-[#0097cf] focus:ring-2 focus:ring-[#0097cf]/20",
+        "focus:border-[#10b981] focus:ring-2 focus:ring-[#10b981]/20",
         disabled
           ? "cursor-not-allowed border-slate-200 bg-slate-100 font-medium text-slate-500"
           : "border-slate-300 bg-white text-slate-800 hover:border-slate-400",
@@ -111,7 +111,7 @@ export function CheckboxInput({
         type="checkbox"
         checked={checked}
         onChange={(event) => onChange(event.target.checked)}
-        className="h-4 w-4 rounded border-slate-300 text-[#0097cf] focus:ring-[#0097cf]"
+        className="h-4 w-4 rounded border-slate-300 text-[#10b981] focus:ring-[#10b981]"
       />
       {label}
     </label>
@@ -134,7 +134,7 @@ export function ToggleChip({
       className={[
         "flex h-9 w-full items-center justify-between gap-2 rounded-md border px-3 text-xs transition-all",
         checked
-          ? "border-[#0097cf] bg-[#0097cf] font-semibold text-white shadow-sm"
+          ? "border-[#10b981] bg-[#10b981] font-semibold text-white shadow-sm"
           : "border-slate-300 bg-slate-50/70 font-medium text-slate-700 hover:border-slate-400 hover:bg-slate-100",
       ].join(" ")}
     >

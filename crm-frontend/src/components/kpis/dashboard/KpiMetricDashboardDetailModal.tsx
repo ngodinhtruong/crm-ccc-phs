@@ -212,40 +212,40 @@ Chỉ hiển thị record thật sự được tính vào kết quả KPI
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1400px] border-collapse text-left text-xs">
+          <table className="w-full min-w-[1400px] border-collapse text-left text-sm">
             <thead>
-              <tr className="h-10 border-b bg-white text-slate-700">
-                <th className="w-[120px] px-3 font-semibold">Ngày gọi</th>
-                <th className="w-[130px] px-3 font-semibold">Mã record</th>
-                <th className="w-[150px] px-3 font-semibold">Số TK</th>
-                <th className="w-[220px] px-3 font-semibold">Khách hàng</th>
-                <th className="w-[170px] px-3 font-semibold">Kết quả gọi</th>
-                <th className="w-[170px] px-3 font-semibold">ICP</th>
-                <th className="w-[90px] px-3 font-semibold">Follow</th>
-                <th className="w-[230px] px-3 font-semibold">Cờ nghiệp vụ</th>
-                <th className="w-[130px] px-3 font-semibold">Phí GD</th>
-                <th className="w-[170px] px-3 font-semibold">Đóng góp</th>
-                <th className="w-[260px] px-3 font-semibold">Ghi chú</th>
+              <tr className="h-11 border-b-2 border-slate-200 bg-slate-50 text-slate-700">
+                <th className="w-[120px] px-4 font-semibold">Ngày gọi</th>
+                <th className="w-[130px] px-4 font-semibold">Mã record</th>
+                <th className="w-[150px] px-4 font-semibold">Số TK</th>
+                <th className="w-[220px] px-4 font-semibold">Khách hàng</th>
+                <th className="w-[170px] px-4 font-semibold">Kết quả gọi</th>
+                <th className="w-[170px] px-4 font-semibold">ICP</th>
+                <th className="w-[90px] px-4 font-semibold">Follow</th>
+                <th className="w-[230px] px-4 font-semibold">Cờ nghiệp vụ</th>
+                <th className="w-[130px] px-4 font-semibold">Phí GD</th>
+                <th className="w-[170px] px-4 font-semibold">Đóng góp</th>
+                <th className="w-[260px] px-4 font-semibold">Ghi chú</th>
               </tr>
             </thead>
 
             <tbody>
               {records.map((record, index) => {
-                const rowBg = index % 2 === 0 ? "bg-white" : "bg-[#f8fafc]";
+                const rowBg = index % 2 === 0 ? "bg-white" : "bg-slate-50/60";
 
                 return (
                   <tr
                     key={record.id}
-                    className={`h-14 border-b border-slate-100 ${rowBg} hover:bg-sky-50`}
+                    className={`h-[46px] border-b border-slate-200 ${rowBg} hover:bg-sky-50`}
                   >
-                    <td className="whitespace-nowrap px-3">
+                    <td className="px-4 text-slate-600">
                       {formatDateTime(record.call_date)}
                     </td>
-                    <td className="px-3 font-semibold text-sky-600">
+                    <td className="px-4 font-semibold text-sky-600">
                       {record.record_code || `#${record.id}`}
                     </td>
-                    <td className="px-3">{record.account_no || "-"}</td>
-                    <td className="px-3">
+                    <td className="px-4 text-slate-700">{record.account_no || "-"}</td>
+                    <td className="px-4 text-slate-700">
                       <div className="font-medium text-slate-700">
                         {record.customer_name_snapshot || "-"}
                       </div>
@@ -253,24 +253,24 @@ Chỉ hiển thị record thật sự được tính vào kết quả KPI
                         {record.branch_name_snapshot || record.pic_name_snapshot || "-"}
                       </div>
                     </td>
-                    <td className="px-3">
+                    <td className="px-4 text-slate-700">
                       {record.call_result_name || record.call_result_code || "-"}
                     </td>
-                    <td className="px-3">
+                    <td className="px-4 text-slate-700">
                       {record.icp_group_name || record.icp_group_code || "-"}
                     </td>
-                    <td className="px-3">{record.follow_no ?? "-"}</td>
-                    <td className="px-3">
+                    <td className="px-4 text-slate-700">{record.follow_no ?? "-"}</td>
+                    <td className="px-4 text-slate-700">
                       <div className="flex flex-wrap gap-1">
                         <BoolBadge active={record.reactivation} label="Tái kích hoạt" />
                         <BoolBadge active={record.referred_rm || record.handover_to_broker} label="Referral/RM" />
                         <BoolBadge active={record.introduced_product} label="SP" />
                       </div>
                     </td>
-                    <td className="px-3">
+                    <td className="px-4 text-slate-700">
                       {formatNumber(record.transaction_fee_snapshot)}
                     </td>
-                    <td className="px-3">
+                    <td className="px-4 text-slate-700">
                       <span className="inline-flex rounded-md bg-emerald-100 px-2 py-1 text-[11px] font-semibold text-emerald-700">
                         {record.contribution_label}
                       </span>
@@ -366,7 +366,7 @@ export function KpiMetricDashboardDetailModal({
                 className={[
                   "border-b-2 px-3 pb-3 text-xs font-semibold",
                   active
-                    ? "border-[#0097cf] text-[#0097cf]"
+                    ? "border-[#10b981] text-[#059669]"
                     : "border-transparent text-slate-500 hover:text-slate-800",
                 ].join(" ")}
               >
@@ -382,40 +382,40 @@ export function KpiMetricDashboardDetailModal({
               <ProgressBar item={item} />
 
               <div className="overflow-hidden rounded border border-slate-200">
-                <table className="w-full min-w-[980px] border-collapse text-left text-xs">
+                <table className="w-full min-w-[980px] border-collapse text-left text-sm">
                   <thead>
-                    <tr className="h-10 border-b bg-white text-slate-700">
-                      <th className="px-3 font-semibold">Mã KPI</th>
-                      <th className="px-3 font-semibold">Tên KPI</th>
-                      <th className="px-3 font-semibold">Nguồn</th>
-                      <th className="px-3 font-semibold">Tần suất</th>
-                      <th className="px-3 font-semibold">Đơn vị</th>
-                      <th className="px-3 font-semibold">Thực tế</th>
-                      <th className="px-3 font-semibold">Chỉ tiêu</th>
-                      <th className="px-3 font-semibold">Tiến độ</th>
-                      <th className="px-3 font-semibold">Trạng thái</th>
-                      <th className="px-3 font-semibold">Cập nhật</th>
+                    <tr className="h-11 border-b-2 border-slate-200 bg-slate-50 text-slate-700">
+                      <th className="px-4 font-semibold">Mã KPI</th>
+                      <th className="px-4 font-semibold">Tên KPI</th>
+                      <th className="px-4 font-semibold">Nguồn</th>
+                      <th className="px-4 font-semibold">Tần suất</th>
+                      <th className="px-4 font-semibold">Đơn vị</th>
+                      <th className="px-4 font-semibold">Thực tế</th>
+                      <th className="px-4 font-semibold">Chỉ tiêu</th>
+                      <th className="px-4 font-semibold">Tiến độ</th>
+                      <th className="px-4 font-semibold">Trạng thái</th>
+                      <th className="px-4 font-semibold">Cập nhật</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr className="h-14 border-b bg-[#f8fafc]">
-                      <td className="px-3 font-semibold text-sky-600">
+                      <td className="px-4 font-semibold text-sky-600">
                         {item.metric.metric_code}
                       </td>
-                      <td className="px-3 font-semibold text-slate-800">
+                      <td className="px-4 font-semibold text-slate-800">
                         {item.metric.metric_name}
                       </td>
-                      <td className="px-3">
+                      <td className="px-4 text-slate-700">
                         {item.sourceType === "AUTO" ? "CRM tự động" : "Admin nhập"}
                       </td>
-                      <td className="px-3">{getFrequencyLabel(item.metric.frequency)}</td>
-                      <td className="px-3">{getUnitLabel(item.metric.target_unit)}</td>
-                      <td className="px-3 font-semibold text-slate-800">
+                      <td className="px-4 text-slate-700">{getFrequencyLabel(item.metric.frequency)}</td>
+                      <td className="px-4 text-slate-700">{getUnitLabel(item.metric.target_unit)}</td>
+                      <td className="px-4 font-semibold text-slate-800">
                         {item.displayActual}
                       </td>
-                      <td className="px-3">{item.displayTarget}</td>
-                      <td className="px-3 font-semibold">{progressLabel}</td>
-                      <td className="px-3">
+                      <td className="px-4 text-slate-700">{item.displayTarget}</td>
+                      <td className="px-4 font-semibold">{progressLabel}</td>
+                      <td className="px-4 text-slate-700">
                         <span
                           className={`inline-flex rounded-md px-2 py-1 text-[11px] font-semibold ${getProgressBadgeClass(
                             item.progressStatus
@@ -424,7 +424,7 @@ export function KpiMetricDashboardDetailModal({
                           {getProgressLabel(item.progressStatus)}
                         </span>
                       </td>
-                      <td className="px-3 text-slate-500">{formatDateTime(updatedAt)}</td>
+                      <td className="px-4 text-slate-500">{formatDateTime(updatedAt)}</td>
                     </tr>
                   </tbody>
                 </table>

@@ -34,7 +34,7 @@ export function SlaCreateForm({
                             value={form.policyName}
                             onChange={(event) => setField("policyName", event.target.value)}
                             placeholder="Nhập tên SLA"
-                            className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400"
+                            className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-emerald-500"
                         />
                     </SlaFormField>
 
@@ -44,7 +44,7 @@ export function SlaCreateForm({
                             onChange={(event) =>
                                 setField("ticketCategory", event.target.value)
                             }
-                            className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400"
+                            className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-emerald-500"
                         >
                             <option value="">Chọn danh mục Ticket</option>
 
@@ -70,7 +70,7 @@ export function SlaCreateForm({
                                 setField("targetTimeValue", event.target.value)
                             }
                             placeholder="Ví dụ: 30"
-                            className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400"
+                            className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-emerald-500"
                         />
                     </SlaFormField>
 
@@ -83,7 +83,7 @@ export function SlaCreateForm({
                                     event.target.value as typeof form.targetTimeUnit
                                 )
                             }
-                            className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400"
+                            className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-emerald-500"
                         >
                             <option value="MINUTE">Phút</option>
                             <option value="HOUR">Giờ</option>
@@ -97,7 +97,7 @@ export function SlaCreateForm({
                             onChange={(event) =>
                                 setField("processingUnit", event.target.value)
                             }
-                            className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400"
+                            className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-emerald-500"
                         >
                             <option value="">Chọn bộ phận xử lý</option>
 
@@ -139,7 +139,7 @@ export function SlaCreateForm({
                             value={form.description}
                             onChange={(event) => setField("description", event.target.value)}
                             rows={4}
-                            className="w-full rounded border border-slate-300 px-3 py-2 text-xs outline-none focus:border-sky-400"
+                            className="w-full rounded border border-slate-300 px-3 py-2 text-xs outline-none focus:border-emerald-500"
                         />
                     </div>
                 </div>

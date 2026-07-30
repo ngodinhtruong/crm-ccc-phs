@@ -47,7 +47,7 @@ export function UserCreatePage() {
             type="button"
             onClick={create.submit}
             disabled={create.submitting || create.loadingMaster}
-            className="flex h-8 items-center gap-1 rounded bg-[#0097cf] px-3 text-xs font-semibold text-white hover:bg-[#0089bd] disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex h-8 items-center gap-1 rounded bg-[#10b981] px-3 text-xs font-semibold text-white hover:bg-[#059669] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {create.submitting ? (
               <Loader2 className="animate-spin" size={15} />

@@ -35,7 +35,7 @@ export function ChatbotDashboardPage() {
           <button
             type="button"
             onClick={dashboard.refresh}
-            className="flex h-8 items-center gap-2 rounded bg-[#0097cf] px-3 text-xs font-semibold text-white hover:bg-[#0089bd]"
+            className="flex h-8 items-center gap-2 rounded bg-[#10b981] px-3 text-xs font-semibold text-white hover:bg-[#059669]"
           >
             <RefreshCcw size={14} />
             Tải lại

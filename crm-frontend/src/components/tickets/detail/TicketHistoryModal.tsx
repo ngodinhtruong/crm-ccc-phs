@@ -66,7 +66,7 @@ function translateActionName(actionName: string): string {
 
 const ACTION_COLOR: Record<string, string> = {
   CREATE: "bg-emerald-100 text-emerald-700",
-  AMEND: "bg-sky-100 text-sky-700",
+  AMEND: "bg-emerald-100 text-emerald-700",
   UPDATE_STATUS: "bg-violet-100 text-violet-700",
   ASSIGN: "bg-amber-100 text-amber-700",
   REASSIGN: "bg-amber-100 text-amber-700",
@@ -129,7 +129,7 @@ export function TicketHistoryModal({
             {ticketCode && (
               <p className="mt-0.5 text-xs text-slate-500">
                 Ticket{" "}
-                <span className="font-semibold text-sky-600">{ticketCode}</span>
+                <span className="font-semibold text-[#059669]">{ticketCode}</span>
               </p>
             )}
           </div>
@@ -165,7 +165,7 @@ export function TicketHistoryModal({
               <div key={item.id} className="flex gap-3">
                 {/* Cột mốc thời gian */}
                 <div className="flex flex-col items-center">
-                  <div className="mt-1 h-2.5 w-2.5 rounded-full bg-sky-500" />
+                  <div className="mt-1 h-2.5 w-2.5 rounded-full bg-emerald-500" />
                   {index < items.length - 1 && (
                     <div className="w-px flex-1 bg-slate-200" />
                   )}

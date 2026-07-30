@@ -30,7 +30,7 @@ export function SlaFilter({
           value={q}
           onChange={(event) => onQChange(event.target.value)}
           placeholder="Tên SLA, mã SLA, mô tả..."
-          className="h-9 w-full rounded border border-slate-300 bg-white px-3 text-xs outline-none focus:border-sky-400"
+          className="h-9 w-full rounded border border-slate-300 bg-white px-3 text-xs outline-none focus:border-emerald-500"
         />
       </div>
 
@@ -43,7 +43,7 @@ export function SlaFilter({
           value={ticketCategory}
           onChange={(event) => onTicketCategoryChange(event.target.value)}
           placeholder="Danh mục Ticket"
-          className="h-9 w-full rounded border border-slate-300 bg-white px-3 text-xs outline-none focus:border-sky-400"
+          className="h-9 w-full rounded border border-slate-300 bg-white px-3 text-xs outline-none focus:border-emerald-500"
         />
       </div>
 
@@ -56,7 +56,7 @@ export function SlaFilter({
           value={processingUnit}
           onChange={(event) => onProcessingUnitChange(event.target.value)}
           placeholder="Đơn vị xử lý"
-          className="h-9 w-full rounded border border-slate-300 bg-white px-3 text-xs outline-none focus:border-sky-400"
+          className="h-9 w-full rounded border border-slate-300 bg-white px-3 text-xs outline-none focus:border-emerald-500"
         />
       </div>
 
@@ -64,7 +64,7 @@ export function SlaFilter({
         <button
           type="button"
           onClick={onSearch}
-          className="flex h-9 items-center gap-1 rounded bg-[#0097cf] px-4 text-xs font-semibold text-white hover:bg-[#0089bd]"
+          className="flex h-9 items-center gap-1 rounded bg-[#10b981] px-4 text-xs font-semibold text-white hover:bg-[#059669]"
         >
           <Search size={14} />
           Tìm

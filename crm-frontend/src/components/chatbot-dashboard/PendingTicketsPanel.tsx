@@ -111,16 +111,16 @@ export function PendingTicketsPanel({
       </div>
 
       <div className="max-h-[256px] overflow-auto overscroll-contain">
-        <table className="w-full min-w-[720px] text-left text-xs">
+        <table className="w-full min-w-[720px] text-left text-sm">
           <thead className="sticky top-0 z-10 border-b bg-slate-50 text-slate-600 shadow-sm">
             <tr className="h-10">
-              <th className="w-12 px-3 font-semibold" />
-              <th className="px-3 font-semibold">Mã ticket</th>
-              <th className="px-3 font-semibold">Session</th>
-              <th className="px-3 font-semibold">Chủ đề</th>
-              <th className="px-3 font-semibold">Nội dung</th>
-              <th className="px-3 font-semibold">Trạng thái</th>
-              <th className="px-3 font-semibold">Ngày</th>
+              <th className="w-12 px-4 font-semibold" />
+              <th className="px-4 font-semibold">Mã ticket</th>
+              <th className="px-4 font-semibold">Session</th>
+              <th className="px-4 font-semibold">Chủ đề</th>
+              <th className="px-4 font-semibold">Nội dung</th>
+              <th className="px-4 font-semibold">Trạng thái</th>
+              <th className="px-4 font-semibold">Ngày</th>
             </tr>
           </thead>
 
@@ -139,9 +139,9 @@ export function PendingTicketsPanel({
             {visibleRows.map((item) => (
               <tr
                 key={item.id}
-                className="h-12 border-b border-slate-100 hover:bg-slate-50"
+                className="h-[46px] border-b border-slate-200 hover:bg-slate-50"
               >
-                <td className="px-3">
+                <td className="px-4 text-slate-700">
                   {item.ticket_chatbot_id && (
                     <button
                       type="button"
@@ -156,17 +156,17 @@ export function PendingTicketsPanel({
                     </button>
                   )}
                 </td>
-                <td className="px-3 font-semibold text-sky-600">
+                <td className="px-4 font-semibold text-sky-600">
                   {item.ticket_chatbot_code || item.ticket_code || "-"}
                 </td>
-                <td className="px-3 font-mono text-[11px] text-slate-600">
+                <td className="px-4 font-mono text-[11px] text-slate-600">
                   {shortText(item.session_id, 12)}
                 </td>
-                <td className="px-3">{item.category_label || "-"}</td>
-                <td className="px-3 text-slate-600">
+                <td className="px-4 text-slate-700">{item.category_label || "-"}</td>
+                <td className="px-4 text-slate-600">
                   {shortText(item.reason || item.last_question, 60)}
                 </td>
-                <td className="px-3">
+                <td className="px-4 text-slate-700">
                   <span
                     className={`rounded-full px-2 py-1 text-[11px] font-semibold ${ticketStatusPillClass(
                       item.ticket_chatbot_status || "Mở"
@@ -175,7 +175,7 @@ export function PendingTicketsPanel({
                     {item.ticket_chatbot_status || "Mở"}
                   </span>
                 </td>
-                <td className="px-3 whitespace-nowrap">
+                <td className="px-4 whitespace-nowrap">
                   {formatDateTime(item.started_at)}
                 </td>
               </tr>

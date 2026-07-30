@@ -33,7 +33,7 @@ export function SlaListPage() {
           <button
             type="button"
             onClick={sla.goCreate}
-            className="flex h-8 items-center gap-1 rounded bg-[#0097cf] px-3 text-xs font-semibold text-white hover:bg-[#0089bd]"
+            className="flex h-8 items-center gap-1 rounded bg-[#10b981] px-3 text-xs font-semibold text-white hover:bg-[#059669]"
           >
             <Plus size={15} />
             Thêm SLA
@@ -41,7 +41,7 @@ export function SlaListPage() {
 
           <button
             type="button"
-            className="flex h-8 items-center gap-1 rounded border border-sky-300 bg-white px-3 text-xs font-semibold text-sky-600 hover:bg-sky-50"
+            className="flex h-8 items-center gap-1 rounded border border-emerald-300 bg-white px-3 text-xs font-semibold text-[#059669] hover:bg-emerald-50"
           >
             <Download size={15} />
             Nhập dữ liệu
@@ -49,7 +49,7 @@ export function SlaListPage() {
 
           <button
             type="button"
-            className="flex h-8 w-8 items-center justify-center rounded border border-sky-300 bg-white text-sky-600 hover:bg-sky-50"
+            className="flex h-8 w-8 items-center justify-center rounded border border-emerald-300 bg-white text-[#059669] hover:bg-emerald-50"
           >
             <Wrench size={15} />
           </button>
@@ -97,14 +97,14 @@ export function SlaListPage() {
         </div>
 
         <div className="flex h-12 items-center justify-center border-b bg-white px-4">
-          <div className="inline-flex overflow-hidden rounded border border-sky-300 text-xs font-semibold">
+          <div className="inline-flex overflow-hidden rounded border border-emerald-300 text-xs font-semibold">
             <button
               type="button"
               onClick={() => sla.changeTab("active")}
               className={`h-8 px-5 ${
                 sla.activeTab === "active"
-                  ? "bg-[#0097cf] text-white"
-                  : "bg-white text-[#0097cf] hover:bg-sky-50"
+                  ? "bg-[#10b981] text-white"
+                  : "bg-white text-[#059669] hover:bg-emerald-50"
               }`}
             >
               SLA đang hoạt động
@@ -113,10 +113,10 @@ export function SlaListPage() {
             <button
               type="button"
               onClick={() => sla.changeTab("inactive")}
-              className={`h-8 border-l border-sky-300 px-5 ${
+              className={`h-8 border-l border-emerald-300 px-5 ${
                 sla.activeTab === "inactive"
-                  ? "bg-[#0097cf] text-white"
-                  : "bg-white text-[#0097cf] hover:bg-sky-50"
+                  ? "bg-[#10b981] text-white"
+                  : "bg-white text-[#059669] hover:bg-emerald-50"
               }`}
             >
               SLA ngừng hoạt động

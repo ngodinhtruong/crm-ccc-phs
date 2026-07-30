@@ -1,8 +1,8 @@
 import { SaAdminOverviewMetric } from "@/types/sale-admin-dashboard.type";
 
 export const SA_DASHBOARD_COLORS = {
-  primary: "#0097cf",
-  primarySoft: "#e0f2fe",
+  primary: "#10b981",
+  primarySoft: "#ecfdf5",
   slate: "#64748b",
   slateSoft: "#f8fafc",
   green: "#10b981",
@@ -182,11 +182,11 @@ export function getMetricTheme(key: string) {
   if (normalized.includes("call")) {
     return {
       icon: "phone",
-      border: "border-sky-100",
-      bg: "bg-sky-50",
-      iconBg: "bg-sky-100 text-[#0097cf]",
+      border: "border-emerald-100",
+      bg: "bg-emerald-50",
+      iconBg: "bg-emerald-100 text-[#059669]",
       value: "text-slate-900",
-      accent: "bg-[#0097cf]",
+      accent: "bg-[#10b981]",
     };
   }
 

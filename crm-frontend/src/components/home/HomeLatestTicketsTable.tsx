@@ -20,23 +20,23 @@ export function HomeLatestTicketsTable({
 
         <button
           type="button"
-          className="text-xs font-semibold text-[#00713d] hover:underline"
+          className="text-xs font-semibold text-[#059669] hover:underline"
         >
           Xem thêm
         </button>
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1180px] border-collapse text-left text-xs">
+        <table className="w-full min-w-[1180px] border-collapse text-left text-sm">
           <thead>
-            <tr className="h-10 border-b bg-white text-slate-700">
-              <th className="w-[140px] px-3 font-semibold">Mã Ticket</th>
-              <th className="w-[170px] px-3 font-semibold">Chi nhánh xử lý</th>
-              <th className="w-[160px] px-3 font-semibold">Phân loại</th>
-              <th className="w-[180px] px-3 font-semibold">Công ty</th>
-              <th className="w-[140px] px-3 font-semibold">Tình trạng</th>
-              <th className="w-[350px] px-3 font-semibold">Mô tả</th>
-              <th className="w-[150px] px-3 font-semibold">Nguồn Ticket</th>
+            <tr className="h-11 border-b-2 border-slate-200 bg-slate-50 text-slate-700">
+              <th className="w-[140px] px-4 font-semibold">Mã Ticket</th>
+              <th className="w-[170px] px-4 font-semibold">Chi nhánh xử lý</th>
+              <th className="w-[160px] px-4 font-semibold">Phân loại</th>
+              <th className="w-[180px] px-4 font-semibold">Công ty</th>
+              <th className="w-[140px] px-4 font-semibold">Tình trạng</th>
+              <th className="w-[350px] px-4 font-semibold">Mô tả</th>
+              <th className="w-[150px] px-4 font-semibold">Nguồn Ticket</th>
             </tr>
           </thead>
 
@@ -50,27 +50,27 @@ export function HomeLatestTicketsTable({
             )}
 
             {rows.map((ticket, index) => {
-              const rowBg = index % 2 === 0 ? "bg-white" : "bg-[#f8fafc]";
+              const rowBg = index % 2 === 0 ? "bg-white" : "bg-slate-50/60";
 
               return (
                 <tr
                   key={ticket.id}
-                  className={`h-14 border-b border-slate-100 ${rowBg} hover:bg-sky-50`}
+                  className={`h-[46px] border-b border-slate-200 ${rowBg} hover:bg-sky-50`}
                 >
-                  <td className="px-3 font-semibold text-sky-600">
+                  <td className="px-4 font-semibold text-sky-600">
                     #{ticket.ticket_code}
                   </td>
 
-                  <td className="px-3">{ticket.branch_name || "-"}</td>
-                  <td className="px-3">{ticket.classification_name || "-"}</td>
-                  <td className="px-3">{ticket.company_name || "-"}</td>
-                  <td className="px-3">{ticket.status_name || "-"}</td>
+                  <td className="px-4 text-slate-700">{ticket.branch_name || "-"}</td>
+                  <td className="px-4 text-slate-700">{ticket.classification_name || "-"}</td>
+                  <td className="px-4 text-slate-700">{ticket.company_name || "-"}</td>
+                  <td className="px-4 text-slate-700">{ticket.status_name || "-"}</td>
 
                   <td className="max-w-[350px] truncate px-3">
                     {ticket.description || "-"}
                   </td>
 
-                  <td className="px-3">{ticket.source_name || "-"}</td>
+                  <td className="px-4 text-slate-700">{ticket.source_name || "-"}</td>
                 </tr>
               );
             })}

@@ -190,7 +190,7 @@ export function DashboardToolbar({
                   onApply();
                   setFilterOpen(false);
                 }}
-                className="flex h-10 items-center justify-center gap-2 rounded-lg bg-[#0097cf] px-5 text-xs font-semibold text-white transition hover:bg-[#0089bd]"
+                className="flex h-10 items-center justify-center gap-2 rounded-lg bg-[#10b981] px-5 text-xs font-semibold text-white transition hover:bg-[#059669]"
               >
                 <Filter size={15} />
                 Áp dụng

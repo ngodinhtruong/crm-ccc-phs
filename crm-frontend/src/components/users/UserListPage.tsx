@@ -33,7 +33,7 @@ export function UserListPage() {
           <button
             type="button"
             onClick={() => router.push("/accounts/users/create")}
-            className="flex h-8 items-center gap-1 rounded bg-[#0097cf] px-3 text-xs font-semibold text-white hover:bg-[#0089bd]"
+            className="flex h-8 items-center gap-1 rounded bg-[#10b981] px-3 text-xs font-semibold text-white hover:bg-[#059669]"
           >
             <Plus size={15} />
             Thêm người dùng
@@ -41,7 +41,7 @@ export function UserListPage() {
 
           <button
             type="button"
-            className="flex h-8 items-center gap-1 rounded bg-[#0097cf] px-3 text-xs font-semibold text-white hover:bg-[#0089bd]"
+            className="flex h-8 items-center gap-1 rounded bg-[#10b981] px-3 text-xs font-semibold text-white hover:bg-[#059669]"
           >
             <Plus size={15} />
             Thêm Người dùng Mobile
@@ -49,7 +49,7 @@ export function UserListPage() {
 
           <button
             type="button"
-            className="flex h-8 items-center gap-1 rounded border border-sky-300 bg-white px-3 text-xs font-semibold text-sky-600 hover:bg-sky-50"
+            className="flex h-8 items-center gap-1 rounded border border-emerald-300 bg-white px-3 text-xs font-semibold text-[#059669] hover:bg-emerald-50"
           >
             <Download size={15} />
             Nhập dữ liệu
@@ -57,7 +57,7 @@ export function UserListPage() {
 
           <button
             type="button"
-            className="flex h-8 w-8 items-center justify-center rounded border border-sky-300 bg-white text-sky-600 hover:bg-sky-50"
+            className="flex h-8 w-8 items-center justify-center rounded border border-emerald-300 bg-white text-[#059669] hover:bg-emerald-50"
           >
             <Wrench size={15} />
           </button>
@@ -99,13 +99,13 @@ export function UserListPage() {
         </div>
 
         <div className="flex h-12 items-center justify-center border-b bg-white px-4">
-          <div className="inline-flex overflow-hidden rounded border border-sky-300 text-xs font-semibold">
+          <div className="inline-flex overflow-hidden rounded border border-emerald-300 text-xs font-semibold">
             <button
               type="button"
               onClick={() => users.changeTab("active")}
               className={`h-8 px-5 ${users.activeTab === "active"
-                  ? "bg-[#0097cf] text-white"
-                  : "bg-white text-[#0097cf] hover:bg-sky-50"
+                  ? "bg-[#10b981] text-white"
+                  : "bg-white text-[#059669] hover:bg-emerald-50"
                 }`}
             >
               Người dùng đang hoạt động
@@ -114,9 +114,9 @@ export function UserListPage() {
             <button
               type="button"
               onClick={() => users.changeTab("inactive")}
-              className={`h-8 border-l border-sky-300 px-5 ${users.activeTab === "inactive"
-                  ? "bg-[#0097cf] text-white"
-                  : "bg-white text-[#0097cf] hover:bg-sky-50"
+              className={`h-8 border-l border-emerald-300 px-5 ${users.activeTab === "inactive"
+                  ? "bg-[#10b981] text-white"
+                  : "bg-white text-[#059669] hover:bg-emerald-50"
                 }`}
             >
               Người dùng ngừng hoạt động

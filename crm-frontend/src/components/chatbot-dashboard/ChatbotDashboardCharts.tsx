@@ -45,7 +45,7 @@ export type ChatbotOverviewCharts = ChatbotOverviewResponse["charts"];
 
 const COLORS = [
   "#0097cf", // Primary PHS Sky Blue
-  "#00713d", // PHS Green
+  "#10b981", // Bright Cool Emerald Green
   "#f59e0b", // Amber
   "#ef4444", // Red
   "#8b5cf6", // Purple
@@ -189,8 +189,8 @@ function AutomationTrendChartCard({
                 type="monotone"
                 dataKey="bot_done"
                 name="Bot tự xử lý (BOT_DONE)"
-                fill="#00713d"
-                stroke="#00713d"
+                fill="#10b981"
+                stroke="#10b981"
                 fillOpacity={0.2}
                 strokeWidth={2.5}
                 isAnimationActive={false}
@@ -346,7 +346,7 @@ function SessionTrendLineChartCard({
  * thấy nhóm nào đang tăng hay giảm qua từng tháng/quý/năm.
  */
 const OUTCOME_SERIES_COLORS: Record<string, string> = {
-  "Chatbot tự xử lý": "#00713d",
+  "Chatbot tự xử lý": "#10b981",
   "Chuyển CCC xử lý": "#f59e0b",
   "Chờ thông tin khách hàng": "#0284c7",
   "Câu hỏi rác": "#ef4444",
@@ -381,7 +381,7 @@ function ChartModeHeader({
             onClick={() => onChange(mode)}
             className={`cursor-pointer px-2.5 py-1 text-xs font-bold rounded-md transition-all ${
               viewMode === mode
-                ? "bg-[#00713d] text-white shadow-xs"
+                ? "bg-[#10b981] text-white shadow-xs"
                 : "text-slate-600 hover:text-slate-900"
             }`}
           >
@@ -1004,7 +1004,7 @@ function HourlyPeakChartCard({
                 <Bar
                   dataKey="count"
                   name="Số lượt chat"
-                  fill="#00713d"
+                  fill="#10b981"
                   radius={[4, 4, 0, 0]}
                   isAnimationActive={false}
                 />
@@ -1378,7 +1378,7 @@ function ChannelPerformanceBarCard({
                 <Bar
                   dataKey="bot_done"
                   name="Bot xử lý (phiên)"
-                  fill="#00713d"
+                  fill="#10b981"
                   radius={[4, 4, 0, 0]}
                   barSize={22}
                   isAnimationActive={false}
@@ -1386,7 +1386,7 @@ function ChannelPerformanceBarCard({
                   <LabelList
                     dataKey="bot_done"
                     position="top"
-                    style={{ fontSize: 9, fill: "#00713d", fontWeight: 700 }}
+                    style={{ fontSize: 9, fill: "#10b981", fontWeight: 700 }}
                     formatter={(val: any) =>
                       val && Number(val) > 0 ? val : ""
                     }

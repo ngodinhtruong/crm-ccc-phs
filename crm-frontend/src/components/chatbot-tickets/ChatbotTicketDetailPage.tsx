@@ -487,7 +487,7 @@ export function ChatbotTicketDetailPage({ id }: { id: number }) {
             <button
               type="button"
               onClick={() => setShowConversation(true)}
-              className="flex w-fit items-center gap-2 rounded-lg bg-[#0097cf] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#0089bd]"
+              className="flex w-fit items-center gap-2 rounded-lg bg-[#10b981] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#059669]"
             >
               <MessageSquareText size={14} />
               Xem lịch sử trò chuyện

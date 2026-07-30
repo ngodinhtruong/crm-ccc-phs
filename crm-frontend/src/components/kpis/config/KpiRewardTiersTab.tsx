@@ -70,29 +70,29 @@ export function KpiRewardTiersTab({
 
       <div className="overflow-hidden rounded border border-slate-200 bg-white">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1400px] text-left text-xs">
+          <table className="w-full min-w-[1400px] text-left text-sm">
             <thead>
               <tr className="h-10 border-b bg-slate-50 text-slate-600">
-                <th className="px-3">Mã</th>
-                <th className="px-3">Tên bậc</th>
-                <th className="px-3">Mô tả</th>
-                <th className="px-3">Rank metric</th>
-                <th className="px-3">Top</th>
-                <th className="px-3">Min score</th>
-                <th className="px-3">Gate</th>
-                <th className="px-3">Reward type</th>
-                <th className="px-3">STT</th>
-                <th className="px-3">Active</th>
-                <th className="px-3">Thao tác</th>
+                <th className="px-4 text-slate-700">Mã</th>
+                <th className="px-4 text-slate-700">Tên bậc</th>
+                <th className="px-4 text-slate-700">Mô tả</th>
+                <th className="px-4 text-slate-700">Rank metric</th>
+                <th className="px-4 text-slate-700">Top</th>
+                <th className="px-4 text-slate-700">Min score</th>
+                <th className="px-4 text-slate-700">Gate</th>
+                <th className="px-4 text-slate-700">Reward type</th>
+                <th className="px-4 text-slate-700">STT</th>
+                <th className="px-4 text-slate-700">Active</th>
+                <th className="px-4 text-slate-700">Thao tác</th>
               </tr>
             </thead>
 
             <tbody>
               {config.rewardRows.map((item) => (
                 <tr key={item.id} className="h-12 border-b align-top">
-                  <td className="px-3 py-2 font-semibold">{item.tier_code}</td>
+                  <td className="px-4 py-2 font-semibold">{item.tier_code}</td>
 
-                  <td className="px-3 py-2">
+                  <td className="px-4 py-2">
                     <input
                       value={item.tier_name}
                       disabled={!config.canManage}
@@ -107,7 +107,7 @@ export function KpiRewardTiersTab({
                     />
                   </td>
 
-                  <td className="px-3 py-2">
+                  <td className="px-4 py-2">
                     <input
                       value={item.description || ""}
                       disabled={!config.canManage}
@@ -122,7 +122,7 @@ export function KpiRewardTiersTab({
                     />
                   </td>
 
-                  <td className="px-3 py-2">
+                  <td className="px-4 py-2">
                     <input
                       value={item.rank_metric_code || ""}
                       disabled={!config.canManage}
@@ -138,7 +138,7 @@ export function KpiRewardTiersTab({
                     />
                   </td>
 
-                  <td className="px-3 py-2">
+                  <td className="px-4 py-2">
                     <input
                       value={item.rank_limit ?? ""}
                       disabled={!config.canManage}
@@ -153,7 +153,7 @@ export function KpiRewardTiersTab({
                     />
                   </td>
 
-                  <td className="px-3 py-2">
+                  <td className="px-4 py-2">
                     <input
                       value={item.min_total_score || ""}
                       disabled={!config.canManage}
@@ -168,7 +168,7 @@ export function KpiRewardTiersTab({
                     />
                   </td>
 
-                  <td className="px-3 py-2">
+                  <td className="px-4 py-2">
                     <input
                       type="checkbox"
                       checked={item.require_all_gates_passed}
@@ -183,7 +183,7 @@ export function KpiRewardTiersTab({
                     />
                   </td>
 
-                  <td className="px-3 py-2">
+                  <td className="px-4 py-2">
                     <input
                       value={item.reward_type || ""}
                       disabled={!config.canManage}
@@ -198,7 +198,7 @@ export function KpiRewardTiersTab({
                     />
                   </td>
 
-                  <td className="px-3 py-2">
+                  <td className="px-4 py-2">
                     <input
                       value={item.sort_order}
                       disabled={!config.canManage}
@@ -213,7 +213,7 @@ export function KpiRewardTiersTab({
                     />
                   </td>
 
-                  <td className="px-3 py-2">
+                  <td className="px-4 py-2">
                     <input
                       type="checkbox"
                       checked={item.is_active}
@@ -228,7 +228,7 @@ export function KpiRewardTiersTab({
                     />
                   </td>
 
-                  <td className="px-3 py-2">
+                  <td className="px-4 py-2">
                     <div className="flex gap-2">
                       <button
                         type="button"

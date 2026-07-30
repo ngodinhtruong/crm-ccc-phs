@@ -66,7 +66,7 @@ export function CustomerCreateForm({
               <input
                 value={form.fullName}
                 onChange={(event) => setField("fullName", event.target.value)}
-                className="h-9 flex-1 rounded border px-3 text-xs outline-none focus:border-sky-400"
+                className="h-9 flex-1 rounded border px-3 text-xs outline-none focus:border-emerald-500"
               />
             </div>
           </div>
@@ -97,7 +97,7 @@ export function CustomerCreateForm({
               onChange={(event) =>
                 setField("identityNumber", event.target.value)
               }
-              className="h-9 w-full rounded border px-3 text-xs outline-none focus:border-sky-400"
+              className="h-9 w-full rounded border px-3 text-xs outline-none focus:border-emerald-500"
             />
           </CustomerFormField>
 
@@ -112,7 +112,7 @@ export function CustomerCreateForm({
               }
               maxLength={10}
               placeholder="10 ký tự chữ + số"
-              className="h-9 w-full rounded border px-3 text-xs outline-none focus:border-sky-400"
+              className="h-9 w-full rounded border px-3 text-xs outline-none focus:border-emerald-500"
             />
           </CustomerFormField>
 
@@ -163,7 +163,7 @@ export function CustomerCreateForm({
             <input
               value={form.phone}
               onChange={(event) => setField("phone", event.target.value)}
-              className="h-9 w-full rounded border px-3 text-xs outline-none focus:border-sky-400"
+              className="h-9 w-full rounded border px-3 text-xs outline-none focus:border-emerald-500"
             />
           </CustomerFormField>
 
@@ -171,7 +171,7 @@ export function CustomerCreateForm({
             <input
               value={form.referrer}
               onChange={(event) => setField("referrer", event.target.value)}
-              className="h-9 w-full rounded border px-3 text-xs outline-none focus:border-sky-400"
+              className="h-9 w-full rounded border px-3 text-xs outline-none focus:border-emerald-500"
             />
           </CustomerFormField>
 
@@ -179,7 +179,7 @@ export function CustomerCreateForm({
             <input
               value={form.email}
               onChange={(event) => setField("email", event.target.value)}
-              className="h-9 w-full rounded border px-3 text-xs outline-none focus:border-sky-400"
+              className="h-9 w-full rounded border px-3 text-xs outline-none focus:border-emerald-500"
             />
           </CustomerFormField>
 
@@ -271,7 +271,7 @@ export function CustomerCreateForm({
             value={form.description}
             onChange={(event) => setField("description", event.target.value)}
             rows={3}
-            className="w-full rounded border px-3 py-2 text-xs outline-none focus:border-sky-400"
+            className="w-full rounded border px-3 py-2 text-xs outline-none focus:border-emerald-500"
           />
         </div>
       </section>
@@ -373,7 +373,7 @@ export function CustomerCreateForm({
         <button
           type="submit"
           disabled={saving}
-          className="h-9 rounded bg-[#0097cf] px-7 text-xs font-semibold text-white hover:bg-[#0089bd] disabled:cursor-not-allowed disabled:opacity-60"
+          className="h-9 rounded bg-[#10b981] px-7 text-xs font-semibold text-white hover:bg-[#059669] disabled:cursor-not-allowed disabled:opacity-60"
         >
           {saving ? "Đang lưu..." : "Lưu"}
         </button>

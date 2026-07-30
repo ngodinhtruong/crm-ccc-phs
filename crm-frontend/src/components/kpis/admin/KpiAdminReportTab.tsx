@@ -285,7 +285,7 @@ function StatCard({
           <div className="mt-1 text-2xl font-bold text-slate-900">{value}</div>
           <div className="mt-1 text-xs font-medium text-slate-400">{unit}</div>
         </div>
-        <div className="rounded-md bg-sky-50 p-2 text-[#0097cf]">{icon}</div>
+        <div className="rounded-md bg-emerald-50 p-2 text-[#059669]">{icon}</div>
       </div>
       {hint && <div className="mt-2 text-xs text-slate-500">{hint}</div>}
     </div>
@@ -308,7 +308,7 @@ function TopList({
   return (
     <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
       <div className="flex h-12 items-center gap-2 border-b bg-white px-4">
-        <div className="text-[#0097cf]">{icon}</div>
+        <div className="text-[#059669]">{icon}</div>
         <h3 className="text-sm font-bold text-slate-800">{title}</h3>
       </div>
 
@@ -357,7 +357,7 @@ function ChartCard({
   return (
     <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
       <div className="mb-3 flex items-start gap-2">
-        <div className="mt-0.5 text-[#0097cf]">{icon}</div>
+        <div className="mt-0.5 text-[#059669]">{icon}</div>
         <div>
           <h3 className="text-sm font-bold text-slate-800">{title}</h3>
           <p className="mt-0.5 text-xs text-slate-500">{description}</p>
@@ -786,7 +786,7 @@ export function KpiAdminReportTab({ admin }: { admin: KpiAdminController }) {
             className={[
               "h-8 rounded px-3 text-sm font-bold transition",
               activeReportTab === "employee"
-                ? "bg-white text-[#0097cf] shadow-sm"
+                ? "bg-white text-[#059669] shadow-sm"
                 : "text-slate-500 hover:text-slate-800",
             ].join(" ")}
           >
@@ -798,7 +798,7 @@ export function KpiAdminReportTab({ admin }: { admin: KpiAdminController }) {
             className={[
               "h-8 rounded px-3 text-sm font-bold transition",
               activeReportTab === "branch"
-                ? "bg-white text-[#0097cf] shadow-sm"
+                ? "bg-white text-[#059669] shadow-sm"
                 : "text-slate-500 hover:text-slate-800",
             ].join(" ")}
           >
@@ -915,7 +915,7 @@ export function KpiAdminReportTab({ admin }: { admin: KpiAdminController }) {
 
           <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
             <div className="flex h-12 items-center gap-2 border-b bg-white px-4">
-              <Building2 size={16} className="text-[#0097cf]" />
+              <Building2 size={16} className="text-[#059669]" />
               <h3 className="text-sm font-bold text-slate-800">Theo chi nhánh</h3>
             </div>
 
@@ -942,7 +942,7 @@ export function KpiAdminReportTab({ admin }: { admin: KpiAdminController }) {
                     </tr>
                   ) : (
                     branchRows.map((row, index) => (
-                      <tr key={row.branchId ?? row.branchName} className={index % 2 === 0 ? "bg-white" : "bg-[#f8fafc]"}>
+                      <tr key={row.branchId ?? row.branchName} className={index % 2 === 0 ? "bg-white" : "bg-slate-50/60"}>
                         <td className="border-b px-4 py-3 font-semibold text-slate-800">{row.branchName}</td>
                         <td className="border-b px-4 py-3 text-right font-semibold text-slate-700">{formatNumber(row.calls)}</td>
                         <td className="border-b px-4 py-3 text-right font-semibold text-slate-700">{formatNumber(row.activated)}</td>

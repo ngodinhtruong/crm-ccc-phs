@@ -43,7 +43,7 @@ export function TicketStatusFlow({
             <div className="flex flex-col items-center">
               <div
                 className={`flex h-10 w-10 items-center justify-center rounded-full text-white ${
-                  reached ? "bg-sky-500" : "bg-slate-300"
+                  reached ? "bg-emerald-500" : "bg-slate-300"
                 }`}
               >
                 {isCurrent ? (
@@ -67,7 +67,7 @@ export function TicketStatusFlow({
             {index < TICKET_STATUS_FLOW.length - 1 && (
               <div
                 className={`mx-2 mb-6 h-0.5 w-12 lg:w-20 ${
-                  currentIndex > index ? "bg-sky-500" : "bg-slate-300"
+                  currentIndex > index ? "bg-emerald-500" : "bg-slate-300"
                 }`}
               />
             )}

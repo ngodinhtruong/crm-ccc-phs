@@ -272,25 +272,15 @@ export function useExternalErrorDashboard() {
     setAppliedFilters({ ...draftFilters, q: draftFilters.q.trim() });
   }, [draftFilters]);
 
-  const applyDateRange = useCallback(() => {
-    setAppliedFilters((current) => ({
-      ...current,
-      dateField: draftFilters.dateField,
-      dateFrom: draftFilters.dateFrom,
-      dateTo: draftFilters.dateTo,
-    }));
-  }, [draftFilters.dateField, draftFilters.dateFrom, draftFilters.dateTo]);
-
-  const resetDateRange = useCallback(() => {
+  const resetDraftDateRange = useCallback(() => {
     const currentYearRange = getYearToCurrentDateRange();
-    const datePatch = {
+
+    setDraftFilters((current) => ({
+      ...current,
       dateField: "received_date",
       dateFrom: currentYearRange.dateFrom,
       dateTo: currentYearRange.dateTo,
-    };
-
-    setDraftFilters((current) => ({ ...current, ...datePatch }));
-    setAppliedFilters((current) => ({ ...current, ...datePatch }));
+    }));
   }, []);
 
   const clearFilter = useCallback(() => {
@@ -358,8 +348,14 @@ export function useExternalErrorDashboard() {
     [causeGroups]
   );
 
-  const appliedFilterCount = useMemo(
-    () =>
+  const appliedFilterCount = useMemo(() => {
+    const defaultFilters = createDefaultFilters();
+    const hasCustomDateRange =
+      appliedFilters.dateField !== defaultFilters.dateField ||
+      appliedFilters.dateFrom !== defaultFilters.dateFrom ||
+      appliedFilters.dateTo !== defaultFilters.dateTo;
+
+    return (
       [
         appliedFilters.source,
         appliedFilters.device,
@@ -368,27 +364,25 @@ export function useExternalErrorDashboard() {
         appliedFilters.status,
         appliedFilters.needReview,
         appliedFilters.q,
-      ].filter(Boolean).length,
-    [
-      appliedFilters.causeGroup,
-      appliedFilters.device,
-      appliedFilters.errorType,
-      appliedFilters.needReview,
-      appliedFilters.q,
-      appliedFilters.source,
-      appliedFilters.status,
-    ]
-  );
+      ].filter(Boolean).length + (hasCustomDateRange ? 1 : 0)
+    );
+  }, [
+    appliedFilters.causeGroup,
+    appliedFilters.dateField,
+    appliedFilters.dateFrom,
+    appliedFilters.dateTo,
+    appliedFilters.device,
+    appliedFilters.errorType,
+    appliedFilters.needReview,
+    appliedFilters.q,
+    appliedFilters.source,
+    appliedFilters.status,
+  ]);
 
   const hasPendingFilters = useMemo(
     () => JSON.stringify(draftFilters) !== JSON.stringify(appliedFilters),
     [appliedFilters, draftFilters]
   );
-
-  const hasPendingDateFilters =
-    draftFilters.dateField !== appliedFilters.dateField ||
-    draftFilters.dateFrom !== appliedFilters.dateFrom ||
-    draftFilters.dateTo !== appliedFilters.dateTo;
 
   return {
     dateField: draftFilters.dateField,
@@ -429,11 +423,9 @@ export function useExternalErrorDashboard() {
     reload: () => loadDashboard(true),
     ensureCatalogs,
     applyFilters,
-    applyDateRange,
-    resetDateRange,
+    resetDraftDateRange,
     clearFilter,
     appliedFilterCount,
     hasPendingFilters,
-    hasPendingDateFilters,
   };
 }

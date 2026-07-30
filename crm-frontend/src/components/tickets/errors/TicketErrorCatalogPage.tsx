@@ -100,9 +100,9 @@ export function TicketErrorCatalogPage() {
                     key={tab.key}
                     type="button"
                     onClick={() => catalog.setActiveTab(tab.key)}
-                    className={`block w-full rounded-md border px-3 py-3 text-left text-xs transition ${
+                    className={`block w-full rounded-md border px-3 py-3 text-left text-sm transition ${
                       active
-                        ? "border-[#0097cf] bg-sky-50 text-sky-700"
+                        ? "border-[#10b981] bg-emerald-50 text-[#059669]"
                         : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                     }`}
                   >
@@ -196,7 +196,7 @@ function TextInput({ value, onChange, placeholder }: { value: string; onChange: 
       value={value}
       onChange={(event) => onChange(event.target.value)}
       placeholder={placeholder}
-      className="h-9 w-full rounded border border-slate-300 bg-white px-3 text-xs outline-none focus:border-sky-400"
+      className="h-9 w-full rounded border border-slate-300 bg-white px-3 text-xs outline-none focus:border-emerald-500"
     />
   );
 }
@@ -216,7 +216,7 @@ function FormActions({ saving, editing, onReset }: { saving: boolean; editing: b
       <button
         type="submit"
         disabled={saving}
-        className="flex h-9 items-center gap-1 rounded bg-[#0097cf] px-4 text-xs font-semibold text-white hover:bg-[#0089bd] disabled:cursor-not-allowed disabled:opacity-60"
+        className="flex h-9 items-center gap-1 rounded bg-[#10b981] px-4 text-xs font-semibold text-white hover:bg-[#059669] disabled:cursor-not-allowed disabled:opacity-60"
       >
         <Save size={14} />
         {saving ? "Đang lưu..." : editing ? "Cập nhật" : "Thêm mới"}
@@ -255,7 +255,7 @@ function GroupForm({ catalog }: { catalog: CatalogReturn }) {
           value={form.description}
           onChange={(event) => catalog.setGroupForm((prev) => ({ ...prev, description: event.target.value }))}
           rows={3}
-          className="w-full rounded border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-sky-400"
+          className="w-full rounded border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-emerald-500"
         />
       </div>
 
@@ -275,7 +275,7 @@ function TypeForm({ catalog }: { catalog: CatalogReturn }) {
         <select
           value={form.group}
           onChange={(event) => catalog.setTypeForm((prev) => ({ ...prev, group: event.target.value }))}
-          className="h-9 w-full rounded border border-slate-300 bg-white px-2 text-xs outline-none focus:border-sky-400"
+          className="h-9 w-full rounded border border-slate-300 bg-white px-2 text-xs outline-none focus:border-emerald-500"
         >
           <option value="">Chọn nhóm lỗi</option>
           {catalog.groups.map((item) => (
@@ -300,7 +300,7 @@ function TypeForm({ catalog }: { catalog: CatalogReturn }) {
           value={form.description}
           onChange={(event) => catalog.setTypeForm((prev) => ({ ...prev, description: event.target.value }))}
           rows={3}
-          className="w-full rounded border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-sky-400"
+          className="w-full rounded border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-emerald-500"
         />
       </div>
 
@@ -328,25 +328,25 @@ function RowActions({ onEdit, onToggle, active }: { onEdit: () => void; onToggle
 function GroupTable({ catalog }: { catalog: CatalogReturn }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[760px] border-collapse text-left text-xs">
+      <table className="w-full min-w-[760px] border-collapse text-left text-sm">
         <thead>
           <tr className="h-10 border-b bg-[#f8fafc] text-slate-700">
-            <th className="px-3 font-semibold">Mã</th>
-            <th className="px-3 font-semibold">Tên nhóm lỗi</th>
-            <th className="px-3 font-semibold">Mô tả</th>
-            <th className="px-3 font-semibold">Trạng thái</th>
-            <th className="px-3 font-semibold">Thao tác</th>
+            <th className="px-4 font-semibold">Mã</th>
+            <th className="px-4 font-semibold">Tên nhóm lỗi</th>
+            <th className="px-4 font-semibold">Mô tả</th>
+            <th className="px-4 font-semibold">Trạng thái</th>
+            <th className="px-4 font-semibold">Thao tác</th>
           </tr>
         </thead>
         <tbody>
           <TableState loading={catalog.loading} error="" empty={!catalog.loading && catalog.filteredGroups.length === 0} colSpan={5} emptyText="Không có nhóm lỗi." />
           {!catalog.loading && catalog.filteredGroups.map((item: TicketErrorGroupOption) => (
-            <tr key={item.id} className="h-12 border-b border-slate-100 hover:bg-sky-50">
-              <td className="px-3 font-semibold text-slate-700">{item.group_code}</td>
-              <td className="px-3">{item.group_name}</td>
+            <tr key={item.id} className="h-[46px] border-b border-slate-200 hover:bg-emerald-50">
+              <td className="px-4 font-semibold text-slate-700">{item.group_code}</td>
+              <td className="px-4 text-slate-700">{item.group_name}</td>
               <td className="max-w-[260px] truncate px-3"><EmptyDash value={item.description} /></td>
-              <td className="px-3"><StatusBadge active={item.is_active} /></td>
-              <td className="px-3"><RowActions active={item.is_active} onEdit={() => catalog.editGroup(item)} onToggle={() => void catalog.toggleGroupActive(item)} /></td>
+              <td className="px-4 text-slate-700"><StatusBadge active={item.is_active} /></td>
+              <td className="px-4 text-slate-700"><RowActions active={item.is_active} onEdit={() => catalog.editGroup(item)} onToggle={() => void catalog.toggleGroupActive(item)} /></td>
             </tr>
           ))}
         </tbody>
@@ -358,27 +358,27 @@ function GroupTable({ catalog }: { catalog: CatalogReturn }) {
 function TypeTable({ catalog }: { catalog: CatalogReturn }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[860px] border-collapse text-left text-xs">
+      <table className="w-full min-w-[860px] border-collapse text-left text-sm">
         <thead>
           <tr className="h-10 border-b bg-[#f8fafc] text-slate-700">
-            <th className="px-3 font-semibold">Nhóm lỗi</th>
-            <th className="px-3 font-semibold">Mã</th>
-            <th className="px-3 font-semibold">Tên loại lỗi</th>
-            <th className="px-3 font-semibold">Mô tả</th>
-            <th className="px-3 font-semibold">Trạng thái</th>
-            <th className="px-3 font-semibold">Thao tác</th>
+            <th className="px-4 font-semibold">Nhóm lỗi</th>
+            <th className="px-4 font-semibold">Mã</th>
+            <th className="px-4 font-semibold">Tên loại lỗi</th>
+            <th className="px-4 font-semibold">Mô tả</th>
+            <th className="px-4 font-semibold">Trạng thái</th>
+            <th className="px-4 font-semibold">Thao tác</th>
           </tr>
         </thead>
         <tbody>
           <TableState loading={catalog.loading} error="" empty={!catalog.loading && catalog.filteredTypes.length === 0} colSpan={6} emptyText="Không có loại lỗi." />
           {!catalog.loading && catalog.filteredTypes.map((item: TicketErrorTypeOption) => (
-            <tr key={item.id} className="h-12 border-b border-slate-100 hover:bg-sky-50">
-              <td className="px-3">{item.group_name || "-"}</td>
-              <td className="px-3 font-semibold text-slate-700">{item.type_code}</td>
-              <td className="px-3">{item.type_name}</td>
+            <tr key={item.id} className="h-[46px] border-b border-slate-200 hover:bg-emerald-50">
+              <td className="px-4 text-slate-700">{item.group_name || "-"}</td>
+              <td className="px-4 font-semibold text-slate-700">{item.type_code}</td>
+              <td className="px-4 text-slate-700">{item.type_name}</td>
               <td className="max-w-[260px] truncate px-3"><EmptyDash value={item.description} /></td>
-              <td className="px-3"><StatusBadge active={item.is_active} /></td>
-              <td className="px-3"><RowActions active={item.is_active} onEdit={() => catalog.editType(item)} onToggle={() => void catalog.toggleTypeActive(item)} /></td>
+              <td className="px-4 text-slate-700"><StatusBadge active={item.is_active} /></td>
+              <td className="px-4 text-slate-700"><RowActions active={item.is_active} onEdit={() => catalog.editType(item)} onToggle={() => void catalog.toggleTypeActive(item)} /></td>
             </tr>
           ))}
         </tbody>

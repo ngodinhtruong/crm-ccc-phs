@@ -106,7 +106,7 @@ export function EmployeePicker({
 
   return (
     <div ref={wrapperRef} className="relative">
-      <div className="flex h-10 items-center rounded-md border border-slate-300 bg-white focus-within:border-sky-500 focus-within:ring-2 focus-within:ring-sky-100">
+      <div className="flex h-10 items-center rounded-md border border-slate-300 bg-white focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100">
         <Search size={15} className="ml-3 shrink-0 text-slate-400" />
         <input
           value={open ? keyword : selectedLabel}
@@ -146,9 +146,9 @@ export function EmployeePicker({
             type="button"
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => selectValue(NEW_EMPLOYEE_VALUE)}
-            className="flex w-full items-start gap-3 border-b border-slate-100 px-3 py-2.5 text-left hover:bg-sky-50"
+            className="flex w-full items-start gap-3 border-b border-slate-100 px-3 py-2.5 text-left hover:bg-emerald-50"
           >
-            <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-sky-100 text-sky-700">
+            <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-emerald-100 text-emerald-700">
               <Plus size={15} />
             </span>
             <span className="min-w-0 flex-1">
@@ -160,7 +160,7 @@ export function EmployeePicker({
               </span>
             </span>
             {value === NEW_EMPLOYEE_VALUE && (
-              <Check size={15} className="mt-1 shrink-0 text-sky-600" />
+              <Check size={15} className="mt-1 shrink-0 text-emerald-600" />
             )}
           </button>
 
@@ -184,8 +184,8 @@ export function EmployeePicker({
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => selectValue(employeeId)}
                   className={[
-                    "flex w-full items-start gap-3 border-b border-slate-100 px-3 py-2.5 text-left last:border-0 hover:bg-sky-50",
-                    active ? "bg-sky-50" : "bg-white",
+                    "flex w-full items-start gap-3 border-b border-slate-100 px-3 py-2.5 text-left last:border-0 hover:bg-emerald-50",
+                    active ? "bg-emerald-50" : "bg-white",
                   ].join(" ")}
                 >
                   <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-600">
@@ -200,7 +200,7 @@ export function EmployeePicker({
                     </span>
                   </span>
                   {active && (
-                    <Check size={15} className="mt-1 shrink-0 text-sky-600" />
+                    <Check size={15} className="mt-1 shrink-0 text-emerald-600" />
                   )}
                 </button>
               );

@@ -16,7 +16,7 @@ import { DashboardLayout } from "@/layouts/DashboardLayout";
 function TicketMethodBadge({ value }: { value?: string | null }) {
   if (value === "AUTO") {
     return (
-      <span className="inline-flex rounded-md bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700">
+      <span className="inline-flex rounded-md bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
         Chatbot
       </span>
     );
@@ -129,7 +129,7 @@ export function TicketListPage() {
           <button
             type="button"
             onClick={tickets.goCreate}
-            className="flex h-8 items-center gap-1 rounded bg-[#0097cf] px-3 text-xs font-semibold text-white hover:bg-[#0089bd]"
+            className="flex h-8 items-center gap-1 rounded bg-[#10b981] px-3 text-xs font-semibold text-white hover:bg-[#059669]"
           >
             <Plus size={15} />
             Thêm ticket
@@ -187,7 +187,7 @@ export function TicketListPage() {
                 type="button"
                 onClick={() => tickets.setAccountLinkStatus(tab.value)}
                 className={`h-8 rounded-full border px-4 text-xs font-semibold transition ${active
-                    ? "border-[#0097cf] bg-[#0097cf] text-white"
+                    ? "border-[#10b981] bg-[#10b981] text-white"
                     : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
                   }`}
               >
@@ -197,28 +197,28 @@ export function TicketListPage() {
           })}
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[2200px] border-collapse text-left text-xs">
+        <div className="table-scroll-container">
+          <table className="data-table w-full min-w-[2300px] border-collapse text-left text-sm">
             <thead>
-              <tr className="h-10 border-b bg-white text-slate-700">
-                <th className="w-[150px] px-3 font-semibold">Ngày tạo</th>
-                <th className="w-[145px] px-3 font-semibold">Mã ticket</th>
-                <th className="w-[180px] px-3 font-semibold">Phân loại</th>
-                <th className="w-[180px] px-3 font-semibold">Danh mục</th>
-                <th className="w-[180px] px-3 font-semibold">Khách hàng</th>
-                <th className="w-[140px] px-3 font-semibold">Số TK</th>
-                <th className="w-[140px] px-3 font-semibold">Di động</th>
-                <th className="w-[140px] px-3 font-semibold">Email</th>
-                <th className="w-[140px] px-3 font-semibold">Nguồn Ticket</th>
-                <th className="w-[160px] px-3 font-semibold">Tình trạng</th>
-                <th className="w-[180px] px-3 font-semibold">Giao cho</th>
-                <th className="w-[180px] px-3 font-semibold">Mức độ ưu tiên</th>
-                <th className="w-[180px] px-3 font-semibold">Tổng thời gian</th>
-                <th className="w-[180px] px-3 font-semibold">Tổng thời gian xử lý</th>
+              <tr className="h-11 border-b-2 border-slate-200 bg-slate-50 text-slate-700">
+                <th className="w-[170px] min-w-[170px] px-4 font-semibold">Ngày tạo</th>
+                <th className="w-[145px] min-w-[145px] px-4 font-semibold">Mã ticket</th>
+                <th className="w-[180px] min-w-[180px] px-4 font-semibold">Phân loại</th>
+                <th className="w-[180px] min-w-[180px] px-4 font-semibold">Danh mục</th>
+                <th className="w-[180px] min-w-[180px] px-4 font-semibold">Khách hàng</th>
+                <th className="w-[140px] min-w-[140px] px-4 font-semibold">Số TK</th>
+                <th className="w-[140px] min-w-[140px] px-4 font-semibold">Di động</th>
+                <th className="w-[140px] min-w-[140px] px-4 font-semibold">Email</th>
+                <th className="w-[140px] min-w-[140px] px-4 font-semibold">Nguồn Ticket</th>
+                <th className="w-[160px] min-w-[160px] px-4 font-semibold">Tình trạng</th>
+                <th className="w-[180px] min-w-[180px] px-4 font-semibold">Giao cho</th>
+                <th className="w-[180px] min-w-[180px] px-4 font-semibold">Mức độ ưu tiên</th>
+                <th className="w-[180px] min-w-[180px] px-4 font-semibold">Tổng thời gian</th>
+                <th className="w-[180px] min-w-[180px] px-4 font-semibold">Tổng thời gian xử lý</th>
               </tr>
 
-              <tr className="border-b bg-[#f8fafc] align-top">
-                <th className="px-2 py-2">
+              <tr className="table-filter-row border-b border-slate-200 bg-slate-50/70 align-top">
+                <th className="px-3 py-2.5">
                   <ColumnDateRangeFilter
                     fromValue={tickets.createdFrom}
                     toValue={tickets.createdTo}
@@ -227,7 +227,7 @@ export function TicketListPage() {
                   />
                 </th>
 
-                <th className="px-2 py-2">
+                <th className="px-3 py-2.5">
                   <ColumnTextFilter
                     value={tickets.ticketCode}
                     onChange={tickets.setTicketCode}
@@ -235,7 +235,7 @@ export function TicketListPage() {
                   />
                 </th>
 
-                <th className="px-2 py-2">
+                <th className="px-3 py-2.5">
                   <ColumnSelectFilter
                     value={tickets.classification}
                     onChange={tickets.setClassification}
@@ -246,7 +246,7 @@ export function TicketListPage() {
                   />
                 </th>
 
-                <th className="px-2 py-2">
+                <th className="px-3 py-2.5">
                   <ColumnSelectFilter
                     value={tickets.supportCategory}
                     onChange={tickets.setSupportCategory}
@@ -257,7 +257,7 @@ export function TicketListPage() {
                   />
                 </th>
 
-                <th className="px-2 py-2">
+                <th className="px-3 py-2.5">
                   <ColumnTextFilter
                     value={tickets.customerName}
                     onChange={tickets.setCustomerName}
@@ -265,7 +265,7 @@ export function TicketListPage() {
                   />
                 </th>
 
-                <th className="px-2 py-2">
+                <th className="px-3 py-2.5">
                   <ColumnTextFilter
                     value={tickets.accountNumber}
                     onChange={tickets.setAccountNumber}
@@ -273,7 +273,7 @@ export function TicketListPage() {
                   />
                 </th>
 
-                <th className="px-2 py-2">
+                <th className="px-3 py-2.5">
                   <ColumnTextFilter
                     value={tickets.customerPhone}
                     onChange={tickets.setCustomerPhone}
@@ -281,7 +281,7 @@ export function TicketListPage() {
                   />
                 </th>
 
-                <th className="px-2 py-2">
+                <th className="px-3 py-2.5">
                   <ColumnTextFilter
                     value={tickets.customerEmail}
                     onChange={tickets.setCustomerEmail}
@@ -289,7 +289,7 @@ export function TicketListPage() {
                   />
                 </th>
 
-                <th className="px-2 py-2">
+                <th className="px-3 py-2.5">
                   <ColumnSelectFilter
                     value={tickets.source}
                     onChange={tickets.setSource}
@@ -300,7 +300,7 @@ export function TicketListPage() {
                   />
                 </th>
 
-                <th className="px-2 py-2">
+                <th className="px-3 py-2.5">
                   <ColumnSelectFilter
                     value={tickets.currentStatus}
                     onChange={tickets.setCurrentStatus}
@@ -311,7 +311,7 @@ export function TicketListPage() {
                   />
                 </th>
 
-                <th className="px-2 py-2">
+                <th className="px-3 py-2.5">
                   <ColumnTextFilter
                     value={tickets.ownerUserName}
                     onChange={tickets.setOwnerUserName}
@@ -319,7 +319,7 @@ export function TicketListPage() {
                   />
                 </th>
 
-                <th className="px-2 py-2">
+                <th className="px-3 py-2.5">
                   <ColumnSelectFilter
                     value={tickets.priority}
                     onChange={tickets.setPriority}
@@ -330,8 +330,8 @@ export function TicketListPage() {
                   />
                 </th>
 
-                <th className="px-2 py-2"></th>
-                <th className="px-2 py-2"></th>
+                <th className="px-3 py-2.5"></th>
+                <th className="px-3 py-2.5"></th>
               </tr>
             </thead>
 
@@ -347,19 +347,19 @@ export function TicketListPage() {
               {!tickets.loading &&
                 !tickets.error &&
                 tickets.items.map((item, index) => {
-                  const rowBg = index % 2 === 0 ? "bg-white" : "bg-[#f8fafc]";
+                  const rowBg = index % 2 === 0 ? "bg-white" : "bg-slate-50/60";
 
                   return (
                     <tr
                       key={item.id}
                       onClick={() => router.push(`/tickets/${item.id}`)}
-                      className={`h-14 cursor-pointer border-b border-slate-100 ${rowBg} hover:bg-sky-50`}
+                      className={`h-[46px] cursor-pointer border-b border-slate-200 ${rowBg} transition-colors hover:bg-emerald-50`}
                     >
-                      <td className="px-3">{formatDate(item.created_at)}</td>
+                      <td className="px-4 text-slate-600">{formatDate(item.created_at)}</td>
 
-                      <td className="px-3">
+                      <td className="px-4">
                         <div className="flex items-center gap-2">
-                          <span className="font-semibold text-sky-600">
+                          <span className="font-semibold text-[#059669]">
                             {item.ticket_code || `TICKET-${item.id}`}
                           </span>
 
@@ -367,35 +367,35 @@ export function TicketListPage() {
                         </div>
                       </td>
 
-                      <td className="px-3">{item.classification_name || "-"}</td>
+                      <td className="px-4 text-slate-700">{item.classification_name || "-"}</td>
 
-                      <td className="px-3">{item.support_category_name || "-"}</td>
+                      <td className="px-4 text-slate-700">{item.support_category_name || "-"}</td>
 
-                      <td className="px-3">{item.customer_name || "-"}</td>
+                      <td className="px-4 text-slate-700">{item.customer_name || "-"}</td>
 
-                      <td className="px-3 font-semibold text-slate-700">
+                      <td className="px-4 font-semibold text-slate-700">
                         {item.display_account_number || item.customer_account_number || item.raw_account_number || "-"}
                       </td>
 
-                      <td className="px-3">{item.customer_phone || "-"}</td>
+                      <td className="px-4 text-slate-600">{item.customer_phone || "-"}</td>
 
-                      <td className="px-3">{item.customer_email || "-"}</td>
+                      <td className="px-4 text-slate-600">{item.customer_email || "-"}</td>
 
-                      <td className="px-3">{item.source_name || "-"}</td>
+                      <td className="px-4 text-slate-600">{item.source_name || "-"}</td>
 
-                      <td className="px-3">{item.status_name || "-"}</td>
+                      <td className="px-4 text-slate-700">{item.status_name || "-"}</td>
 
-                      <td className="px-3">
+                      <td className="px-4 text-slate-700">
                         {item.assigned_employee_name || item.owner_user_name || "-"}
                       </td>
 
-                      <td className="px-3">{item.priority_name || "-"}</td>
+                      <td className="px-4 text-slate-600">{item.priority_name || "-"}</td>
 
-                      <td className="px-3 font-medium text-slate-600">
+                      <td className="px-4 font-medium text-slate-600">
                         {formatDuration(item.total_duration_minutes)}
                       </td>
 
-                      <td className="px-3 font-medium text-slate-600">
+                      <td className="px-4 font-medium text-slate-600">
                         {formatDuration(item.processing_duration_minutes)}
                       </td>
                     </tr>

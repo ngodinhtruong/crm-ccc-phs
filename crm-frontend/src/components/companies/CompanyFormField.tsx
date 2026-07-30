@@ -49,7 +49,7 @@ export function CompanyDateInput({
         type="date"
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-9 flex-1 rounded-l border px-3 text-xs outline-none focus:border-sky-400"
+        className="h-9 flex-1 rounded-l border px-3 text-xs outline-none focus:border-emerald-500"
       />
 
       <div className="flex h-9 w-9 items-center justify-center rounded-r border-y border-r bg-slate-100 text-slate-600">

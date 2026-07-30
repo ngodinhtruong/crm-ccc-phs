@@ -21,7 +21,7 @@ export function KpiMetricProgressRow({
 
   return (
     <tr
-      className="h-14 cursor-pointer border-b border-slate-100 bg-white hover:bg-sky-50"
+      className="h-14 cursor-pointer border-b border-slate-100 bg-white hover:bg-emerald-50"
       onClick={() => onViewDetail(item)}
       onDoubleClick={() => onViewDetail(item)}
     >
@@ -34,7 +34,7 @@ export function KpiMetricProgressRow({
               event.stopPropagation();
               onViewDetail(item);
             }}
-            className="hover:text-sky-600"
+            className="hover:text-[#059669]"
           >
             <Eye size={15} />
           </button>
@@ -42,7 +42,7 @@ export function KpiMetricProgressRow({
       </td>
 
       <td className="px-3">
-        <div className="font-semibold text-sky-600">{item.metric.metric_code}</div>
+        <div className="font-semibold text-[#059669]">{item.metric.metric_code}</div>
       </td>
 
       <td className="px-3">

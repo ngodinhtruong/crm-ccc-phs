@@ -34,7 +34,7 @@ export function CustomerStatusBadge({ value }: { value?: string | null }) {
 
 export function CustomerVipBadge({ value }: { value?: string | null }) {
   return (
-    <span className="inline-flex max-w-[130px] truncate rounded-md bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700">
+    <span className="inline-flex max-w-[130px] truncate rounded-md bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
       {value || "Khách thường"}
     </span>
   );

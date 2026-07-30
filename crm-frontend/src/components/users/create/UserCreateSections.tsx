@@ -29,7 +29,7 @@ function SectionCard({
   return (
     <section className="rounded-lg border border-slate-200 bg-white">
       <div className="flex items-center gap-2 border-b border-slate-100 px-4 py-3">
-        <span className="text-sky-700">{icon}</span>
+        <span className="text-emerald-700">{icon}</span>
         <h2 className="text-sm font-bold text-slate-800">{title}</h2>
       </div>
       <div className="p-4">{children}</div>

@@ -50,7 +50,7 @@ const SummaryCard = memo(function SummaryCard({
   tone?: "sky" | "emerald" | "amber" | "rose" | "slate" | "violet";
 }) {
   const toneClass: Record<string, string> = {
-    sky: "border-sky-100 bg-sky-50 text-sky-700",
+    sky: "border-emerald-100 bg-emerald-50 text-emerald-700",
     emerald: "border-emerald-100 bg-emerald-50 text-emerald-700",
     amber: "border-amber-100 bg-amber-50 text-amber-700",
     rose: "border-rose-100 bg-rose-50 text-rose-700",
@@ -113,7 +113,7 @@ function FilterPopover({
         <div>
           <h2 className="text-sm font-semibold text-slate-800">Bộ lọc Dashboard lỗi</h2>
           <p className="mt-0.5 text-xs text-slate-500">
-            Lọc theo nguồn, thiết bị, nhóm lỗi, nhóm nguyên nhân, trạng thái và nội dung lỗi.
+            Lọc theo thời gian, nguồn, thiết bị, nhóm lỗi, nhóm nguyên nhân, trạng thái và nội dung lỗi.
           </p>
           {dashboard.catalogsLoading && (
             <p className="mt-1 text-[11px] font-medium text-sky-600">
@@ -132,6 +132,50 @@ function FilterPopover({
       </div>
 
       <div className="max-h-[calc(100vh-160px)] overflow-y-auto bg-[#f8fafc] px-4 py-3">
+        <div className="mb-4 rounded-md border border-slate-200 bg-white p-3">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-700">
+                Thời gian
+              </h3>
+              <p className="mt-0.5 text-[11px] text-slate-500">
+                Chọn trường ngày và khoảng thời gian dùng cho toàn bộ Dashboard.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={dashboard.resetDraftDateRange}
+              disabled={dashboard.fetching}
+              className="h-8 rounded border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+            >
+              Từ đầu năm
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <FilterSelect
+              label="Trường thời gian"
+              value={dashboard.dateField}
+              onChange={dashboard.setDateField}
+              options={[
+                { label: "Ngày nhận", value: "received_date" },
+                { label: "Ngày hoàn thành", value: "completed_date" },
+              ]}
+              placeholder="Chọn trường ngày"
+            />
+
+            <DateRangeFilter
+              fromLabel="Từ ngày"
+              toLabel="Đến ngày"
+              fromValue={dashboard.dateFrom}
+              toValue={dashboard.dateTo}
+              onFromChange={dashboard.setDateFrom}
+              onToChange={dashboard.setDateTo}
+            />
+          </div>
+        </div>
+
         <div className="grid grid-cols-12 gap-3">
           <div className="col-span-12 md:col-span-4">
             <label className="mb-1 block text-xs font-medium text-slate-500">Tìm kiếm</label>
@@ -213,7 +257,7 @@ function FilterPopover({
           type="button"
           onClick={applyFilter}
           disabled={!dashboard.hasPendingFilters || dashboard.fetching}
-          className="h-9 rounded bg-[#0097cf] px-4 text-xs font-semibold text-white hover:bg-[#0089bd] disabled:cursor-not-allowed disabled:opacity-50"
+          className="h-9 rounded bg-[#10b981] px-4 text-xs font-semibold text-white hover:bg-[#059669] disabled:cursor-not-allowed disabled:opacity-50"
         >
           Áp dụng bộ lọc
         </button>
@@ -265,14 +309,14 @@ export function ExternalErrorDashboardPage() {
               if (nextOpen) void dashboard.ensureCatalogs();
             }}
             className={`relative flex h-8 items-center gap-1 rounded border px-3 text-xs font-semibold ${filterOpen || activeFilterCount > 0
-              ? "border-[#0097cf] bg-sky-50 text-[#007ead]"
+              ? "border-[#10b981] bg-emerald-50 text-[#059669]"
               : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
             }`}
           >
             <SlidersHorizontal size={15} />
             Bộ lọc
             {activeFilterCount > 0 && (
-              <span className="ml-1 rounded-full bg-[#0097cf] px-1.5 py-0.5 text-[10px] font-bold text-white">
+              <span className="ml-1 rounded-full bg-[#10b981] px-1.5 py-0.5 text-[10px] font-bold text-white">
                 {activeFilterCount}
               </span>
             )}
@@ -284,7 +328,7 @@ export function ExternalErrorDashboardPage() {
             type="button"
             onClick={() => void dashboard.reload()}
             disabled={dashboard.fetching}
-            className="flex h-8 items-center gap-1 rounded bg-[#0097cf] px-3 text-xs font-semibold text-white hover:bg-[#0089bd] disabled:opacity-50"
+            className="flex h-8 items-center gap-1 rounded bg-[#10b981] px-3 text-xs font-semibold text-white hover:bg-[#059669] disabled:opacity-50"
           >
             <RefreshCw size={15} className={dashboard.fetching ? "animate-spin" : ""} />
             Làm mới
@@ -295,7 +339,7 @@ export function ExternalErrorDashboardPage() {
       <div className="space-y-4">
         <div className="rounded-md border border-slate-200 bg-gradient-to-r from-sky-50 via-white to-amber-50 p-5 shadow-sm">
           <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white text-[#0097cf] shadow-sm ring-1 ring-sky-100">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white text-[#059669] shadow-sm ring-1 ring-emerald-100">
               <AlertTriangle size={22} />
             </div>
             <div>
@@ -307,54 +351,8 @@ export function ExternalErrorDashboardPage() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-end gap-3 rounded-md border border-slate-200 bg-white px-4 py-3 shadow-sm">
-          
-
-          <div className="w-full sm:w-[190px]">
-            <FilterSelect
-              label="Trường thời gian"
-              value={dashboard.dateField}
-              onChange={dashboard.setDateField}
-              options={[
-                { label: "Ngày nhận", value: "received_date" },
-                { label: "Ngày hoàn thành", value: "completed_date" },
-              ]}
-              placeholder="Chọn trường ngày"
-            />
-          </div>
-
-          <div className="grid w-full grid-cols-2 gap-3 sm:w-[380px]">
-            <DateRangeFilter
-              fromLabel="Từ ngày"
-              toLabel="Đến ngày"
-              fromValue={dashboard.dateFrom}
-              toValue={dashboard.dateTo}
-              onFromChange={dashboard.setDateFrom}
-              onToChange={dashboard.setDateTo}
-            />
-          </div>
-
-          <button
-            type="button"
-            onClick={dashboard.applyDateRange}
-            disabled={!dashboard.hasPendingDateFilters || dashboard.fetching}
-            className="h-9 rounded bg-[#0097cf] px-3 text-xs font-semibold text-white hover:bg-[#0089bd] disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Áp dụng thời gian
-          </button>
-
-          <button
-            type="button"
-            onClick={dashboard.resetDateRange}
-            disabled={dashboard.fetching}
-            className="h-9 rounded border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-          >
-            Từ đầu năm
-          </button>
-        </div>
-
         {dashboard.fetching && summary && (
-          <div className="flex items-center gap-2 rounded-md border border-sky-100 bg-sky-50 px-3 py-2 text-xs font-medium text-sky-700">
+          <div className="flex items-center gap-2 rounded-md border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700">
             <RefreshCw size={13} className="animate-spin" />
             Đang cập nhật dữ liệu dashboard...
           </div>

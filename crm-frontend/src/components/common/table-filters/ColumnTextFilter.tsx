@@ -19,7 +19,7 @@ export function ColumnTextFilter({
       value={value}
       onChange={(event) => onChange(event.target.value)}
       placeholder={placeholder}
-      className="h-8 w-full rounded border border-slate-300 bg-white px-2 text-[11px] font-normal outline-none focus:border-sky-400"
+      className="table-filter-control h-8 rounded border border-slate-300 bg-white px-2 font-normal outline-none focus:border-sky-400"
     />
   );
 }

@@ -78,7 +78,7 @@ export function ExternalErrorListPage() {
           </Link>
           <Link
             href="/external-errors/create"
-            className="flex h-8 items-center gap-1 rounded bg-[#0097cf] px-3 text-xs font-semibold text-white hover:bg-[#0089bd]"
+            className="flex h-8 items-center gap-1 rounded bg-[#10b981] px-3 text-xs font-semibold text-white hover:bg-[#059669]"
           >
             <Plus size={14} />
             Thêm lỗi
@@ -201,7 +201,7 @@ export function ExternalErrorListPage() {
             type="button"
             disabled={state.actionLoading}
             onClick={() => state.bulkClassifyMatching(false)}
-            className="h-8 rounded border border-sky-300 bg-sky-50 px-3 text-xs font-semibold text-sky-700 hover:bg-sky-100 disabled:opacity-50"
+            className="h-8 rounded border border-emerald-300 bg-emerald-50 px-3 text-xs font-semibold text-[#059669] hover:bg-emerald-100 disabled:opacity-50"
           >
             Phân loại các dòng đang lọc
           </button>
@@ -241,7 +241,7 @@ export function ExternalErrorListPage() {
                 onChange={(event) =>
                   setConfirmErrorCode(event.target.value)
                 }
-                className="h-9 w-full rounded border border-slate-300 bg-white px-2 text-xs outline-none focus:border-sky-400"
+                className="h-9 w-full rounded border border-slate-300 bg-white px-2 text-xs outline-none focus:border-emerald-500"
               >
                 <option value="">Chọn mã lỗi</option>
                 {confirmCodeOptions.map((item) => (

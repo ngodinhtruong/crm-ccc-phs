@@ -23,7 +23,7 @@ export function TicketCreateForm({
             <select
               value={form.supportCategory}
               onChange={(event) => ticket.changeSupportCategory(event.target.value)}
-              className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400"
+              className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-emerald-500"
             >
               <option value="">Chọn danh mục hỗ trợ</option>
               {ticket.supportCategories.map((item) => (
@@ -38,7 +38,7 @@ export function TicketCreateForm({
             <select
               value={form.classification}
               onChange={(event) => setField("classification", event.target.value)}
-              className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400"
+              className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-emerald-500"
             >
               <option value="">Chọn phân loại</option>
               {ticket.filteredClassifications.map((item) => (
@@ -53,7 +53,7 @@ export function TicketCreateForm({
             <select
               value={form.status}
               onChange={(event) => setField("status", event.target.value)}
-              className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400"
+              className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-emerald-500"
             >
               <option value="">Chọn tình trạng</option>
               {ticket.statuses.map((item) => (
@@ -68,7 +68,7 @@ export function TicketCreateForm({
             <select
               value={form.priority}
               onChange={(event) => setField("priority", event.target.value)}
-              className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400"
+              className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-emerald-500"
             >
               <option value="">Chọn mức độ ưu tiên</option>
               {ticket.priorities.map((item) => (
@@ -83,7 +83,7 @@ export function TicketCreateForm({
             <select
               value={form.assignedUnit}
               onChange={(event) => setField("assignedUnit", event.target.value)}
-              className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400"
+              className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-emerald-500"
             >
               <option value="">Chọn đơn vị xử lý</option>
               {ticket.processingUnits.map((item) => (
@@ -98,7 +98,7 @@ export function TicketCreateForm({
             <select
               value={form.source}
               onChange={(event) => setField("source", event.target.value)}
-              className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400"
+              className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-emerald-500"
             >
               <option value="">Chọn nguồn</option>
               {ticket.sources.map((item) => (
@@ -113,7 +113,7 @@ export function TicketCreateForm({
             <select
               value={form.handlingBranch}
               onChange={(event) => setField("handlingBranch", event.target.value)}
-              className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400"
+              className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-emerald-500"
             >
               <option value="">Chọn chi nhánh xử lý</option>
               {ticket.branches.map((item) => (
@@ -145,7 +145,7 @@ export function TicketCreateForm({
             <select
               value={form.company}
               onChange={(event) => void ticket.changeCompany(event.target.value)}
-              className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400"
+              className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-emerald-500"
             >
               <option value="">Chọn công ty</option>
               {ticket.companies.map((company) => (
@@ -172,7 +172,7 @@ export function TicketCreateForm({
             <select
               value={form.customer}
               onChange={(event) => void ticket.changeCustomer(event.target.value)}
-              className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400"
+              className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-emerald-500"
             >
               <option value="">Chọn người liên hệ</option>
               {ticket.customers.map((customer) => (
@@ -188,7 +188,7 @@ export function TicketCreateForm({
               value={form.accountNumber}
               onChange={(event) => ticket.changeRawAccountNumber(event.target.value)}
               placeholder="Nhập số TK nếu chưa xác định được KH"
-              className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400"
+              className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-emerald-500"
             />
           </TicketFormField>
 
@@ -196,7 +196,7 @@ export function TicketCreateForm({
             <input
               value={form.mobile}
               onChange={(event) => setField("mobile", event.target.value)}
-              className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400"
+              className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-emerald-500"
             />
           </TicketFormField>
 
@@ -204,7 +204,7 @@ export function TicketCreateForm({
             <input
               value={form.email}
               onChange={(event) => setField("email", event.target.value)}
-              className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400"
+              className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-emerald-500"
             />
           </TicketFormField>
         </div>
@@ -216,7 +216,7 @@ export function TicketCreateForm({
             <select
               value={form.slaPolicy}
               onChange={(event) => ticket.changeSlaPolicy(event.target.value)}
-              className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400"
+              className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-emerald-500"
             >
               <option value="">Chọn danh mục SLA</option>
 
@@ -246,7 +246,7 @@ export function TicketCreateForm({
             <select
               value={form.errorGroup}
               onChange={(event) => ticket.changeErrorGroup(event.target.value)}
-              className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400"
+              className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-emerald-500"
             >
               <option value="">Chọn nhóm lỗi</option>
               {ticket.errorGroups.map((item) => (
@@ -262,7 +262,7 @@ export function TicketCreateForm({
               value={form.errorType}
               onChange={(event) => ticket.changeErrorType(event.target.value)}
               disabled={!form.errorGroup}
-              className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400 disabled:bg-slate-100"
+              className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-emerald-500 disabled:bg-slate-100"
             >
               <option value="">Chọn loại lỗi</option>
               {ticket.filteredErrorTypes.map((item) => (
@@ -278,7 +278,7 @@ export function TicketCreateForm({
               value={form.relatedSystem}
               onChange={(event) => setField("relatedSystem", event.target.value)}
               placeholder="Base / Flex / App / API / CRM..."
-              className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400"
+              className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-emerald-500"
             />
           </TicketFormField>
 
@@ -287,7 +287,7 @@ export function TicketCreateForm({
               value={form.externalStatus}
               onChange={(event) => setField("externalStatus", event.target.value)}
               placeholder="OPEN / PROCESSING / DONE... nếu có"
-              className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400"
+              className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-emerald-500"
             />
           </TicketFormField>
         </div>
@@ -299,7 +299,7 @@ export function TicketCreateForm({
               onChange={(event) => setField("errorNote", event.target.value)}
               rows={3}
               placeholder="Mô tả tình huống lỗi thực tế do CCC ghi nhận..."
-              className="w-full rounded border border-slate-300 px-3 py-2 text-xs outline-none focus:border-sky-400"
+              className="w-full rounded border border-slate-300 px-3 py-2 text-xs outline-none focus:border-emerald-500"
             />
           </TicketFormField>
         </div>
@@ -311,7 +311,7 @@ export function TicketCreateForm({
             value={form.requestContent}
             onChange={(event) => setField("requestContent", event.target.value)}
             rows={4}
-            className="w-full rounded border border-slate-300 px-3 py-2 text-xs outline-none focus:border-sky-400"
+            className="w-full rounded border border-slate-300 px-3 py-2 text-xs outline-none focus:border-emerald-500"
           />
         </TicketFormField>
       </TicketFormSection>
@@ -322,7 +322,7 @@ export function TicketCreateForm({
             value={form.handlingSolution}
             onChange={(event) => setField("handlingSolution", event.target.value)}
             rows={4}
-            className="w-full rounded border border-slate-300 px-3 py-2 text-xs outline-none focus:border-sky-400"
+            className="w-full rounded border border-slate-300 px-3 py-2 text-xs outline-none focus:border-emerald-500"
           />
         </TicketFormField>
       </TicketFormSection>
@@ -333,7 +333,7 @@ export function TicketCreateForm({
             value={form.finalResponse}
             onChange={(event) => setField("finalResponse", event.target.value)}
             rows={6}
-            className="w-full rounded border border-slate-300 px-3 py-2 text-xs outline-none focus:border-sky-400"
+            className="w-full rounded border border-slate-300 px-3 py-2 text-xs outline-none focus:border-emerald-500"
           />
         </TicketFormField>
       </TicketFormSection>

@@ -21,7 +21,7 @@ export function FilterSelect({
   placeholder = "Tất cả",
 }: FilterSelectProps) {
   return (
-    <div>
+    <div className="min-w-0">
       <label className="mb-1 block text-xs font-medium text-slate-500">
         {label}
       </label>
@@ -29,7 +29,7 @@ export function FilterSelect({
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-9 w-full rounded border border-slate-300 bg-white px-2 text-xs outline-none focus:border-sky-400"
+        className="h-9 w-full min-w-0 max-w-full truncate rounded border border-slate-300 bg-white px-2 pr-7 text-xs outline-none focus:border-emerald-500"
       >
         <option value="">{placeholder}</option>
 

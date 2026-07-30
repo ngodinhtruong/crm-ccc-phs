@@ -60,7 +60,7 @@ export function TextInput({
       placeholder={placeholder}
       className={[
         "h-10 w-full rounded-md border px-3 text-sm text-slate-800 outline-none transition",
-        "border-slate-300 placeholder:text-slate-400 focus:border-sky-500 focus:ring-2 focus:ring-sky-100",
+        "border-slate-300 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100",
         readOnly || disabled
           ? "cursor-not-allowed bg-slate-100 text-slate-600"
           : "bg-white",
@@ -88,7 +88,7 @@ export function SelectInput({
       value={value}
       disabled={disabled}
       onChange={(event) => onChange(event.target.value)}
-      className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
+      className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
     >
       {children}
     </select>
@@ -112,7 +112,7 @@ export function CheckboxInput({
     <label
       className={[
         "flex items-start gap-3 rounded-md border p-3",
-        checked ? "border-sky-300 bg-sky-50" : "border-slate-200 bg-white",
+        checked ? "border-emerald-300 bg-emerald-50" : "border-slate-200 bg-white",
         disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer",
       ].join(" ")}
     >
@@ -121,7 +121,7 @@ export function CheckboxInput({
         checked={checked}
         disabled={disabled}
         onChange={(event) => onChange(event.target.checked)}
-        className="mt-0.5 h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+        className="mt-0.5 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
       />
       <span>
         <span className="block text-xs font-semibold text-slate-700">
@@ -155,7 +155,7 @@ export function ChoiceCard({
       className={[
         "w-full rounded-lg border p-3 text-left transition",
         selected
-          ? "border-sky-400 bg-sky-50 ring-1 ring-sky-200"
+          ? "border-emerald-400 bg-emerald-50 ring-1 ring-emerald-200"
           : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50",
       ].join(" ")}
     >
@@ -163,10 +163,10 @@ export function ChoiceCard({
         <span
           className={[
             "flex h-4 w-4 items-center justify-center rounded-full border",
-            selected ? "border-sky-500" : "border-slate-300",
+            selected ? "border-emerald-500" : "border-slate-300",
           ].join(" ")}
         >
-          {selected && <span className="h-2 w-2 rounded-full bg-sky-500" />}
+          {selected && <span className="h-2 w-2 rounded-full bg-emerald-500" />}
         </span>
         <span className="text-xs font-bold text-slate-800">{title}</span>
       </span>

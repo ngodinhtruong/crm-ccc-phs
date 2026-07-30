@@ -258,7 +258,7 @@ export function KpiAdminTargetsTab({ admin }: { admin: KpiAdminController }) {
             type="button"
             onClick={admin.saveTargets}
             disabled={admin.saving || rows.length === 0}
-            className="flex h-8 items-center gap-1 rounded bg-[#0097cf] px-3 text-xs font-semibold text-white hover:bg-[#0089bd] disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex h-8 items-center gap-1 rounded bg-[#10b981] px-3 text-xs font-semibold text-white hover:bg-[#059669] disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Save size={14} />
             {admin.saving ? "Đang lưu..." : "Lưu chỉ tiêu"}
@@ -334,27 +334,27 @@ export function KpiAdminTargetsTab({ admin }: { admin: KpiAdminController }) {
         </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[1680px] border-collapse text-left text-xs">
+      <div className="table-scroll-container">
+        <table className="data-table w-full min-w-[1680px] border-collapse text-left text-sm">
           <thead>
-            <tr className="h-10 border-b bg-white text-slate-700">
+            <tr className="h-11 border-b-2 border-slate-200 bg-slate-50 text-slate-700">
               {admin.copyFirstEmployeeMode && (
-                <th className="sticky left-0 z-30 w-[56px] bg-white px-3 text-center font-semibold">
+                <th className="sticky left-0 z-30 w-[56px] min-w-[56px] bg-white px-3 text-center font-semibold">
                   Chọn
                 </th>
               )}
               <th
-                className="sticky z-20 w-[240px] bg-white px-3 font-semibold"
+                className="sticky z-20 w-[240px] min-w-[240px] bg-slate-50 px-4 font-semibold"
                 style={{ left: admin.copyFirstEmployeeMode ? 56 : 0 }}
               >
                 Nhân viên
               </th>
-              <th className="w-[140px] px-3 font-semibold">Mã NV</th>
-              <th className="w-[170px] px-3 font-semibold">Chi nhánh</th>
-              <th className="w-[90px] px-3 font-semibold">Vai trò</th>
-              <th className="w-[130px] px-3 font-semibold">Trạng thái</th>
+              <th className="w-[140px] min-w-[140px] px-4 font-semibold">Mã NV</th>
+              <th className="w-[170px] min-w-[170px] px-4 font-semibold">Chi nhánh</th>
+              <th className="w-[90px] min-w-[90px] px-4 font-semibold">Vai trò</th>
+              <th className="w-[130px] min-w-[130px] px-4 font-semibold">Trạng thái</th>
               {metrics.map((metric) => (
-                <th key={metric.id} className="w-[165px] px-3 font-semibold" title={metric.metric_name}>
+                <th key={metric.id} className="w-[165px] min-w-[165px] px-4 font-semibold" title={metric.metric_name}>
                   <div className="text-[11px] text-slate-500">{metric.group_code}</div>
                   <div>{getMetricShortName(metric.metric_name)}</div>
                   <div className="mt-0.5 text-[10px] font-normal text-slate-400">
@@ -364,10 +364,10 @@ export function KpiAdminTargetsTab({ admin }: { admin: KpiAdminController }) {
               ))}
             </tr>
 
-            <tr className="border-b bg-[#f8fafc] align-top">
-              {admin.copyFirstEmployeeMode && <th className="sticky left-0 z-30 bg-[#f8fafc] px-2 py-2" />}
+            <tr className="table-filter-row border-b border-slate-200 bg-slate-50/70 align-top">
+              {admin.copyFirstEmployeeMode && <th className="sticky left-0 z-30 bg-slate-50/70 px-3 py-2.5" />}
               <th
-                className="sticky z-20 bg-[#f8fafc] px-2 py-2"
+                className="sticky z-20 bg-slate-50/70 px-3 py-2.5"
                 style={{ left: admin.copyFirstEmployeeMode ? 56 : 0 }}
               >
                 <ColumnTextFilter
@@ -376,21 +376,21 @@ export function KpiAdminTargetsTab({ admin }: { admin: KpiAdminController }) {
                   placeholder="Tên / username / email"
                 />
               </th>
-              <th className="px-2 py-2">
+              <th className="px-4 py-2.5">
                 <ColumnTextFilter
                   value={employeeCodeFilter}
                   onChange={setEmployeeCodeFilter}
                   placeholder="Mã NV"
                 />
               </th>
-              <th className="px-2 py-2">
+              <th className="px-4 py-2.5">
                 <ColumnSelectFilter
                   value={branchFilter}
                   onChange={setBranchFilter}
                   options={branchOptions}
                 />
               </th>
-              <th className="px-2 py-2">
+              <th className="px-4 py-2.5">
                 <ColumnSelectFilter
                   value={roleFilter}
                   onChange={setRoleFilter}
@@ -400,7 +400,7 @@ export function KpiAdminTargetsTab({ admin }: { admin: KpiAdminController }) {
                   ]}
                 />
               </th>
-              <th className="px-2 py-2">
+              <th className="px-4 py-2.5">
                 <ColumnSelectFilter
                   value={targetStatusFilter}
                   onChange={(value) => setTargetStatusFilter(value as TargetStatusFilter)}
@@ -411,7 +411,7 @@ export function KpiAdminTargetsTab({ admin }: { admin: KpiAdminController }) {
                 />
               </th>
               {metrics.map((metric) => (
-                <th key={metric.id} className="px-2 py-2" />
+                <th key={metric.id} className="px-4 py-2.5" />
               ))}
             </tr>
           </thead>
@@ -433,7 +433,7 @@ export function KpiAdminTargetsTab({ admin }: { admin: KpiAdminController }) {
                 const rowHasAssignedTarget = hasAssignedTarget(row, metricIds);
 
                 return (
-                  <tr key={row.user.id} className={index % 2 === 0 ? "bg-white" : "bg-[#f8fafc]"}>
+                  <tr key={row.user.id} className={index % 2 === 0 ? "bg-white" : "bg-slate-50/60"}>
                     {admin.copyFirstEmployeeMode && (
                       <td className="sticky left-0 z-10 border-b bg-inherit px-3 py-3 text-center">
                         {isFirst ? (

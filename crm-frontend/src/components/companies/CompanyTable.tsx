@@ -38,35 +38,35 @@ export function CompanyTable({
   const companies = companyState.companies;
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[1700px] border-collapse text-left text-xs">
+    <div className="table-scroll-container">
+      <table className="data-table w-full min-w-[2465px] border-collapse text-left text-sm">
         <thead>
-          <tr className="h-10 border-b bg-white text-slate-700">
-            <th className="sticky left-0 z-20 w-[90px] bg-white px-3 font-semibold">
+          <tr className="h-11 border-b-2 border-slate-200 bg-slate-50 text-slate-700">
+            <th className="sticky left-0 z-20 w-[90px] min-w-[90px] bg-slate-50 px-4 font-semibold">
               Thao tác
             </th>
-            <th className="w-[220px] px-3 font-semibold">Tên công ty</th>
-            <th className="w-[140px] px-3 font-semibold">Điện thoại</th>
-            <th className="w-[160px] px-3 font-semibold">Số tài khoản</th>
-            <th className="w-[135px] px-3 font-semibold">Ngày mở TK</th>
-            <th className="w-[150px] px-3 font-semibold">Mã số thuế</th>
-            <th className="w-[210px] px-3 font-semibold">Email</th>
-            <th className="w-[180px] px-3 font-semibold">Website</th>
-            <th className="w-[180px] px-3 font-semibold">
+            <th className="w-[220px] min-w-[220px] px-4 font-semibold">Tên công ty</th>
+            <th className="w-[140px] min-w-[140px] px-4 font-semibold">Điện thoại</th>
+            <th className="w-[160px] min-w-[160px] px-4 font-semibold">Số tài khoản</th>
+            <th className="w-[170px] min-w-[170px] px-4 font-semibold">Ngày mở TK</th>
+            <th className="w-[150px] min-w-[150px] px-4 font-semibold">Mã số thuế</th>
+            <th className="w-[210px] min-w-[210px] px-4 font-semibold">Email</th>
+            <th className="w-[180px] min-w-[180px] px-4 font-semibold">Website</th>
+            <th className="w-[180px] min-w-[180px] px-4 font-semibold">
               Người liên hệ chính
             </th>
-            <th className="w-[140px] px-3 font-semibold">Nguồn</th>
-            <th className="w-[140px] px-3 font-semibold">Đánh giá</th>
-            <th className="w-[160px] px-3 font-semibold">Hạng thành viên</th>
-            <th className="w-[160px] px-3 font-semibold">Giao cho</th>
-            <th className="w-[140px] px-3 font-semibold">Tình trạng</th>
-            <th className="w-[220px] px-3 font-semibold">Địa chỉ</th>
+            <th className="w-[140px] min-w-[140px] px-4 font-semibold">Nguồn</th>
+            <th className="w-[140px] min-w-[140px] px-4 font-semibold">Đánh giá</th>
+            <th className="w-[160px] min-w-[160px] px-4 font-semibold">Hạng thành viên</th>
+            <th className="w-[160px] min-w-[160px] px-4 font-semibold">Giao cho</th>
+            <th className="w-[140px] min-w-[140px] px-4 font-semibold">Tình trạng</th>
+            <th className="w-[220px] min-w-[220px] px-4 font-semibold">Địa chỉ</th>
           </tr>
 
-          <tr className="border-b bg-[#f8fafc] align-top">
-            <th className="sticky left-0 z-20 bg-[#f8fafc] px-2 py-2" />
+          <tr className="table-filter-row border-b border-slate-200 bg-slate-50/70 align-top">
+            <th className="sticky left-0 z-20 bg-slate-50/70 px-3 py-2.5" />
 
-            <th className="px-2 py-2">
+            <th className="px-3 py-2.5">
               <ColumnTextFilter
                 value={companyState.companyName}
                 onChange={companyState.setCompanyName}
@@ -74,7 +74,7 @@ export function CompanyTable({
               />
             </th>
 
-            <th className="px-2 py-2">
+            <th className="px-3 py-2.5">
               <ColumnTextFilter
                 value={companyState.phone}
                 onChange={companyState.setPhone}
@@ -82,7 +82,7 @@ export function CompanyTable({
               />
             </th>
 
-            <th className="px-2 py-2">
+            <th className="px-3 py-2.5">
               <ColumnTextFilter
                 value={companyState.accountNumber}
                 onChange={companyState.setAccountNumber}
@@ -90,7 +90,7 @@ export function CompanyTable({
               />
             </th>
 
-            <th className="px-2 py-2">
+            <th className="px-3 py-2.5">
               <ColumnDateRangeFilter
                 fromValue={companyState.openedAtFrom}
                 toValue={companyState.openedAtTo}
@@ -99,7 +99,7 @@ export function CompanyTable({
               />
             </th>
 
-            <th className="px-2 py-2">
+            <th className="px-3 py-2.5">
               <ColumnTextFilter
                 value={companyState.taxCode}
                 onChange={companyState.setTaxCode}
@@ -107,7 +107,7 @@ export function CompanyTable({
               />
             </th>
 
-            <th className="px-2 py-2">
+            <th className="px-3 py-2.5">
               <ColumnTextFilter
                 value={companyState.email}
                 onChange={companyState.setEmail}
@@ -115,7 +115,7 @@ export function CompanyTable({
               />
             </th>
 
-            <th className="px-2 py-2">
+            <th className="px-3 py-2.5">
               <ColumnTextFilter
                 value={companyState.website}
                 onChange={companyState.setWebsite}
@@ -123,7 +123,7 @@ export function CompanyTable({
               />
             </th>
 
-            <th className="px-2 py-2">
+            <th className="px-3 py-2.5">
               <ColumnTextFilter
                 value={companyState.primaryContactName}
                 onChange={companyState.setPrimaryContactName}
@@ -131,7 +131,7 @@ export function CompanyTable({
               />
             </th>
 
-            <th className="px-2 py-2">
+            <th className="px-3 py-2.5">
               <ColumnSelectFilter
                 value={companyState.source}
                 onChange={companyState.setSource}
@@ -142,7 +142,7 @@ export function CompanyTable({
               />
             </th>
 
-            <th className="px-2 py-2">
+            <th className="px-3 py-2.5">
               <ColumnSelectFilter
                 value={companyState.rating}
                 onChange={companyState.setRating}
@@ -153,7 +153,7 @@ export function CompanyTable({
               />
             </th>
 
-            <th className="px-2 py-2">
+            <th className="px-3 py-2.5">
               <ColumnSelectFilter
                 value={companyState.membershipTier}
                 onChange={companyState.setMembershipTier}
@@ -164,7 +164,7 @@ export function CompanyTable({
               />
             </th>
 
-            <th className="px-2 py-2">
+            <th className="px-3 py-2.5">
               <ColumnSelectFilter
                 value={companyState.assignedEmployee}
                 onChange={companyState.setAssignedEmployee}
@@ -175,7 +175,7 @@ export function CompanyTable({
               />
             </th>
 
-            <th className="px-2 py-2">
+            <th className="px-3 py-2.5">
               <ColumnSelectFilter
                 value={companyState.status}
                 onChange={companyState.setStatus}
@@ -192,7 +192,7 @@ export function CompanyTable({
               />
             </th>
 
-            <th className="px-2 py-2">
+            <th className="px-3 py-2.5">
               <ColumnTextFilter
                 value={companyState.address}
                 onChange={companyState.setAddress}
@@ -218,20 +218,20 @@ export function CompanyTable({
           {!companyState.loading &&
             !companyState.error &&
             companies.map((company, index) => {
-              const rowBg = index % 2 === 0 ? "bg-white" : "bg-[#f8fafc]";
+              const rowBg = index % 2 === 0 ? "bg-white" : "bg-slate-50/60";
 
               return (
                 <tr
                   key={company.id}
-                  className={`h-14 border-b border-slate-100 ${rowBg} hover:bg-sky-50`}
+                  className={`h-[46px] border-b border-slate-200 ${rowBg} transition-colors hover:bg-emerald-50`}
                 >
-                  <td className={`sticky left-0 z-10 px-3 ${rowBg}`}>
+                  <td className={`sticky left-0 z-10 px-4 ${rowBg}`}>
                     <div className="flex items-center gap-3 text-slate-400">
                       <button
                         type="button"
                         title="Xem"
                         onClick={() => companyState.goToDetail(company.id)}
-                        className="hover:text-sky-600"
+                        className="hover:text-[#059669]"
                       >
                         <Eye size={15} />
                       </button>
@@ -239,72 +239,80 @@ export function CompanyTable({
                       <button
                         type="button"
                         title="Thêm"
-                        className="hover:text-sky-600"
+                        className="hover:text-[#059669]"
                       >
                         <MoreVertical size={15} />
                       </button>
                     </div>
                   </td>
 
-                  <td className="px-3">
+                  <td className="px-4">
                     <Link
                       href={`/companies/${company.id}`}
-                      className="font-semibold text-sky-600 hover:underline"
+                      className="block truncate font-semibold text-[#059669] hover:underline"
                     >
                       {company.company_name || "-"}
                     </Link>
                   </td>
 
-                  <td className="whitespace-nowrap px-3">
+                  <td className="px-4 text-slate-700">
                     {company.phone || "-"}
                   </td>
 
-                  <td className="px-3">
-                    <span className="line-clamp-2 break-all">
+                  <td className="px-4 text-slate-600">
+                    <span className="block truncate">
                       {company.account_number || "-"}
                     </span>
                   </td>
 
-                  <td className="whitespace-nowrap px-3">
+                  <td className="px-4 text-slate-600">
                     {company.opened_at_display || company.opened_at || "-"}
                   </td>
 
-                  <td className="px-3">{company.tax_code || "-"}</td>
+                  <td className="px-4 text-slate-600">{company.tax_code || "-"}</td>
 
-                  <td className="px-3">
-                    <span className="text-sky-600">{company.email || "-"}</span>
+                  <td className="px-4">
+                    <span className="block truncate text-[#059669]">{company.email || "-"}</span>
                   </td>
 
-                  <td className="px-3">
-                    <span className="text-sky-600">
+                  <td className="px-4">
+                    <span className="block truncate text-[#059669]">
                       {company.website || "-"}
                     </span>
                   </td>
 
-                  <td className="px-3">
-                    {company.primary_contact_name || "-"}
+                  <td className="px-4 text-slate-700">
+                    <span className="block truncate">
+                      {company.primary_contact_name || "-"}
+                    </span>
                   </td>
 
-                  <td className="px-3">{company.source_name || "-"}</td>
+                  <td className="px-4 text-slate-600">{company.source_name || "-"}</td>
 
-                  <td className="px-3">{company.rating_name || "-"}</td>
+                  <td className="px-4 text-slate-600">{company.rating_name || "-"}</td>
 
-                  <td className="px-3">
-                    {company.membership_tier_name || "-"}
+                  <td className="px-4 text-slate-600">
+                    <span className="block truncate">
+                      {company.membership_tier_name || "-"}
+                    </span>
                   </td>
 
-                  <td className="px-3">
-                    {company.assigned_employee_name || "-"}
+                  <td className="px-4 text-slate-700">
+                    <span className="block truncate">
+                      {company.assigned_employee_name || "-"}
+                    </span>
                   </td>
 
-                  <td className="px-3">
+                  <td className="px-4">
                     <CompanyStatusBadge
                       value={company.status_label || company.status}
                     />
                   </td>
 
-                  <td className="max-w-[220px] truncate px-3">
-                    {buildAddress(company)}
+                  <td className="px-4">
+                    <span className="block max-w-[220px] truncate text-slate-500">
+                      {buildAddress(company)}
+                    </span>
                   </td>
                 </tr>
               );

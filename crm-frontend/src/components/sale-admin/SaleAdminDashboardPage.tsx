@@ -65,7 +65,7 @@ function ActiveFilterSummary({
   return (
     <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
       <span className="inline-flex items-center gap-1 rounded-full bg-white/90 px-3 py-1 font-semibold text-slate-700 ring-1 ring-slate-200">
-        <CalendarDays size={13} className="text-[#0097cf]" />
+        <CalendarDays size={13} className="text-[#059669]" />
         {periodLabel}
       </span>
 
@@ -87,7 +87,7 @@ function HeroStats({ dashboard }: { dashboard: ReturnType<typeof useSaleAdminDas
 
   return (
     <div className="grid gap-2 sm:grid-cols-3">
-      <div className="rounded-lg border border-sky-100 bg-white/90 px-3 py-2 shadow-sm">
+      <div className="rounded-lg border border-emerald-100 bg-white/90 px-3 py-2 shadow-sm">
         <p className="text-[11px] font-medium text-slate-500">Chi nhánh có dữ liệu</p>
         <p className="mt-0.5 text-sm font-bold text-slate-900">{formatNumber(branchCount)} CN</p>
       </div>
@@ -174,14 +174,14 @@ export function SaleAdminDashboardPage() {
             type="button"
             onClick={() => setFilterOpen((value) => !value)}
             className={`relative flex h-8 items-center gap-1 rounded-md border px-3 text-xs font-semibold transition ${filterOpen || activeFilterCount > 0
-                ? "border-[#0097cf] bg-sky-50 text-[#007ead]"
+                ? "border-[#10b981] bg-emerald-50 text-[#059669]"
                 : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
               }`}
           >
             <SlidersHorizontal size={15} />
             Bộ lọc
             {activeFilterCount > 0 && (
-              <span className="ml-1 rounded-full bg-[#0097cf] px-1.5 py-0.5 text-[10px] font-bold text-white">
+              <span className="ml-1 rounded-full bg-[#10b981] px-1.5 py-0.5 text-[10px] font-bold text-white">
                 {activeFilterCount}
               </span>
             )}
@@ -198,7 +198,7 @@ export function SaleAdminDashboardPage() {
             type="button"
             onClick={dashboard.refresh}
             disabled={dashboard.backgroundRefreshing}
-            className="flex h-8 items-center gap-1 rounded-md bg-[#0097cf] px-3 text-xs font-semibold text-white shadow-sm hover:bg-[#0089bd] disabled:opacity-50"
+            className="flex h-8 items-center gap-1 rounded-md bg-[#10b981] px-3 text-xs font-semibold text-white shadow-sm hover:bg-[#059669] disabled:opacity-50"
           >
             <RefreshCw size={15} className={dashboard.backgroundRefreshing ? "animate-spin" : ""} />
             Làm mới
@@ -211,7 +211,7 @@ export function SaleAdminDashboardPage() {
           <div className="p-5">
             <div className="flex flex-col justify-between gap-4 xl:flex-row xl:items-end">
               <div className="max-w-3xl">
-                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#0097cf]">
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#059669]">
                   CRM Mini · Sale Admin Report
                 </p>
                 <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950">

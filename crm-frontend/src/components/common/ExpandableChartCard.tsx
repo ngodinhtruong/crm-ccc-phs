@@ -73,7 +73,7 @@ export function ExpandableChartCard({
       >
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-5 py-3.5">
           <div className="flex-1 pr-2">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-[#00713d]">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-[#059669]">
               {title}
             </h3>
             {description && (
@@ -114,7 +114,7 @@ export function ExpandableChartCard({
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 bg-slate-50/70">
               <div>
-                <h3 className="text-sm font-bold uppercase tracking-wider text-[#00713d]">
+                <h3 className="text-sm font-bold uppercase tracking-wider text-[#059669]">
                   {title}
                 </h3>
                 {description && (

@@ -100,7 +100,7 @@ export function UserCreateSuccessDialog({
           <button
             type="button"
             onClick={create.goToUserList}
-            className="flex h-10 items-center justify-center gap-2 rounded-md bg-sky-600 px-4 text-xs font-bold text-white hover:bg-sky-700"
+            className="flex h-10 items-center justify-center gap-2 rounded-md bg-emerald-600 px-4 text-xs font-bold text-white hover:bg-emerald-700"
           >
             <List size={15} />
             Về danh sách

@@ -204,11 +204,11 @@ export function DashboardSidebar({
       }`}
     >
       {/* Icon rail */}
-      <div className="flex h-full w-10 flex-col items-center bg-[#263747] text-white">
+      <div className="flex h-full w-10 flex-col items-center bg-[#064e3b] text-white">
         <button
           type="button"
           onClick={onClose}
-          className="flex h-10 w-full items-center justify-center bg-orange-500 hover:bg-orange-600"
+          className="flex h-10 w-full items-center justify-center bg-[#10b981] hover:bg-[#059669]"
           title="Cài đặt"
         >
           <Settings size={22} />
@@ -227,7 +227,7 @@ export function DashboardSidebar({
       </div>
 
       {/* Main sidebar */}
-      <div className="h-full w-[275px] overflow-y-auto bg-[#263747] text-white shadow-2xl">
+      <div className="h-full w-[275px] overflow-y-auto bg-[#064e3b] text-white shadow-2xl">
         <div className="border-b border-white/10 px-3 py-3">
           <input
             value={search}

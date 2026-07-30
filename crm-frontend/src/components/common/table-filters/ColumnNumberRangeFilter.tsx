@@ -18,13 +18,13 @@ export function ColumnNumberRangeFilter({
   maxPlaceholder = "Đến",
 }: ColumnNumberRangeFilterProps) {
   return (
-    <div className="space-y-1">
+    <div className="table-filter-stack">
       <input
         type="number"
         value={minValue}
         onChange={(event) => onMinChange(event.target.value)}
         placeholder={minPlaceholder}
-        className="h-8 w-full rounded border border-slate-300 bg-white px-2 text-[11px] font-normal outline-none focus:border-sky-400"
+        className="table-filter-control h-8 rounded border border-slate-300 bg-white px-2 font-normal outline-none focus:border-sky-400"
       />
 
       <input
@@ -32,7 +32,7 @@ export function ColumnNumberRangeFilter({
         value={maxValue}
         onChange={(event) => onMaxChange(event.target.value)}
         placeholder={maxPlaceholder}
-        className="h-8 w-full rounded border border-slate-300 bg-white px-2 text-[11px] font-normal outline-none focus:border-sky-400"
+        className="table-filter-control h-8 rounded border border-slate-300 bg-white px-2 font-normal outline-none focus:border-sky-400"
       />
     </div>
   );

@@ -43,7 +43,7 @@ export function KpiSummaryCards({
         value={formatNumber(summary?.total_score)}
         description="Tổng điểm sau khi cộng Phần A và Phần B."
       >
-        <Trophy size={22} className="text-sky-600" />
+        <Trophy size={22} className="text-emerald-600" />
       </SummaryCard>
 
       <SummaryCard
@@ -59,7 +59,7 @@ export function KpiSummaryCards({
         value={formatNumber(summary?.auto_score)}
         description="Dữ liệu CRM tự động cập nhật định kỳ."
       >
-        <CircleDollarSign size={22} className="text-sky-600" />
+        <CircleDollarSign size={22} className="text-emerald-600" />
       </SummaryCard>
 
       <SummaryCard

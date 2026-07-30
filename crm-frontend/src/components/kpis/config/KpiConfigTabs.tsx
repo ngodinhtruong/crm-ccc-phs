@@ -29,10 +29,10 @@ export function KpiConfigTabs({
               onClick={() => onChange(tab.key)}
               className={[
                 "h-8 px-5",
-                index > 0 ? "border-l border-sky-300" : "",
+                index > 0 ? "border-l border-emerald-300" : "",
                 active
-                  ? "bg-[#0097cf] text-white"
-                  : "bg-white text-[#0097cf] hover:bg-sky-50",
+                  ? "bg-[#10b981] text-white"
+                  : "bg-white text-[#059669] hover:bg-emerald-50",
               ].join(" ")}
             >
               {tab.label}

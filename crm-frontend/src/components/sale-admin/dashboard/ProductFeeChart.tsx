@@ -63,7 +63,7 @@ function CustomTooltip({ active, payload, label }: any) {
     <div className="rounded-xl border border-slate-200 bg-white/95 p-3.5 text-xs shadow-xl backdrop-blur-sm">
       <div className="mb-2 flex items-center justify-between gap-4 border-b border-slate-100 pb-1.5 font-bold text-slate-800">
         <span>{label}</span>
-        <span className="text-[#0097cf]">Tổng: {formatMoney(total)}</span>
+        <span className="text-[#059669]">Tổng: {formatMoney(total)}</span>
       </div>
       <div className="space-y-1.5">
         {payload.map((item: any) => (

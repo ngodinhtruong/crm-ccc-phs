@@ -23,7 +23,7 @@ import {
 type TabKey = "customers" | "tickets" | "sales" | "transactions";
 
 const COLORS = [
-  "#00713d", // PHS Green
+  "#10b981", // Fresh Green
   "#0097cf", // Sky Blue
   "#f59e0b", // Amber
   "#ef4444", // Rose
@@ -52,7 +52,7 @@ function CustomTooltip({ active, payload }: any) {
       <p className="font-bold text-slate-800">
         {item.name || item.payload?.name || item.payload?.label}
       </p>
-      <p className="mt-1 text-[#00713d]">
+      <p className="mt-1 text-[#059669]">
         Số lượng:{" "}
         <span className="font-extrabold">{formatNumber(Number(item.value || 0))}</span>
       </p>
@@ -216,7 +216,7 @@ function HorizontalBarCard({
               interval={0}
             />
             <Tooltip content={<CustomTooltip />} />
-            <Bar dataKey="value" radius={[0, 6, 6, 0]} fill="#00713d" />
+            <Bar dataKey="value" radius={[0, 6, 6, 0]} fill="#10b981" />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -250,13 +250,13 @@ export function DashboardChartsGrid({
             onClick={() => setActiveTab(tab.key as TabKey)}
             className={`relative cursor-pointer px-4 py-2.5 text-xs font-bold transition-all duration-200 ${
               activeTab === tab.key
-                ? "text-[#00713d]"
-                : "text-slate-500 hover:text-slate-800"
+                ? "text-[#059669]"
+                : "text-slate-500 hover:text-slate-700"
             }`}
           >
             {tab.label}
             {activeTab === tab.key && (
-              <div className="absolute bottom-0 left-0 h-0.5 w-full bg-[#00713d]" />
+              <div className="absolute bottom-0 left-0 h-0.5 w-full bg-[#10b981]" />
             )}
           </button>
         ))}

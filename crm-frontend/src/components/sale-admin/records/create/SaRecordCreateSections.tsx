@@ -90,7 +90,7 @@ function AccountSuggestionCombobox({
         <div className="absolute left-0 right-0 top-[42px] z-40 max-h-72 overflow-auto rounded-md border border-slate-200 bg-white shadow-xl">
           {create.accountSuggestionLoading && (
             <div className="flex items-center gap-2 px-3 py-2.5 text-xs text-slate-500">
-              <span className="h-2 w-2 animate-ping rounded-full bg-[#0097cf]" />
+              <span className="h-2 w-2 animate-ping rounded-full bg-[#10b981]" />
               Đang tìm kiếm tài khoản...
             </div>
           )}
@@ -121,10 +121,10 @@ function AccountSuggestionCombobox({
                   create.selectCustomerAccountSuggestion(account);
                   create.setAccountDropdownOpen(false);
                 }}
-                className="flex w-full items-start justify-between gap-3 border-b border-slate-100 px-3 py-2.5 text-left transition-colors hover:bg-sky-50/70"
+                className="flex w-full items-start justify-between gap-3 border-b border-slate-100 px-3 py-2.5 text-left transition-colors hover:bg-emerald-50/70"
               >
                 <div className="min-w-0">
-                  <p className="truncate text-xs font-bold text-[#007ead]">
+                  <p className="truncate text-xs font-bold text-[#059669]">
                     {account.account_number}
                   </p>
                   <p className="mt-0.5 truncate text-[11px] text-slate-600">
@@ -133,7 +133,7 @@ function AccountSuggestionCombobox({
                 </div>
 
                 {account.membership_tier_name && (
-                  <span className="shrink-0 rounded bg-sky-100 px-2 py-0.5 text-[10px] font-bold text-[#007ead]">
+                  <span className="shrink-0 rounded bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-[#059669]">
                     {account.membership_tier_name}
                   </span>
                 )}
@@ -151,9 +151,9 @@ export function SaRecordAccountSection({
   create: SaRecordCreateController;
 }) {
   return (
-    <section className="rounded-lg border border-slate-200 border-l-4 border-l-[#0097cf] bg-white p-4 shadow-sm">
+    <section className="rounded-lg border border-slate-200 border-l-4 border-l-[#10b981] bg-white p-4 shadow-sm">
       <div className="mb-4 flex items-center gap-2 border-b border-slate-100 pb-3">
-        <div className="flex h-7 w-7 items-center justify-center rounded bg-sky-50 text-[#0097cf]">
+        <div className="flex h-7 w-7 items-center justify-center rounded bg-emerald-50 text-[#059669]">
           <UserCheck size={16} />
         </div>
         <div>
@@ -237,7 +237,7 @@ export function SaRecordAccountSection({
         <div className="mt-4 flex flex-wrap items-center gap-3 rounded-md border border-slate-200 bg-slate-50/70 p-3 text-xs">
           <span className="font-semibold text-slate-600">Thông tin tóm tắt:</span>
           <span className="inline-flex items-center gap-1 rounded bg-white px-2.5 py-1 font-bold text-slate-800 shadow-sm border border-slate-200">
-            <Building2 size={13} className="text-[#0097cf]" />
+            <Building2 size={13} className="text-[#059669]" />
             {create.form.customerNameSnapshot}
           </span>
           {create.form.branchNameSnapshot && (
@@ -246,7 +246,7 @@ export function SaRecordAccountSection({
             </span>
           )}
           {create.form.accountStatus && (
-            <span className="rounded bg-[#0097cf] px-2.5 py-1 font-semibold text-white">
+            <span className="rounded bg-[#10b981] px-2.5 py-1 font-semibold text-white">
               {create.form.accountStatus}
             </span>
           )}
@@ -262,9 +262,9 @@ export function SaRecordCallSection({
   create: SaRecordCreateController;
 }) {
   return (
-    <section className="rounded-lg border border-slate-200 border-l-4 border-l-[#0097cf] bg-white p-4 shadow-sm">
+    <section className="rounded-lg border border-slate-200 border-l-4 border-l-[#10b981] bg-white p-4 shadow-sm">
       <div className="mb-4 flex items-center gap-2 border-b border-slate-100 pb-3">
-        <div className="flex h-7 w-7 items-center justify-center rounded bg-sky-50 text-[#0097cf]">
+        <div className="flex h-7 w-7 items-center justify-center rounded bg-emerald-50 text-[#059669]">
           <PhoneCall size={16} />
         </div>
         <div>
@@ -383,9 +383,9 @@ export function SaRecordTransactionSection({
   mode?: SaRecordFormMode;
 }) {
   return (
-    <section className="rounded-lg border border-slate-200 border-l-4 border-l-[#0097cf] bg-white p-4 shadow-sm space-y-4">
+    <section className="rounded-lg border border-slate-200 border-l-4 border-l-[#10b981] bg-white p-4 shadow-sm space-y-4">
       <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-        <div className="flex h-7 w-7 items-center justify-center rounded bg-sky-50 text-[#0097cf]">
+        <div className="flex h-7 w-7 items-center justify-center rounded bg-emerald-50 text-[#059669]">
           <ArrowRightLeft size={16} />
         </div>
         <div>
@@ -434,8 +434,8 @@ export function SaRecordTransactionSection({
       </div>
 
       {create.form.handoverToBroker && (
-        <div className="rounded-md border border-sky-200 bg-sky-50/70 p-4 space-y-3">
-          <div className="flex items-center gap-2 text-xs font-bold text-[#007ead]">
+        <div className="rounded-md border border-emerald-200 bg-emerald-50/70 p-4 space-y-3">
+          <div className="flex items-center gap-2 text-xs font-bold text-[#059669]">
             <UserPlus size={16} />
             <span>THÔNG TIN BÀN GIAO MÔI GIỚI</span>
           </div>
@@ -486,7 +486,7 @@ export function SaRecordTransactionSection({
               ? "Nhập lý do chỉnh sửa SA Record (nếu có)..."
               : "Nhập ghi chú chi tiết về cuộc gọi hoặc yêu cầu của khách hàng..."
           }
-          className="w-full rounded-md border border-slate-300 bg-white p-3 text-xs outline-none transition-colors focus:border-[#0097cf] focus:ring-2 focus:ring-[#0097cf]/20"
+          className="w-full rounded-md border border-slate-300 bg-white p-3 text-xs outline-none transition-colors focus:border-[#10b981] focus:ring-2 focus:ring-[#10b981]/20"
         />
       </div>
     </section>

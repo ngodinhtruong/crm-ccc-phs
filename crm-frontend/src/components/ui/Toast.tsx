@@ -37,7 +37,7 @@ export function ToastItem({
           ? "border-emerald-200 bg-emerald-50 text-emerald-900"
           : isError
           ? "border-red-200 bg-red-50 text-red-900"
-          : "border-sky-200 bg-sky-50 text-sky-900",
+          : "border-emerald-200 bg-emerald-50 text-emerald-900",
       ].join(" ")}
     >
       <div className="mt-0.5 shrink-0">
@@ -46,7 +46,7 @@ export function ToastItem({
         ) : isError ? (
           <AlertCircle className="h-4 w-4 text-red-600" />
         ) : (
-          <CheckCircle2 className="h-4 w-4 text-sky-600" />
+          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
         )}
       </div>
 

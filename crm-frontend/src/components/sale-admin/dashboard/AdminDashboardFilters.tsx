@@ -125,7 +125,7 @@ export function AdminDashboardFilters({
           <button
             type="button"
             onClick={() => setRange(last5MonthsRange())}
-            className="h-8 rounded-full border border-sky-300 bg-sky-100 px-3 text-[11px] font-bold text-[#007ead] hover:bg-sky-200"
+            className="h-8 rounded-full border border-emerald-300 bg-emerald-100 px-3 text-[11px] font-bold text-[#059669] hover:bg-emerald-200"
           >
             5 tháng gần nhất (Mặc định)
           </button>
@@ -151,7 +151,7 @@ export function AdminDashboardFilters({
           type="button"
           onClick={dashboard.refresh}
           disabled={dashboard.backgroundRefreshing}
-          className="flex h-9 items-center justify-center gap-1 rounded-md border border-sky-200 bg-white px-4 text-xs font-semibold text-[#007ead] hover:bg-sky-50 disabled:opacity-50"
+          className="flex h-9 items-center justify-center gap-1 rounded-md border border-emerald-200 bg-white px-4 text-xs font-semibold text-[#059669] hover:bg-emerald-50 disabled:opacity-50"
         >
           <RefreshCw size={14} className={dashboard.backgroundRefreshing ? "animate-spin" : ""} />
           Tải lại dữ liệu
@@ -171,7 +171,7 @@ export function AdminDashboardFilters({
             type="button"
             onClick={applyFilter}
             disabled={dashboard.loading}
-            className="h-9 rounded-md bg-[#0097cf] px-4 text-xs font-semibold text-white shadow-sm hover:bg-[#0089bd] disabled:opacity-50"
+            className="h-9 rounded-md bg-[#10b981] px-4 text-xs font-semibold text-white shadow-sm hover:bg-[#059669] disabled:opacity-50"
           >
             Áp dụng
           </button>

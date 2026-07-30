@@ -92,7 +92,7 @@ function FilterPopover({
       </div>
 
       {dashboard.masterLoading && (
-        <div className="border-b border-sky-100 bg-sky-50 px-4 py-2 text-xs text-sky-700">
+        <div className="border-b border-emerald-100 bg-emerald-50 px-4 py-2 text-xs text-emerald-700">
           Đang tải danh mục bộ lọc...
         </div>
       )}
@@ -114,7 +114,7 @@ function FilterPopover({
               value={dashboard.period}
               onChange={(event) => dashboard.setPeriod(event.target.value)}
               disabled={Boolean(dashboard.dateFrom || dashboard.dateTo)}
-              className="h-9 w-full rounded border border-slate-300 bg-white px-2 text-xs outline-none focus:border-sky-400 disabled:bg-slate-100 disabled:text-slate-400"
+              className="h-9 w-full rounded border border-slate-300 bg-white px-2 text-xs outline-none focus:border-emerald-500 disabled:bg-slate-100 disabled:text-slate-400"
             />
           </div>
 
@@ -220,7 +220,7 @@ function FilterPopover({
               value={dashboard.vipTier}
               onChange={(event) => dashboard.setVipTier(event.target.value)}
               placeholder="Nhập VIP / tier"
-              className="h-9 w-full rounded border border-slate-300 bg-white px-2 text-xs outline-none focus:border-sky-400"
+              className="h-9 w-full rounded border border-slate-300 bg-white px-2 text-xs outline-none focus:border-emerald-500"
             />
           </div>
 
@@ -234,7 +234,7 @@ function FilterPopover({
                 dashboard.setRelatedSystem(event.target.value)
               }
               placeholder="BASE / FLEX / APP / CRM..."
-              className="h-9 w-full rounded border border-slate-300 bg-white px-2 text-xs outline-none focus:border-sky-400"
+              className="h-9 w-full rounded border border-slate-300 bg-white px-2 text-xs outline-none focus:border-emerald-500"
             />
           </div>
         </div>
@@ -263,7 +263,7 @@ function FilterPopover({
           type="button"
           onClick={applyFilter}
           disabled={busy}
-          className="h-9 rounded bg-[#0097cf] px-4 text-xs font-semibold text-white hover:bg-[#0089bd] disabled:opacity-50"
+          className="h-9 rounded bg-[#10b981] px-4 text-xs font-semibold text-white hover:bg-[#059669] disabled:opacity-50"
         >
           Áp dụng bộ lọc
         </button>
@@ -283,7 +283,7 @@ function TicketTabSummary({
     <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
       <Link
         href="/tickets"
-        className="rounded-md border border-slate-200 bg-white p-4 shadow-sm transition hover:border-sky-200 hover:bg-sky-50"
+        className="rounded-md border border-slate-200 bg-white p-4 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50"
       >
         <p className="text-xs font-medium text-slate-500">Danh sách Ticket</p>
         <p className="mt-2 text-2xl font-bold text-slate-800">
@@ -414,14 +414,14 @@ export function CccDashboardPage() {
             type="button"
             onClick={toggleFilter}
             className={`relative flex h-8 items-center gap-1 rounded border px-3 text-xs font-semibold ${filterOpen || dashboard.activeFilterCount > 0
-                ? "border-[#0097cf] bg-sky-50 text-[#007ead]"
+                ? "border-[#10b981] bg-emerald-50 text-[#059669]"
                 : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
               }`}
           >
             <SlidersHorizontal size={15} />
             Bộ lọc
             {dashboard.activeFilterCount > 0 && (
-              <span className="ml-1 rounded-full bg-[#0097cf] px-1.5 py-0.5 text-[10px] font-bold text-white">
+              <span className="ml-1 rounded-full bg-[#10b981] px-1.5 py-0.5 text-[10px] font-bold text-white">
                 {dashboard.activeFilterCount}
               </span>
             )}
@@ -438,7 +438,7 @@ export function CccDashboardPage() {
             type="button"
             onClick={dashboard.reload}
             disabled={busy}
-            className="flex h-8 items-center gap-1 rounded bg-[#0097cf] px-3 text-xs font-semibold text-white hover:bg-[#0089bd] disabled:opacity-50"
+            className="flex h-8 items-center gap-1 rounded bg-[#10b981] px-3 text-xs font-semibold text-white hover:bg-[#059669] disabled:opacity-50"
             title="Bỏ qua cache và tải dữ liệu mới từ backend"
           >
             <RefreshCw size={15} className={busy ? "animate-spin" : ""} />
@@ -477,7 +477,7 @@ export function CccDashboardPage() {
             </div>
 
             {dashboard.fetching && dashboard.data && (
-              <span className="inline-flex shrink-0 items-center gap-2 rounded-md bg-sky-50 px-3 py-1.5 text-xs font-medium text-sky-700 ring-1 ring-sky-100">
+              <span className="inline-flex shrink-0 items-center gap-2 rounded-md bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-100">
                 <RefreshCw size={13} className="animate-spin" />
                 Đang cập nhật dữ liệu...
               </span>

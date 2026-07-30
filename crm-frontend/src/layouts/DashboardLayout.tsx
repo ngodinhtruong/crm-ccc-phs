@@ -9,7 +9,9 @@ import { DashboardTopbar } from "@/components/layout/DashboardTopbar";
 import { MainNavigationDrawer } from "@/components/layout/MainNavigationDrawer";
 import { BreadcrumbItem } from "@/types/common.type";
 import { useWorkspaceGuard } from "@/hooks/useWorkspaceGuard";
+import { useNavigationBreadcrumbs } from "@/hooks/useNavigationBreadcrumbs";
 import { WORKSPACE_LABEL } from "@/constants/workspace-navigation.constant";
+import { getDefaultPathForWorkspaceByUser } from "@/utils/default-home.util";
 
 export function DashboardLayout({
     children,
@@ -37,6 +39,16 @@ export function DashboardLayout({
 
     const { currentUser, activeWorkspace, loading, error } = useWorkspaceGuard();
 
+    const homeHref = activeWorkspace
+        ? getDefaultPathForWorkspaceByUser(activeWorkspace, currentUser)
+        : "/workspace";
+
+    const navigationBreadcrumbs = useNavigationBreadcrumbs({
+        declaredItems: breadcrumbs || [],
+        homeHref,
+        enabled: !loading && Boolean(activeWorkspace),
+    });
+
     if (loading) {
         return (
             <div className="flex min-h-screen items-center justify-center bg-slate-50 text-sm text-slate-500">
@@ -61,7 +73,7 @@ export function DashboardLayout({
                     <button
                         type="button"
                         onClick={() => window.location.reload()}
-                        className="mt-4 h-9 rounded-lg bg-[#0097cf] px-4 text-xs font-semibold text-white transition hover:bg-[#0089bd]"
+                        className="mt-4 h-9 rounded-lg bg-[#10b981] px-4 text-xs font-semibold text-white transition hover:bg-[#059669]"
                     >
                         Thử lại
                     </button>
@@ -71,7 +83,7 @@ export function DashboardLayout({
     }
 
     return (
-        <main className="min-h-screen bg-[#eef2f5] text-slate-800">
+        <main className="min-h-screen bg-[#eef6f2] text-slate-800">
             <MainNavigationDrawer
                 open={menuOpen}
                 onClose={() => setMenuOpen(false)}
@@ -89,13 +101,13 @@ export function DashboardLayout({
                 showCloseButton={sidebarShowCloseButton}
             />
 
-            <aside className="fixed left-0 top-14 z-30 h-[calc(100vh-56px)] w-10 bg-[#263747]">
+            <aside className="fixed left-0 top-14 z-30 h-[calc(100vh-56px)] w-10 bg-[#064e3b]">
                 {/* <button
                     type="button"
                     onClick={() => setSettingsSidebarOpen(true)}
                     className={`flex h-10 w-full items-center justify-center text-white ${settingsSidebarOpen
-                            ? "bg-orange-500 hover:bg-orange-600"
-                            : "bg-[#1d2c39] hover:bg-orange-500"
+                            ? "bg-[#10b981] hover:bg-[#059669]"
+                            : "bg-[#0f291e] hover:bg-[#10b981]"
                         }`}
                     title="Mở cài đặt"
                 >
@@ -105,15 +117,22 @@ export function DashboardLayout({
 
             <section className={`min-h-screen pt-14 ${contentClassName}`}>
                 <div className="sticky top-[56px] z-20 flex h-11 items-center justify-between border-b border-slate-200 bg-white/95 px-4 backdrop-blur-sm shadow-xs">
-                    <div className="flex items-center gap-3">
-                        <Breadcrumbs items={breadcrumbs || []} />
+                    <div className="flex min-w-0 flex-1 items-center gap-3">
+                        <Breadcrumbs
+                            items={navigationBreadcrumbs.items}
+                            onNavigate={navigationBreadcrumbs.truncateAt}
+                        />
 
-                        <span className="rounded bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600">
+                        <span className="shrink-0 rounded bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-[#059669]">
                             {WORKSPACE_LABEL[activeWorkspace]}
                         </span>
                     </div>
 
-                    {rightAction && <div className="flex items-center">{rightAction}</div>}
+                    {rightAction && (
+                        <div className="ml-3 flex shrink-0 items-center">
+                            {rightAction}
+                        </div>
+                    )}
                 </div>
 
                 <div className="space-y-4 p-4">{children}</div>
@@ -122,41 +141,58 @@ export function DashboardLayout({
     );
 }
 
-function Breadcrumbs({ items }: { items: BreadcrumbItem[] }) {
+function Breadcrumbs({
+    items,
+    onNavigate,
+}: {
+    items: BreadcrumbItem[];
+    onNavigate: (index: number) => void;
+}) {
     if (items.length === 0) {
         return <div />;
     }
 
     return (
-        <div className="flex items-center gap-1 text-xs text-slate-600">
-            {items.map((item, index) => {
-                const isLast = index === items.length - 1;
+        <nav
+            aria-label="Breadcrumb"
+            className="min-w-0 flex-1 overflow-x-auto"
+        >
+            <div className="flex w-max items-center gap-1 whitespace-nowrap text-xs text-slate-600">
+                {items.map((item, index) => {
+                    const isLast = index === items.length - 1;
 
-                return (
-                    <div key={`${item.label}-${index}`} className="flex items-center gap-1">
-                        {item.href && !isLast ? (
-                            <Link
-                                href={item.href}
-                                className="font-medium text-slate-700 hover:text-orange-500"
-                            >
-                                {item.label}
-                            </Link>
-                        ) : (
-                            <span
-                                className={
-                                    isLast
-                                        ? "font-semibold text-slate-800"
-                                        : "font-medium text-slate-700"
-                                }
-                            >
-                                {item.label}
-                            </span>
-                        )}
+                    return (
+                        <div
+                            key={`${item.href || item.label}-${index}`}
+                            className="flex items-center gap-1"
+                        >
+                            {item.href && !isLast ? (
+                                <Link
+                                    href={item.href}
+                                    onClick={() => onNavigate(index)}
+                                    title={item.label}
+                                    className="max-w-44 truncate font-medium text-slate-700 hover:text-[#10b981]"
+                                >
+                                    {item.label}
+                                </Link>
+                            ) : (
+                                <span
+                                    title={item.label}
+                                    className={
+                                        isLast
+                                            ? "max-w-56 truncate font-semibold text-slate-800"
+                                            : "max-w-44 truncate font-medium text-slate-700"
+                                    }
+                                >
+                                    {item.label}
+                                </span>
+                            )}
 
-                        {!isLast && <span>&gt;</span>}
-                    </div>
-                );
-            })}
-        </div>
+                            {!isLast && <span aria-hidden="true">&gt;</span>}
+                        </div>
+                    );
+                })}
+            </div>
+        </nav>
     );
 }

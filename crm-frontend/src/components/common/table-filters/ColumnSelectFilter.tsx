@@ -22,7 +22,12 @@ export function ColumnSelectFilter({
     <select
       value={value}
       onChange={(event) => onChange(event.target.value)}
-      className="h-8 w-full rounded border border-slate-300 bg-white px-2 text-[11px] font-normal outline-none focus:border-sky-400"
+      title={
+        value
+          ? options.find((option) => option.value === value)?.label
+          : placeholder
+      }
+      className="table-filter-control h-8 cursor-pointer rounded border border-slate-300 bg-white px-2 pr-7 font-normal outline-none focus:border-sky-400"
     >
       <option value="">{placeholder}</option>
 

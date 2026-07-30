@@ -23,7 +23,7 @@ export function HomeTabs({
           onClick={() => onChange(tab)}
           className={`mr-1 rounded-t border px-4 py-2 text-xs font-semibold ${
             activeTab === tab
-              ? "border-b-white bg-white text-[#00713d]"
+              ? "border-b-white bg-white text-[#059669]"
               : "bg-slate-50 text-slate-700 hover:bg-white"
           }`}
         >

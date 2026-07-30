@@ -50,7 +50,7 @@ export function CompanyFilter({
         <button
           type="button"
           onClick={onSearch}
-          className="flex h-9 items-center gap-1 rounded bg-[#0097cf] px-4 text-xs font-semibold text-white hover:bg-[#0089bd]"
+          className="flex h-9 items-center gap-1 rounded bg-[#10b981] px-4 text-xs font-semibold text-white hover:bg-[#059669]"
         >
           <Search size={14} />
           Tìm kiếm

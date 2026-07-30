@@ -181,18 +181,18 @@ export function CustomerDetailPage({ id }: { id: number }) {
                 {customer.phone && (
                   <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-600">
                     {customer.phone}
-                    <Phone size={12} className="text-sky-500" />
+                    <Phone size={12} className="text-emerald-500" />
                   </div>
                 )}
 
-                <div className="mt-1 flex items-center gap-1.5 text-xs text-sky-600">
+                <div className="mt-1 flex items-center gap-1.5 text-xs text-[#059669]">
                   <MapPin size={12} />
                   Xem bản đồ
                 </div>
 
                 <button
                   type="button"
-                  className="mt-3 flex items-center gap-1.5 text-xs font-medium text-sky-600 hover:underline"
+                  className="mt-3 flex items-center gap-1.5 text-xs font-medium text-[#059669] hover:underline"
                 >
                   <Tag size={12} />
                   Gán Tag
@@ -219,7 +219,7 @@ export function CustomerDetailPage({ id }: { id: number }) {
                   onClick={() => setTab(t.key)}
                   className={`relative px-4 py-3 text-xs font-medium transition ${
                     tab === t.key
-                      ? "text-sky-600 after:absolute after:inset-x-2 after:-bottom-px after:h-0.5 after:bg-sky-500"
+                      ? "text-[#059669] after:absolute after:inset-x-2 after:-bottom-px after:h-0.5 after:bg-[#10b981]"
                       : "text-slate-500 hover:text-slate-700"
                   }`}
                 >
@@ -257,7 +257,7 @@ export function CustomerDetailPage({ id }: { id: number }) {
                     {customer.phone && (
                       <span className="inline-flex items-center gap-1">
                         {customer.phone}
-                        <Phone size={11} className="text-sky-500" />
+                        <Phone size={11} className="text-emerald-500" />
                       </span>
                     )}
                   </Field>
@@ -267,7 +267,7 @@ export function CustomerDetailPage({ id }: { id: number }) {
 
                   <Field label="Email">
                     {customer.email && (
-                      <span className="text-sky-600">{customer.email}</span>
+                      <span className="text-[#059669]">{customer.email}</span>
                     )}
                   </Field>
                   <Field label="Môi giới">
@@ -281,7 +281,7 @@ export function CustomerDetailPage({ id }: { id: number }) {
                     {customer.vip_type && (
                       <span
                         className={`rounded px-2 py-0.5 text-[11px] font-semibold text-white ${
-                          isVip ? "bg-amber-400" : "bg-sky-500"
+                          isVip ? "bg-amber-400" : "bg-[#10b981]"
                         }`}
                       >
                         {customer.vip_type}

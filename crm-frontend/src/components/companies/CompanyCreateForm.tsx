@@ -40,7 +40,7 @@ export function CompanyCreateForm({
             <input
               value={form.companyName}
               onChange={(event) => setField("companyName", event.target.value)}
-              className="h-9 w-full rounded border px-3 text-xs outline-none focus:border-sky-400"
+              className="h-9 w-full rounded border px-3 text-xs outline-none focus:border-emerald-500"
             />
           </CompanyFormField>
 
@@ -66,7 +66,7 @@ export function CompanyCreateForm({
             <input
               value={form.phone}
               onChange={(event) => setField("phone", event.target.value)}
-              className="h-9 w-full rounded border px-3 text-xs outline-none focus:border-sky-400"
+              className="h-9 w-full rounded border px-3 text-xs outline-none focus:border-emerald-500"
             />
           </CompanyFormField>
 
@@ -81,7 +81,7 @@ export function CompanyCreateForm({
                 )
               }
               placeholder="10 ký tự chữ + số"
-              className="h-9 w-full rounded border px-3 text-xs outline-none focus:border-sky-400"
+              className="h-9 w-full rounded border px-3 text-xs outline-none focus:border-emerald-500"
             />
           </CompanyFormField>
 
@@ -89,7 +89,7 @@ export function CompanyCreateForm({
             <input
               value={form.email}
               onChange={(event) => setField("email", event.target.value)}
-              className="h-9 w-full rounded border px-3 text-xs outline-none focus:border-sky-400"
+              className="h-9 w-full rounded border px-3 text-xs outline-none focus:border-emerald-500"
             />
           </CompanyFormField>
 
@@ -104,7 +104,7 @@ export function CompanyCreateForm({
             <input
               value={form.website}
               onChange={(event) => setField("website", event.target.value)}
-              className="h-9 w-full rounded border px-3 text-xs outline-none focus:border-sky-400"
+              className="h-9 w-full rounded border px-3 text-xs outline-none focus:border-emerald-500"
             />
           </CompanyFormField>
 
@@ -112,7 +112,7 @@ export function CompanyCreateForm({
             <input
               value={form.taxCode}
               onChange={(event) => setField("taxCode", event.target.value)}
-              className="h-9 w-full rounded border px-3 text-xs outline-none focus:border-sky-400"
+              className="h-9 w-full rounded border px-3 text-xs outline-none focus:border-emerald-500"
             />
           </CompanyFormField>
 
@@ -120,7 +120,7 @@ export function CompanyCreateForm({
             <input
               value={form.fax}
               onChange={(event) => setField("fax", event.target.value)}
-              className="h-9 w-full rounded border px-3 text-xs outline-none focus:border-sky-400"
+              className="h-9 w-full rounded border px-3 text-xs outline-none focus:border-emerald-500"
             />
           </CompanyFormField>
 
@@ -128,7 +128,7 @@ export function CompanyCreateForm({
             <select
               value={form.source}
               onChange={(event) => setField("source", event.target.value)}
-              className="h-9 w-full rounded border px-3 text-xs outline-none focus:border-sky-400"
+              className="h-9 w-full rounded border px-3 text-xs outline-none focus:border-emerald-500"
             >
               <option value="">Chọn một giá trị</option>
 
@@ -148,7 +148,7 @@ export function CompanyCreateForm({
             <input
               value={form.address}
               onChange={(event) => setField("address", event.target.value)}
-              className="h-9 w-full rounded border px-3 text-xs outline-none focus:border-sky-400"
+              className="h-9 w-full rounded border px-3 text-xs outline-none focus:border-emerald-500"
             />
           </CompanyFormField>
 
@@ -156,7 +156,7 @@ export function CompanyCreateForm({
             <input
               value={form.country}
               onChange={(event) => setField("country", event.target.value)}
-              className="h-9 w-full rounded border px-3 text-xs outline-none focus:border-sky-400"
+              className="h-9 w-full rounded border px-3 text-xs outline-none focus:border-emerald-500"
             />
           </CompanyFormField>
 
@@ -164,7 +164,7 @@ export function CompanyCreateForm({
             <input
               value={form.province}
               onChange={(event) => setField("province", event.target.value)}
-              className="h-9 w-full rounded border px-3 text-xs outline-none focus:border-sky-400"
+              className="h-9 w-full rounded border px-3 text-xs outline-none focus:border-emerald-500"
             />
           </CompanyFormField>
 
@@ -172,7 +172,7 @@ export function CompanyCreateForm({
             <input
               value={form.district}
               onChange={(event) => setField("district", event.target.value)}
-              className="h-9 w-full rounded border px-3 text-xs outline-none focus:border-sky-400"
+              className="h-9 w-full rounded border px-3 text-xs outline-none focus:border-emerald-500"
             />
           </CompanyFormField>
         </div>
@@ -188,7 +188,7 @@ export function CompanyCreateForm({
             value={form.description}
             onChange={(event) => setField("description", event.target.value)}
             rows={3}
-            className="w-full rounded border px-3 py-2 text-xs outline-none focus:border-sky-400"
+            className="w-full rounded border px-3 py-2 text-xs outline-none focus:border-emerald-500"
           />
         </div>
       </CompanyFormSection>
@@ -217,7 +217,7 @@ export function CompanyCreateForm({
               onChange={(event) =>
                 setField("membershipTier", event.target.value)
               }
-              className="h-9 w-full rounded border px-3 text-xs outline-none focus:border-sky-400"
+              className="h-9 w-full rounded border px-3 text-xs outline-none focus:border-emerald-500"
             >
               <option value="">Chọn một tùy chọn</option>
 
@@ -233,7 +233,7 @@ export function CompanyCreateForm({
             <select
               value={form.rating}
               onChange={(event) => setField("rating", event.target.value)}
-              className="h-9 w-full rounded border px-3 text-xs outline-none focus:border-sky-400"
+              className="h-9 w-full rounded border px-3 text-xs outline-none focus:border-emerald-500"
             >
               <option value="">Chọn đánh giá</option>
 
@@ -259,7 +259,7 @@ export function CompanyCreateForm({
         <button
           type="submit"
           disabled={saving}
-          className="h-9 rounded bg-[#0097cf] px-7 text-xs font-semibold text-white hover:bg-[#0089bd] disabled:cursor-not-allowed disabled:opacity-60"
+          className="h-9 rounded bg-[#10b981] px-7 text-xs font-semibold text-white hover:bg-[#059669] disabled:cursor-not-allowed disabled:opacity-60"
         >
           {saving ? "Đang lưu..." : "Lưu"}
         </button>

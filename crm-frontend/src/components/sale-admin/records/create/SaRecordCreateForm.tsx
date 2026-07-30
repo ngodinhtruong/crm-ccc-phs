@@ -29,7 +29,7 @@ export function SaRecordCreateForm({
       {/* Header Banner */}
       <div className="border-b border-slate-200 bg-white px-5 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#0097cf] text-white shadow-sm">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#10b981] text-white shadow-sm">
             <PhoneCall size={20} />
           </div>
           <div>
@@ -58,7 +58,7 @@ export function SaRecordCreateForm({
             type="button"
             onClick={create.submit}
             disabled={create.submitting}
-            className="flex h-9 items-center gap-1.5 rounded-md bg-[#0097cf] px-5 text-xs font-semibold text-white transition-colors hover:bg-[#0084b6] shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex h-9 items-center gap-1.5 rounded-md bg-[#10b981] px-5 text-xs font-semibold text-white transition-colors hover:bg-[#059669] shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Save size={15} />
             {create.submitting
@@ -112,7 +112,7 @@ export function SaRecordCreateForm({
               type="button"
               onClick={create.submit}
               disabled={create.submitting}
-              className="flex h-9 items-center gap-1.5 rounded-md bg-[#0097cf] px-5 text-xs font-semibold text-white transition-colors hover:bg-[#0084b6] shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex h-9 items-center gap-1.5 rounded-md bg-[#10b981] px-5 text-xs font-semibold text-white transition-colors hover:bg-[#059669] shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Save size={15} />
               {create.submitting

@@ -14,19 +14,23 @@ export function ColumnDateRangeFilter({
   onToChange,
 }: ColumnDateRangeFilterProps) {
   return (
-    <div className="space-y-1">
+    <div className="table-filter-stack">
       <input
         type="date"
+        aria-label="Từ ngày"
+        title="Từ ngày"
         value={fromValue}
         onChange={(event) => onFromChange(event.target.value)}
-        className="h-8 w-full rounded border border-slate-300 bg-white px-1 text-[10px] font-normal outline-none focus:border-sky-400"
+        className="table-filter-control table-filter-date h-8 rounded border border-slate-300 bg-white px-1.5 font-normal outline-none focus:border-sky-400"
       />
 
       <input
         type="date"
+        aria-label="Đến ngày"
+        title="Đến ngày"
         value={toValue}
         onChange={(event) => onToChange(event.target.value)}
-        className="h-8 w-full rounded border border-slate-300 bg-white px-1 text-[10px] font-normal outline-none focus:border-sky-400"
+        className="table-filter-control table-filter-date h-8 rounded border border-slate-300 bg-white px-1.5 font-normal outline-none focus:border-sky-400"
       />
     </div>
   );

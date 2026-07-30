@@ -66,26 +66,26 @@ export function KpiGateConfigsTab({ config }: { config: KpiConfigController }) {
 
       <div className="overflow-hidden rounded border border-slate-200 bg-white">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1100px] text-left text-xs">
+          <table className="w-full min-w-[1100px] text-left text-sm">
             <thead>
               <tr className="h-10 border-b bg-slate-50 text-slate-600">
-                <th className="px-3">Mã Gate</th>
-                <th className="px-3">Tên Gate</th>
-                <th className="px-3">Formula</th>
-                <th className="px-3">Operator</th>
-                <th className="px-3">Threshold</th>
-                <th className="px-3">Required</th>
-                <th className="px-3">Active</th>
-                <th className="px-3">Thao tác</th>
+                <th className="px-4 text-slate-700">Mã Gate</th>
+                <th className="px-4 text-slate-700">Tên Gate</th>
+                <th className="px-4 text-slate-700">Formula</th>
+                <th className="px-4 text-slate-700">Operator</th>
+                <th className="px-4 text-slate-700">Threshold</th>
+                <th className="px-4 text-slate-700">Required</th>
+                <th className="px-4 text-slate-700">Active</th>
+                <th className="px-4 text-slate-700">Thao tác</th>
               </tr>
             </thead>
 
             <tbody>
               {config.gateRows.map((item) => (
                 <tr key={item.id} className="h-12 border-b">
-                  <td className="px-3 font-semibold">{item.gate_code}</td>
+                  <td className="px-4 font-semibold">{item.gate_code}</td>
 
-                  <td className="px-3">
+                  <td className="px-4 text-slate-700">
                     <input
                       value={item.gate_name}
                       disabled={!config.canManage}
@@ -96,9 +96,9 @@ export function KpiGateConfigsTab({ config }: { config: KpiConfigController }) {
                     />
                   </td>
 
-                  <td className="px-3">{item.formula_key}</td>
+                  <td className="px-4 text-slate-700">{item.formula_key}</td>
 
-                  <td className="px-3">
+                  <td className="px-4 text-slate-700">
                     <select
                       value={item.operator}
                       disabled={!config.canManage}
@@ -115,7 +115,7 @@ export function KpiGateConfigsTab({ config }: { config: KpiConfigController }) {
                     </select>
                   </td>
 
-                  <td className="px-3">
+                  <td className="px-4 text-slate-700">
                     <input
                       value={item.threshold_value}
                       disabled={!config.canManage}
@@ -130,7 +130,7 @@ export function KpiGateConfigsTab({ config }: { config: KpiConfigController }) {
                     />
                   </td>
 
-                  <td className="px-3">
+                  <td className="px-4 text-slate-700">
                     <input
                       type="checkbox"
                       checked={item.is_required}
@@ -145,7 +145,7 @@ export function KpiGateConfigsTab({ config }: { config: KpiConfigController }) {
                     />
                   </td>
 
-                  <td className="px-3">
+                  <td className="px-4 text-slate-700">
                     <input
                       type="checkbox"
                       checked={item.is_active}
@@ -160,13 +160,13 @@ export function KpiGateConfigsTab({ config }: { config: KpiConfigController }) {
                     />
                   </td>
 
-                  <td className="px-3">
+                  <td className="px-4 text-slate-700">
                     <div className="flex gap-2">
                       <button
                         type="button"
                         disabled={!config.canManage}
                         onClick={() => config.saveGate(item)}
-                        className="h-7 rounded border border-sky-200 bg-sky-50 px-2 text-[11px] font-semibold text-sky-700 disabled:opacity-50"
+                        className="h-7 rounded border border-emerald-200 bg-emerald-50 px-2 text-[11px] font-semibold text-emerald-700 disabled:opacity-50"
                       >
                         Lưu
                       </button>

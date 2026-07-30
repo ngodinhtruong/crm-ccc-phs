@@ -29,7 +29,7 @@ export function CustomerListPage() {
         <div className="flex items-center gap-2">
           <Link
             href="/customers/create"
-            className="flex h-8 items-center gap-1 rounded bg-[#0097cf] px-3 text-xs font-semibold text-white shadow-sm hover:bg-[#0089bd]"
+            className="flex h-8 items-center gap-1 rounded bg-[#10b981] px-3 text-xs font-semibold text-white shadow-sm hover:bg-[#059669]"
           >
             <Plus size={15} />
             Thêm khách hàng
@@ -37,7 +37,7 @@ export function CustomerListPage() {
 
           <button
             type="button"
-            className="flex h-8 items-center gap-1 rounded border border-sky-300 bg-white px-3 text-xs font-semibold text-sky-600 hover:bg-sky-50"
+            className="flex h-8 items-center gap-1 rounded border border-emerald-300 bg-white px-3 text-xs font-semibold text-[#059669] hover:bg-emerald-50"
           >
             <Upload size={15} />
             Nhập dữ liệu
@@ -45,7 +45,7 @@ export function CustomerListPage() {
 
           <button
             type="button"
-            className="flex h-8 items-center gap-1 rounded border border-sky-300 bg-white px-3 text-xs font-semibold text-sky-600 hover:bg-sky-50"
+            className="flex h-8 items-center gap-1 rounded border border-emerald-300 bg-white px-3 text-xs font-semibold text-[#059669] hover:bg-emerald-50"
           >
             <Download size={15} />
             Xuất dữ liệu

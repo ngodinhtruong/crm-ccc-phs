@@ -19,7 +19,7 @@ export function DateRangeFilter({
 }: DateRangeFilterProps) {
   return (
     <>
-      <div>
+      <div className="min-w-0">
         <label className="mb-1 block text-xs font-medium text-slate-500">
           {fromLabel}
         </label>
@@ -28,11 +28,11 @@ export function DateRangeFilter({
           type="date"
           value={fromValue}
           onChange={(event) => onFromChange(event.target.value)}
-          className="h-9 w-full rounded border border-slate-300 bg-white px-2 text-xs outline-none focus:border-sky-400"
+          className="h-9 w-full min-w-0 max-w-full rounded border border-slate-300 bg-white px-2 text-xs outline-none focus:border-sky-400"
         />
       </div>
 
-      <div>
+      <div className="min-w-0">
         <label className="mb-1 block text-xs font-medium text-slate-500">
           {toLabel}
         </label>
@@ -41,7 +41,7 @@ export function DateRangeFilter({
           type="date"
           value={toValue}
           onChange={(event) => onToChange(event.target.value)}
-          className="h-9 w-full rounded border border-slate-300 bg-white px-2 text-xs outline-none focus:border-sky-400"
+          className="h-9 w-full min-w-0 max-w-full rounded border border-slate-300 bg-white px-2 text-xs outline-none focus:border-sky-400"
         />
       </div>
     </>

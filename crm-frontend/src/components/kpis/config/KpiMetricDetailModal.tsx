@@ -74,7 +74,7 @@ export function KpiMetricDetailModal({
       <div className="max-h-[88vh] w-full max-w-4xl overflow-hidden rounded-md border border-slate-200 bg-white shadow-xl">
         <div className="flex items-start justify-between border-b bg-white px-5 py-4">
           <div>
-            <div className="text-xs font-semibold uppercase text-sky-600">
+            <div className="text-xs font-semibold uppercase text-emerald-600">
               {metric.metric_code} · {metric.group_code || metric.group}
             </div>
             <h2 className="mt-1 text-base font-semibold text-slate-800">

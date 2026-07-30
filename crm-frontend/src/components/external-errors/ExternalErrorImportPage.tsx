@@ -62,10 +62,10 @@ export function ExternalErrorImportPage() {
                 File Excel <span className="text-red-500">*</span>
               </label>
 
-              <label className="flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-md border-2 border-dashed border-slate-300 bg-slate-50 px-4 text-center hover:border-sky-400 hover:bg-sky-50">
+              <label className="flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-md border-2 border-dashed border-slate-300 bg-slate-50 px-4 text-center hover:border-emerald-500 hover:bg-emerald-50">
                 <FileSpreadsheet
                   size={34}
-                  className="text-sky-600"
+                  className="text-emerald-600"
                 />
                 <span className="mt-2 text-sm font-semibold text-slate-700">
                   {state.file
@@ -105,11 +105,11 @@ export function ExternalErrorImportPage() {
                   state.setSheetName(event.target.value)
                 }
                 placeholder="Để trống để lấy sheet đầu tiên"
-                className="h-9 w-full rounded border border-slate-300 bg-white px-3 text-xs outline-none focus:border-sky-400"
+                className="h-9 w-full rounded border border-slate-300 bg-white px-3 text-xs outline-none focus:border-emerald-500"
               />
             </div>
 
-            <label className="flex items-start gap-2 rounded-md border border-sky-200 bg-sky-50 p-3 text-xs text-sky-800">
+            <label className="flex items-start gap-2 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">
               <input
                 type="checkbox"
                 checked={state.autoClassify}
@@ -130,7 +130,7 @@ export function ExternalErrorImportPage() {
               type="button"
               disabled={!state.file || state.loading}
               onClick={() => void state.importExcel()}
-              className="flex h-10 items-center gap-2 rounded bg-[#0097cf] px-5 text-xs font-semibold text-white hover:bg-[#0089bd] disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex h-10 items-center gap-2 rounded bg-[#10b981] px-5 text-xs font-semibold text-white hover:bg-[#059669] disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Upload size={15} />
               {state.loading

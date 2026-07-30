@@ -14,7 +14,7 @@ export function FilterTextInput({
   placeholder,
 }: FilterTextInputProps) {
   return (
-    <div>
+    <div className="min-w-0">
       <label className="mb-1 block text-xs font-medium text-slate-500">
         {label}
       </label>
@@ -23,7 +23,7 @@ export function FilterTextInput({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
-        className="h-9 w-full rounded border border-slate-300 bg-white px-3 text-xs outline-none focus:border-sky-400"
+        className="h-9 w-full min-w-0 max-w-full rounded border border-slate-300 bg-white px-3 text-xs outline-none focus:border-sky-400"
       />
     </div>
   );

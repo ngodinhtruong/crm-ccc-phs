@@ -72,9 +72,9 @@ export function ExternalErrorCatalogPage() {
             <button
               type="button"
               onClick={() => state.setActiveTab("groups")}
-              className={`mb-2 block w-full rounded-md border px-3 py-3 text-left text-xs ${
+              className={`mb-2 block w-full rounded-md border px-3 py-3 text-left text-sm ${
                 state.activeTab === "groups"
-                  ? "border-sky-400 bg-sky-50 text-sky-700"
+                  ? "border-emerald-500 bg-emerald-50 text-emerald-700"
                   : "border-slate-200 bg-white text-slate-600"
               }`}
             >
@@ -87,9 +87,9 @@ export function ExternalErrorCatalogPage() {
             <button
               type="button"
               onClick={() => state.setActiveTab("codes")}
-              className={`block w-full rounded-md border px-3 py-3 text-left text-xs ${
+              className={`block w-full rounded-md border px-3 py-3 text-left text-sm ${
                 state.activeTab === "codes"
-                  ? "border-sky-400 bg-sky-50 text-sky-700"
+                  ? "border-emerald-500 bg-emerald-50 text-emerald-700"
                   : "border-slate-200 bg-white text-slate-600"
               }`}
             >
@@ -235,7 +235,7 @@ function GroupForm({ state }: { state: CatalogState }) {
             }))
           }
           rows={3}
-          className="w-full rounded border border-slate-300 px-3 py-2 text-xs outline-none focus:border-sky-400"
+          className="w-full rounded border border-slate-300 px-3 py-2 text-xs outline-none focus:border-emerald-500"
         />
       </Field>
 
@@ -250,7 +250,7 @@ function GroupForm({ state }: { state: CatalogState }) {
               sortOrder: event.target.value,
             }))
           }
-          className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400"
+          className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-emerald-500"
         />
       </Field>
 
@@ -287,7 +287,7 @@ function CodeForm({ state }: { state: CatalogState }) {
               group: event.target.value,
             }))
           }
-          className="h-9 w-full rounded border border-slate-300 bg-white px-2 text-xs outline-none focus:border-sky-400"
+          className="h-9 w-full rounded border border-slate-300 bg-white px-2 text-xs outline-none focus:border-emerald-500"
         >
           <option value="">Chọn nhóm lỗi</option>
           {state.groups
@@ -340,7 +340,7 @@ function CodeForm({ state }: { state: CatalogState }) {
             }))
           }
           rows={3}
-          className="w-full rounded border border-slate-300 px-3 py-2 text-xs outline-none focus:border-sky-400"
+          className="w-full rounded border border-slate-300 px-3 py-2 text-xs outline-none focus:border-emerald-500"
         />
       </Field>
 
@@ -355,7 +355,7 @@ function CodeForm({ state }: { state: CatalogState }) {
           }
           rows={3}
           placeholder="Mỗi dòng hoặc phân cách bằng dấu phẩy"
-          className="w-full rounded border border-slate-300 px-3 py-2 text-xs outline-none focus:border-sky-400"
+          className="w-full rounded border border-slate-300 px-3 py-2 text-xs outline-none focus:border-emerald-500"
         />
       </Field>
 
@@ -370,7 +370,7 @@ function CodeForm({ state }: { state: CatalogState }) {
           }
           rows={3}
           placeholder="Mỗi dòng một ví dụ"
-          className="w-full rounded border border-slate-300 px-3 py-2 text-xs outline-none focus:border-sky-400"
+          className="w-full rounded border border-slate-300 px-3 py-2 text-xs outline-none focus:border-emerald-500"
         />
       </Field>
 
@@ -385,7 +385,7 @@ function CodeForm({ state }: { state: CatalogState }) {
               sortOrder: event.target.value,
             }))
           }
-          className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400"
+          className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-emerald-500"
         />
       </Field>
 
@@ -411,14 +411,14 @@ function CodeForm({ state }: { state: CatalogState }) {
 function GroupTable({ state }: { state: CatalogState }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[760px] text-left text-xs">
+      <table className="w-full min-w-[760px] text-left text-sm">
         <thead>
           <tr className="h-10 border-b bg-[#f8fafc]">
-            <th className="px-3 font-semibold">Mã</th>
-            <th className="px-3 font-semibold">Tên nhóm</th>
-            <th className="px-3 font-semibold">Số mã lỗi</th>
-            <th className="px-3 font-semibold">Trạng thái</th>
-            <th className="px-3 font-semibold">Thao tác</th>
+            <th className="px-4 font-semibold">Mã</th>
+            <th className="px-4 font-semibold">Tên nhóm</th>
+            <th className="px-4 font-semibold">Số mã lỗi</th>
+            <th className="px-4 font-semibold">Trạng thái</th>
+            <th className="px-4 font-semibold">Thao tác</th>
           </tr>
         </thead>
         <tbody>
@@ -433,12 +433,12 @@ function GroupTable({ state }: { state: CatalogState }) {
             state.filteredGroups.map((item) => (
               <tr
                 key={item.id}
-                className="h-12 border-b border-slate-100 hover:bg-sky-50"
+                className="h-[46px] border-b border-slate-200 hover:bg-emerald-50"
               >
-                <td className="px-3 font-semibold text-slate-700">
+                <td className="px-4 font-semibold text-slate-700">
                   {item.group_code}
                 </td>
-                <td className="px-3">
+                <td className="px-4 text-slate-700">
                   <div className="font-semibold text-slate-700">
                     {item.group_name}
                   </div>
@@ -446,13 +446,13 @@ function GroupTable({ state }: { state: CatalogState }) {
                     {item.description || "-"}
                   </div>
                 </td>
-                <td className="px-3 text-slate-600">
+                <td className="px-4 text-slate-600">
                   {item.error_code_count}
                 </td>
-                <td className="px-3">
+                <td className="px-4 text-slate-700">
                   <StatusBadge active={item.is_active} />
                 </td>
-                <td className="px-3">
+                <td className="px-4 text-slate-700">
                   <RowActions
                     item={item}
                     onEdit={() => state.editGroup(item)}
@@ -473,15 +473,15 @@ function GroupTable({ state }: { state: CatalogState }) {
 function CodeTable({ state }: { state: CatalogState }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[920px] text-left text-xs">
+      <table className="w-full min-w-[920px] text-left text-sm">
         <thead>
           <tr className="h-10 border-b bg-[#f8fafc]">
-            <th className="px-3 font-semibold">Mã lỗi</th>
-            <th className="px-3 font-semibold">Tên lỗi</th>
-            <th className="px-3 font-semibold">Nhóm lỗi</th>
-            <th className="px-3 font-semibold">Từ khóa</th>
-            <th className="px-3 font-semibold">Trạng thái</th>
-            <th className="px-3 font-semibold">Thao tác</th>
+            <th className="px-4 font-semibold">Mã lỗi</th>
+            <th className="px-4 font-semibold">Tên lỗi</th>
+            <th className="px-4 font-semibold">Nhóm lỗi</th>
+            <th className="px-4 font-semibold">Từ khóa</th>
+            <th className="px-4 font-semibold">Trạng thái</th>
+            <th className="px-4 font-semibold">Thao tác</th>
           </tr>
         </thead>
         <tbody>
@@ -496,12 +496,12 @@ function CodeTable({ state }: { state: CatalogState }) {
             state.filteredCodes.map((item) => (
               <tr
                 key={item.id}
-                className="border-b border-slate-100 align-top hover:bg-sky-50"
+                className="border-b border-slate-100 align-top hover:bg-emerald-50"
               >
-                <td className="px-3 py-3 font-semibold text-slate-700">
+                <td className="px-4 py-3 font-semibold text-slate-700">
                   {item.error_code}
                 </td>
-                <td className="px-3 py-3">
+                <td className="px-4 py-3">
                   <div className="font-semibold text-slate-700">
                     {item.error_name}
                   </div>
@@ -509,16 +509,16 @@ function CodeTable({ state }: { state: CatalogState }) {
                     {item.description || "-"}
                   </div>
                 </td>
-                <td className="px-3 py-3 text-slate-600">
+                <td className="px-4 py-3 text-slate-600">
                   {item.group_name}
                 </td>
                 <td className="max-w-[240px] px-3 py-3 text-[11px] text-slate-500">
                   {(item.keywords || []).join(", ") || "-"}
                 </td>
-                <td className="px-3 py-3">
+                <td className="px-4 py-3">
                   <StatusBadge active={item.is_active} />
                 </td>
-                <td className="px-3 py-3">
+                <td className="px-4 py-3">
                   <RowActions
                     item={item}
                     onEdit={() => state.editCode(item)}
@@ -570,7 +570,7 @@ function TextInput({
       value={value}
       onChange={(event) => onChange(event.target.value)}
       placeholder={placeholder}
-      className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400"
+      className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-emerald-500"
     />
   );
 }
@@ -608,7 +608,7 @@ function FormActions({
       <button
         type="submit"
         disabled={saving}
-        className="flex h-9 items-center gap-1 rounded bg-[#0097cf] px-4 text-xs font-semibold text-white hover:bg-[#0089bd] disabled:opacity-50"
+        className="flex h-9 items-center gap-1 rounded bg-[#10b981] px-4 text-xs font-semibold text-white hover:bg-[#059669] disabled:opacity-50"
       >
         <Save size={14} />
         {saving

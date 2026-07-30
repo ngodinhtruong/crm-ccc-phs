@@ -64,7 +64,7 @@ export function SaRecordCreatePage() {
             type="button"
             onClick={create.submit}
             disabled={create.submitting}
-            className="flex h-8 items-center gap-1 rounded bg-[#0097cf] px-3 text-xs font-semibold text-white hover:bg-[#0089bd] disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex h-8 items-center gap-1 rounded bg-[#10b981] px-3 text-xs font-semibold text-white hover:bg-[#059669] disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Save size={15} />
             {create.submitting ? "Đang lưu..." : "Lưu SA Record"}

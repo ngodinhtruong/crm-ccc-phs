@@ -55,21 +55,21 @@ export function KpiMetricProgressSection({
                   </div>
 
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[1250px] border-collapse text-left text-xs">
+                    <table className="w-full min-w-[1250px] border-collapse text-left text-sm">
                       <thead>
                         <tr className="h-10 border-y bg-white text-slate-700">
-                          <th className="sticky left-0 z-20 w-[80px] bg-white px-3 font-semibold">
+                          <th className="sticky left-0 z-20 w-[80px] bg-slate-50 px-4 font-semibold">
                             Thao tác
                           </th>
-                          <th className="w-[120px] px-3 font-semibold">Mã KPI</th>
-                          <th className="w-[300px] px-3 font-semibold">Tên KPI</th>
-                          <th className="w-[100px] px-3 font-semibold">Tần suất</th>
-                          <th className="w-[100px] px-3 font-semibold">Đơn vị</th>
-                          <th className="w-[120px] px-3 font-semibold">Thực tế</th>
-                          <th className="w-[120px] px-3 font-semibold">Chỉ tiêu</th>
-                          <th className="w-[260px] px-3 font-semibold">Tiến độ</th>
-                          <th className="w-[130px] px-3 font-semibold">Trạng thái</th>
-                          <th className="w-[160px] px-3 font-semibold">Cập nhật</th>
+                          <th className="w-[120px] px-4 font-semibold">Mã KPI</th>
+                          <th className="w-[300px] px-4 font-semibold">Tên KPI</th>
+                          <th className="w-[100px] px-4 font-semibold">Tần suất</th>
+                          <th className="w-[100px] px-4 font-semibold">Đơn vị</th>
+                          <th className="w-[120px] px-4 font-semibold">Thực tế</th>
+                          <th className="w-[120px] px-4 font-semibold">Chỉ tiêu</th>
+                          <th className="w-[260px] px-4 font-semibold">Tiến độ</th>
+                          <th className="w-[130px] px-4 font-semibold">Trạng thái</th>
+                          <th className="w-[160px] px-4 font-semibold">Cập nhật</th>
                         </tr>
                       </thead>
                       <tbody>

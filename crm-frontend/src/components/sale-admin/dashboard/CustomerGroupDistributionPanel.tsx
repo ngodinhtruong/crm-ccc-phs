@@ -108,7 +108,7 @@ function AccountModal({
       <div className="max-h-[82vh] w-full max-w-4xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
         <div className="flex items-start justify-between gap-3 border-b border-slate-100 bg-slate-50/80 px-5 py-4">
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#0097cf]">
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#059669]">
               Chi tiết phân nhóm KH
             </p>
             <h2 className="mt-1 text-base font-bold text-slate-900">
@@ -128,15 +128,15 @@ function AccountModal({
         </div>
 
         <div className="max-h-[62vh] overflow-auto">
-          <table className="w-full min-w-[820px] border-collapse text-left text-xs">
+          <table className="w-full min-w-[820px] border-collapse text-left text-sm">
             <thead>
-              <tr className="h-10 border-b border-slate-100 bg-white text-[11px] text-slate-500">
-                <th className="px-3 font-semibold">Số TK</th>
-                <th className="px-3 font-semibold">Khách hàng</th>
-                <th className="px-3 font-semibold">Chi nhánh</th>
-                <th className="px-3 font-semibold">PIC</th>
-                <th className="px-3 text-right font-semibold">Phí GD</th>
-                <th className="px-3 text-right font-semibold">GT GD</th>
+              <tr className="h-[46px] border-b border-slate-200 bg-white text-[11px] text-slate-500">
+                <th className="px-4 font-semibold">Số TK</th>
+                <th className="px-4 font-semibold">Khách hàng</th>
+                <th className="px-4 font-semibold">Chi nhánh</th>
+                <th className="px-4 font-semibold">PIC</th>
+                <th className="px-4 text-right font-semibold">Phí GD</th>
+                <th className="px-4 text-right font-semibold">GT GD</th>
               </tr>
             </thead>
             <tbody>
@@ -153,20 +153,20 @@ function AccountModal({
                     className={`h-11 border-b border-slate-100 ${index % 2 === 0 ? "bg-white" : "bg-slate-50/50"
                       }`}
                   >
-                    <td className="px-3 font-semibold text-[#007ead]">
+                    <td className="px-4 font-semibold text-[#059669]">
                       {account.account_no || "-"}
                     </td>
-                    <td className="px-3 text-slate-700">{account.customer_name || "-"}</td>
-                    <td className="px-3 text-slate-600">{account.branch_name || "-"}</td>
-                    <td className="px-3 text-slate-600">{account.pic_name || "-"}</td>
+                    <td className="px-4 text-slate-700">{account.customer_name || "-"}</td>
+                    <td className="px-4 text-slate-600">{account.branch_name || "-"}</td>
+                    <td className="px-4 text-slate-600">{account.pic_name || "-"}</td>
                     <td
-                      className="px-3 text-right font-semibold text-amber-600"
+                      className="px-4 text-right font-semibold text-amber-600"
                       title={formatMoney(account.transaction_fee)}
                     >
                       {formatCompactMoney(account.transaction_fee)}
                     </td>
                     <td
-                      className="px-3 text-right text-slate-600"
+                      className="px-4 text-right text-slate-600"
                       title={formatMoney(account.transaction_value)}
                     >
                       {formatCompactMoney(account.transaction_value)}
@@ -191,7 +191,7 @@ function CustomTooltip({ active, payload, label }: any) {
     <div className="rounded-xl border border-slate-200 bg-white/95 p-3.5 text-xs shadow-xl backdrop-blur-sm">
       <div className="mb-2 flex items-center justify-between gap-4 border-b border-slate-100 pb-1.5 font-bold text-slate-800">
         <span>{label}</span>
-        <span className="text-[#0097cf]">Tổng: {formatNumber(total)} TK</span>
+        <span className="text-[#059669]">Tổng: {formatNumber(total)} TK</span>
       </div>
       <div className="space-y-1.5">
         {payload.map((item: any) => (
@@ -390,7 +390,7 @@ export function CustomerGroupDistributionPanel({
                       key={item.key}
                       type="button"
                       onClick={() => setSelectedGroup(item.row)}
-                      className="group flex items-center justify-between rounded-lg bg-slate-50 p-2.5 text-left ring-1 ring-slate-200/60 transition hover:bg-sky-50 hover:ring-sky-200"
+                      className="group flex items-center justify-between rounded-lg bg-slate-50 p-2.5 text-left ring-1 ring-slate-200/60 transition hover:bg-emerald-50 hover:ring-emerald-200"
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         <span

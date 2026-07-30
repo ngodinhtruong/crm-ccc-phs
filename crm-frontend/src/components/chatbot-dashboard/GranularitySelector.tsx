@@ -44,7 +44,7 @@ export function GranularitySelector({
             onClick={() => onChange(option.key)}
             className={`cursor-pointer rounded-md px-2.5 py-1 text-xs font-bold transition-all duration-200 ${
               value === option.key
-                ? "bg-[#00713d] text-white shadow-xs"
+                ? "bg-[#10b981] text-white shadow-xs"
                 : "text-slate-600 hover:bg-slate-200/60 hover:text-slate-900"
             }`}
           >

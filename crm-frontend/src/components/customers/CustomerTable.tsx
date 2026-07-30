@@ -28,33 +28,33 @@ export function CustomerTable({
   const openDetail = (id: number) => router.push(`/customers/${id}`);
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[1700px] border-collapse text-left text-xs">
+    <div className="table-scroll-container">
+      <table className="data-table w-full min-w-[2315px] border-collapse text-left text-sm">
         <thead>
-          <tr className="h-10 border-b bg-white text-slate-700">
-            <th className="sticky left-0 z-20 w-[90px] bg-white px-3 font-semibold">
+          <tr className="h-11 border-b-2 border-slate-200 bg-slate-50 text-slate-700">
+            <th className="sticky left-0 z-20 w-[90px] min-w-[90px] bg-slate-50 px-4 font-semibold">
               Thao tác
             </th>
-            <th className="w-[150px] px-3 font-semibold">Ngày mở tài khoản</th>
-            <th className="w-[180px] px-3 font-semibold">Họ và tên</th>
-            <th className="w-[140px] px-3 font-semibold">Di động</th>
-            <th className="w-[160px] px-3 font-semibold">Số tài khoản</th>
-            <th className="w-[160px] px-3 font-semibold">Công ty</th>
-            <th className="w-[230px] px-3 font-semibold">Email</th>
-            <th className="w-[145px] px-3 font-semibold">Phân loại VIP</th>
-            <th className="w-[150px] px-3 font-semibold">Giao cho</th>
-            <th className="w-[140px] px-3 font-semibold">Nguồn</th>
-            <th className="w-[125px] px-3 font-semibold">Ngày sinh</th>
-            <th className="w-[180px] px-3 font-semibold">Mô tả</th>
-            <th className="w-[120px] px-3 font-semibold">Theo dõi</th>
-            <th className="w-[130px] px-3 font-semibold">Tình trạng</th>
-            <th className="w-[150px] px-3 font-semibold">Chi nhánh</th>
+            <th className="w-[170px] min-w-[170px] px-4 font-semibold">Ngày mở tài khoản</th>
+            <th className="w-[180px] min-w-[180px] px-4 font-semibold">Họ và tên</th>
+            <th className="w-[140px] min-w-[140px] px-4 font-semibold">Di động</th>
+            <th className="w-[160px] min-w-[160px] px-4 font-semibold">Số tài khoản</th>
+            <th className="w-[160px] min-w-[160px] px-4 font-semibold">Công ty</th>
+            <th className="w-[230px] min-w-[230px] px-4 font-semibold">Email</th>
+            <th className="w-[145px] min-w-[145px] px-4 font-semibold">Phân loại VIP</th>
+            <th className="w-[150px] min-w-[150px] px-4 font-semibold">Giao cho</th>
+            <th className="w-[140px] min-w-[140px] px-4 font-semibold">Nguồn</th>
+            <th className="w-[170px] min-w-[170px] px-4 font-semibold">Ngày sinh</th>
+            <th className="w-[180px] min-w-[180px] px-4 font-semibold">Mô tả</th>
+            <th className="w-[120px] min-w-[120px] px-4 font-semibold">Theo dõi</th>
+            <th className="w-[130px] min-w-[130px] px-4 font-semibold">Tình trạng</th>
+            <th className="w-[150px] min-w-[150px] px-4 font-semibold">Chi nhánh</th>
           </tr>
 
-          <tr className="border-b bg-[#f8fafc] align-top">
-            <th className="sticky left-0 z-20 bg-[#f8fafc] px-2 py-2" />
+          <tr className="table-filter-row border-b border-slate-200 bg-slate-50/70 align-top">
+            <th className="sticky left-0 z-20 bg-slate-50/70 px-3 py-2.5" />
 
-            <th className="px-2 py-2">
+            <th className="px-3 py-2.5">
               <ColumnDateRangeFilter
                 fromValue={customerState.openedAccountFrom}
                 toValue={customerState.openedAccountTo}
@@ -63,7 +63,7 @@ export function CustomerTable({
               />
             </th>
 
-            <th className="px-2 py-2">
+            <th className="px-3 py-2.5">
               <ColumnTextFilter
                 value={customerState.fullName}
                 onChange={customerState.setFullName}
@@ -71,7 +71,7 @@ export function CustomerTable({
               />
             </th>
 
-            <th className="px-2 py-2">
+            <th className="px-3 py-2.5">
               <ColumnTextFilter
                 value={customerState.phone}
                 onChange={customerState.setPhone}
@@ -79,7 +79,7 @@ export function CustomerTable({
               />
             </th>
 
-            <th className="px-2 py-2">
+            <th className="px-3 py-2.5">
               <ColumnTextFilter
                 value={customerState.accountNumber}
                 onChange={customerState.setAccountNumber}
@@ -87,7 +87,7 @@ export function CustomerTable({
               />
             </th>
 
-            <th className="px-2 py-2">
+            <th className="px-3 py-2.5">
               <ColumnTextFilter
                 value={customerState.companyName}
                 onChange={customerState.setCompanyName}
@@ -95,7 +95,7 @@ export function CustomerTable({
               />
             </th>
 
-            <th className="px-2 py-2">
+            <th className="px-3 py-2.5">
               <ColumnTextFilter
                 value={customerState.email}
                 onChange={customerState.setEmail}
@@ -103,7 +103,7 @@ export function CustomerTable({
               />
             </th>
 
-            <th className="px-2 py-2">
+            <th className="px-3 py-2.5">
               <ColumnSelectFilter
                 value={customerState.membershipTier}
                 onChange={customerState.setMembershipTier}
@@ -114,7 +114,7 @@ export function CustomerTable({
               />
             </th>
 
-            <th className="px-2 py-2">
+            <th className="px-3 py-2.5">
               <ColumnTextFilter
                 value={customerState.assignedEmployeeName}
                 onChange={customerState.setAssignedEmployeeName}
@@ -122,7 +122,7 @@ export function CustomerTable({
               />
             </th>
 
-            <th className="px-2 py-2">
+            <th className="px-3 py-2.5">
               <ColumnSelectFilter
                 value={customerState.source}
                 onChange={customerState.setSource}
@@ -133,7 +133,7 @@ export function CustomerTable({
               />
             </th>
 
-            <th className="px-2 py-2">
+            <th className="px-3 py-2.5">
               <ColumnDateRangeFilter
                 fromValue={customerState.dateOfBirthFrom}
                 toValue={customerState.dateOfBirthTo}
@@ -142,7 +142,7 @@ export function CustomerTable({
               />
             </th>
 
-            <th className="px-2 py-2">
+            <th className="px-3 py-2.5">
               <ColumnTextFilter
                 value={customerState.description}
                 onChange={customerState.setDescription}
@@ -150,9 +150,9 @@ export function CustomerTable({
               />
             </th>
 
-            <th className="px-2 py-2" />
+            <th className="px-3 py-2.5" />
 
-            <th className="px-2 py-2">
+            <th className="px-3 py-2.5">
               <ColumnSelectFilter
                 value={customerState.status}
                 onChange={customerState.setStatus}
@@ -173,7 +173,7 @@ export function CustomerTable({
               />
             </th>
 
-            <th className="px-2 py-2">
+            <th className="px-3 py-2.5">
               <ColumnSelectFilter
                 value={customerState.branch}
                 onChange={customerState.setBranch}
@@ -202,15 +202,15 @@ export function CustomerTable({
           {!customerState.loading &&
             !customerState.error &&
             customers.map((customer, index) => {
-              const rowBg = index % 2 === 0 ? "bg-white" : "bg-[#f8fafc]";
+              const rowBg = index % 2 === 0 ? "bg-white" : "bg-slate-50/60";
 
               return (
                 <tr
                   key={customer.id}
                   onClick={() => openDetail(customer.id)}
-                  className={`h-14 cursor-pointer border-b border-slate-100 ${rowBg} hover:bg-sky-50`}
+                  className={`h-[46px] cursor-pointer border-b border-slate-200 ${rowBg} transition-colors hover:bg-emerald-50`}
                 >
-                  <td className={`sticky left-0 z-10 px-3 ${rowBg}`}>
+                  <td className={`sticky left-0 z-10 align-middle px-4 ${rowBg}`}>
                     <div className="flex items-center gap-3 text-slate-400">
                       <button
                         type="button"
@@ -219,87 +219,93 @@ export function CustomerTable({
                           event.stopPropagation();
                           openDetail(customer.id);
                         }}
-                        className="hover:text-sky-600"
+                        className="hover:text-[#059669]"
                       >
-                        <Eye size={15} />
+                        <Eye size={16} />
                       </button>
 
                       <button
                         type="button"
                         title="Thêm"
                         onClick={(event) => event.stopPropagation()}
-                        className="hover:text-sky-600"
+                        className="hover:text-[#059669]"
                       >
-                        <MoreVertical size={15} />
+                        <MoreVertical size={16} />
                       </button>
                     </div>
                   </td>
 
-                  <td className="whitespace-nowrap px-3">
+                  <td className="align-middle whitespace-nowrap px-4 text-slate-600">
                     {customer.opened_account_date || "-"}
                   </td>
 
-                  <td className="px-3">
-                    <span className="font-semibold text-sky-600">
+                  <td className="align-middle px-4">
+                    <span className="block truncate font-semibold text-[#059669]">
                       {customer.full_name || "-"}
                     </span>
                   </td>
 
-                  <td className="px-3">
-                    <div className="flex items-center gap-1 whitespace-nowrap">
+                  <td className="align-middle px-4">
+                    <div className="flex items-center gap-1.5 whitespace-nowrap text-slate-700">
                       <span>{customer.phone || "-"}</span>
-                      {customer.phone && <Phone size={13} className="text-sky-500" />}
+                      {customer.phone && <Phone size={14} className="shrink-0 text-emerald-500" />}
                     </div>
                   </td>
 
-                  <td className="px-3">
-                    <span className="line-clamp-2 break-all">
+                  <td className="align-middle whitespace-nowrap px-4 text-slate-600">
+                    <span className="block truncate">
                       {customer.account_number || "-"}
                     </span>
                   </td>
 
-                  <td className="px-3">
-                    <span className="line-clamp-2">
+                  <td className="align-middle px-4 text-slate-700">
+                    <span className="block truncate">
                       {customer.company_name || "-"}
                     </span>
                   </td>
 
-                  <td className="px-3">
-                    <span className="text-sky-600">{customer.email || "-"}</span>
+                  <td className="align-middle px-4">
+                    <span className="block truncate text-[#059669]">{customer.email || "-"}</span>
                   </td>
 
-                  <td className="px-3">
+                  <td className="align-middle whitespace-nowrap px-4">
                     <CustomerVipBadge value={customer.vip_type} />
                   </td>
 
-                  <td className="px-3">
-                    {customer.assigned_employee_name || "-"}
+                  <td className="align-middle px-4 text-slate-700">
+                    <span className="block truncate">
+                      {customer.assigned_employee_name || "-"}
+                    </span>
                   </td>
 
-                  <td className="px-3">{customer.source_name || "-"}</td>
+                  <td className="align-middle whitespace-nowrap px-4 text-slate-600">
+                    {customer.source_name || "-"}
+                  </td>
 
-                  <td className="whitespace-nowrap px-3">
+                  <td className="align-middle whitespace-nowrap px-4 text-slate-600">
                     {customer.birth_date_display || "-"}
                   </td>
 
-                  <td className="max-w-[180px] truncate px-3">
-                    {customer.description_display || "-"}
+                  <td className="align-middle px-4 text-slate-500">
+                    <span className="block max-w-[180px] truncate">
+                      {customer.description_display || "-"}
+                    </span>
                   </td>
 
-                  <td className="px-3">
-                    <span className="inline-flex h-6 min-w-16 items-center justify-center rounded bg-sky-100 px-2 text-xs font-semibold text-sky-700">
+                  <td className="align-middle px-4">
+                    <span className="inline-flex h-7 min-w-16 items-center justify-center whitespace-nowrap rounded-md bg-emerald-100 px-2.5 text-xs font-semibold text-emerald-700">
                       -
                     </span>
                   </td>
 
-                  <td className="px-3">
+                  <td className="align-middle whitespace-nowrap px-4">
                     <CustomerStatusBadge
                       value={customer.status_label || customer.status}
                     />
                   </td>
 
-                  <td className="px-3">
-                    <span className="font-medium text-slate-700">
+                  <td className="align-middle px-4">
+                    <span className="block truncate font-medium text-slate-700">
                       {customer.branch_name || "-"}
                     </span>
                   </td>

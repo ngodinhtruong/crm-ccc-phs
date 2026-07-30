@@ -92,7 +92,7 @@ function SectionBlock({
       <div className="flex h-12 items-center justify-between border-b bg-white px-4">
         <div>
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-sky-600">{section.section_code}</span>
+            <span className="font-semibold text-[#059669]">{section.section_code}</span>
             <span className="text-sm font-semibold text-slate-800">
               {section.section_name}
             </span>
@@ -120,7 +120,7 @@ function SectionBlock({
               <button
                 type="button"
                 onClick={() => config.saveSection(section)}
-                className="flex h-8 items-center gap-1 rounded border border-sky-300 bg-white px-3 text-xs font-semibold text-sky-600 hover:bg-sky-50"
+                className="flex h-8 items-center gap-1 rounded border border-emerald-300 bg-white px-3 text-xs font-semibold text-[#059669] hover:bg-emerald-50"
               >
                 <Save size={15} />
                 Lưu phần
@@ -148,7 +148,7 @@ function SectionBlock({
             onChange={(event) =>
               config.setSectionField(section.id, "section_name", event.target.value)
             }
-            className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400 disabled:bg-slate-50"
+            className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-emerald-500 disabled:bg-slate-50"
           />
         </div>
 
@@ -160,7 +160,7 @@ function SectionBlock({
             onChange={(event) =>
               config.setSectionField(section.id, "weight_percent", event.target.value)
             }
-            className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400 disabled:bg-slate-50"
+            className="h-9 w-full rounded border border-slate-300 px-3 text-xs outline-none focus:border-emerald-500 disabled:bg-slate-50"
           />
         </div>
 
@@ -181,18 +181,18 @@ function SectionBlock({
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1050px] border-collapse text-left text-xs">
+        <table className="w-full min-w-[1050px] border-collapse text-left text-sm">
           <thead>
-            <tr className="h-10 border-b bg-white text-slate-700">
-              <th className="sticky left-0 z-20 w-[130px] bg-white px-3 font-semibold">
+            <tr className="h-11 border-b-2 border-slate-200 bg-slate-50 text-slate-700">
+              <th className="sticky left-0 z-20 w-[130px] bg-slate-50 px-4 font-semibold">
                 Thao tác
               </th>
-              <th className="w-[120px] px-3 font-semibold">Mã nhóm</th>
-              <th className="w-[300px] px-3 font-semibold">Tên nhóm</th>
-              <th className="w-[140px] px-3 font-semibold">Loại</th>
-              <th className="w-[140px] px-3 font-semibold">Trọng số %</th>
-              <th className="w-[120px] px-3 font-semibold">Trạng thái</th>
-              <th className="w-[120px] px-3 font-semibold">Số KPI</th>
+              <th className="w-[120px] px-4 font-semibold">Mã nhóm</th>
+              <th className="w-[300px] px-4 font-semibold">Tên nhóm</th>
+              <th className="w-[140px] px-4 font-semibold">Loại</th>
+              <th className="w-[140px] px-4 font-semibold">Trọng số %</th>
+              <th className="w-[120px] px-4 font-semibold">Trạng thái</th>
+              <th className="w-[120px] px-4 font-semibold">Số KPI</th>
             </tr>
           </thead>
 
@@ -206,13 +206,13 @@ function SectionBlock({
             )}
 
             {groups.map((group, index) => {
-              const rowBg = index % 2 === 0 ? "bg-white" : "bg-[#f8fafc]";
+              const rowBg = index % 2 === 0 ? "bg-white" : "bg-slate-50/60";
               const metricCount = config.metricRows.filter((item) => item.group === group.id).length;
 
               return (
                 <tr
                   key={group.id}
-                  className={`h-14 border-b border-slate-100 ${rowBg} hover:bg-sky-50`}
+                  className={`h-[46px] border-b border-slate-200 ${rowBg} hover:bg-emerald-50`}
                 >
                   <td className={`sticky left-0 z-10 px-3 ${rowBg}`}>
                     <div className="flex items-center gap-3 text-slate-400">
@@ -221,7 +221,7 @@ function SectionBlock({
                         title="Lưu nhóm"
                         disabled={!config.canManage}
                         onClick={() => config.saveGroup(group)}
-                        className="hover:text-sky-600 disabled:opacity-40"
+                        className="hover:text-[#059669] disabled:opacity-40"
                       >
                         <Edit size={15} />
                       </button>
@@ -248,22 +248,22 @@ function SectionBlock({
                     </div>
                   </td>
 
-                  <td className="px-3 font-semibold text-sky-600">
+                  <td className="px-4 font-semibold text-[#059669]">
                     {group.group_code}
                   </td>
 
-                  <td className="px-3">
+                  <td className="px-4 text-slate-700">
                     <input
                       value={group.group_name}
                       disabled={!config.canManage}
                       onChange={(event) =>
                         config.setGroupField(group.id, "group_name", event.target.value)
                       }
-                      className="h-8 w-full rounded border border-slate-300 px-2 text-xs outline-none focus:border-sky-400 disabled:bg-slate-50"
+                      className="h-8 w-full rounded border border-slate-300 px-2 text-xs outline-none focus:border-emerald-500 disabled:bg-slate-50"
                     />
                   </td>
 
-                  <td className="px-3">
+                  <td className="px-4 text-slate-700">
                     <select
                       value={group.group_type}
                       disabled={!config.canManage}
@@ -274,7 +274,7 @@ function SectionBlock({
                           event.target.value as KpiGroupType
                         )
                       }
-                      className="h-8 w-full rounded border border-slate-300 px-2 text-xs outline-none focus:border-sky-400 disabled:bg-slate-50"
+                      className="h-8 w-full rounded border border-slate-300 px-2 text-xs outline-none focus:border-emerald-500 disabled:bg-slate-50"
                     >
                       <option value="MANUAL">MANUAL</option>
                       <option value="AUTO">AUTO</option>
@@ -283,18 +283,18 @@ function SectionBlock({
                     
                   </td>
 
-                  <td className="px-3">
+                  <td className="px-4 text-slate-700">
                     <input
                       value={group.weight_percent}
                       disabled={!config.canManage}
                       onChange={(event) =>
                         config.setGroupField(group.id, "weight_percent", event.target.value)
                       }
-                      className="h-8 w-24 rounded border border-slate-300 px-2 text-xs outline-none focus:border-sky-400 disabled:bg-slate-50"
+                      className="h-8 w-24 rounded border border-slate-300 px-2 text-xs outline-none focus:border-emerald-500 disabled:bg-slate-50"
                     />
                   </td>
 
-                  <td className="px-3">
+                  <td className="px-4 text-slate-700">
                     <label className="mb-1 flex items-center gap-2 text-xs text-slate-700">
                       <input
                         type="checkbox"
@@ -309,7 +309,7 @@ function SectionBlock({
                     {/* <StatusBadge active={group.is_active} /> */}
                   </td>
 
-                  <td className="px-3 font-medium text-slate-700">
+                  <td className="px-4 font-medium text-slate-700">
                     {metricCount}
                   </td>
                 </tr>
@@ -388,18 +388,18 @@ export function KpiGroupsTab({ config }: { config: KpiConfigController }) {
                 onChange={(event) => setSectionCode(event.target.value)}
                 onBlur={() => setSectionCode(normalizeKpiCode(sectionCode))}
                 placeholder="Mã phần, VD: A"
-                className="col-span-12 h-9 rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400 md:col-span-3"
+                className="col-span-12 h-9 rounded border border-slate-300 px-3 text-xs outline-none focus:border-emerald-500 md:col-span-3"
               />
               <input
                 value={sectionName}
                 onChange={(event) => setSectionName(event.target.value)}
                 placeholder="Tên phần KPI"
-                className="col-span-12 h-9 rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400 md:col-span-6"
+                className="col-span-12 h-9 rounded border border-slate-300 px-3 text-xs outline-none focus:border-emerald-500 md:col-span-6"
               />
               <button
                 type="button"
                 onClick={addSection}
-                className="col-span-12 flex h-9 items-center justify-center gap-1 rounded bg-[#0097cf] px-3 text-xs font-semibold text-white hover:bg-[#0089bd] md:col-span-3"
+                className="col-span-12 flex h-9 items-center justify-center gap-1 rounded bg-[#10b981] px-3 text-xs font-semibold text-white hover:bg-[#059669] md:col-span-3"
               >
                 <Plus size={15} />
                 Thêm phần
@@ -416,7 +416,7 @@ export function KpiGroupsTab({ config }: { config: KpiConfigController }) {
               <select
                 value={groupSectionId}
                 onChange={(event) => setGroupSectionId(event.target.value)}
-                className="col-span-12 h-9 rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400 md:col-span-3"
+                className="col-span-12 h-9 rounded border border-slate-300 px-3 text-xs outline-none focus:border-emerald-500 md:col-span-3"
               >
                 <option value="">Chọn phần</option>
                 {config.sectionRows.map((item) => (
@@ -431,20 +431,20 @@ export function KpiGroupsTab({ config }: { config: KpiConfigController }) {
                 onChange={(event) => setGroupCode(event.target.value)}
                 onBlur={() => setGroupCode(normalizeKpiCode(groupCode))}
                 placeholder="Mã nhóm"
-                className="col-span-12 h-9 rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400 md:col-span-2"
+                className="col-span-12 h-9 rounded border border-slate-300 px-3 text-xs outline-none focus:border-emerald-500 md:col-span-2"
               />
 
               <input
                 value={groupName}
                 onChange={(event) => setGroupName(event.target.value)}
                 placeholder="Tên nhóm KPI"
-                className="col-span-12 h-9 rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400 md:col-span-3"
+                className="col-span-12 h-9 rounded border border-slate-300 px-3 text-xs outline-none focus:border-emerald-500 md:col-span-3"
               />
 
               <select
                 value={groupType}
                 onChange={(event) => setGroupType(event.target.value as KpiGroupType)}
-                className="col-span-12 h-9 rounded border border-slate-300 px-3 text-xs outline-none focus:border-sky-400 md:col-span-2"
+                className="col-span-12 h-9 rounded border border-slate-300 px-3 text-xs outline-none focus:border-emerald-500 md:col-span-2"
               >
                 <option value="MANUAL">MANUAL</option>
                 <option value="AUTO">AUTO</option>
@@ -454,7 +454,7 @@ export function KpiGroupsTab({ config }: { config: KpiConfigController }) {
               <button
                 type="button"
                 onClick={addGroup}
-                className="col-span-12 flex h-9 items-center justify-center gap-1 rounded bg-[#0097cf] px-3 text-xs font-semibold text-white hover:bg-[#0089bd] md:col-span-2"
+                className="col-span-12 flex h-9 items-center justify-center gap-1 rounded bg-[#10b981] px-3 text-xs font-semibold text-white hover:bg-[#059669] md:col-span-2"
               >
                 <Plus size={15} />
                 Thêm nhóm

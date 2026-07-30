@@ -116,7 +116,7 @@ export function GlobalChartViewModeSelector({
           onClick={() => onViewModeChange("TREND_OVER_TIME")}
           className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium transition-all ${
             viewMode === "TREND_OVER_TIME"
-              ? "bg-white text-[#00713d] shadow-sm font-semibold"
+              ? "bg-white text-[#059669] shadow-sm font-semibold"
               : "text-slate-600 hover:text-slate-900"
           }`}
           title="Xem diễn biến qua các tháng"
@@ -130,7 +130,7 @@ export function GlobalChartViewModeSelector({
           onClick={() => onViewModeChange("TOTAL_OVERALL")}
           className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium transition-all ${
             viewMode === "TOTAL_OVERALL"
-              ? "bg-white text-[#00713d] shadow-sm font-semibold"
+              ? "bg-white text-[#059669] shadow-sm font-semibold"
               : "text-slate-600 hover:text-slate-900"
           }`}
           title="Xem gộp tổng quan toàn kỳ"
@@ -158,7 +158,7 @@ export function LocalChartViewModeSelector({
           onClick={() => onViewModeChange("TREND_OVER_TIME")}
           className={`rounded p-1 transition-all ${
             viewMode === "TREND_OVER_TIME"
-              ? "bg-white text-[#00713d] shadow-xs"
+              ? "bg-white text-[#059669] shadow-xs"
               : "text-slate-400 hover:text-slate-700"
           }`}
           title="Diễn biến theo thời gian (Trend)"
@@ -171,7 +171,7 @@ export function LocalChartViewModeSelector({
           onClick={() => onViewModeChange("TOTAL_OVERALL")}
           className={`rounded p-1 transition-all ${
             viewMode === "TOTAL_OVERALL"
-              ? "bg-white text-[#00713d] shadow-xs"
+              ? "bg-white text-[#059669] shadow-xs"
               : "text-slate-400 hover:text-slate-700"
           }`}
           title="Tổng quan toàn kỳ (Overall)"

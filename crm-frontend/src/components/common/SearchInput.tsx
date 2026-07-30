@@ -14,7 +14,7 @@ export function SearchInput({
   placeholder = "Tìm kiếm...",
 }: SearchInputProps) {
   return (
-    <div className="relative">
+    <div className="relative min-w-0">
       <Search
         size={14}
         className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
@@ -24,7 +24,7 @@ export function SearchInput({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
-        className="h-9 w-full rounded border border-slate-300 bg-white pl-8 pr-8 text-xs outline-none focus:border-sky-400"
+        className="h-9 w-full min-w-0 max-w-full rounded border border-slate-300 bg-white pl-8 pr-8 text-xs outline-none focus:border-emerald-500"
       />
 
       {value && (

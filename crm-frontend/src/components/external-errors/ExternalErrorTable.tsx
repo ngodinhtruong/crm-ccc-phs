@@ -85,45 +85,45 @@ export function ExternalErrorTable({
   onConfirm: (record: ExternalErrorRecord) => void;
 }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[2600px] border-collapse text-left text-xs">
+    <div className="table-scroll-container">
+      <table className="data-table w-full min-w-[2800px] border-collapse text-left text-sm">
         <thead>
-          <tr className="h-10 border-b bg-white text-slate-700">
-            <th className="w-[145px] px-3 font-semibold">Ngày nhận</th>
-            <th className="w-[145px] px-3 font-semibold">Ngày hoàn thành</th>
-            <th className="w-[130px] px-3 font-semibold">Nguồn</th>
-            <th className="w-[140px] px-3 font-semibold">Thiết bị</th>
-            <th className="w-[190px] px-3 font-semibold">Batch</th>
-            <th className="w-[330px] px-3 font-semibold">Nội dung lỗi</th>
-            <th className="w-[190px] px-3 font-semibold">Nhóm lỗi</th>
-            <th className="w-[210px] px-3 font-semibold">Mã lỗi</th>
-            <th className="w-[300px] px-3 font-semibold">Nguyên nhân</th>
-            <th className="w-[220px] px-3 font-semibold">Nhóm nguyên nhân</th>
-            <th className="w-[145px] px-3 font-semibold">Tin cậy lỗi</th>
-            <th className="w-[165px] px-3 font-semibold">Tin cậy nguyên nhân</th>
-            <th className="w-[160px] px-3 font-semibold">Trạng thái lỗi</th>
-            <th className="w-[190px] px-3 font-semibold">Trạng thái nguyên nhân</th>
-            <th className="w-[135px] px-3 font-semibold">Thao tác</th>
+          <tr className="h-11 border-b-2 border-slate-200 bg-slate-50 text-slate-700">
+            <th className="w-[145px] min-w-[145px] px-4 font-semibold">Ngày nhận</th>
+            <th className="w-[145px] min-w-[145px] px-4 font-semibold">Ngày hoàn thành</th>
+            <th className="w-[130px] min-w-[130px] px-4 font-semibold">Nguồn</th>
+            <th className="w-[140px] min-w-[140px] px-4 font-semibold">Thiết bị</th>
+            <th className="w-[190px] min-w-[190px] px-4 font-semibold">Batch</th>
+            <th className="w-[330px] min-w-[330px] px-4 font-semibold">Nội dung lỗi</th>
+            <th className="w-[190px] min-w-[190px] px-4 font-semibold">Nhóm lỗi</th>
+            <th className="w-[210px] min-w-[210px] px-4 font-semibold">Mã lỗi</th>
+            <th className="w-[300px] min-w-[300px] px-4 font-semibold">Nguyên nhân</th>
+            <th className="w-[220px] min-w-[220px] px-4 font-semibold">Nhóm nguyên nhân</th>
+            <th className="w-[145px] min-w-[145px] px-4 font-semibold">Tin cậy lỗi</th>
+            <th className="w-[165px] min-w-[165px] px-4 font-semibold">Tin cậy nguyên nhân</th>
+            <th className="w-[160px] min-w-[160px] px-4 font-semibold">Trạng thái lỗi</th>
+            <th className="w-[190px] min-w-[190px] px-4 font-semibold">Trạng thái nguyên nhân</th>
+            <th className="w-[135px] min-w-[135px] px-4 font-semibold">Thao tác</th>
           </tr>
 
-          <tr className="border-b bg-[#f8fafc] align-top">
-            <th className="px-2 py-2" />
-            <th className="px-2 py-2" />
-            <th className="px-2 py-2">
+          <tr className="table-filter-row border-b border-slate-200 bg-slate-50/70 align-top">
+            <th className="px-4 py-2.5" />
+            <th className="px-4 py-2.5" />
+            <th className="px-4 py-2.5">
               <ColumnTextFilter
                 value={filters.source}
                 onChange={filters.onSourceChange}
                 placeholder="Nguồn"
               />
             </th>
-            <th className="px-2 py-2">
+            <th className="px-4 py-2.5">
               <ColumnTextFilter
                 value={filters.device}
                 onChange={filters.onDeviceChange}
                 placeholder="Thiết bị"
               />
             </th>
-            <th className="px-2 py-2">
+            <th className="px-4 py-2.5">
               <ColumnSelectFilter
                 value={filters.batch}
                 onChange={filters.onBatchChange}
@@ -133,14 +133,14 @@ export function ExternalErrorTable({
                 }))}
               />
             </th>
-            <th className="px-2 py-2">
+            <th className="px-4 py-2.5">
               <ColumnTextFilter
                 value={filters.q}
                 onChange={filters.onQChange}
                 placeholder="Nội dung / nguyên nhân"
               />
             </th>
-            <th className="px-2 py-2">
+            <th className="px-4 py-2.5">
               <ColumnSelectFilter
                 value={filters.errorGroup}
                 onChange={filters.onErrorGroupChange}
@@ -150,7 +150,7 @@ export function ExternalErrorTable({
                 }))}
               />
             </th>
-            <th className="px-2 py-2">
+            <th className="px-4 py-2.5">
               <ColumnSelectFilter
                 value={filters.errorCode}
                 onChange={filters.onErrorCodeChange}
@@ -160,8 +160,8 @@ export function ExternalErrorTable({
                 }))}
               />
             </th>
-            <th className="px-2 py-2" />
-            <th className="px-2 py-2">
+            <th className="px-4 py-2.5" />
+            <th className="px-4 py-2.5">
               <ColumnSelectFilter
                 value={filters.causeGroup}
                 onChange={filters.onCauseGroupChange}
@@ -171,35 +171,35 @@ export function ExternalErrorTable({
                 }))}
               />
             </th>
-            <th className="px-2 py-2">
+            <th className="px-4 py-2.5">
               <ColumnSelectFilter
                 value={filters.needReview}
                 onChange={filters.onNeedReviewChange}
                 options={REVIEW_OPTIONS}
               />
             </th>
-            <th className="px-2 py-2">
+            <th className="px-4 py-2.5">
               <ColumnSelectFilter
                 value={filters.causeNeedReview}
                 onChange={filters.onCauseNeedReviewChange}
                 options={REVIEW_OPTIONS}
               />
             </th>
-            <th className="px-2 py-2">
+            <th className="px-4 py-2.5">
               <ColumnSelectFilter
                 value={filters.status}
                 onChange={filters.onStatusChange}
                 options={STATUS_OPTIONS}
               />
             </th>
-            <th className="px-2 py-2">
+            <th className="px-4 py-2.5">
               <ColumnSelectFilter
                 value={filters.causeStatus}
                 onChange={filters.onCauseStatusChange}
                 options={STATUS_OPTIONS}
               />
             </th>
-            <th className="px-2 py-2" />
+            <th className="px-4 py-2.5" />
           </tr>
         </thead>
 
@@ -216,21 +216,21 @@ export function ExternalErrorTable({
             records.map((record) => (
               <tr
                 key={record.id}
-                className="border-b border-slate-100 align-top hover:bg-sky-50"
+                className="border-b border-slate-100 align-top hover:bg-emerald-50"
               >
-                <td className="whitespace-nowrap px-3 py-3 text-slate-600">
+                <td className="px-4 text-slate-600 py-3 text-slate-600">
                   {formatDateTime(record.received_date)}
                 </td>
-                <td className="whitespace-nowrap px-3 py-3 text-slate-600">
+                <td className="px-4 text-slate-600 py-3 text-slate-600">
                   {formatDateTime(record.completed_date)}
                 </td>
-                <td className="px-3 py-3 text-slate-600">
+                <td className="px-4 py-3 text-slate-600">
                   {record.clean_source || "-"}
                 </td>
-                <td className="px-3 py-3 text-slate-600">
+                <td className="px-4 py-3 text-slate-600">
                   {record.clean_device || "-"}
                 </td>
-                <td className="px-3 py-3 text-slate-600">
+                <td className="px-4 py-3 text-slate-600">
                   {record.batch_code || "-"}
                 </td>
                 <td className="max-w-[330px] px-3 py-3">
@@ -248,7 +248,7 @@ export function ExternalErrorTable({
                     </div>
                   )}
                 </td>
-                <td className="px-3 py-3">
+                <td className="px-4 py-3">
                   <div className="font-semibold text-slate-700">
                     {record.error_group_name || "-"}
                   </div>
@@ -256,7 +256,7 @@ export function ExternalErrorTable({
                     {record.error_group_code || ""}
                   </div>
                 </td>
-                <td className="px-3 py-3">
+                <td className="px-4 py-3">
                   <div className="font-semibold text-slate-700">
                     {record.error_code_value || "-"}
                   </div>
@@ -279,7 +279,7 @@ export function ExternalErrorTable({
                     </div>
                   )}
                 </td>
-                <td className="px-3 py-3">
+                <td className="px-4 py-3">
                   <div className="font-semibold text-slate-700">
                     {record.cause_group_name || "-"}
                   </div>
@@ -287,7 +287,7 @@ export function ExternalErrorTable({
                     {record.cause_group_code || ""}
                   </div>
                 </td>
-                <td className="whitespace-nowrap px-3 py-3 text-slate-600">
+                <td className="px-4 text-slate-600 py-3 text-slate-600">
                   {formatConfidence(record.classification_confidence)}
                   {record.need_review && (
                     <div className="mt-1 text-[11px] font-medium text-amber-600">
@@ -295,7 +295,7 @@ export function ExternalErrorTable({
                     </div>
                   )}
                 </td>
-                <td className="whitespace-nowrap px-3 py-3 text-slate-600">
+                <td className="px-4 text-slate-600 py-3 text-slate-600">
                   {formatConfidence(record.cause_classification_confidence)}
                   {record.cause_need_review && (
                     <div className="mt-1 text-[11px] font-medium text-amber-600">
@@ -303,7 +303,7 @@ export function ExternalErrorTable({
                     </div>
                   )}
                 </td>
-                <td className="px-3 py-3">
+                <td className="px-4 py-3">
                   <span
                     className={`inline-flex rounded-md px-2 py-1 text-[11px] font-semibold ${statusBadgeClass(
                       record.classification_status
@@ -314,7 +314,7 @@ export function ExternalErrorTable({
                     ] || record.classification_status}
                   </span>
                 </td>
-                <td className="px-3 py-3">
+                <td className="px-4 py-3">
                   <span
                     className={`inline-flex rounded-md px-2 py-1 text-[11px] font-semibold ${statusBadgeClass(
                       record.cause_classification_status
@@ -325,7 +325,7 @@ export function ExternalErrorTable({
                     ] || record.cause_classification_status}
                   </span>
                 </td>
-                <td className="px-3 py-3">
+                <td className="px-4 py-3">
                   <div className="flex flex-col items-start gap-2">
                     <button
                       type="button"

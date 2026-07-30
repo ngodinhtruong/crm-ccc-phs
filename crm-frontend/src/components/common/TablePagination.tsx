@@ -40,7 +40,7 @@ export function TablePagination({
               value={pageSize}
               onChange={(event) => onPageSizeChange?.(Number(event.target.value))}
               disabled={loading}
-              className="h-8 rounded border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-700 outline-none focus:border-sky-400 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+              className="h-8 rounded border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-700 outline-none focus:border-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
               aria-label="Số dòng hiển thị trên mỗi trang"
             >
               {pageSizeOptions.map((option) => (

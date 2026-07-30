@@ -37,7 +37,7 @@ export function KpiRankingPage() {
       rightAction={
         <button
           type="button"
-          className="flex h-8 items-center gap-1 rounded border border-sky-300 bg-white px-3 text-xs font-semibold text-sky-600 hover:bg-sky-50"
+          className="flex h-8 items-center gap-1 rounded border border-emerald-300 bg-white px-3 text-xs font-semibold text-[#059669] hover:bg-emerald-50"
         >
           <Download size={15} />
           Xuất dữ liệu
@@ -54,7 +54,7 @@ export function KpiRankingPage() {
           <div className="flex h-12 items-center justify-between border-b bg-white px-4">
             <div>
               <h1 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-                <Trophy size={16} className="text-[#0097cf]" />
+                <Trophy size={16} className="text-[#059669]" />
                 Bảng xếp hạng nhân viên Sale Admin
               </h1>
               <p className="mt-0.5 text-xs text-slate-500">
@@ -166,7 +166,7 @@ export function KpiRankingPage() {
               <span className="mx-2 text-slate-300">|</span>
               Bảng xếp hạng dùng profile KPI SA của nhân viên.
               {ranking.loadingRanking && (
-                <span className="ml-2 inline-flex items-center gap-1 text-sky-600">
+                <span className="ml-2 inline-flex items-center gap-1 text-[#059669]">
                   <RefreshCw size={12} className="animate-spin" />
                   Đang tải...
                 </span>

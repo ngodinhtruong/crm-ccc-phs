@@ -113,7 +113,7 @@ export function KpiAdminHeader({ admin }: { admin: KpiAdminController }) {
                   className={[
                     "flex h-8 items-center gap-1.5 rounded px-3 text-sm font-semibold transition",
                     active
-                      ? "bg-white text-[#0097cf] shadow-sm"
+                      ? "bg-white text-[#059669] shadow-sm"
                       : "text-slate-500 hover:text-slate-800",
                   ].join(" ")}
                 >
@@ -132,7 +132,7 @@ export function KpiAdminHeader({ admin }: { admin: KpiAdminController }) {
             >
               <Filter size={15} />
               Bộ lọc
-              <span className="rounded bg-[#0097cf] px-1.5 py-0.5 text-[11px] font-bold text-white">
+              <span className="rounded bg-[#10b981] px-1.5 py-0.5 text-[11px] font-bold text-white">
                 {activeFilterCount}
               </span>
             </button>
@@ -169,7 +169,7 @@ export function KpiAdminHeader({ admin }: { admin: KpiAdminController }) {
                             className={[
                               "h-9 rounded border text-sm font-bold transition",
                               active
-                                ? "border-[#0097cf] bg-sky-50 text-[#0097cf]"
+                                ? "border-[#10b981] bg-emerald-50 text-[#059669]"
                                 : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
                             ].join(" ")}
                           >
@@ -185,7 +185,7 @@ export function KpiAdminHeader({ admin }: { admin: KpiAdminController }) {
                     <select
                       value={admin.selectedPeriodId}
                       onChange={(event) => admin.setSelectedPeriodId(event.target.value)}
-                      className="h-9 w-full rounded border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 outline-none focus:border-sky-400"
+                      className="h-9 w-full rounded border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 outline-none focus:border-emerald-500"
                     >
                       <option value="">Kỳ hiện tại</option>
                       {admin.periods.map((item) => (
@@ -201,7 +201,7 @@ export function KpiAdminHeader({ admin }: { admin: KpiAdminController }) {
                     <select
                       value={admin.selectedBranch}
                       onChange={(event) => admin.setSelectedBranch(event.target.value)}
-                      className="h-9 w-full rounded border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 outline-none focus:border-sky-400"
+                      className="h-9 w-full rounded border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 outline-none focus:border-emerald-500"
                     >
                       <option value="all">Tất cả chi nhánh</option>
                       {branches.map((branch) => (
@@ -238,7 +238,7 @@ export function KpiAdminHeader({ admin }: { admin: KpiAdminController }) {
                     <button
                       type="button"
                       onClick={() => setFilterOpen(false)}
-                      className="h-8 rounded bg-[#0097cf] px-3 text-xs font-bold text-white hover:bg-[#0089bd]"
+                      className="h-8 rounded bg-[#10b981] px-3 text-xs font-bold text-white hover:bg-[#059669]"
                     >
                       Áp dụng
                     </button>
