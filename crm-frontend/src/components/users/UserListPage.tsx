@@ -20,6 +20,7 @@ export function UserListPage() {
         },
         {
           label: "Quản lý người dùng",
+          href: "/accounts/users",
         },
         {
           label: "Users",

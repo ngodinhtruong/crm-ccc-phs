@@ -16,6 +16,10 @@ export function SlaCreatePage() {
         },
         {
           label: "SLA",
+          href: "/sla",
+        },
+        {
+          label: "Thêm mới",
         },
       ]}
     >

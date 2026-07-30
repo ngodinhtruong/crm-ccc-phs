@@ -25,9 +25,6 @@ export function ChatbotDashboardPage() {
             href: "/",
           },
           {
-            label: "Báo cáo",
-          },
-          {
             label: "Dashboard Chatbot",
           },
         ]}

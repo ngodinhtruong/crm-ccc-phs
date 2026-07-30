@@ -50,7 +50,7 @@ function buildKpiHref(row: KpiAdminRankingRow, periodId: string) {
   const params = new URLSearchParams({ user: String(row.user.id) });
   if (periodId) params.set("period", periodId);
   params.set("employeeName", getEmployeeName(row.user));
-  return `/sale-admin/kpi?${params.toString()}`;
+  return `/sale-admin/kpis/personal?${params.toString()}`;
 }
 
 function getScoreClass(value?: string | number | null) {

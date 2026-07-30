@@ -71,7 +71,7 @@ function getFallbackPath(user: CurrentUser) {
   }
 
   if (isSaleAdminKpiHomeUser(user)) {
-    return "/sale-admin/kpi";
+    return "/sale-admin/kpis/personal";
   }
 
   if (groups.includes("SALE_ADMIN")) {

@@ -20,6 +20,7 @@ export function CustomerListPage() {
         },
         {
           label: "Khách hàng",
+          href: "/customers",
         },
         {
           label: "Customers",

@@ -31,6 +31,12 @@ const CLOSING_STATUSES: ChatbotTicketStatus[] = [
   "CLOSED",
 ];
 
+/**
+ * Đường về của breadcrumb: phải mang theo ?tab=tickets, nếu không dashboard
+ * mở lại ở tab Tổng quan và người dùng phải bấm sang tab Tickets lần nữa.
+ */
+const CHATBOT_TICKETS_HREF = "/chatbots/dashboard?tab=tickets";
+
 type Opt = { id: number; name: string };
 
 function Field({
@@ -277,7 +283,13 @@ export function ChatbotTicketDetailPage({ id }: { id: number }) {
 
   if (loading) {
     return (
-      <DashboardLayout breadcrumbs={[{ label: "TRANG CHỦ", href: "/" }]}>
+      <DashboardLayout
+        breadcrumbs={[
+          { label: "TRANG CHỦ", href: "/" },
+          { label: "Dashboard Chatbot", href: CHATBOT_TICKETS_HREF },
+          { label: "Ticket chatbot" },
+        ]}
+      >
         <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
           Đang tải...
         </div>
@@ -287,7 +299,13 @@ export function ChatbotTicketDetailPage({ id }: { id: number }) {
 
   if (!ticket) {
     return (
-      <DashboardLayout breadcrumbs={[{ label: "TRANG CHỦ", href: "/" }]}>
+      <DashboardLayout
+        breadcrumbs={[
+          { label: "TRANG CHỦ", href: "/" },
+          { label: "Dashboard Chatbot", href: CHATBOT_TICKETS_HREF },
+          { label: "Ticket chatbot" },
+        ]}
+      >
         <div className="rounded-2xl border border-rose-200 bg-rose-50 p-8 text-center text-sm text-rose-600">
           {error || "Không tìm thấy ticket."}
         </div>
@@ -305,9 +323,8 @@ export function ChatbotTicketDetailPage({ id }: { id: number }) {
     <DashboardLayout
       breadcrumbs={[
         { label: "TRANG CHỦ", href: "/" },
-        { label: "Chatbot", href: "/chatbots/dashboard" },
-        { label: "Ticket chuyển CCC" },
-        { label: ticket.ticket_code || "Chi tiết" },
+        { label: "Dashboard Chatbot", href: CHATBOT_TICKETS_HREF },
+        { label: ticket.ticket_code || "Ticket chatbot" },
       ]}
       rightAction={
         <button

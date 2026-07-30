@@ -596,6 +596,7 @@ export function SaRecordDetailPage({ recordId }: { recordId: string }) {
                 },
                 {
                     label: "Sale Admin",
+                    href: "/sale-admin/dashboard",
                 },
                 {
                     label: "SA Records",

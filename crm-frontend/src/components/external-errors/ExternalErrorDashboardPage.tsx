@@ -234,7 +234,7 @@ export function ExternalErrorDashboardPage() {
     <DashboardLayout
       breadcrumbs={[
         { label: "TRANG CHỦ", href: "/workspace" },
-        { label: "Lỗi bên ngoài" },
+        { label: "Lỗi bên ngoài", href: "/external-errors" },
         { label: "Dashboard lỗi" },
       ]}
       sidebarDefaultExpandedGroupKey="ccc-external-errors"

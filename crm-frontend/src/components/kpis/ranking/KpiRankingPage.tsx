@@ -27,6 +27,7 @@ export function KpiRankingPage() {
         },
         {
           label: "Sale Admin",
+          href: "/sale-admin/dashboard",
         },
         {
           label: "Bảng xếp hạng KPI",

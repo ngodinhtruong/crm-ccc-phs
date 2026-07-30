@@ -72,7 +72,7 @@ export function getDefaultHomePath(user?: CurrentUser | null): string {
   }
 
   if (isSaleAdminKpiHomeUser(user)) {
-    return "/sale-admin/kpi-personal";
+    return "/sale-admin/kpis/personal";
   }
 
   const groups = user.accessible_groups || [];
@@ -103,7 +103,7 @@ export function getDefaultPathForWorkspaceByUser(
   user?: CurrentUser | null
 ): string {
   if (workspace === "SALE_ADMIN" && isSaleAdminKpiHomeUser(user)) {
-    return "/sale-admin/kpi-personal";
+    return "/sale-admin/kpis/personal";
   }
 
   return getDefaultPathByWorkspace(workspace);

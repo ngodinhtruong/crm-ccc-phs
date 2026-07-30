@@ -63,7 +63,7 @@ export function ExternalErrorListPage() {
       rightAction={
         <div className="flex items-center gap-2">
           <Link
-            href="/external-errors/catalogs"
+            href="/external-errors/error-catalogs"
             className="flex h-8 items-center gap-1 rounded border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50"
           >
             <Tags size={14} />

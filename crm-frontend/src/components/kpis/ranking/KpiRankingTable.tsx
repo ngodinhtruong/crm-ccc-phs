@@ -69,7 +69,7 @@ function buildKpiHref(item: KpiRankingItem, periodId: string) {
   const employeeName = getEmployeeName(item);
   if (employeeName) params.set("employeeName", employeeName);
 
-  return `/sale-admin/kpi?${params.toString()}`;
+  return `/sale-admin/kpis/personal?${params.toString()}`;
 }
 
 export function KpiRankingTable({

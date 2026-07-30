@@ -96,6 +96,7 @@ export function SaRecordListPage() {
                 },
                 {
                     label: "Sale Admin",
+                    href: "/sale-admin/dashboard",
                 },
                 {
                     label: "Ghi nhận cuộc gọi",

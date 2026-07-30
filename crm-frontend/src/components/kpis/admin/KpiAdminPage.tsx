@@ -21,6 +21,7 @@ export function KpiAdminPage() {
         },
         {
           label: "Sale Admin",
+          href: "/sale-admin/dashboard",
         },
         {
           label: "KPI Admin",

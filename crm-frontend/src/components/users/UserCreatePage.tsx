@@ -19,6 +19,7 @@ export function UserCreatePage() {
         },
         {
           label: "Quản lý người dùng",
+          href: "/accounts/users",
         },
         {
           label: "Users",

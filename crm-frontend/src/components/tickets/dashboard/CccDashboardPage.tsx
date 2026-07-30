@@ -390,8 +390,7 @@ export function CccDashboardPage() {
     <DashboardLayout
       breadcrumbs={[
         { label: "TRANG CHỦ", href: "/" },
-        { label: "CCC" },
-        { label: "Dashboard Ticket" },
+        { label: "Dashboard Ticket CCC" },
       ]}
       rightAction={
         <div className="relative flex flex-wrap items-center gap-2">

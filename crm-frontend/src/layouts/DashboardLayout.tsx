@@ -137,12 +137,13 @@ function Breadcrumbs({ items }: { items: BreadcrumbItem[] }) {
                         {item.href && !isLast ? (
                             <Link
                                 href={item.href}
-                                className="font-medium text-slate-700 hover:text-orange-500"
+                                className="font-medium text-slate-700 hover:text-orange-500 hover:underline"
                             >
                                 {item.label}
                             </Link>
                         ) : (
                             <span
+                                aria-current={isLast ? "page" : undefined}
                                 className={
                                     isLast
                                         ? "font-semibold text-slate-800"

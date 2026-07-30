@@ -148,19 +148,19 @@ export const WORKSPACE_NAVIGATION: Record<
         {
           key: "sa-customers",
           label: "Khách hàng Inactive",
-          href: "/sale-admin/customers",
+          href: "/sale-admin/inactive-customers",
           icon: UsersRound,
         },
         {
           key: "sa-kpi",
           label: "KPI Sale Admin",
-          href: "/sale-admin/kpi",
+          href: "/sale-admin/kpis/personal",
           icon: Target,
         },
         {
           key: "sa-kpi-admin",
           label: "KPI Admin",
-          href: "/sale-admin/kpi-admin",
+          href: "/sale-admin/kpis/admin",
           icon: BarChart3,
         },
         {
