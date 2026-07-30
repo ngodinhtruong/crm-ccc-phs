@@ -133,6 +133,7 @@ export function SaleAdminDashboardPage() {
           },
           {
             label: "Sale Admin",
+            href: "/sale-admin/dashboard",
           },
           {
             label: "Báo cáo",
@@ -156,6 +157,7 @@ export function SaleAdminDashboardPage() {
         },
         {
           label: "Sale Admin",
+          href: "/sale-admin/dashboard",
         },
         {
           label: "Báo cáo",

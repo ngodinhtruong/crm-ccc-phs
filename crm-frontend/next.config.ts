@@ -38,6 +38,24 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+
+  /**
+   * Đường dẫn cũ trước khi gom tên route cho nhất quán.
+   *
+   * Giữ lại để link đã gửi cho nhau và bookmark của người dùng không chết.
+   * Dùng permanent: false (307) chứ không phải 308 — trình duyệt sẽ không nhớ
+   * vĩnh viễn, sau này muốn đổi tiếp thì không phải bảo mọi người xoá cache.
+   */
+  async redirects() {
+    return [
+      { source: "/sale-admin/kpi", destination: "/sale-admin/kpis/personal", permanent: false },
+      { source: "/sale-admin/kpi-personal", destination: "/sale-admin/kpis/personal", permanent: false },
+      { source: "/sale-admin/kpi-admin", destination: "/sale-admin/kpis/admin", permanent: false },
+      { source: "/sale-admin/kpi-ranking", destination: "/sale-admin/kpis/ranking", permanent: false },
+      { source: "/sale-admin/customers", destination: "/sale-admin/inactive-customers", permanent: false },
+      { source: "/external-errors/catalogs", destination: "/external-errors/error-catalogs", permanent: false },
+    ];
+  },
 };
 
 export default nextConfig;

@@ -157,7 +157,7 @@ const mainMenuItemsByWorkspace: Record<WorkspaceCode, MainMenuItem[]> = {
     },
     {
       title: "KPI CÁ NHÂN",
-      href: "/sale-admin/kpi-personal",
+      href: "/sale-admin/kpis/personal",
       icon: Target,
       saOrSupOnly: true,
     },
@@ -174,7 +174,7 @@ const mainMenuItemsByWorkspace: Record<WorkspaceCode, MainMenuItem[]> = {
     // },
     {
       title: "KPI ADMIN",
-      href: "/sale-admin/kpi-admin",
+      href: "/sale-admin/kpis/admin",
       icon: BarChart3,
       adminOnly: true,
     },
@@ -330,7 +330,7 @@ const panelGroupsByWorkspace: Record<
           },
           {
             title: "Nhóm lỗi - Mã lỗi",
-            href: "/external-errors/catalogs",
+            href: "/external-errors/error-catalogs",
             icon: Settings,
             permissionCode: "EXTERNAL_ERROR_MANAGE",
           },

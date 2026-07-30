@@ -84,6 +84,7 @@ export function KpiConfigPage() {
         },
         {
           label: "Sale Admin",
+          href: "/sale-admin/dashboard",
         },
         {
           label: "Cấu hình KPI",

@@ -20,6 +20,7 @@ export function SaleAdminPlaceholderPage({
         },
         {
           label: "Sale Admin",
+          href: "/sale-admin/dashboard",
         },
         {
           label: title,

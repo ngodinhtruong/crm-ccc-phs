@@ -20,6 +20,7 @@ export function CompanyListPage() {
         },
         {
           label: "Khách hàng",
+          href: "/customers",
         },
         {
           label: "Công ty",
