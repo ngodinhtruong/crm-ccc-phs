@@ -7,6 +7,7 @@ from django.utils import timezone
 
 from apps.chatbots.constants import (
     category_label,
+    is_faq_question,
     is_spam_question,
     normalize_category,
     normalize_step,
@@ -130,10 +131,19 @@ def detect_outcome(logs, has_state, has_request):
     Quyết định phiên được xử lý thế nào.
 
     Thứ tự ưu tiên bám theo nghiệp vụ:
-      1. Có cskh_request  -> CCC (đã xin được thông tin, tạo ticket)
-      2. Có cskh_state    -> PENDING (chatbot bí, KH chưa/không cho thông tin)
-      3. Chỉ toàn câu rác -> SPAM
-      4. Còn lại          -> BOT_DONE
+      1. Có cskh_request     -> CCC (đã xin được thông tin, tạo ticket)
+      2. Có cskh_state       -> PENDING (chatbot bí, KH chưa/không cho thông tin)
+      3. Có câu FAQ          -> BOT_DONE (chatbot tự trả lời bằng kho tri thức)
+      4. Còn lại             -> SPAM
+
+    Bước 3 chỉ nhận CUSTOMER_CARE, chứ không nhận mọi câu "không phải rác" như
+    trước. Lý do: chỉ CUSTOMER_CARE mới được chatbot gán category, nên nếu tính
+    cả RESEARCH (phân tích cổ phiếu, khuyến nghị thị trường) vào BOT_DONE thì
+    phía bot đầy phiên không có chủ đề và không đặt cạnh phía CCC để so được.
+
+    Hệ quả có ý thức: phiên chỉ toàn RESEARCH rơi xuống nhánh cuối cùng chung
+    với câu rác. Nghiệp vụ hiện không theo dõi riêng nhóm RESEARCH; muốn tách
+    thì thêm một mã vào OUTCOME_CHOICES và OUTCOME_SERIES.
     """
     if has_request:
         return ChatbotSessionSummary.OUTCOME_CCC
@@ -141,9 +151,9 @@ def detect_outcome(logs, has_state, has_request):
     if has_state:
         return ChatbotSessionSummary.OUTCOME_PENDING
 
-    has_real_question = any(not is_spam_question(log.questionType) for log in logs)
+    has_faq_question = any(is_faq_question(log.questionType) for log in logs)
 
-    if has_real_question:
+    if has_faq_question:
         return ChatbotSessionSummary.OUTCOME_BOT_DONE
 
     return ChatbotSessionSummary.OUTCOME_SPAM
@@ -153,8 +163,15 @@ def count_messages(logs, outcome):
     """
     Chia số lượt hỏi của phiên vào đúng nhóm.
 
-    Câu rác luôn tính vào msg_count_spam, kể cả trong phiên CCC/PENDING,
-    để "tổng tiếp nhận" = bot_done + ccc + spam + pending không bị đếm trùng.
+    Bất biến cần giữ: msg_count_total = bot_done + ccc + spam + pending.
+
+    Câu rác luôn tính vào msg_count_spam, kể cả trong phiên CCC/PENDING, để
+    "tổng tiếp nhận" không bị đếm trùng.
+
+    Phiên SPAM thì dồn toàn bộ lượt hỏi vào msg_count_spam. Từ khi BOT_DONE
+    chỉ nhận câu FAQ, phiên SPAM có thể còn lượt RESEARCH vốn không phải câu
+    rác; để nguyên nhánh mặc định cũ thì số lượt đó chảy sang msg_count_bot_done
+    của một phiên không hề là BOT_DONE.
     """
     spam = sum(1 for log in logs if is_spam_question(log.questionType))
     non_spam = len(logs) - spam
@@ -171,8 +188,10 @@ def count_messages(logs, outcome):
         counts["msg_count_ccc"] = non_spam
     elif outcome == ChatbotSessionSummary.OUTCOME_PENDING:
         counts["msg_count_pending"] = non_spam
-    else:
+    elif outcome == ChatbotSessionSummary.OUTCOME_BOT_DONE:
         counts["msg_count_bot_done"] = non_spam
+    else:
+        counts["msg_count_spam"] = len(logs)
 
     return counts
 

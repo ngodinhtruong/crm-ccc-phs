@@ -169,6 +169,43 @@ export type CategoryCccRateItem = {
   rate: number;
 };
 
+export type CategoryBotVsCccItem = {
+  name: string;
+  bot_done: number;
+  ccc: number;
+  total: number;
+  ccc_rate: number;
+};
+
+/**
+ * So sánh bot tự xử lý với chuyển CCC trên cùng một chủ đề.
+ *
+ * Các trường `skipped_*` là số phiên KHÔNG nằm trong `items` — phiên chưa gán
+ * chủ đề, chủ đề dưới ngưỡng `min_volume`, và chủ đề rơi ngoài top. Frontend
+ * ghi chú các con số này dưới biểu đồ để người xem biết phần bị cắt.
+ */
+export type CategoryBotVsCccData = {
+  items: CategoryBotVsCccItem[];
+  min_volume: number;
+  skipped_uncategorized: number;
+  skipped_low_volume: number;
+  skipped_beyond_limit: number;
+};
+
+/**
+ * Cùng bộ chủ đề của `CategoryBotVsCccData` nhưng tách theo kỳ, để so được
+ * bot đang khá lên hay tệ đi trên từng chủ đề khi bộ lọc trải nhiều kỳ.
+ *
+ * Mỗi dòng là một chủ đề; mỗi kỳ là một khóa động mang tỷ lệ % chuyển CCC,
+ * kèm ba khóa phụ `<kỳ>__bot`, `<kỳ>__ccc`, `<kỳ>__total` để tooltip hiện số
+ * phiên thật. Kỳ không có phiên nào của chủ đề mang giá trị `null` (khác hẳn
+ * 0% nghĩa là bot xử lý hết).
+ */
+export type CategoryBotVsCccByPeriodData = {
+  period_labels: string[];
+  items: Array<Record<string, any>>;
+};
+
 export type FunnelStepItem = {
   step: number;
   name: string;
@@ -225,6 +262,8 @@ export type ChatbotOverviewResponse = {
     ccc_multi_month_topics?: CccMultiMonthTopicsData;
     all_topic_multi_month?: CccMultiMonthTopicsData;
 
+    category_bot_vs_ccc?: CategoryBotVsCccData;
+    category_bot_vs_ccc_multi_period?: CategoryBotVsCccByPeriodData;
     category_ccc_rate?: CategoryCccRateItem[];
     chat_funnel?: FunnelStepItem[];
     hourly_peak?: HourlyPeakItem[];

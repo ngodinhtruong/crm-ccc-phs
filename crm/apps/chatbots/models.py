@@ -93,8 +93,10 @@ class ChatbotSessionSummary(TimeStampedModel):
       - CCC     : phiên đã xin được thông tin KH (có trong cskh_requests)
       - PENDING : chatbot bí, đã hỏi xin thông tin nhưng KH chưa/không cho
                   (có trong cskh_state, chưa có cskh_requests)
-      - BOT_DONE: chatbot tự trả lời xong (không nằm trong cskh_state)
-      - SPAM    : phiên chỉ toàn câu hỏi GREETING/UNRELATED
+      - BOT_DONE: chatbot tự trả lời xong câu FAQ (có lượt hỏi CUSTOMER_CARE,
+                  không nằm trong cskh_state lẫn cskh_requests)
+      - SPAM    : phần còn lại — phiên toàn GREETING/UNRELATED, và cả phiên
+                  chỉ có RESEARCH vì nghiệp vụ chưa theo dõi nhóm này
     """
 
     OUTCOME_BOT_DONE = "BOT_DONE"

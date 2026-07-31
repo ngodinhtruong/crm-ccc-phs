@@ -8,6 +8,7 @@ from apps.chatbots.constants import (
     UNCATEGORIZED_LABEL,
     category_label,
     channel_label,
+    normalize_category,
 )
 from apps.chatbots.dashboard.periods import (
     DASHBOARD_TIMEZONE,
@@ -30,6 +31,12 @@ OUTCOME_SPAM = ChatbotSessionSummary.OUTCOME_SPAM
 OUTCOME_PENDING = ChatbotSessionSummary.OUTCOME_PENDING
 
 TOPIC_OUTCOMES = (OUTCOME_BOT_DONE, OUTCOME_CCC)
+
+# Ngưỡng cho biểu đồ so sánh bot vs CCC theo chủ đề. Chủ đề chỉ 1-2 phiên mà
+# 100% chuyển CCC không nói lên bot yếu, chỉ nói lên mẫu quá nhỏ; giới hạn số
+# chủ đề vẽ ra để các cột không bị bóp lại đến mức không đọc được.
+TOPIC_COMPARISON_MIN_VOLUME = 5
+TOPIC_COMPARISON_LIMIT = 8
 
 # Bốn nhóm xử lý phiên: mã trong DB -> tên cột đếm -> nhãn hiển thị.
 # Một bảng duy nhất để KPI, biểu đồ theo kỳ và biểu đồ so sánh không trôi
@@ -316,6 +323,153 @@ class ChatbotDashboardAggregator:
             value_field="ccc",
         )
 
+    def _category_bot_vs_ccc(
+        self,
+        limit=TOPIC_COMPARISON_LIMIT,
+        min_volume=TOPIC_COMPARISON_MIN_VOLUME,
+    ):
+        """
+        Cùng một chủ đề: bot tự xử lý xong bao nhiêu phiên, phải đẩy CCC bao nhiêu.
+
+        Chỉ đếm BOT_DONE và CCC (bỏ SPAM/PENDING) để mẫu số đúng nghĩa "phiên
+        có nghiệp vụ để xử lý".
+
+        Phiên chưa gán chủ đề bị loại hẳn chứ không gom vào "Chưa phân loại":
+        nguồn ``chatbot_chat_logs.category`` bỏ trống phần lớn các câu bot trả
+        được (RESEARCH, hỏi đáp thị trường), nên nhóm đó lệch nặng về phía bot
+        và vẽ chung sẽ át hết các chủ đề thật. Số phiên bị loại trả kèm để
+        frontend ghi chú ngay dưới biểu đồ thay vì giấu đi.
+        """
+        merged = {}
+        skipped_uncategorized = 0
+
+        for row in (
+            self.summaries.filter(outcome_type__in=TOPIC_OUTCOMES)
+            .values("dashboard_category")
+            .annotate(
+                bot_done=Count("id", filter=Q(outcome_type=OUTCOME_BOT_DONE)),
+                ccc=Count("id", filter=Q(outcome_type=OUTCOME_CCC)),
+            )
+        ):
+            bot_done = row["bot_done"] or 0
+            ccc = row["ccc"] or 0
+            name = normalize_category(row["dashboard_category"])
+
+            if not name:
+                skipped_uncategorized += bot_done + ccc
+                continue
+
+            item = merged.setdefault(name, {"name": name, "bot_done": 0, "ccc": 0})
+            item["bot_done"] += bot_done
+            item["ccc"] += ccc
+
+        ranked = []
+        skipped_low_volume = 0
+
+        for item in merged.values():
+            total = item["bot_done"] + item["ccc"]
+
+            if total < min_volume:
+                skipped_low_volume += total
+                continue
+
+            ranked.append(
+                {
+                    **item,
+                    "total": total,
+                    "ccc_rate": self.rate(item["ccc"], total, digits=1),
+                }
+            )
+
+        # Chủ đề bot đuối nhất lên đầu — đây là danh sách ưu tiên sửa kịch bản.
+        # Hòa tỷ lệ thì chủ đề nhiều phiên hơn đứng trước vì sửa được nó gỡ
+        # tải cho CCC nhiều hơn.
+        ranked.sort(key=lambda item: (-item["ccc_rate"], -item["total"], item["name"]))
+
+        return {
+            "items": ranked[:limit],
+            "min_volume": min_volume,
+            "skipped_uncategorized": skipped_uncategorized,
+            "skipped_low_volume": skipped_low_volume,
+            "skipped_beyond_limit": sum(item["total"] for item in ranked[limit:]),
+        }
+
+    def _category_bot_vs_ccc_by_period(self, granularity, names):
+        """
+        Cùng bộ chủ đề của biểu đồ gộp, nhưng tách tỷ lệ chuyển CCC theo từng kỳ.
+
+        Bản gộp chỉ trả lời "chủ đề nào bot đang đuối"; lọc 5 tháng mà xem số
+        cộng dồn thì không biết bot đang khá lên hay tệ đi trên từng chủ đề.
+        Giá trị vẽ ra là tỷ lệ % chứ không phải số phiên: số phiên theo kỳ đã
+        có ở biểu đồ "Số lượt Chuyển CCC theo Category", và số tuyệt đối lên
+        xuống theo lưu lượng nên không so được chất lượng bot giữa các kỳ.
+
+        Danh sách chủ đề và thứ tự lấy nguyên từ bản gộp để mã CD1..CDn ở chú
+        thích dưới biểu đồ khớp nhau giữa hai chế độ xem.
+
+        Kỳ không có phiên nào của chủ đề trả về ``None`` chứ không phải 0 —
+        0 nghĩa là "bot xử lý hết", không có dữ liệu là chuyện khác hẳn.
+        """
+        if not names:
+            return {"period_labels": [], "items": []}
+
+        granularity = normalize_granularity(granularity)
+        wanted = set(names)
+
+        period_labels = {}
+        matrix = {}
+
+        for row in (
+            self.summaries.filter(
+                outcome_type__in=TOPIC_OUTCOMES,
+                started_at__isnull=False,
+            )
+            .annotate(period=period_trunc(granularity))
+            .values("period", "dashboard_category")
+            .annotate(
+                bot_done=Count("id", filter=Q(outcome_type=OUTCOME_BOT_DONE)),
+                ccc=Count("id", filter=Q(outcome_type=OUTCOME_CCC)),
+            )
+            .order_by("period")
+        ):
+            if not row["period"]:
+                continue
+
+            name = normalize_category(row["dashboard_category"])
+
+            if name not in wanted:
+                continue
+
+            key = period_key(granularity, row["period"])
+            period_labels[key] = period_label(granularity, row["period"])
+
+            bucket = matrix.setdefault((key, name), {"bot_done": 0, "ccc": 0})
+            bucket["bot_done"] += row["bot_done"] or 0
+            bucket["ccc"] += row["ccc"] or 0
+
+        keys = sorted(period_labels)
+        labels = [period_labels[key] for key in keys]
+
+        items = []
+
+        for name in names:
+            entry = {"name": name}
+
+            for key, label in zip(keys, labels):
+                bucket = matrix.get((key, name)) or {"bot_done": 0, "ccc": 0}
+                bot_done = bucket["bot_done"]
+                ccc = bucket["ccc"]
+                total = bot_done + ccc
+
+                entry[label] = self.rate(ccc, total, digits=1) if total else None
+                entry[f"{label}__bot"] = bot_done
+                entry[f"{label}__ccc"] = ccc
+                entry[f"{label}__total"] = total
+
+            items.append(entry)
+
+        return {"period_labels": labels, "items": items}
+
     def build_topics_section(self, granularity="month"):
         totals = {}
 
@@ -333,6 +487,8 @@ class ChatbotDashboardAggregator:
             if value
         ]
 
+        bot_vs_ccc = self._category_bot_vs_ccc()
+
         return {
             "charts": {
                 "topic_bar": topic_bar,
@@ -341,6 +497,13 @@ class ChatbotDashboardAggregator:
                 ),
                 "all_topic_multi_month": self.build_multi_month_all_topics(
                     granularity
+                ),
+                "category_bot_vs_ccc": bot_vs_ccc,
+                "category_bot_vs_ccc_multi_period": (
+                    self._category_bot_vs_ccc_by_period(
+                        granularity,
+                        [item["name"] for item in bot_vs_ccc["items"]],
+                    )
                 ),
             }
         }
@@ -520,14 +683,24 @@ class ChatbotDashboardAggregator:
         }
 
     def _top_reasons(self, limit=6):
-        rows = (
-            self._with_reason()
-            .values("reason")
-            .annotate(count=Count("id"))
-            .order_by("-count")[:limit]
-        )
+        """
+        Chủ đề của các phiên đã phát sinh yêu cầu hỗ trợ.
 
-        return [{"name": row["reason"], "value": row["count"]} for row in rows]
+        Gom theo `dashboard_category` chứ không phải `reason`: cùng một hệ nhãn
+        với biểu đồ so sánh bot vs CCC đứng cạnh thì hai biểu đồ đọc ngang được,
+        thay vì mỗi bên một hệ nhãn riêng.
+        """
+        merged = {}
+
+        for row in (
+            self._with_reason().values("dashboard_category").annotate(count=Count("id"))
+        ):
+            name = category_label(row["dashboard_category"])
+            merged[name] = merged.get(name, 0) + (row["count"] or 0)
+
+        ranked = sorted(merged.items(), key=lambda item: (-item[1], item[0]))
+
+        return [{"name": name, "value": value} for name, value in ranked[:limit]]
 
     def _with_reason(self):
         """Phiên có ghi lý do chuyển CCC."""
@@ -537,9 +710,9 @@ class ChatbotDashboardAggregator:
         return self._period_matrix(
             granularity,
             self._with_reason(),
-            "reason",
-            label_of=lambda value: value,
-            fallback=("Chưa có dữ liệu",),
+            "dashboard_category",
+            label_of=category_label,
+            fallback=(UNCATEGORIZED_LABEL,),
         )
 
     def _channel_performance(self):

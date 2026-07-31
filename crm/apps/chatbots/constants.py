@@ -4,6 +4,10 @@
 QUESTION_TYPE_GREETING = "GREETING"
 QUESTION_TYPE_UNRELATED = "UNRELATED"
 
+# Câu hỏi nghiệp vụ (FAQ). Đây là loại questionType duy nhất được chatbot gán
+# category, nên cũng là loại duy nhất so sánh được bot với CCC theo chủ đề.
+QUESTION_TYPE_CUSTOMER_CARE = "CUSTOMER_CARE"
+
 # Câu hỏi rác: chào hỏi + không liên quan
 SPAM_QUESTION_TYPES = [QUESTION_TYPE_GREETING, QUESTION_TYPE_UNRELATED]
 
@@ -48,3 +52,8 @@ def channel_label(value):
 
 def is_spam_question(question_type):
     return normalize_question_type(question_type) in SPAM_QUESTION_TYPES
+
+
+def is_faq_question(question_type):
+    """Câu hỏi nghiệp vụ mà chatbot trả lời bằng kho tri thức."""
+    return normalize_question_type(question_type) == QUESTION_TYPE_CUSTOMER_CARE

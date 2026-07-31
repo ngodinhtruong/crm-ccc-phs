@@ -2,12 +2,10 @@
 
 import { useMemo, useState } from "react";
 import {
-  Area,
   Bar,
   BarChart,
   CartesianGrid,
   Cell,
-  ComposedChart,
   Legend,
   Line,
   LineChart,
@@ -29,6 +27,8 @@ import {
   type DrilldownSlice,
 } from "@/components/common";
 import type {
+  CategoryBotVsCccByPeriodData,
+  CategoryBotVsCccData,
   CategoryCccRateItem,
   CccMultiMonthTopicsData,
   ChannelPerformanceItem,
@@ -60,6 +60,11 @@ const integerFormatter = new Intl.NumberFormat("vi-VN");
 
 function formatNumber(val: number) {
   return integerFormatter.format(val || 0);
+}
+
+/** Ẩn nhãn của cột bằng 0 để biểu đồ không rải số 0 vô nghĩa. */
+function hideZeroLabel(val: number | string | boolean | undefined | null) {
+  return val && Number(val) > 0 ? val : "";
 }
 
 function ValueTooltip({ active, payload, label }: any) {
@@ -150,7 +155,7 @@ function AutomationTrendChartCard({
         selectedPeriod,
         hasContextPeriods
           ? `Đang xem ${focusedLabels.join(", ")} — các kỳ làm mờ xung quanh là nền so sánh`
-          : "Vùng Xanh: Bot tự xử lý | Cột Vàng: Chuyển CCC",
+          : "Cột Xanh: Bot tự xử lý | Cột Vàng: Chuyển CCC",
       )}
       headerRight={
         selectedPeriod ? (
@@ -168,10 +173,11 @@ function AutomationTrendChartCard({
           />
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart
+            <BarChart
               data={chartData}
               margin={{ top: 15, right: 25, left: 0, bottom: 15 }}
               onClick={openPeriod}
+              barGap={6}
               className="cursor-pointer"
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
@@ -183,24 +189,18 @@ function AutomationTrendChartCard({
                 tick={{ fontSize: 11, fill: "#64748b" }}
                 allowDecimals={false}
               />
-              <Tooltip content={<ValueTooltip />} />
+              <Tooltip content={<ValueTooltip />} cursor={{ fill: "#f8fafc" }} />
               <Legend wrapperStyle={{ fontSize: 11, paddingTop: 6 }} />
-              <Area
-                type="monotone"
+              {/* Hai cột cạnh nhau cho mỗi kỳ: đọc trực tiếp được phần bot gánh
+                so với phần phải đẩy sang CCC, không phải ước lượng bằng mắt
+                giữa một vùng nền và một cột như trước. */}
+              <Bar
                 dataKey="bot_done"
                 name="Bot tự xử lý (BOT_DONE)"
-                fill="#10b981"
-                stroke="#10b981"
+                fill="#00713d"
+                stroke="#00713d"
                 fillOpacity={0.2}
                 strokeWidth={2.5}
-                isAnimationActive={false}
-              />
-              <Bar
-                dataKey="ccc"
-                name="Chuyển CCC (CCC)"
-                fill="#f59e0b"
-                radius={[4, 4, 0, 0]}
-                barSize={24}
                 isAnimationActive={false}
               >
                 {/* Khi backend nới dữ liệu ra kỳ cha (vd lọc "hôm nay" -> vẽ cả
@@ -213,13 +213,35 @@ function AutomationTrendChartCard({
                     />
                   ))}
                 <LabelList
+                  dataKey="bot_done"
+                  position="top"
+                  style={{ fontSize: 10, fill: "#00713d", fontWeight: 700 }}
+                  formatter={hideZeroLabel}
+                />
+              </Bar>
+              <Bar
+                dataKey="ccc"
+                name="Chuyển CCC (CCC)"
+                fill="#f59e0b"
+                radius={[4, 4, 0, 0]}
+                barSize={22}
+                isAnimationActive={false}
+              >
+                {hasContextPeriods &&
+                  chartData.map((row) => (
+                    <Cell
+                      key={row.date}
+                      fillOpacity={row.is_current ? 1 : 0.35}
+                    />
+                  ))}
+                <LabelList
                   dataKey="ccc"
                   position="top"
                   style={{ fontSize: 10, fill: "#b45309", fontWeight: 700 }}
-                  formatter={(val: any) => (val && Number(val) > 0 ? val : "")}
+                  formatter={hideZeroLabel}
                 />
               </Bar>
-            </ComposedChart>
+            </BarChart>
           </ResponsiveContainer>
         )}
       </div>
@@ -897,6 +919,366 @@ function CategoryCccRateHorizontalBarCard({
 }
 
 /* ====================================================================
+ * 📊 BOT TỰ XỬ LÝ VS CHUYỂN CCC THEO CHỦ ĐỀ (GROUPED BAR)
+ * ==================================================================== */
+/**
+ * Tooltip khi đã bấm vào một chủ đề: ngoài số phiên của kỳ còn ghi luôn tỷ lệ
+ * chuyển CCC, vì đó mới là con số nói bot đang khá lên hay tệ đi.
+ */
+function BotVsCccPeriodTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null;
+
+  const row = payload[0]?.payload ?? {};
+  const total = Number(row.total) || 0;
+
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white/95 px-3.5 py-2.5 text-xs shadow-xl backdrop-blur-sm">
+      <div className="mb-1.5 font-bold text-slate-800">{label}</div>
+
+      {total === 0 ? (
+        <div className="text-slate-500">Kỳ này chủ đề không có phiên nào.</div>
+      ) : (
+        <div className="space-y-1">
+          {payload.map((item: any) => (
+            <div
+              key={String(item.dataKey)}
+              className="flex items-center justify-between gap-4"
+            >
+              <div className="flex items-center gap-1.5">
+                <span
+                  className="h-2 w-2 rounded-full"
+                  style={{ backgroundColor: item.color || item.fill }}
+                />
+                <span className="text-slate-600">{item.name}</span>
+              </div>
+              <span className="font-bold text-slate-900">
+                {formatNumber(Number(item.value) || 0)}
+              </span>
+            </div>
+          ))}
+
+          <div className="mt-1.5 border-t border-slate-100 pt-1.5 text-slate-600">
+            Tỷ lệ chuyển CCC:{" "}
+            <span className="font-bold text-amber-700">{row.rate}%</span>
+            <span className="ml-1.5 text-slate-400">
+              trên {formatNumber(total)} phiên
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CategoryBotVsCccBarCard({
+  data,
+  multiPeriodData,
+}: {
+  data?: CategoryBotVsCccData | null;
+  multiPeriodData?: CategoryBotVsCccByPeriodData | null;
+}) {
+  // `?? []` trần sẽ tạo mảng mới mỗi lần render và làm các useMemo bên dưới
+  // tính lại vô ích, nên gói luôn vào useMemo.
+  const items = useMemo(() => data?.items ?? [], [data]);
+
+  const periodLabels = useMemo(
+    () => multiPeriodData?.period_labels ?? [],
+    [multiPeriodData],
+  );
+
+  const periodItems = useMemo(
+    () => multiPeriodData?.items ?? [],
+    [multiPeriodData],
+  );
+
+  // Chỉ một kỳ thì xem theo thời gian cho ra đúng cột đang đứng ở bản gộp,
+  // nên không cho bấm; lọc rộng ra nhiều kỳ mới mở drill-down.
+  const canComparePeriods = periodLabels.length > 1 && periodItems.length > 0;
+
+  // Dùng lại hook drill-down chung: recharts đưa nhãn cột vừa bấm qua
+  // `activeLabel`, ở đây nhãn đó chính là tên chủ đề.
+  const {
+    selectedPeriod: selectedTopic,
+    openPeriod: openTopic,
+    closePeriod: closeTopic,
+  } = usePeriodDrilldown();
+
+  const topicRow = useMemo(
+    () =>
+      selectedTopic
+        ? periodItems.find((item) => item.name === selectedTopic)
+        : undefined,
+    [periodItems, selectedTopic],
+  );
+
+  // Đổi bộ lọc trong lúc đang mở một chủ đề có thể làm chủ đề đó rơi khỏi top,
+  // khi ấy tự rơi về biểu đồ gộp thay vì treo một thẻ rỗng có tiêu đề chủ đề
+  // không còn dữ liệu.
+  const activeTopic = canComparePeriods && topicRow ? selectedTopic : null;
+
+  // Chuỗi thời gian của riêng chủ đề đang mở: mỗi kỳ một dòng, giữ cả kỳ
+  // trống để trục thời gian liền mạch — khoảng hụt giữa hai kỳ cũng là thông
+  // tin ("tháng đó chủ đề này không ai hỏi").
+  const topicSeries = useMemo(() => {
+    if (!topicRow) return [];
+
+    return periodLabels.map((period) => ({
+      label: period,
+      bot_done: Number(topicRow[`${period}__bot`]) || 0,
+      ccc: Number(topicRow[`${period}__ccc`]) || 0,
+      total: Number(topicRow[`${period}__total`]) || 0,
+      rate: topicRow[period] ?? 0,
+    }));
+  }, [periodLabels, topicRow]);
+
+  // Tên chủ đề dài ("Câu hỏi về Giao Dịch Ký Quỹ Chứng Khoán") in thẳng lên
+  // trục hoành thì các nhãn đè lên nhau. Dùng lại cách của biểu đồ Top Lý do:
+  // mã CD1..CDn trên trục, tên đầy đủ đưa xuống chú thích dưới biểu đồ.
+  const topicLegend = useMemo(
+    () =>
+      items.map((item, index) => ({
+        code: `CD${index + 1}`,
+        label: item.name,
+        cccRate: item.ccc_rate,
+        total: item.total,
+      })),
+    [items],
+  );
+
+  const topicCodeByLabel = useMemo(
+    () => new Map(topicLegend.map((item) => [item.label, item.code])),
+    [topicLegend],
+  );
+
+  // Ghi chú phần bị cắt: người xem phải biết biểu đồ không phủ hết dữ liệu,
+  // nhất là nhóm chưa gán chủ đề vốn rất lớn ở phía bot.
+  const skippedNotes = useMemo(() => {
+    if (!data) return [];
+
+    const notes: string[] = [];
+
+    if (data.skipped_uncategorized > 0) {
+      notes.push(
+        `${formatNumber(data.skipped_uncategorized)} phiên chưa gán chủ đề`,
+      );
+    }
+
+    if (data.skipped_low_volume > 0) {
+      notes.push(
+        `${formatNumber(data.skipped_low_volume)} phiên thuộc chủ đề dưới ${data.min_volume} phiên`,
+      );
+    }
+
+    if (data.skipped_beyond_limit > 0) {
+      notes.push(
+        `${formatNumber(data.skipped_beyond_limit)} phiên thuộc chủ đề ngoài top ${items.length}`,
+      );
+    }
+
+    return notes;
+  }, [data, items.length]);
+
+  return (
+    <ChartCard
+      title={
+        activeTopic
+          ? `📊 Bot Tự xử lý vs Chuyển CCC — ${topicCodeByLabel.get(activeTopic) ?? ""}. ${activeTopic}`
+          : "📊 Bot Tự xử lý vs Chuyển CCC theo Chủ đề"
+      }
+      description={
+        activeTopic
+          ? "Trục hoành: các kỳ trong bộ lọc | Cột vàng thấp dần nghĩa là bot đang gánh thêm được chủ đề này — nhấp đúp hoặc bấm 'Quay lại' để xem tất cả chủ đề"
+          : `Trục hoành: Mã chủ đề (xem chú thích dưới biểu đồ) | Xếp theo tỷ lệ chuyển CCC giảm dần${
+              canComparePeriods ? " — bấm vào một chủ đề để xem theo thời gian" : ""
+            }`
+      }
+      headerRight={
+        activeTopic ? (
+          <PeriodDrilldownBackButton onClick={closeTopic} />
+        ) : undefined
+      }
+      className="xl:col-span-6"
+    >
+      {/* Nhường chiều cao cho phần chú thích mã chủ đề ở dưới, để thẻ không
+          cao hơn biểu đồ Top Lý do đứng cạnh. */}
+      <div className="h-[236px]">
+        {items.length === 0 ? (
+          <EmptyState message="Chưa có chủ đề nào đủ dữ liệu để so sánh." />
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            {activeTopic ? (
+              <BarChart
+                data={topicSeries}
+                onDoubleClick={closeTopic}
+                margin={{ top: 20, right: 25, left: 0, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis
+                  dataKey="label"
+                  interval={0}
+                  tick={{ fontSize: 10, fontWeight: 700, fill: "#334155" }}
+                />
+                <YAxis
+                  tick={{ fontSize: 11, fill: "#64748b" }}
+                  allowDecimals={false}
+                />
+                <Tooltip
+                  content={<BotVsCccPeriodTooltip />}
+                  cursor={{ fill: "#f8fafc" }}
+                />
+                <Legend wrapperStyle={{ fontSize: 11, paddingTop: 6 }} />
+                <Bar
+                  dataKey="bot_done"
+                  name="Bot tự xử lý (phiên)"
+                  fill="#00713d"
+                  radius={[4, 4, 0, 0]}
+                  barSize={14}
+                  isAnimationActive={false}
+                >
+                  <LabelList
+                    dataKey="bot_done"
+                    position="top"
+                    style={{ fontSize: 9, fill: "#00713d", fontWeight: 700 }}
+                    formatter={hideZeroLabel}
+                  />
+                </Bar>
+                <Bar
+                  dataKey="ccc"
+                  name="Chuyển CCC (phiên)"
+                  fill="#f59e0b"
+                  radius={[4, 4, 0, 0]}
+                  barSize={14}
+                  isAnimationActive={false}
+                >
+                  <LabelList
+                    dataKey="ccc"
+                    position="top"
+                    style={{ fontSize: 9, fill: "#b45309", fontWeight: 700 }}
+                    formatter={hideZeroLabel}
+                  />
+                </Bar>
+              </BarChart>
+            ) : (
+              <BarChart
+                data={items}
+                onClick={canComparePeriods ? openTopic : undefined}
+                className={canComparePeriods ? "cursor-pointer" : undefined}
+                margin={{ top: 20, right: 25, left: 0, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                {/* Vẫn bind theo `name` để tooltip đọc được tên chủ đề đầy đủ;
+                    chỉ phần chữ vẽ lên trục mới rút thành mã. */}
+                <XAxis
+                  dataKey="name"
+                  interval={0}
+                  tickFormatter={(value: string) =>
+                    topicCodeByLabel.get(value) ?? value
+                  }
+                  tick={{ fontSize: 11, fontWeight: 700, fill: "#334155" }}
+                />
+                <YAxis
+                  tick={{ fontSize: 11, fill: "#64748b" }}
+                  allowDecimals={false}
+                />
+                <Tooltip content={<ValueTooltip />} />
+                <Legend wrapperStyle={{ fontSize: 11, paddingTop: 6 }} />
+                <Bar
+                  dataKey="bot_done"
+                  name="Bot tự xử lý (phiên)"
+                  fill="#00713d"
+                  radius={[4, 4, 0, 0]}
+                  barSize={14}
+                  isAnimationActive={false}
+                >
+                  <LabelList
+                    dataKey="bot_done"
+                    position="top"
+                    style={{ fontSize: 9, fill: "#00713d", fontWeight: 700 }}
+                    formatter={hideZeroLabel}
+                  />
+                </Bar>
+                <Bar
+                  dataKey="ccc"
+                  name="Chuyển CCC (phiên)"
+                  fill="#f59e0b"
+                  radius={[4, 4, 0, 0]}
+                  barSize={14}
+                  isAnimationActive={false}
+                >
+                  <LabelList
+                    dataKey="ccc"
+                    position="top"
+                    style={{ fontSize: 9, fill: "#b45309", fontWeight: 700 }}
+                    formatter={hideZeroLabel}
+                  />
+                </Bar>
+              </BarChart>
+            )}
+          </ResponsiveContainer>
+        )}
+      </div>
+
+      {topicLegend.length > 0 && (
+        // Một cột như biểu đồ Top Lý do: thẻ chỉ rộng nửa màn hình, chia hai
+        // cột thì tên chủ đề bị cắt gần hết. Kèm luôn % chuyển CCC vì cột đôi
+        // chỉ nói số tuyệt đối, còn thứ tự trên trục lại đang xếp theo tỷ lệ.
+        //
+        // Bấm được luôn vào dòng chú thích: trên trục chỉ có mã CD1..CDn nên
+        // nhắm đúng cột theo tên chủ đề ở đây dễ hơn là bấm vào biểu đồ.
+        <dl className="mt-2 space-y-0.5 border-t border-slate-100 pt-2 text-[11px] leading-snug">
+          {topicLegend.map((item) => (
+            <div
+              key={item.code}
+              role={canComparePeriods ? "button" : undefined}
+              tabIndex={canComparePeriods ? 0 : undefined}
+              onClick={
+                canComparePeriods
+                  ? () => openTopic({ activeLabel: item.label })
+                  : undefined
+              }
+              onKeyDown={
+                canComparePeriods
+                  ? (event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        openTopic({ activeLabel: item.label });
+                      }
+                    }
+                  : undefined
+              }
+              className={`flex gap-2 rounded ${
+                canComparePeriods ? "cursor-pointer hover:bg-slate-50" : ""
+              } ${
+                activeTopic === item.label ? "bg-sky-50 ring-1 ring-sky-200" : ""
+              }`}
+            >
+              <dt className="w-9 shrink-0 font-bold text-slate-900">
+                {item.code}
+              </dt>
+              <dd
+                className="flex min-w-0 flex-1 justify-between gap-2 text-slate-600"
+                title={item.label}
+              >
+                <span className="truncate">{item.label}</span>
+                <span className="shrink-0 font-bold text-amber-700">
+                  {item.cccRate}% CCC
+                </span>
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
+
+      {skippedNotes.length > 0 && (
+        <p className="mt-2 text-[11px] italic leading-snug text-slate-500">
+          Đã loại khỏi biểu đồ: {skippedNotes.join(" · ")}.
+        </p>
+      )}
+    </ChartCard>
+  );
+}
+
+/* ====================================================================
  * 🔻 5. FUNNEL CHUYỂN ĐỔI CHATBOT → TICKET → CCC (FUNNEL CHART)
  * ==================================================================== */
 function ChatbotFunnelChartCard({ data }: { data?: FunnelStepItem[] | null }) {
@@ -1073,7 +1455,7 @@ function CustomYAxisReasonTick({ x, y, payload }: any) {
 }
 
 /* ====================================================================
- * 📊 7. TOP LÝ DO CHUYỂN CCC (HORIZONTAL BAR & TIME SERIES)
+ * 📊 7. TOP CHỦ ĐỀ CHUYỂN CCC (HORIZONTAL BAR & TIME SERIES)
  * ==================================================================== */
 function TopReasonHorizontalBarCard({
   data,
@@ -1127,30 +1509,13 @@ function TopReasonHorizontalBarCard({
     [monthLabels, selectedPeriod, timeSeriesData],
   );
 
-  // Lý do chuyển CCC là câu dài, in thẳng lên trục hoành thì các nhãn đè lên
-  // nhau và bị cắt. Đánh mã LD1..LDn cho trục, câu đầy đủ đưa xuống chú thích
-  // ngay dưới biểu đồ (và vẫn hiện nguyên văn trong tooltip).
-  const reasonLegend = useMemo(
-    () =>
-      timeSeriesData.data_by_category.map((row: any, index: number) => ({
-        code: `LD${index + 1}`,
-        label: String(row.label ?? ""),
-      })),
-    [timeSeriesData],
-  );
-
-  const reasonCodeByLabel = useMemo(
-    () => new Map(reasonLegend.map((item) => [item.label, item.code])),
-    [reasonLegend],
-  );
-
   return (
     <ChartCard
-      title="📊 7. Top Lý do Chuyển CCC"
+      title="📊 7. Top Chủ đề Chuyển CCC"
       description={
         viewMode === "DEFAULT"
-          ? "Dựa vào trường reason để tìm điểm nghẽn và cải tiến kịch bản Chatbot"
-          : "Trục hoành: Mã lý do (xem chú thích dưới biểu đồ) | Biến động theo thời gian (phụ thuộc bộ lọc)"
+          ? "Chủ đề của các phiên phát sinh yêu cầu hỗ trợ, tìm điểm nghẽn để cải tiến kịch bản Chatbot"
+          : "Trục hoành: Các chủ đề nghiệp vụ | Biến động theo thời gian (phụ thuộc bộ lọc)"
       }
       headerRight={
         <ChartModeHeader
@@ -1161,9 +1526,7 @@ function TopReasonHorizontalBarCard({
       }
       className="xl:col-span-6"
     >
-      {/* Chế độ theo thời gian nhường bớt chiều cao cho phần chú thích mã lý
-          do ở dưới, để thẻ không cao hơn các biểu đồ đứng cạnh. */}
-      <div className={viewMode === "DEFAULT" ? "h-[330px]" : "h-[236px]"}>
+      <div className="h-[330px]">
         {selectedPeriod ? (
           <PeriodDrilldownDonut
             data={drilldownSlices}
@@ -1191,7 +1554,7 @@ function TopReasonHorizontalBarCard({
                   dataKey="name"
                   interval={0}
                   tick={<CustomYAxisReasonTick />}
-                  width={180}
+                  width={140}
                 />
                 <Tooltip content={<ValueTooltip />} />
                 <Bar
@@ -1220,15 +1583,10 @@ function TopReasonHorizontalBarCard({
                 margin={{ top: 25, right: 25, left: -10, bottom: 0 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                {/* Vẫn bind theo `label` để tooltip đọc được nguyên văn lý do;
-                  chỉ phần chữ vẽ lên trục mới rút thành mã. */}
                 <XAxis
                   dataKey="label"
                   interval={0}
-                  tickFormatter={(value: string) =>
-                    reasonCodeByLabel.get(value) ?? value
-                  }
-                  tick={{ fontSize: 11, fontWeight: 700, fill: "#334155" }}
+                  tick={<CustomCategoryAxisTick />}
                 />
                 <YAxis
                   tick={{ fontSize: 11, fill: "#64748b" }}
@@ -1261,22 +1619,6 @@ function TopReasonHorizontalBarCard({
         )}
       </div>
 
-      {viewMode === "TIME" && reasonLegend.length > 0 && (
-        // Một cột: lý do dài 20-60 ký tự, chia hai cột thì lại bị cắt đúng
-        // như khi in thẳng lên trục.
-        <dl className="mt-2 space-y-0.5 border-t border-slate-100 pt-2 text-[11px] leading-snug">
-          {reasonLegend.map((item) => (
-            <div key={item.code} className="flex gap-2">
-              <dt className="w-9 shrink-0 font-bold text-slate-900">
-                {item.code}
-              </dt>
-              <dd className="truncate text-slate-600" title={item.label}>
-                {item.label}
-              </dd>
-            </div>
-          ))}
-        </dl>
-      )}
     </ChartCard>
   );
 }
@@ -1346,7 +1688,9 @@ function ChannelPerformanceBarCard({
           onBack={selectedPeriod ? closePeriod : undefined}
         />
       }
-      className="xl:col-span-6"
+      // Đứng một mình trên hàng sau khi biểu đồ chủ đề chiếm chỗ cạnh Top Lý
+      // do, nên trải hết chiều ngang thay vì bỏ trống nửa hàng.
+      className="xl:col-span-12"
     >
       <div className="h-[330px]">
         {selectedPeriod ? (
@@ -1567,12 +1911,20 @@ export function ChatbotDashboardCharts({
         />
       </div>
 
-      {/* SECTION 5: PHÂN TÍCH LÝ DO & HIỆU QUẢ CHANNEL */}
+      {/* SECTION 5: LÝ DO CHUYỂN CCC & NĂNG LỰC BOT TRÊN CÙNG CHỦ ĐỀ */}
       <div className="grid gap-4 xl:grid-cols-12">
         <TopReasonHorizontalBarCard
           data={charts.top_reasons}
           multiPeriodData={charts.top_reasons_multi_period}
         />
+        <CategoryBotVsCccBarCard
+          data={charts.category_bot_vs_ccc}
+          multiPeriodData={charts.category_bot_vs_ccc_multi_period}
+        />
+      </div>
+
+      {/* SECTION 5B: HIỆU QUẢ THEO CHANNEL */}
+      <div className="grid gap-4 xl:grid-cols-12">
         <ChannelPerformanceBarCard
           data={charts.channel_performance}
           multiPeriodData={charts.channel_performance_multi_period}
