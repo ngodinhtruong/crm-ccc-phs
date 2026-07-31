@@ -401,11 +401,10 @@ function ChartModeHeader({
             key={mode}
             type="button"
             onClick={() => onChange(mode)}
-            className={`cursor-pointer px-2.5 py-1 text-xs font-bold rounded-md transition-all ${
-              viewMode === mode
+            className={`cursor-pointer px-2.5 py-1 text-xs font-bold rounded-md transition-all ${viewMode === mode
                 ? "bg-[#10b981] text-white shadow-xs"
                 : "text-slate-600 hover:text-slate-900"
-            }`}
+              }`}
           >
             {mode === "DEFAULT" ? "Tổng quan" : "📅 Theo thời gian"}
           </button>
@@ -1088,9 +1087,8 @@ function CategoryBotVsCccBarCard({
       description={
         activeTopic
           ? "Trục hoành: các kỳ trong bộ lọc | Cột vàng thấp dần nghĩa là bot đang gánh thêm được chủ đề này — nhấp đúp hoặc bấm 'Quay lại' để xem tất cả chủ đề"
-          : `Trục hoành: Mã chủ đề (xem chú thích dưới biểu đồ) | Xếp theo tỷ lệ chuyển CCC giảm dần${
-              canComparePeriods ? " — bấm vào một chủ đề để xem theo thời gian" : ""
-            }`
+          : `Trục hoành: Mã chủ đề (xem chú thích dưới biểu đồ) | Xếp theo tỷ lệ chuyển CCC giảm dần${canComparePeriods ? " — bấm vào một chủ đề để xem theo thời gian" : ""
+          }`
       }
       headerRight={
         activeTopic ? (
@@ -1239,18 +1237,16 @@ function CategoryBotVsCccBarCard({
               onKeyDown={
                 canComparePeriods
                   ? (event) => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        openTopic({ activeLabel: item.label });
-                      }
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      openTopic({ activeLabel: item.label });
                     }
+                  }
                   : undefined
               }
-              className={`flex gap-2 rounded ${
-                canComparePeriods ? "cursor-pointer hover:bg-slate-50" : ""
-              } ${
-                activeTopic === item.label ? "bg-sky-50 ring-1 ring-sky-200" : ""
-              }`}
+              className={`flex gap-2 rounded ${canComparePeriods ? "cursor-pointer hover:bg-slate-50" : ""
+                } ${activeTopic === item.label ? "bg-sky-50 ring-1 ring-sky-200" : ""
+                }`}
             >
               <dt className="w-9 shrink-0 font-bold text-slate-900">
                 {item.code}
@@ -1269,11 +1265,11 @@ function CategoryBotVsCccBarCard({
         </dl>
       )}
 
-      {skippedNotes.length > 0 && (
+      {/* {skippedNotes.length > 0 && (
         <p className="mt-2 text-[11px] italic leading-snug text-slate-500">
           Đã loại khỏi biểu đồ: {skippedNotes.join(" · ")}.
         </p>
-      )}
+      )} */}
     </ChartCard>
   );
 }
