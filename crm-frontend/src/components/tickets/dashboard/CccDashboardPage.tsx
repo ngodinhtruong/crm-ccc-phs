@@ -2,7 +2,16 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { RefreshCw, SlidersHorizontal, Ticket, X } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowUpRight,
+  BotMessageSquare,
+  RefreshCw,
+  SlidersHorizontal,
+  Ticket,
+  Users,
+  X,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { TicketListTable } from "@/components/tickets/dashboard/CccDashboardTables";
 
@@ -21,6 +30,9 @@ import {
   formatDateTime,
   formatNumber,
 } from "./CccDashboardUtils";
+import { userService } from "@/apis/user.api";
+import { chatbotDashboardService } from "@/services/chatbot-dashboard.service";
+import { externalErrorService } from "@/services/external-error.service";
 
 const CccDashboardCharts = dynamic(
   () =>
@@ -272,6 +284,181 @@ function FilterPopover({
   );
 }
 
+function SystemOverviewGrid({
+  dashboard,
+  systemMetrics,
+}: {
+  dashboard: ReturnType<typeof useCccDashboard>;
+  systemMetrics: {
+    totalUsers: number | null;
+    chatbotReceived: number | null;
+    chatbotBotDone: number | null;
+    chatbotCcc: number | null;
+    externalTotalErrors: number | null;
+    externalNeedReview: number | null;
+    externalClassificationRate: number | null;
+    loading: boolean;
+  };
+}) {
+  const overview = dashboard.data?.overview;
+  const totalReceived = systemMetrics.chatbotReceived || 0;
+  const botDone = systemMetrics.chatbotBotDone || 0;
+  const botDoneRate = totalReceived > 0 ? Math.round((botDone / totalReceived) * 100) : 0;
+
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* 1. Ticket CCC Card */}
+      <Link
+        href="/tickets"
+        className="group relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md"
+      >
+        <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-emerald-500 to-teal-600" />
+        <div className="flex items-start justify-between">
+          <div>
+            <span className="inline-flex items-center gap-1.5 rounded-md bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700">
+              <Ticket size={13} />
+              Tickets CCC
+            </span>
+            <p className="mt-2.5 text-2xl font-black tracking-tight text-slate-800">
+              {formatNumber(overview?.total_tickets || 0)}
+            </p>
+          </div>
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 transition group-hover:bg-emerald-600 group-hover:text-white">
+            <ArrowUpRight size={17} />
+          </div>
+        </div>
+
+        <div className="mt-3 grid grid-cols-3 gap-1 border-t border-slate-100 pt-2 text-xs">
+          <div>
+            <span className="text-[11px] text-slate-400">Chờ XL:</span>
+            <p className="text-xs font-extrabold text-amber-600">
+              {formatNumber(overview?.pending_processing || 0)}
+            </p>
+          </div>
+          <div>
+            <span className="text-[11px] text-slate-400">Đã giải quyết:</span>
+            <p className="text-xs font-extrabold text-emerald-600">
+              {formatNumber(overview?.resolved_tickets || 0)}
+            </p>
+          </div>
+          <div>
+            <span className="text-[11px] text-slate-400">Đã liên kết:</span>
+            <p className="text-xs font-extrabold text-blue-600">
+              {formatNumber(overview?.linked_tickets || 0)}
+            </p>
+          </div>
+        </div>
+      </Link>
+
+      {/* 2. System Users Card */}
+      <Link
+        href="/accounts/users"
+        className="group relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-md"
+      >
+        <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-sky-500 to-blue-600" />
+        <div className="flex items-start justify-between">
+          <div>
+            <span className="inline-flex items-center gap-1.5 rounded-md bg-sky-50 px-2.5 py-1 text-[11px] font-bold text-sky-700">
+              <Users size={13} />
+              Người dùng hệ thống
+            </span>
+            <p className="mt-2.5 text-2xl font-black tracking-tight text-slate-800">
+              {systemMetrics.loading ? "..." : formatNumber(systemMetrics.totalUsers || 0)}
+            </p>
+          </div>
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-50 text-sky-600 transition group-hover:bg-sky-600 group-hover:text-white">
+            <ArrowUpRight size={17} />
+          </div>
+        </div>
+
+        <div className="mt-3 border-t border-slate-100 pt-2 text-xs text-slate-500">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-slate-400">Tài khoản CRM active:</span>
+            <span className="font-extrabold text-slate-700">
+              {systemMetrics.loading ? "..." : `${formatNumber(systemMetrics.totalUsers || 0)} user`}
+            </span>
+          </div>
+          <p className="mt-0.5 text-[10px] text-slate-400">Đã gán phân quyền & chi nhánh</p>
+        </div>
+      </Link>
+
+      {/* 3. Chatbot Card */}
+      <Link
+        href="/chatbots/dashboard"
+        className="group relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-purple-300 hover:shadow-md"
+      >
+        <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-purple-500 to-pink-600" />
+        <div className="flex items-start justify-between">
+          <div>
+            <span className="inline-flex items-center gap-1.5 rounded-md bg-purple-50 px-2.5 py-1 text-[11px] font-bold text-purple-700">
+              <BotMessageSquare size={13} />
+              Trợ lý Chatbot AI
+            </span>
+            <p className="mt-2.5 text-2xl font-black tracking-tight text-slate-800">
+              {systemMetrics.loading ? "..." : formatNumber(systemMetrics.chatbotReceived || 0)}
+            </p>
+          </div>
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-50 text-purple-600 transition group-hover:bg-purple-600 group-hover:text-white">
+            <ArrowUpRight size={17} />
+          </div>
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-1 border-t border-slate-100 pt-2 text-xs">
+          <div>
+            <span className="text-[11px] text-slate-400">Bot xử lý:</span>
+            <p className="font-extrabold text-purple-700">
+              {systemMetrics.loading ? "..." : `${formatNumber(systemMetrics.chatbotBotDone || 0)} (${botDoneRate}%)`}
+            </p>
+          </div>
+          <div>
+            <span className="text-[11px] text-slate-400">Chuyển CCC:</span>
+            <p className="font-extrabold text-indigo-600">
+              {systemMetrics.loading ? "..." : formatNumber(systemMetrics.chatbotCcc || 0)}
+            </p>
+          </div>
+        </div>
+      </Link>
+
+      {/* 4. External Errors Card */}
+      <Link
+        href="/external-errors/dashboard"
+        className="group relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-amber-300 hover:shadow-md"
+      >
+        <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-amber-500 to-rose-600" />
+        <div className="flex items-start justify-between">
+          <div>
+            <span className="inline-flex items-center gap-1.5 rounded-md bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-700">
+              <AlertTriangle size={13} />
+              Lỗi hệ thống / Bên ngoài
+            </span>
+            <p className="mt-2.5 text-2xl font-black tracking-tight text-slate-800">
+              {systemMetrics.loading ? "..." : formatNumber(systemMetrics.externalTotalErrors || 0)}
+            </p>
+          </div>
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-600 transition group-hover:bg-amber-600 group-hover:text-white">
+            <ArrowUpRight size={17} />
+          </div>
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-1 border-t border-slate-100 pt-2 text-xs">
+          <div>
+            <span className="text-[11px] text-slate-400">Cần rà soát:</span>
+            <p className="font-extrabold text-rose-600">
+              {systemMetrics.loading ? "..." : formatNumber(systemMetrics.externalNeedReview || 0)}
+            </p>
+          </div>
+          <div>
+            <span className="text-[11px] text-slate-400">Đã phân loại:</span>
+            <p className="font-extrabold text-emerald-600">
+              {systemMetrics.loading ? "..." : `${systemMetrics.externalClassificationRate || 0}%`}
+            </p>
+          </div>
+        </div>
+      </Link>
+    </div>
+  );
+}
+
 function TicketTabSummary({
   dashboard,
 }: {
@@ -356,6 +543,64 @@ export function CccDashboardPage() {
   const [granularity, setGranularity] = useState<GranularityMode>("MONTH");
   const [compareMode, setCompareMode] = useState<CompareMode>("NONE");
   const [globalMonth, setGlobalMonth] = useState<string>("");
+
+  const [systemMetrics, setSystemMetrics] = useState({
+    totalUsers: null as number | null,
+    chatbotReceived: null as number | null,
+    chatbotBotDone: null as number | null,
+    chatbotCcc: null as number | null,
+    externalTotalErrors: null as number | null,
+    externalNeedReview: null as number | null,
+    externalClassificationRate: null as number | null,
+    loading: true,
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchMetrics = async () => {
+      try {
+        const [usersRes, chatbotRes, errorRes] = await Promise.allSettled([
+          userService.getUsers({ page: "1" }),
+          chatbotDashboardService.getOverview(),
+          externalErrorService.getDashboardOverview(),
+        ]);
+
+        if (!isMounted) return;
+
+        const usersCount = usersRes.status === "fulfilled" ? usersRes.value.count || 0 : 0;
+
+        const chatbotSummary = chatbotRes.status === "fulfilled" ? chatbotRes.value.summary : null;
+        const chatbotReceived = chatbotSummary?.total_received?.value ?? 0;
+        const chatbotBotDone = chatbotSummary?.bot_done?.value ?? 0;
+        const chatbotCcc = chatbotSummary?.ccc?.value ?? 0;
+
+        const errorSummary = errorRes.status === "fulfilled" ? errorRes.value.summary : null;
+        const externalTotalErrors = errorSummary?.total_errors ?? 0;
+        const externalNeedReview = errorSummary?.need_review_errors ?? 0;
+        const externalClassificationRate = errorSummary?.classification_rate ?? 0;
+
+        setSystemMetrics({
+          totalUsers: usersCount,
+          chatbotReceived,
+          chatbotBotDone,
+          chatbotCcc,
+          externalTotalErrors,
+          externalNeedReview,
+          externalClassificationRate,
+          loading: false,
+        });
+      } catch {
+        if (isMounted) {
+          setSystemMetrics((prev) => ({ ...prev, loading: false }));
+        }
+      }
+    };
+
+    void fetchMetrics();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const report = dashboard.data?.report;
   const reportMonthCount = getMonthCount(report?.range_from, report?.range_to);
@@ -446,7 +691,7 @@ export function CccDashboardPage() {
         </div>
       }
     >
-      <div className="space-y-4">
+      <div className="space-y-5">
         <div className="rounded-md border border-slate-200 bg-gradient-to-r from-lime-50 via-white to-sky-50 px-4 py-3 shadow-sm">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="min-w-0">
@@ -484,6 +729,15 @@ export function CccDashboardPage() {
           </div>
         </div>
 
+        {/* 1. Core Unified System Executive Summary Grid (4 Cards) */}
+        <SystemOverviewGrid
+          dashboard={dashboard}
+          systemMetrics={systemMetrics}
+        />
+
+        {/* 2. Ticket Status & Account Linking Quick Access */}
+        <TicketTabSummary dashboard={dashboard} />
+
         {dashboard.error && <ErrorBlock message={dashboard.error} />}
 
         {dashboard.loading && !dashboard.data && <LoadingBlock />}
@@ -498,14 +752,12 @@ export function CccDashboardPage() {
         )}
 
         {dashboard.data && (
-          <>
-            <CccDashboardCharts
-              charts={dashboard.data.charts}
-              globalViewMode={globalViewMode}
-              granularity={granularity}
-              compareMode={compareMode}
-            />
-          </>
+          <CccDashboardCharts
+            charts={dashboard.data.charts}
+            globalViewMode={globalViewMode}
+            granularity={granularity}
+            compareMode={compareMode}
+          />
         )}
       </div>
     </DashboardLayout>
