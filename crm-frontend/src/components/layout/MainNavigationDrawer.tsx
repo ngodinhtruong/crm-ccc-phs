@@ -95,6 +95,11 @@ const WORKSPACE_ORDER: WorkspaceCode[] = ["CCC", "SALE_ADMIN"];
 const mainMenuItemsByWorkspace: Record<WorkspaceCode, MainMenuItem[]> = {
   CCC: [
     {
+      title: "DASHBOARD TỔNG HỢP",
+      href: "/dashboard",
+      icon: BarChart3,
+    },
+    {
       title: "DASHBOARD CCC",
       href: "/tickets/dashboard",
       icon: Gauge,

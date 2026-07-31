@@ -5,8 +5,9 @@ import { KpiConfigTab } from "@/hooks/useKpiConfig";
 const tabs: { key: KpiConfigTab; label: string }[] = [
   { key: "metrics", label: "Chỉ tiêu KPI" },
   { key: "groups", label: "Phần & Nhóm KPI" },
-  { key: "gates", label: "Gate Conditions" },
-  { key: "rewards", label: "Bậc thưởng" },
+  // Ẩn 2 tab bên dưới để phát triển sau
+  // { key: "gates", label: "Gate Conditions" },
+  // { key: "rewards", label: "Bậc thưởng" },
 ];
 
 export function KpiConfigTabs({

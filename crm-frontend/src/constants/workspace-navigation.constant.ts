@@ -46,6 +46,12 @@ export const WORKSPACE_NAVIGATION: Record<
       label: "CCC",
       items: [
         {
+          key: "ccc-dashboard-general",
+          label: "Dashboard Tổng hợp",
+          href: "/dashboard",
+          icon: BarChart3,
+        },
+        {
           key: "ccc-dashboard",
           label: "Dashboard CCC",
           href: "/tickets/dashboard",
