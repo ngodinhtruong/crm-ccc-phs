@@ -24,9 +24,10 @@ import { accountService, CurrentUser } from "@/services/account.service";
 
 type DashboardTopbarProps = {
     onMenuClick?: () => void;
+    isPinned?: boolean;
 };
 
-export function DashboardTopbar({ onMenuClick }: DashboardTopbarProps) {
+export function DashboardTopbar({ onMenuClick, isPinned = false }: DashboardTopbarProps) {
     const router = useRouter();
     const [me, setMe] = useState<CurrentUser | null>(null);
 
@@ -60,7 +61,11 @@ export function DashboardTopbar({ onMenuClick }: DashboardTopbarProps) {
         "";
 
     return (
-        <header className="fixed left-0 right-0 top-0 z-40 h-14 border-b border-[#10b981] bg-white shadow-sm">
+        <header
+            className={`fixed right-0 top-0 z-40 h-14 border-b border-[#10b981] bg-white shadow-sm transition-all duration-300 ${
+                isPinned ? "left-0 lg:left-[300px]" : "left-0"
+            }`}
+        >
             <div className="flex h-full items-center justify-between">
                 <div className="flex h-full items-center">
                     {/* icon sidebar width */}

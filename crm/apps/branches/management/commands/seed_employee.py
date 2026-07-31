@@ -237,6 +237,18 @@ BRANCH_EMPLOYEE_DATA = {
 class Command(BaseCommand):
     help = "Seed lại nhân viên mẫu: Mỗi chi nhánh gồm 1 CCC, 1 SA và 1 Supervisor (Tổng 21 nhân viên/tài khoản)."
 
+    def safe_write(self, msg, style_func=None):
+        try:
+            output = style_func(msg) if style_func else msg
+            self.stdout.write(output)
+        except Exception:
+            try:
+                clean_msg = str(msg).encode('ascii', 'replace').decode('ascii')
+                output = style_func(clean_msg) if style_func else clean_msg
+                self.stdout.write(output)
+            except Exception:
+                pass
+
     @transaction.atomic
     def handle(self, *args, **options):
         roles = self.seed_roles()
@@ -250,10 +262,9 @@ class Command(BaseCommand):
             try:
                 branch = Branch.objects.get(branch_code=branch_code)
             except Branch.DoesNotExist:
-                self.stdout.write(
-                    self.style.WARNING(
-                        f"Bỏ qua {branch_code}: chưa tồn tại chi nhánh"
-                    )
+                self.safe_write(
+                    f"Bỏ qua {branch_code}: chưa tồn tại chi nhánh",
+                    style_func=self.style.WARNING
                 )
                 continue
 
@@ -310,10 +321,9 @@ class Command(BaseCommand):
                     },
                 )
 
-                # Cài mật khẩu mặc định 123456 nếu tài khoản mới hoặc chưa có mật khẩu
-                if user_created or not user.has_usable_password():
-                    user.set_password("123456")
-                    user.save()
+                # Cài mật khẩu mặc định 123456 cho tất cả tài khoản mẫu
+                user.set_password("123456")
+                user.save()
 
                 if user_created:
                     user_created_count += 1
@@ -354,7 +364,7 @@ class Command(BaseCommand):
                     },
                 )
 
-                self.stdout.write(
+                self.safe_write(
                     f"{employee.employee_code:<18} | "
                     f"{employee.full_name:<20} | "
                     f"{branch.branch_code:<8} | "
@@ -366,15 +376,14 @@ class Command(BaseCommand):
             employee_code__in=active_codes
         ).update(status="INACTIVE")
 
-        self.stdout.write(
-            self.style.SUCCESS(
-                "\n=== HOÀN TẤT SEED NHÂN VIÊN (3 NV/CHI NHÁNH) ===\n"
-                f"- Số chi nhánh: {len(BRANCH_EMPLOYEE_DATA)}\n"
-                f"- Tổng số nhân viên active: {len(active_codes)}\n"
-                f"- Nhân viên tạo mới: {employee_created_count}\n"
-                f"- Tài khoản tạo mới: {user_created_count}\n"
-                f"- Nhân viên cũ ngưng hoạt động (INACTIVE): {deactivated}"
-            )
+        self.safe_write(
+            "\n=== HOÀN TẤT SEED NHÂN VIÊN (3 NV/CHI NHÁNH) ===\n"
+            f"- Số chi nhánh: {len(BRANCH_EMPLOYEE_DATA)}\n"
+            f"- Tổng số nhân viên active: {len(active_codes)}\n"
+            f"- Nhân viên tạo mới: {employee_created_count}\n"
+            f"- Tài khoản tạo mới: {user_created_count}\n"
+            f"- Nhân viên cũ ngưng hoạt động (INACTIVE): {deactivated}",
+            style_func=self.style.SUCCESS
         )
 
     def seed_roles(self):

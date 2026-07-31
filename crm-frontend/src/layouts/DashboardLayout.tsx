@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ReactNode, useState } from "react";
+import { ReactNode, useState, useEffect } from "react";
 import { Settings } from "lucide-react";
 
 import { DashboardSidebar } from "@/components/layout/DashboardSidebar";
@@ -33,9 +33,29 @@ export function DashboardLayout({
     contentClassName?: string;
 }) {
     const [menuOpen, setMenuOpen] = useState(false);
+    const [isPinned, setIsPinned] = useState(false);
     const [settingsSidebarOpen, setSettingsSidebarOpen] = useState(
         defaultSettingsSidebarOpen
     );
+
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            const stored = localStorage.getItem("crm_nav_pinned");
+            if (stored === "true") {
+                setIsPinned(true);
+            }
+        }
+    }, []);
+
+    const handleTogglePin = () => {
+        setIsPinned((prev) => {
+            const next = !prev;
+            if (typeof window !== "undefined") {
+                localStorage.setItem("crm_nav_pinned", String(next));
+            }
+            return next;
+        });
+    };
 
     const { currentUser, activeWorkspace, loading, error } = useWorkspaceGuard();
 
@@ -85,13 +105,18 @@ export function DashboardLayout({
     return (
         <main className="min-h-screen bg-[#eef6f2] text-slate-800">
             <MainNavigationDrawer
-                open={menuOpen}
+                open={menuOpen || isPinned}
                 onClose={() => setMenuOpen(false)}
+                isPinned={isPinned}
+                onTogglePin={handleTogglePin}
                 activeWorkspace={activeWorkspace}
                 currentUser={currentUser}
             />
 
-            <DashboardTopbar onMenuClick={() => setMenuOpen(true)} />
+            <DashboardTopbar
+                onMenuClick={() => setMenuOpen((prev) => !prev)}
+                isPinned={isPinned}
+            />
 
             <DashboardSidebar
                 open={settingsSidebarOpen}
@@ -101,21 +126,27 @@ export function DashboardLayout({
                 showCloseButton={sidebarShowCloseButton}
             />
 
-            <aside className="fixed left-0 top-14 z-30 h-[calc(100vh-56px)] w-10 bg-[#064e3b]">
-                {/* <button
-                    type="button"
-                    onClick={() => setSettingsSidebarOpen(true)}
-                    className={`flex h-10 w-full items-center justify-center text-white ${settingsSidebarOpen
-                            ? "bg-[#10b981] hover:bg-[#059669]"
-                            : "bg-[#0f291e] hover:bg-[#10b981]"
-                        }`}
-                    title="Mở cài đặt"
-                >
-                    <Settings size={22} />
-                </button> */}
-            </aside>
+            {!isPinned && (
+                <aside className="fixed left-0 top-14 z-30 h-[calc(100vh-56px)] w-10 bg-[#064e3b]">
+                    {/* <button
+                        type="button"
+                        onClick={() => setSettingsSidebarOpen(true)}
+                        className={`flex h-10 w-full items-center justify-center text-white ${settingsSidebarOpen
+                                ? "bg-[#10b981] hover:bg-[#059669]"
+                                : "bg-[#0f291e] hover:bg-[#10b981]"
+                            }`}
+                        title="Mở cài đặt"
+                    >
+                        <Settings size={22} />
+                    </button> */}
+                </aside>
+            )}
 
-            <section className={`min-h-screen pt-14 ${contentClassName}`}>
+            <section
+                className={`min-h-screen pt-14 transition-all duration-300 ${
+                    isPinned ? "pl-0 lg:pl-[300px]" : contentClassName
+                }`}
+            >
                 <div className="sticky top-[56px] z-20 flex h-11 items-center justify-between border-b border-slate-200 bg-white/95 px-4 backdrop-blur-sm shadow-xs">
                     <div className="flex min-w-0 flex-1 items-center gap-3">
                         <Breadcrumbs

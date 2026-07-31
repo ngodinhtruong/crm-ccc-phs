@@ -47,6 +47,8 @@ import { setActiveWorkspace } from "@/utils/workspace.util";
 type MainNavigationDrawerProps = {
   open: boolean;
   onClose: () => void;
+  isPinned?: boolean;
+  onTogglePin?: () => void;
   activeWorkspace: WorkspaceCode;
   currentUser?: CurrentUser | null;
 };
@@ -94,11 +96,11 @@ const WORKSPACE_ORDER: WorkspaceCode[] = ["CCC", "SALE_ADMIN"];
 
 const mainMenuItemsByWorkspace: Record<WorkspaceCode, MainMenuItem[]> = {
   CCC: [
-    {
-      title: "DASHBOARD TỔNG HỢP",
-      href: "/dashboard",
-      icon: BarChart3,
-    },
+    // {
+    //   title: "DASHBOARD TỔNG HỢP",
+    //   href: "/dashboard",
+    //   icon: BarChart3,
+    // },
     {
       title: "DASHBOARD CCC",
       href: "/tickets/dashboard",
@@ -710,6 +712,8 @@ function filterPanelGroups(
 export function MainNavigationDrawer({
   open,
   onClose,
+  isPinned = false,
+  onTogglePin,
   activeWorkspace,
   currentUser,
 }: MainNavigationDrawerProps) {
@@ -738,12 +742,16 @@ export function MainNavigationDrawer({
   const handleClose = () => {
     setActivePanel(null);
     setActivePanelWorkspace(null);
-    onClose();
+    if (!isPinned) {
+      onClose();
+    }
   };
 
   const handleNavigate = (workspace: WorkspaceCode) => {
     setActiveWorkspace(workspace);
-    handleClose();
+    if (!isPinned) {
+      handleClose();
+    }
   };
 
   const activeGroups =
@@ -759,7 +767,7 @@ export function MainNavigationDrawer({
 
   return (
     <>
-      {open && (
+      {open && !isPinned && (
         <button
           type="button"
           onClick={handleClose}
@@ -773,8 +781,9 @@ export function MainNavigationDrawer({
           setActivePanel(null);
           setActivePanelWorkspace(null);
         }}
-        className={`fixed left-0 top-0 z-50 h-screen w-[300px] bg-[#064e3b] text-white shadow-2xl transition-transform duration-300 ${open ? "translate-x-0" : "-translate-x-full"
-          }`}
+        className={`fixed left-0 top-0 z-50 h-screen w-[300px] bg-[#064e3b] text-white shadow-2xl transition-transform duration-300 ${
+          open || isPinned ? "translate-x-0" : "-translate-x-full"
+        }`}
       >
         <div className="h-screen w-[300px] overflow-y-auto border-r border-white/10 bg-[#064e3b]">
           <div className="flex h-[56px] items-center justify-between border-b border-white/10 px-4">
@@ -787,9 +796,30 @@ export function MainNavigationDrawer({
               <X size={22} />
             </button>
 
-            <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-white/45">
-              Menu chức năng
-              <Pin size={18} className="text-white/35" />
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-white/45">
+                Menu chức năng
+              </span>
+              {onTogglePin && (
+                <button
+                  type="button"
+                  onClick={onTogglePin}
+                  className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-[11px] font-semibold transition ${
+                    isPinned
+                      ? "bg-[#10b981] text-white shadow-xs"
+                      : "text-white/60 hover:bg-white/10 hover:text-white"
+                  }`}
+                  title={isPinned ? "Bỏ ghim menu" : "Ghim menu cố định"}
+                >
+                  <Pin
+                    size={15}
+                    className={`transition-transform duration-200 ${
+                      isPinned ? "rotate-45 fill-current text-white" : ""
+                    }`}
+                  />
+                  <span>{isPinned ? "Đã ghim" : "Ghim"}</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -866,7 +896,7 @@ export function MainNavigationDrawer({
 
                   <ChevronRight size={24} className="text-white/60" />
                 </button>
-                <Link
+                {/* <Link
                   href="/dashboard"
                   onMouseEnter={() => {
                     setActivePanel(null);
@@ -880,7 +910,7 @@ export function MainNavigationDrawer({
                   <span className="flex-1 text-[10px] font-semibold tracking-wide">
                     DASHBOARD TỔNG HỢP
                   </span>
-                </Link>
+                </Link> */}
 
 
 

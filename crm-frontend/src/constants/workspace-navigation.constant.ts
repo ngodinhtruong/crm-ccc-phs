@@ -45,12 +45,12 @@ export const WORKSPACE_NAVIGATION: Record<
       key: "ccc-main",
       label: "CCC",
       items: [
-        {
-          key: "ccc-dashboard-general",
-          label: "Dashboard Tổng hợp",
-          href: "/dashboard",
-          icon: BarChart3,
-        },
+        // {
+        //   key: "ccc-dashboard-general",
+        //   label: "Dashboard Tổng hợp",
+        //   href: "/dashboard",
+        //   icon: BarChart3,
+        // },
         {
           key: "ccc-dashboard",
           label: "Dashboard CCC",
