@@ -37,7 +37,10 @@ logger.info(
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-zn^@^qr1ft*$d)2k9dwyc9m8czs)r)l@^rc8+0@o&5rd$mfpoi'
+SECRET_KEY = os.getenv(
+    "DJANGO_SECRET_KEY",
+    "django-insecure-zn^@^qr1ft*$d)2k9dwyc9m8czs)r)l@^rc8+0@o&5rd$mfpoi",
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
