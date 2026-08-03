@@ -17,7 +17,6 @@ const ALLOWED_DEV_ORIGINS = (
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: ALLOWED_DEV_ORIGINS,
-
   /**
    * Giữ nguyên URL, không để Next.js trả 308 redirect cắt dấu "/" cuối —
    * Django bắt buộc phải có nó.
