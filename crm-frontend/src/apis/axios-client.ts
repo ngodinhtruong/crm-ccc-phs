@@ -4,11 +4,7 @@ import axios, {
   InternalAxiosRequestConfig,
 } from "axios";
 
-/**
- * Để rỗng: trình duyệt gọi đường dẫn tương đối (/api/...) tới chính origin
- * đang mở, rồi Next.js chuyển tiếp sang Django.
- */
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
 
 type RetryableAxiosRequestConfig = InternalAxiosRequestConfig & {
   _retry?: boolean;
@@ -17,11 +13,6 @@ type RetryableAxiosRequestConfig = InternalAxiosRequestConfig & {
 export const api: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: 15000,
-
-  // Không đặt Content-Type cố định ở đây.
-  // Axios sẽ tự chọn:
-  // - application/json cho object JSON.
-  // - multipart/form-data kèm boundary cho FormData.
 });
 
 function clearAuthAndRedirect() {
@@ -34,6 +25,19 @@ function clearAuthAndRedirect() {
 
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
+    /*
+     * Chuẩn hóa endpoint:
+     *
+     * baseURL = /api
+     *
+     * /token/              -> /api/token/
+     * /api/token/          -> /api/token/
+     * /api/accounts/me/    -> /api/accounts/me/
+     */
+    if (config.url) {
+      config.url = config.url.replace(/^\/api(?=\/)/, "");
+    }
+
     if (typeof window !== "undefined") {
       const accessToken = localStorage.getItem("access_token");
 
@@ -42,9 +46,6 @@ api.interceptors.request.use(
       }
     }
 
-    // Xóa Content-Type cũ nếu request gửi FormData.
-    // Trình duyệt phải tự sinh multipart boundary; không được giữ
-    // application/json hoặc tự viết multipart/form-data thủ công.
     if (
       typeof FormData !== "undefined" &&
       config.data instanceof FormData
@@ -60,11 +61,13 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    const originalRequest = error.config as RetryableAxiosRequestConfig;
+    const originalRequest =
+      error.config as RetryableAxiosRequestConfig | undefined;
 
     if (
       error.response?.status === 401 &&
-      !originalRequest?._retry &&
+      originalRequest &&
+      !originalRequest._retry &&
       typeof window !== "undefined"
     ) {
       originalRequest._retry = true;
@@ -73,23 +76,27 @@ api.interceptors.response.use(
 
       if (!refreshToken) {
         clearAuthAndRedirect();
-        return new Promise(() => { });
+        return Promise.reject(error);
       }
 
       try {
         const response = await axios.post(
           `${API_BASE_URL}/token/refresh/`,
           { refresh: refreshToken },
-          { headers: { "Content-Type": "application/json" } }
+          {
+            headers: {
+              "Content-Type": "application/json",
+            },
+          }
         );
 
         const newAccessToken = response.data.access;
 
         localStorage.setItem("access_token", newAccessToken);
-        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
 
-        // Nếu request gốc là FormData thì tiếp tục để browser tự tạo boundary
-        // khi Axios gửi lại request sau refresh token.
+        originalRequest.headers.Authorization =
+          `Bearer ${newAccessToken}`;
+
         if (
           typeof FormData !== "undefined" &&
           originalRequest.data instanceof FormData
@@ -98,9 +105,9 @@ api.interceptors.response.use(
         }
 
         return api(originalRequest);
-      } catch {
+      } catch (refreshError) {
         clearAuthAndRedirect();
-        return new Promise(() => { });
+        return Promise.reject(refreshError);
       }
     }
 
