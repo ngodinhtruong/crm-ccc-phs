@@ -41,10 +41,18 @@ SECRET_KEY = os.getenv(
     "DJANGO_SECRET_KEY",
     "django-insecure-zn^@^qr1ft*$d)2k9dwyc9m8czs)r)l@^rc8+0@o&5rd$mfpoi",
 )
+SECURE_PROXY_SSL_HEADER = (
+    "HTTP_X_FORWARDED_PROTO",
+    "https",
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-
+DEBUG = os.getenv("DJANGO_DEBUG", "False").lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
 
 
 # Application definition
