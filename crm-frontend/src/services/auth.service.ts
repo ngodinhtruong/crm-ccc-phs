@@ -34,7 +34,7 @@ function isTokenUsable(token: string | null) {
 
 export const authService = {
   login: async (payload: LoginPayload) => {
-    const response = await api.post<TokenResponse>("/api/token/", payload);
+    const response = await api.post<TokenResponse>("/token/", payload);
 
     localStorage.setItem("access_token", response.data.access);
     localStorage.setItem("refresh_token", response.data.refresh);
