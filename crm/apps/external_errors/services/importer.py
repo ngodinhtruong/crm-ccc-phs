@@ -34,7 +34,14 @@ EXCEL_COLUMN_ALIASES = {
         "Nguyên nhân lỗi",
         "Nguyên nhân chính",
     ),
+    "solution": (
+        "Giải pháp",
+        "Giải pháp xử lý",
+        "Biện pháp khắc phục",
+    ),
 }
+
+OPTIONAL_EXCEL_FIELDS = {"solution"}
 
 # Alias tương thích với code/test cũ.
 EXCEL_COLUMNS = {
@@ -63,6 +70,86 @@ def ensure_aware(value: datetime) -> datetime:
     )
 
 
+def normalize_datetime_string(text: Any) -> str:
+    cleaned = clean_text(text)
+    if not cleaned:
+        return ""
+
+    # Gom nhiều khoảng trắng dư thừa thành 1 khoảng trắng duy nhất
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+
+    # Xóa khoảng trắng thừa xung quanh các ký tự phân cách ngày giờ như /, -, :
+    # Ví dụ: "06 / 05 / 2026   13 : 54 : 00" -> "06/05/2026 13:54:00"
+    cleaned = re.sub(r"\s*([/\-:])\s*", r"\1", cleaned)
+
+    # Gom lại khoảng trắng nếu có sau khi làm sạch ký tự phân cách
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+
+    def fix_time_ampm(m: re.Match) -> str:
+        time_part = m.group(1)
+        ampm = m.group(2).upper()
+
+        parts = time_part.split(":")
+        try:
+            hour = int(parts[0])
+        except ValueError:
+            return f"{time_part} {ampm}"
+
+        if hour > 12 or hour == 0:
+            # Ví dụ: 13:54 PM / 13:54 AM -> 13:54, 00:15 PM -> 00:15
+            return time_part
+        elif hour == 12:
+            if ampm == "AM":
+                # 12:30 AM -> 00:30
+                parts[0] = "00"
+                return ":".join(parts)
+            else:
+                # 12:30 PM -> 12:30
+                return time_part
+        else:
+            # 1 <= hour < 12 (ví dụ: 02:30 PM -> 02:30 PM)
+            return f"{time_part} {ampm}"
+
+    return re.sub(
+        r"(?i)(\d{1,2}:\d{2}(?::\d{2})?)\s*(am|pm)\b",
+        fix_time_ampm,
+        cleaned,
+    )
+
+
+COMMON_DATETIME_FORMATS = (
+    # 12-hour AM/PM formats
+    "%d/%m/%Y %I:%M:%S %p",
+    "%d/%m/%Y %I:%M %p",
+    "%d-%m-%Y %I:%M:%S %p",
+    "%d-%m-%Y %I:%M %p",
+    "%Y-%m-%d %I:%M:%S %p",
+    "%Y-%m-%d %I:%M %p",
+    "%m/%d/%Y %I:%M:%S %p",
+    "%m/%d/%Y %I:%M %p",
+    "%m-%d-%Y %I:%M:%S %p",
+    "%m-%d-%Y %I:%M %p",
+    # 24-hour formats
+    "%d/%m/%Y %H:%M:%S",
+    "%d/%m/%Y %H:%M",
+    "%d/%m/%Y",
+    "%d-%m-%Y %H:%M:%S",
+    "%d-%m-%Y %H:%M",
+    "%d-%m-%Y",
+    "%Y-%m-%dT%H:%M:%S",
+    "%Y-%m-%dT%H:%M",
+    "%Y-%m-%d %H:%M:%S",
+    "%Y-%m-%d %H:%M",
+    "%Y-%m-%d",
+    "%m/%d/%Y %H:%M:%S",
+    "%m/%d/%Y %H:%M",
+    "%m/%d/%Y",
+    "%m-%d-%Y %H:%M:%S",
+    "%m-%d-%Y %H:%M",
+    "%m-%d-%Y",
+)
+
+
 def parse_received_datetime(value: Any) -> datetime | None:
     if value is None:
         return None
@@ -71,25 +158,11 @@ def parse_received_datetime(value: Any) -> datetime | None:
     if isinstance(value, date):
         return ensure_aware(datetime.combine(value, time.min))
 
-    text_value = clean_text(value)
+    text_value = normalize_datetime_string(value)
     if not text_value:
         return None
 
-    formats = (
-        "%d/%m/%Y %H:%M:%S",
-        "%d/%m/%Y %H:%M",
-        "%d/%m/%Y",
-        "%d-%m-%Y %H:%M:%S",
-        "%d-%m-%Y %H:%M",
-        "%d-%m-%Y",
-        "%Y-%m-%dT%H:%M:%S",
-        "%Y-%m-%dT%H:%M",
-        "%Y-%m-%d %H:%M:%S",
-        "%Y-%m-%d %H:%M",
-        "%Y-%m-%d",
-    )
-
-    for fmt in formats:
+    for fmt in COMMON_DATETIME_FORMATS:
         try:
             return ensure_aware(
                 datetime.strptime(text_value, fmt)
@@ -114,37 +187,18 @@ def parse_completed_datetime(value: Any) -> datetime | None:
             datetime.combine(value, time(23, 59))
         )
 
-    text_value = clean_text(value)
+    text_value = normalize_datetime_string(value)
     if not text_value:
         return None
 
     has_time = bool(
         re.search(
-            r"\b\d{1,2}:\d{2}(?::\d{2})?\b",
+            r"(?i)\b\d{1,2}:\d{2}(?::\d{2})?\b|\b(am|pm)\b",
             text_value,
         )
     )
-    formats = (
-        "%m/%d/%Y %H:%M:%S",
-        "%m/%d/%Y %H:%M",
-        "%m/%d/%Y",
-        "%m-%d-%Y %H:%M:%S",
-        "%m-%d-%Y %H:%M",
-        "%m-%d-%Y",
-        "%Y-%m-%dT%H:%M:%S",
-        "%Y-%m-%dT%H:%M",
-        "%Y-%m-%d %H:%M:%S",
-        "%Y-%m-%d %H:%M",
-        "%Y-%m-%d",
-        "%d/%m/%Y %H:%M:%S",
-        "%d/%m/%Y %H:%M",
-        "%d/%m/%Y",
-        "%d-%m-%Y %H:%M:%S",
-        "%d-%m-%Y %H:%M",
-        "%d-%m-%Y",
-    )
 
-    for fmt in formats:
+    for fmt in COMMON_DATETIME_FORMATS:
         try:
             parsed = datetime.strptime(text_value, fmt)
             if not has_time:
@@ -171,7 +225,10 @@ def is_resolved_result(value: Any) -> bool:
     text = re.sub(r"[^a-z0-9]+", " ", text)
     text = re.sub(r"\s+", " ", text).strip()
     return bool(
-        re.search(r"\bda(?: duoc)? khac phuc\b", text)
+        re.search(
+            r"\bda(?: duoc)? khac phuc\b|\bhoan thanh\b|\bda xu ly\b|\bresolved\b|\bdone\b|\bfixed\b",
+            text,
+        )
     )
 
 
@@ -188,7 +245,7 @@ def build_batch_code(prefix: str = "EXTERR") -> str:
 def build_record(
     *,
     received_date: datetime,
-    completed_date: datetime,
+    completed_date: datetime | None = None,
     source: Any,
     device: Any,
     result: Any,
@@ -201,10 +258,6 @@ def build_record(
     if received_date is None:
         raise ValueError(
             "Không thể tạo record khi Ngày nhận bị rỗng."
-        )
-    if completed_date is None:
-        raise ValueError(
-            "Không thể tạo record khi Ngày hoàn thành bị rỗng."
         )
 
     raw_data = {
@@ -255,7 +308,7 @@ def validate_record_values(
     result: Any,
     content: Any,
     import_time: datetime | None = None,
-) -> tuple[datetime, datetime]:
+) -> tuple[datetime, datetime | None]:
     received_at = parse_received_datetime(received_date)
     if received_at is None:
         raise ValueError(
@@ -270,15 +323,10 @@ def validate_record_values(
         if is_resolved_result(result):
             completed_at = import_time or timezone.now()
         else:
-            raise ValueError(
-                "Thiếu Ngày hoàn thành và Kết quả xử lý "
-                "không có 'Đã khắc phục'."
-            )
+            completed_at = None
 
-    if completed_at < received_at:
-        raise ValueError(
-            "Ngày hoàn thành không được trước Ngày nhận."
-        )
+    if completed_at is not None and completed_at < received_at:
+        completed_at = received_at
 
     return received_at, completed_at
 
@@ -308,13 +356,25 @@ def create_manual_record(
         created_by=created_by,
     )
     record.save()
+    try:
+        from apps.external_errors.models import ExternalErrorRecordAuditLog
+        from apps.external_errors.services.audit import log_record_audit, snapshot_record_data
+        log_record_audit(
+            record=record,
+            action_type=ExternalErrorRecordAuditLog.ACTION_CREATE,
+            user=created_by,
+            new_data=snapshot_record_data(record),
+            note="Tạo mới lỗi thủ công",
+        )
+    except Exception:
+        pass
     invalidate_external_error_dashboard_cache()
     return record
 
 
 def find_excel_columns(
     headers: tuple[Any, ...],
-) -> dict[str, int]:
+) -> dict[str, int | None]:
     normalized_headers = {
         normalize_header(header): index
         for index, header in enumerate(headers)
@@ -334,7 +394,10 @@ def find_excel_columns(
                 break
 
         if column_index is None:
-            missing.append(aliases[0])
+            if field_name in OPTIONAL_EXCEL_FIELDS:
+                result[field_name] = None
+            else:
+                missing.append(aliases[0])
         else:
             result[field_name] = column_index
 
@@ -482,7 +545,7 @@ def import_excel_file(
         values = {
             field_name: (
                 row[column_index]
-                if column_index < len(row)
+                if column_index is not None and column_index < len(row)
                 else None
             )
             for field_name, column_index in column_map.items()
@@ -513,6 +576,7 @@ def import_excel_file(
                     result=values["result"],
                     content=values["content"],
                     cause=values.get("cause"),
+                    solution=values.get("solution"),
                     created_by=created_by,
                 )
             )
@@ -542,14 +606,12 @@ def import_excel_file(
         )
 
         invalid_count = batch.records.filter(
-            Q(received_date__isnull=True)
-            | Q(completed_date__isnull=True)
+            received_date__isnull=True
         ).count()
         if invalid_count:
             raise RuntimeError(
                 "Import bị hủy vì có "
-                f"{invalid_count} record không lưu được "
-                "Ngày nhận hoặc Ngày hoàn thành."
+                f"{invalid_count} record không lưu được Ngày nhận."
             )
 
         batch.total_rows = len(pending_records)

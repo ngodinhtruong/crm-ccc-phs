@@ -9,6 +9,7 @@ from apps.external_errors.models import (
     ExternalErrorGroup,
     ExternalErrorImportBatch,
     ExternalErrorRecord,
+    ExternalErrorRecordAuditLog,
 )
 from apps.external_errors.services.importer import (
     parse_completed_datetime,
@@ -175,19 +176,31 @@ class ExternalErrorRecordSerializer(serializers.ModelSerializer):
             "cause_llm_model_id", "cause_classified_at", "created_by",
             "updated_by", "created_at", "updated_at",
         ]
-        read_only_fields = fields
+        read_only_fields = [
+            "id", "batch", "batch_code", "error_code_value", "error_code_name",
+            "error_group_id", "error_group_code", "error_group_name",
+            "error_type_code", "error_type_name", "error_type_label",
+            "cause_group_code", "cause_group_name", "created_by",
+            "updated_by", "created_at", "updated_at",
+        ]
+
+    def update(self, instance, validated_data):
+        if "raw_result" in validated_data and validated_data["raw_result"]:
+            validated_data["clean_result"] = validated_data["raw_result"]
+        return super().update(instance, validated_data)
 
 
 class ExternalErrorRecordListSerializer(ExternalErrorRecordSerializer):
     class Meta(ExternalErrorRecordSerializer.Meta):
         fields = [
             "id", "batch", "batch_code", "received_date", "completed_date",
-            "clean_source", "clean_device", "clean_result", "clean_content",
-            "clean_cause", "error_code", "error_code_value",
-            "error_code_name", "error_group_id", "error_group_code",
-            "error_group_name", "error_type_code", "error_type_name",
-            "error_type_label", "normalized_issue",
-            "classification_confidence", "need_review",
+            "raw_source", "raw_device", "raw_result", "raw_content",
+            "raw_cause", "raw_solution", "clean_source", "clean_device",
+            "clean_result", "clean_content", "clean_cause", "clean_solution",
+            "error_code", "error_code_value", "error_code_name",
+            "error_group_id", "error_group_code", "error_group_name",
+            "error_type_code", "error_type_name", "error_type_label",
+            "normalized_issue", "classification_confidence", "need_review",
             "classification_status", "classification_error", "classified_at",
             "cause_group", "cause_group_code", "cause_group_name",
             "normalized_cause", "cause_classification_confidence",
@@ -320,5 +333,20 @@ class ExternalErrorClassificationLogSerializer(serializers.ModelSerializer):
         fields = [
             "id", "record", "model_id", "prompt_version", "input_payload",
             "output_payload", "error_message", "latency_ms", "created_at",
+        ]
+        read_only_fields = fields
+
+
+class ExternalErrorRecordAuditLogSerializer(serializers.ModelSerializer):
+    changed_by_username = serializers.CharField(
+        source="changed_by_user.username", read_only=True, allow_null=True
+    )
+
+    class Meta:
+        model = ExternalErrorRecordAuditLog
+        fields = [
+            "id", "record", "action_type", "old_data", "new_data",
+            "changed_fields", "changed_by_user", "changed_by_username",
+            "changed_at", "note",
         ]
         read_only_fields = fields

@@ -871,7 +871,13 @@ class KpiUserSummarySerializer(serializers.ModelSerializer):
     user_username = serializers.CharField(source="user.username", read_only=True)
     user_email = serializers.CharField(source="user.email", read_only=True)
     employee_name = serializers.CharField(source="employee.full_name", read_only=True)
+    employee_position = serializers.CharField(source="employee.position", read_only=True)
     branch_name = serializers.CharField(source="branch.branch_name", read_only=True)
+    role_names = serializers.SerializerMethodField()
+
+    def get_role_names(self, obj):
+        roles = obj.user.user_roles.select_related("role").all() if obj.user_id else []
+        return [r.role.role_name for r in roles if r.role]
 
     class Meta:
         model = KpiUserSummary
@@ -886,8 +892,10 @@ class KpiUserSummarySerializer(serializers.ModelSerializer):
             "user_email",
             "employee",
             "employee_name",
+            "employee_position",
             "branch",
             "branch_name",
+            "role_names",
             "manual_score",
             "auto_score",
             "total_score",

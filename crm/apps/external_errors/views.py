@@ -15,6 +15,7 @@ from apps.external_errors.models import (
     ExternalErrorGroup,
     ExternalErrorImportBatch,
     ExternalErrorRecord,
+    ExternalErrorRecordAuditLog,
 )
 from apps.external_errors.permissions import (
     ExternalErrorPermission,
@@ -34,8 +35,13 @@ from apps.external_errors.serializers import (
     ExternalErrorImportBatchSerializer,
     ExternalErrorManualCreateSerializer,
     ExternalErrorRawImportSerializer,
+    ExternalErrorRecordAuditLogSerializer,
     ExternalErrorRecordListSerializer,
     ExternalErrorRecordSerializer,
+)
+from apps.external_errors.services.audit import (
+    log_record_audit,
+    snapshot_record_data,
 )
 from apps.external_errors.services.analytics import (
     apply_external_error_filters,
@@ -67,6 +73,7 @@ from apps.external_errors.services.importer import (
 
 from apps.external_errors.tasks import (
     classify_external_error_batch,
+    classify_external_error_records_task,
 )
 
 
@@ -249,6 +256,18 @@ class ExternalErrorImportBatchViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = ExternalErrorImportBatchSerializer
     permission_classes = [IsAuthenticated, ExternalErrorPermission]
 
+    @action(detail=True, methods=["post"], url_path="classify")
+    def classify(self, request, pk=None):
+        batch = self.get_object()
+        task = classify_external_error_batch.delay(batch.id)
+        batch.status = ExternalErrorImportBatch.STATUS_CLASSIFYING
+        batch.save(update_fields=["status", "updated_at"])
+        return Response({
+            "detail": f"Đã đẩy tác vụ Phân loại Batch #{batch.id} vào hàng chờ Celery.",
+            "task_id": task.id,
+            "batch": ExternalErrorImportBatchSerializer(batch).data,
+        })
+
 
 class ExternalErrorRecordViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, ExternalErrorPermission]
@@ -278,10 +297,11 @@ class ExternalErrorRecordViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
+        user = request.user if getattr(request.user, "is_authenticated", False) else None
         try:
             record = create_manual_record(
                 data=serializer.validated_data,
-                created_by=request.user,
+                created_by=user,
             )
         except ValueError as exc:
             raise ValidationError({"detail": str(exc)}) from exc
@@ -306,12 +326,42 @@ class ExternalErrorRecordViewSet(viewsets.ModelViewSet):
         return Response(output.data, status=status.HTTP_201_CREATED)
 
     def perform_update(self, serializer):
-        serializer.save(updated_by=self.request.user)
+        old_data = snapshot_record_data(serializer.instance)
+        user = self.request.user if getattr(self.request.user, "is_authenticated", False) else None
+        save_kwargs = {}
+        if user:
+            save_kwargs["updated_by"] = user
+
+        instance = serializer.save(**save_kwargs)
+        new_data = snapshot_record_data(instance)
+        log_record_audit(
+            record=instance,
+            action_type=ExternalErrorRecordAuditLog.ACTION_UPDATE,
+            user=user,
+            old_data=old_data,
+            new_data=new_data,
+            note="Chỉnh sửa thông tin lỗi",
+        )
         invalidate_external_error_dashboard_cache()
 
     def perform_destroy(self, instance):
+        old_data = snapshot_record_data(instance)
+        log_record_audit(
+            record=instance,
+            action_type=ExternalErrorRecordAuditLog.ACTION_DELETE,
+            user=self.request.user,
+            old_data=old_data,
+            note="Xóa bản ghi lỗi",
+        )
         instance.delete()
         invalidate_external_error_dashboard_cache()
+
+    @action(detail=True, methods=["get"], url_path="audit-logs")
+    def audit_logs(self, request, pk=None):
+        record = self.get_object()
+        logs = record.audit_logs.select_related("changed_by_user").all()
+        serializer = ExternalErrorRecordAuditLogSerializer(logs, many=True)
+        return Response(serializer.data)
 
     @action(detail=True, methods=["post"], url_path="classify")
     def classify(self, request, pk=None):
@@ -471,9 +521,24 @@ class ExternalErrorRecordViewSet(viewsets.ModelViewSet):
                 ]
             )
 
-        return Response(
-            classify_queryset(queryset.order_by("id"), force=force)
-        )
+        target_ids = list(queryset.values_list("id", flat=True)) if not all_matching else []
+        try:
+            task = classify_external_error_records_task.delay(
+                record_ids=target_ids,
+                all_matching=all_matching,
+                force=force,
+            )
+            return Response({
+                "detail": f"Đã đẩy tác vụ Phân loại {len(target_ids) if target_ids else 'toàn bộ'} dòng vào hàng chờ Celery.",
+                "task_id": task.id,
+                "total": len(target_ids) if target_ids else queryset.count(),
+                "classified": 0,
+                "failed": 0,
+            })
+        except Exception:
+            return Response(
+                classify_queryset(queryset.order_by("id"), force=force)
+            )
 
     @action(
         detail=False,

@@ -266,7 +266,7 @@ def get_matched_transactions(period, account_nos, metric=None):
 
     window = get_metric_window(period, metric)
     return TransactionLog.objects.filter(
-        account_no__in=account_nos,
+        customer_account__account_number__in=account_nos,
         transaction_date__gte=window.start_date,
         transaction_date__lte=window.end_date,
         order_status__iexact=MATCHED_STATUS,
@@ -279,7 +279,7 @@ def get_active_reactivated_account_nos(period, account_nos, metric=None):
 
     return list(
         get_matched_transactions(period, account_nos, metric=metric)
-        .values_list("account_no", flat=True)
+        .values_list("customer_account__account_number", flat=True)
         .distinct()
     )
 

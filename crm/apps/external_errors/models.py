@@ -278,6 +278,16 @@ class ExternalErrorRecord(TimeStampedModel):
     def error_code_value(self):
         return self.error_code.error_code if self.error_code_id else None
 
+    PROCESSING_STATUS_RECEIVED = "Tiếp nhận"
+    PROCESSING_STATUS_IN_PROGRESS = "Đang xử lý"
+    PROCESSING_STATUS_SOLVED = "Đã xử lý"
+
+    PROCESSING_STATUS_CHOICES = [
+        (PROCESSING_STATUS_RECEIVED, "Tiếp nhận"),
+        (PROCESSING_STATUS_IN_PROGRESS, "Đang xử lý"),
+        (PROCESSING_STATUS_SOLVED, "Đã xử lý"),
+    ]
+
     @property
     def error_code_name(self):
         return self.error_code.error_name if self.error_code_id else None
@@ -289,6 +299,46 @@ class ExternalErrorRecord(TimeStampedModel):
     @property
     def cause_group_name(self):
         return self.cause_group.cause_name if self.cause_group_id else None
+
+
+class ExternalErrorRecordAuditLog(models.Model):
+    ACTION_CREATE = "CREATE"
+    ACTION_UPDATE = "UPDATE"
+    ACTION_DELETE = "DELETE"
+    ACTION_CLASSIFY = "CLASSIFY"
+
+    ACTION_CHOICES = [
+        (ACTION_CREATE, "Tạo mới"),
+        (ACTION_UPDATE, "Cập nhật"),
+        (ACTION_DELETE, "Xóa"),
+        (ACTION_CLASSIFY, "Phân loại AI"),
+    ]
+
+    record = models.ForeignKey(
+        ExternalErrorRecord,
+        on_delete=models.CASCADE,
+        related_name="audit_logs",
+    )
+    action_type = models.CharField(max_length=50, choices=ACTION_CHOICES)
+    old_data = models.JSONField(null=True, blank=True)
+    new_data = models.JSONField(null=True, blank=True)
+    changed_fields = models.JSONField(null=True, blank=True)
+    changed_by_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="external_error_record_audit_logs",
+    )
+    changed_at = models.DateTimeField(auto_now_add=True)
+    note = models.TextField(null=True, blank=True)
+
+    class Meta:
+        db_table = "external_error_record_audit_logs"
+        ordering = ["-changed_at", "-id"]
+
+    def __str__(self):
+        return f"AuditLog #{self.id} for Record #{self.record_id} ({self.action_type})"
 
 
 class ExternalErrorClassificationLog(models.Model):

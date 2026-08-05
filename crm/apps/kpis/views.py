@@ -990,6 +990,28 @@ class KpiUserMetricResultViewSet(viewsets.ReadOnlyModelViewSet):
 
         return queryset.order_by("period_id", "profile__sort_order", "user_id", "group__sort_order", "metric__metric_code", "id")
 
+    def list(self, request, *args, **kwargs):
+        period = request.query_params.get("period")
+        profile_code = request.query_params.get("profile_code")
+        user_id = request.query_params.get("user") or request.user.id
+
+        if period:
+            period_obj = KpiPeriod.objects.filter(id=period).first()
+            if period_obj and period_obj.status != KpiPeriod.STATUS_CLOSED:
+                target_user = get_user_model().objects.filter(id=user_id).first()
+                if target_user:
+                    try:
+                        profile_obj = KpiProfile.objects.filter(period=period_obj, profile_code=profile_code).first() if profile_code else None
+                        calculate_auto_kpis_for_user(
+                            period=period_obj,
+                            user=target_user,
+                            profile=profile_obj,
+                        )
+                    except Exception:
+                        pass
+
+        return super().list(request, *args, **kwargs)
+
     @action(methods=["get"], detail=False, url_path="metric-contributions")
     def metric_contributions(self, request):
         period_id = request.query_params.get("period")
@@ -1164,6 +1186,28 @@ class KpiUserSummaryViewSet(viewsets.ReadOnlyModelViewSet):
         if reward_tier_code:
             queryset = queryset.filter(reward_tier_code=reward_tier_code)
         return queryset.order_by("period_id", "profile__sort_order", "-total_score", "id")
+
+    def list(self, request, *args, **kwargs):
+        period = request.query_params.get("period")
+        profile_code = request.query_params.get("profile_code")
+        user_id = request.query_params.get("user") or request.user.id
+
+        if period:
+            period_obj = KpiPeriod.objects.filter(id=period).first()
+            if period_obj and period_obj.status != KpiPeriod.STATUS_CLOSED:
+                target_user = get_user_model().objects.filter(id=user_id).first()
+                if target_user:
+                    try:
+                        profile_obj = KpiProfile.objects.filter(period=period_obj, profile_code=profile_code).first() if profile_code else None
+                        calculate_kpi_summaries(
+                            period=period_obj,
+                            user=target_user,
+                            profile=profile_obj,
+                        )
+                    except Exception:
+                        pass
+
+        return super().list(request, *args, **kwargs)
 
     @action(methods=["get"], detail=False, url_path="ranking")
     def ranking(self, request):

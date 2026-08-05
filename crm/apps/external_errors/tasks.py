@@ -136,3 +136,51 @@ def classify_external_error_batch(self, batch_id: int):
         }
     finally:
         close_old_connections()
+
+
+@shared_task(
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=10,
+    retry_kwargs={"max_retries": 3},
+)
+def classify_external_error_records_task(
+    self,
+    record_ids: list[int] = None,
+    all_matching: bool = False,
+    force: bool = False,
+):
+    close_old_connections()
+    try:
+        if all_matching or not record_ids:
+            queryset = ExternalErrorRecord.objects.all()
+        else:
+            queryset = ExternalErrorRecord.objects.filter(id__in=record_ids)
+
+        if not force:
+            error_qs = queryset.exclude(
+                classification_status__in=[
+                    ExternalErrorRecord.STATUS_CLASSIFIED,
+                    ExternalErrorRecord.STATUS_CONFIRMED,
+                ]
+            ).order_by("id")
+            cause_qs = queryset.exclude(
+                cause_classification_status__in=[
+                    ExternalErrorRecord.STATUS_CLASSIFIED,
+                    ExternalErrorRecord.STATUS_CONFIRMED,
+                ]
+            ).order_by("id")
+        else:
+            error_qs = queryset.order_by("id")
+            cause_qs = queryset.order_by("id")
+
+        error_stats = classify_queryset(error_qs, force=force)
+        cause_stats = classify_queryset_causes(cause_qs, force=force)
+        invalidate_external_error_dashboard_cache()
+
+        return {
+            "error_classification": error_stats,
+            "cause_classification": cause_stats,
+        }
+    finally:
+        close_old_connections()

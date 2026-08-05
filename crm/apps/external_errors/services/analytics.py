@@ -230,11 +230,21 @@ def _group_by_queryset(
 
 
 def _summary_counts(queryset: QuerySet):
+    classified_statuses = [
+        ExternalErrorRecord.STATUS_CLASSIFIED,
+        ExternalErrorRecord.STATUS_CONFIRMED,
+    ]
     return queryset.aggregate(
         total=Count("id"),
         classified=Count(
             "id",
-            filter=Q(classification_status__in=SUCCESS_STATUSES),
+            filter=Q(classification_status__in=classified_statuses),
+        ),
+        unclassified=Count(
+            "id",
+            filter=Q(
+                classification_status=ExternalErrorRecord.STATUS_UNCLASSIFIED
+            ),
         ),
         need_review=Count(
             "id",
@@ -248,7 +258,13 @@ def _summary_counts(queryset: QuerySet):
         ),
         cause_classified=Count(
             "id",
-            filter=Q(cause_classification_status__in=SUCCESS_STATUSES),
+            filter=Q(cause_classification_status__in=classified_statuses),
+        ),
+        cause_unclassified=Count(
+            "id",
+            filter=Q(
+                cause_classification_status=ExternalErrorRecord.STATUS_UNCLASSIFIED
+            ),
         ),
         cause_need_review=Count(
             "id",
@@ -312,23 +328,22 @@ def _build_summary_from_queryset(queryset: QuerySet):
     )
 
     classified = counts["classified"] or 0
+    unclassified = counts["unclassified"] or 0
     failed = counts["failed"] or 0
     cause_classified = counts["cause_classified"] or 0
+    cause_unclassified = counts["cause_unclassified"] or 0
     cause_failed = counts["cause_failed"] or 0
 
     return {
         "total_errors": total,
         "classified_errors": classified,
-        "unclassified_errors": max(total - classified - failed, 0),
+        "unclassified_errors": unclassified,
         "need_review_errors": counts["need_review"] or 0,
         "failed_errors": failed,
         "recurring_issue_count": _recurring_issue_group_count(queryset),
         "classification_rate": safe_percent(classified, total),
         "cause_classified_errors": cause_classified,
-        "cause_unclassified_errors": max(
-            total - cause_classified - cause_failed,
-            0,
-        ),
+        "cause_unclassified_errors": cause_unclassified,
         "cause_need_review_errors": counts["cause_need_review"] or 0,
         "cause_failed_errors": cause_failed,
         "cause_classification_rate": safe_percent(
@@ -571,6 +586,7 @@ def _recurring_queryset(
             "devices": [],
             "error_groups": [],
             "cause_groups": [],
+            "solutions": [],
             "error_codes": [],
             "error_code_keys": set(),
         }
@@ -584,6 +600,8 @@ def _recurring_queryset(
         .values(
             "normalized_issue",
             "clean_device",
+            "clean_solution",
+            "raw_solution",
             "error_code__error_code",
             "error_code__error_name",
             "error_code__group__group_code",
@@ -609,6 +627,9 @@ def _recurring_queryset(
             bucket["cause_groups"],
             detail["cause_group__cause_name"],
         )
+        solution = str(detail["clean_solution"] or detail["raw_solution"] or "").strip()
+        if solution:
+            _append_unique(bucket["solutions"], solution)
 
         error_code = detail["error_code__error_code"]
         error_name = detail["error_code__error_name"]
@@ -653,6 +674,7 @@ def _recurring_queryset(
                 # Dữ liệu mới.
                 "error_groups": bucket["error_groups"],
                 "cause_groups": bucket["cause_groups"],
+                "solutions": bucket["solutions"],
                 "error_codes": bucket["error_codes"],
             }
         )

@@ -24,11 +24,13 @@ from apps.kpis.models import (
     TransactionLog,
 )
 from apps.kpis.auto_calculation import (
+    calculate_auto_kpis_for_user,
     calculate_metric_actual_value,
     get_branch_sa_records,
     get_user_employee_and_branch,
     get_user_sa_records,
 )
+from apps.kpis.summary_calculation import calculate_kpi_summaries
 from apps.sale_admin.models import SaRecord
 from apps.kpis.permissions import (
     SA_ROLE_CODES,
@@ -553,6 +555,29 @@ class KpiAdminRankingAPIView(KpiAdminBaseAPIView):
         metric_results = get_metric_result_map(period, profile, users, metrics)
         target_map = get_target_map(period, profile, users, metrics)
 
+        # Trigger auto-calculation for users missing metric results in active/non-closed periods
+        if period and period.status != KpiPeriod.STATUS_CLOSED:
+            user_ids_with_results = set(
+                KpiUserMetricResult.objects.filter(
+                    period=period,
+                    profile=profile,
+                    user_id__in=[u.id for u in users],
+                ).values_list("user_id", flat=True).distinct()
+            )
+            missing_users = [u for u in users if u.id not in user_ids_with_results]
+            if missing_users:
+                for target_u in missing_users:
+                    try:
+                        calculate_auto_kpis_for_user(period=period, profile=profile, user=target_u)
+                        calculate_kpi_summaries(period=period, profile=profile, user=target_u)
+                    except Exception:
+                        pass
+                # Re-fetch updated maps
+                summaries = get_summary_map(period, profile, users)
+                part_scores = get_part_score_map(period, profile, users)
+                metric_results = get_metric_result_map(period, profile, users, metrics)
+                target_map = get_target_map(period, profile, users, metrics)
+
         rows = []
         for user in users:
             summary = summaries.get(user.id)
@@ -583,6 +608,25 @@ class KpiAdminRankingAPIView(KpiAdminBaseAPIView):
                     except Exception:
                         actual_val = None
 
+                # Determine score value: result -> fallback from actual/target
+                score_val = getattr(result, "score", None)
+                if score_val is None and actual_val is not None:
+                    try:
+                        if target_val is not None and Decimal(str(target_val)) > 0:
+                            score_val = (Decimal(str(actual_val)) / Decimal(str(target_val))) * Decimal("100")
+                            score_val = min(score_val, Decimal("100"))
+                        else:
+                            score_val = Decimal("0")
+                    except Exception:
+                        score_val = None
+
+                weighted_val = getattr(result, "weighted_score", None)
+                if weighted_val is None and score_val is not None and metric.weight_percent:
+                    try:
+                        weighted_val = (Decimal(str(score_val)) * Decimal(str(metric.weight_percent))) / Decimal("100")
+                    except Exception:
+                        weighted_val = None
+
                 row_metrics.append(
                     {
                         "metric_id": metric.id,
@@ -591,19 +635,35 @@ class KpiAdminRankingAPIView(KpiAdminBaseAPIView):
                         "group_code": metric.group.group_code if metric.group else None,
                         "actual_value": decimal_to_string(actual_val, None),
                         "target_value": decimal_to_string(target_val, None),
-                        "score": decimal_to_string(getattr(result, "score", None), "0"),
-                        "weighted_score": decimal_to_string(getattr(result, "weighted_score", None), "0"),
+                        "score": decimal_to_string(score_val, "0"),
+                        "weighted_score": decimal_to_string(weighted_val, "0"),
                         "result_status": getattr(result, "result_status", None),
                     }
                 )
+
+            manual_sc = (
+                summary.manual_score
+                if summary and summary.manual_score is not None
+                else part_scores[user.id]["part_a_score"]
+            )
+            auto_sc = (
+                summary.auto_score
+                if summary and summary.auto_score is not None
+                else part_scores[user.id]["part_b_score"]
+            )
+            total_sc = (
+                summary.total_score
+                if summary and summary.total_score is not None
+                else (manual_sc + auto_sc)
+            )
 
             rows.append(
                 {
                     "user": user_info,
                     "summary_id": getattr(summary, "id", None),
-                    "manual_score": decimal_to_string(getattr(summary, "manual_score", None), "0"),
-                    "auto_score": decimal_to_string(getattr(summary, "auto_score", None), "0"),
-                    "total_score": decimal_to_string(getattr(summary, "total_score", None), "0"),
+                    "manual_score": decimal_to_string(manual_sc, "0"),
+                    "auto_score": decimal_to_string(auto_sc, "0"),
+                    "total_score": decimal_to_string(total_sc, "0"),
                     "part_a_score": decimal_to_string(part_scores[user.id]["part_a_score"], "0"),
                     "part_b_score": decimal_to_string(part_scores[user.id]["part_b_score"], "0"),
                     "reward_tier_code": getattr(summary, "reward_tier_code", None),
