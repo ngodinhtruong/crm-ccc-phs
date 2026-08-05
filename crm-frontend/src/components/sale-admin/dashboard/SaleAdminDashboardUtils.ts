@@ -18,12 +18,18 @@ export const SA_DASHBOARD_COLORS = {
 };
 
 export const CHART_COLORS = [
-  SA_DASHBOARD_COLORS.primary,
-  SA_DASHBOARD_COLORS.green,
-  SA_DASHBOARD_COLORS.amber,
-  SA_DASHBOARD_COLORS.purple,
-  SA_DASHBOARD_COLORS.orange,
-  SA_DASHBOARD_COLORS.slate,
+  "#10b981", // Emerald Green
+  "#3b82f6", // Royal Blue
+  "#f59e0b", // Warm Amber
+  "#8b5cf6", // Vibrant Purple
+  "#ec4899", // Bright Pink
+  "#06b6d4", // Cyan / Teal
+  "#f97316", // Vibrant Orange
+  "#6366f1", // Indigo
+  "#14b8a6", // Turquoise
+  "#eab308", // Golden Yellow
+  "#64748b", // Slate Blue
+  "#ef4444", // Crimson Red
 ];
 
 export function toNumber(value?: string | number | null) {

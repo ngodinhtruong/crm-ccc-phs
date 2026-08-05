@@ -8,6 +8,8 @@ import {
   useCurrentUserPermissions,
 } from "@/hooks/useCurrentUserPermissions";
 import { kpiService } from "@/services/kpi.service";
+import { saleAdminApi } from "@/apis/sale-admin.api";
+import { SaIcpGroup } from "@/types/sale-admin.type";
 import {
   KpiGateConfigPayload,
   KpiGateDefinitionItem,
@@ -28,7 +30,7 @@ import {
   KpiWeightValidation,
 } from "@/types/kpi.type";
 
-export type KpiConfigTab = "groups" | "metrics" | "gates" | "rewards";
+export type KpiConfigTab = "groups" | "metrics" | "gates" | "rewards" | "icp";
 
 function formatApiErrorData(data: unknown): string {
   if (!data) return "";
@@ -157,6 +159,9 @@ export function useKpiConfig() {
 
   const [weightValidation, setWeightValidation] =
     useState<KpiWeightValidation | null>(null);
+
+  const [icpGroups, setIcpGroups] = useState<SaIcpGroup[]>([]);
+  const [loadingIcp, setLoadingIcp] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -387,6 +392,83 @@ export function useKpiConfig() {
       void loadWeightValidation(selectedPeriodId, selectedProfileId);
     }
   }, [selectedPeriodId, selectedProfileId, profileRows.length, loadWeightValidation]);
+
+  const fetchIcpGroups = useCallback(async () => {
+    try {
+      setLoadingIcp(true);
+      const groups = await saleAdminApi.getIcpGroups(true);
+      setIcpGroups(groups);
+    } catch (err: unknown) {
+      console.error("Lỗi khi tải danh sách ICP groups:", err);
+    } finally {
+      setLoadingIcp(false);
+    }
+  }, []);
+
+  const createIcpGroup = useCallback(
+    async (payload: Partial<SaIcpGroup>) => {
+      try {
+        setSaving(true);
+        setError("");
+        const created = await saleAdminApi.createIcpGroup(payload);
+        setNotice(`Đã tạo phân khúc ICP: ${created.icp_code} - ${created.icp_name}`);
+        await fetchIcpGroups();
+        return created;
+      } catch (err: unknown) {
+        const errMsg = getErrorMessage(err, "Tạo phân khúc ICP thất bại");
+        setError(errMsg);
+        throw err;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [fetchIcpGroups]
+  );
+
+  const updateIcpGroup = useCallback(
+    async (id: number, payload: Partial<SaIcpGroup>) => {
+      try {
+        setSaving(true);
+        setError("");
+        const updated = await saleAdminApi.updateIcpGroup(id, payload);
+        setNotice(`Đã cập nhật phân khúc ICP: ${updated.icp_code} - ${updated.icp_name}`);
+        await fetchIcpGroups();
+        return updated;
+      } catch (err: unknown) {
+        const errMsg = getErrorMessage(err, "Cập nhật phân khúc ICP thất bại");
+        setError(errMsg);
+        throw err;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [fetchIcpGroups]
+  );
+
+  const deleteIcpGroup = useCallback(
+    async (id: number) => {
+      try {
+        setSaving(true);
+        setError("");
+        await saleAdminApi.deleteIcpGroup(id);
+        setNotice("Đã ngưng sử dụng phân khúc ICP thành công.");
+        await fetchIcpGroups();
+      } catch (err: unknown) {
+        const errMsg = getErrorMessage(err, "Ngưng sử dụng phân khúc ICP thất bại");
+        setError(errMsg);
+        throw err;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [fetchIcpGroups]
+  );
+
+  useEffect(() => {
+    if (activeTab === "icp") {
+      void fetchIcpGroups();
+    }
+  }, [activeTab, fetchIcpGroups]);
 
   const clearMessages = () => {
     setError("");
@@ -1097,6 +1179,13 @@ export function useKpiConfig() {
     markSectionInactive,
     markGroupInactive,
     markMetricInactive,
+
+    icpGroups,
+    loadingIcp,
+    fetchIcpGroups,
+    createIcpGroup,
+    updateIcpGroup,
+    deleteIcpGroup,
 
     saveWeights,
     saveProfile,

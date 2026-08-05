@@ -5,6 +5,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
   Legend,
   ResponsiveContainer,
   Tooltip,
@@ -161,7 +162,7 @@ export function IcpDistributionChart({
 
   return (
     <ExpandableChartCard
-      title="Tỷ lệ Tiềm năng / Không TN"
+      title="Cơ cấu Phân khúc KH (ICP)"
       description={`Biến động cơ cấu phân bổ khách hàng theo ICP ${granularityDesc}${compareDesc}`}
       className="h-full"
     >
@@ -203,7 +204,15 @@ export function IcpDistributionChart({
                     radius={index === icpKeys.length - 1 ? [6, 6, 0, 0] : [0, 0, 0, 0]}
                     maxBarSize={56}
                     isAnimationActive={false}
-                  />
+                  >
+                    {icpKeys.length === 1 &&
+                      chartData.map((entry, cIdx) => (
+                        <Cell
+                          key={`cell-${entry.monthLabel || cIdx}`}
+                          fill={CHART_COLORS[cIdx % CHART_COLORS.length]}
+                        />
+                      ))}
+                  </Bar>
                 ))}
               </BarChart>
             </ResponsiveContainer>

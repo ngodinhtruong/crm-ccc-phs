@@ -5,6 +5,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
   Legend,
   ResponsiveContainer,
   Tooltip,
@@ -202,7 +203,15 @@ export function ProductFeeChart({
                     radius={index === productKeys.length - 1 ? [6, 6, 0, 0] : [0, 0, 0, 0]}
                     maxBarSize={56}
                     isAnimationActive={false}
-                  />
+                  >
+                    {productKeys.length === 1 &&
+                      chartData.map((entry, cIdx) => (
+                        <Cell
+                          key={`cell-${entry.monthLabel || cIdx}`}
+                          fill={CHART_COLORS[cIdx % CHART_COLORS.length]}
+                        />
+                      ))}
+                  </Bar>
                 ))}
               </BarChart>
             </ResponsiveContainer>

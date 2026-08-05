@@ -55,6 +55,7 @@ function isCccPath(pathname: string) {
     pathname.startsWith("/sla") ||
     pathname.startsWith("/chatbots") ||
     pathname.startsWith("/dashboard") ||
+    pathname.startsWith("/ekyc") ||
     isExternalErrorPath(pathname)
   );
 }

@@ -4,6 +4,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
   Legend,
   ResponsiveContainer,
   Tooltip,
@@ -12,6 +13,7 @@ import {
 } from "recharts";
 
 import {
+  CHART_COLORS,
   formatCompactNumber,
   toNumber,
 } from "@/components/sale-admin/dashboard/SaleAdminDashboardUtils";
@@ -165,7 +167,15 @@ export function SimpleBarChart({
                   fill="#0097cf"
                   radius={isVertical ? [0, 6, 6, 0] : [6, 6, 0, 0]}
                   maxBarSize={isVertical ? 16 : 32}
-                />
+                >
+                  {!hasComparison &&
+                    data.map((entry, cIdx) => (
+                      <Cell
+                        key={`cell-${entry.label || cIdx}`}
+                        fill={CHART_COLORS[cIdx % CHART_COLORS.length]}
+                      />
+                    ))}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>

@@ -23,7 +23,6 @@ import { BranchRankingTable } from "@/components/sale-admin/dashboard/BranchRank
 import { CustomerGroupDistributionPanel } from "@/components/sale-admin/dashboard/CustomerGroupDistributionPanel";
 import { FeeByBranchChart } from "@/components/sale-admin/dashboard/FeeByBranchChart";
 import { IcpDistributionChart } from "@/components/sale-admin/dashboard/IcpDistributionChart";
-import { ProductFeeChart } from "@/components/sale-admin/dashboard/ProductFeeChart";
 import { TopAccountsTable } from "@/components/sale-admin/dashboard/TopAccountsTable";
 import { TopEmployeeChart } from "@/components/sale-admin/dashboard/TopEmployeeChart";
 import { TopEmployeesTable } from "@/components/sale-admin/dashboard/TopEmployeesTable";
@@ -306,19 +305,7 @@ export function SaleAdminDashboardPage() {
                 />
               </div>
 
-              <div className="2xl:col-span-4">
-                <ProductFeeChart
-                  rows={dashboard.data.product_fee}
-                  historyData={dashboard.historyData}
-                  month={dashboard.month}
-                  year={dashboard.year}
-                  periodLabel={periodLabel}
-                  granularity={granularity}
-                  compareMode={compareMode}
-                />
-              </div>
-
-              <div className="2xl:col-span-4">
+              <div className="2xl:col-span-6">
                 <IcpDistributionChart
                   rows={dashboard.data.icp_distribution}
                   historyData={dashboard.historyData}
@@ -330,7 +317,7 @@ export function SaleAdminDashboardPage() {
                 />
               </div>
 
-              <div className="2xl:col-span-4">
+              <div className="2xl:col-span-6">
                 <CustomerGroupDistributionPanel
                   rows={dashboard.data.customer_group_distribution}
                   historyData={dashboard.historyData}

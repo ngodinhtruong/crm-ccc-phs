@@ -41,4 +41,7 @@ urlpatterns = [
 
     #error
     path("api/external-errors/", include("apps.external_errors.urls")),
+
+    #ekyc
+    path("api/ekyc/", include("apps.ekyc.urls")),
 ]

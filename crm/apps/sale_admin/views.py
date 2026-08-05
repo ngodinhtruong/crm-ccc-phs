@@ -206,10 +206,26 @@ class SaInterestLevelViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = SaInterestLevel.objects.filter(is_active=True).order_by("sort_order", "id")
 
 
-class SaIcpGroupViewSet(viewsets.ReadOnlyModelViewSet):
+class SaIcpGroupViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = SaIcpGroupSerializer
-    queryset = SaIcpGroup.objects.filter(is_active=True).order_by("sort_order", "id")
+
+    def get_queryset(self):
+        queryset = SaIcpGroup.objects.all().order_by("sort_order", "id")
+        if self.action == "list":
+            include_inactive = self.request.query_params.get(
+                "include_inactive", ""
+            ).lower() in ("true", "1")
+            if not include_inactive:
+                queryset = queryset.filter(is_active=True)
+        return queryset
+
+    def perform_destroy(self, instance):
+        if instance.sa_records.exists():
+            instance.is_active = False
+            instance.save(update_fields=["is_active", "updated_at"])
+        else:
+            instance.delete()
 
 
 class SaRecordViewSet(viewsets.ModelViewSet):

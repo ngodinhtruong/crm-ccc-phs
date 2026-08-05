@@ -28,6 +28,7 @@ import {
   PhoneCall,
   Pin,
   Settings,
+  ShieldCheck,
   Target,
   Trash2,
   UserCog,
@@ -58,6 +59,7 @@ type PanelKey =
   | "surveys"
   | "tickets"
   | "external_errors"
+  | "ekyc"
   | "reports"
   | "utilities"
   | "settings"
@@ -129,6 +131,12 @@ const mainMenuItemsByWorkspace: Record<WorkspaceCode, MainMenuItem[]> = {
       href: "/external-errors/dashboard",
       icon: AlertTriangle,
       panel: "external_errors",
+    },
+    {
+      title: "QUẢN LÝ eKYC",
+      href: "/ekyc/dashboard",
+      icon: ShieldCheck,
+      panel: "ekyc",
     },
     {
       title: "QUẢN LÝ USER",
@@ -340,6 +348,34 @@ const panelGroupsByWorkspace: Record<
             href: "/external-errors/error-catalogs",
             icon: Settings,
             permissionCode: "EXTERNAL_ERROR_MANAGE",
+          },
+        ],
+      },
+    ],
+
+    ekyc: [
+      {
+        title: "QUẢN LÝ eKYC",
+        items: [
+          {
+            title: "Dashboard eKYC",
+            href: "/ekyc/dashboard",
+            icon: BarChart3,
+          },
+          {
+            title: "Danh sách eKYC",
+            href: "/ekyc",
+            icon: ClipboardList,
+          },
+          {
+            title: "Nhập eKYC mới",
+            href: "/ekyc/create",
+            icon: FileCheck2,
+          },
+          {
+            title: "Import Excel",
+            href: "/ekyc/import",
+            icon: FileSpreadsheet,
           },
         ],
       },
@@ -565,6 +601,7 @@ const panelTitleMap: Record<PanelKey, string> = {
   surveys: "KHẢO SÁT",
   tickets: "CSKH",
   external_errors: "LỖI BÊN NGOÀI",
+  ekyc: "QUẢN LÝ eKYC",
   reports: "BÁO CÁO",
   utilities: "TIỆN ÍCH",
   settings: "CẤU HÌNH",

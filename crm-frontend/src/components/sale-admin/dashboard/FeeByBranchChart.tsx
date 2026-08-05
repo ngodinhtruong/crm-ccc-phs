@@ -5,6 +5,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
   Legend,
   ResponsiveContainer,
   Tooltip,
@@ -230,7 +231,15 @@ export function FeeByBranchChart({
                     radius={[6, 6, 0, 0]}
                     maxBarSize={48}
                     isAnimationActive={false}
-                  />
+                  >
+                    {periodKeys.length === 1 &&
+                      chartData.map((entry, cIdx) => (
+                        <Cell
+                          key={`cell-${entry.branch_name}-${cIdx}`}
+                          fill={CHART_COLORS[cIdx % CHART_COLORS.length]}
+                        />
+                      ))}
+                  </Bar>
                 ))}
               </BarChart>
             </ResponsiveContainer>

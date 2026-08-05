@@ -11,6 +11,7 @@ import {
   Info,
   Plug,
   Settings,
+  ShieldCheck,
   SlidersHorizontal,
   Users,
   Workflow,
@@ -108,6 +109,33 @@ const menuGroups: SidebarGroup[] = [
     key: "customer-care",
     title: "CHĂM SÓC KHÁCH HÀNG",
     icon: Headphones,
+  },
+  {
+    key: "ekyc",
+    title: "QUẢN LÝ eKYC",
+    icon: ShieldCheck,
+    children: [
+      {
+        key: "ekyc-dashboard",
+        title: "Dashboard eKYC",
+        href: "/ekyc/dashboard",
+      },
+      {
+        key: "ekyc-list",
+        title: "Danh sách eKYC",
+        href: "/ekyc",
+      },
+      {
+        key: "ekyc-create",
+        title: "Nhập eKYC mới",
+        href: "/ekyc/create",
+      },
+      {
+        key: "ekyc-import",
+        title: "Import Excel",
+        href: "/ekyc/import",
+      },
+    ],
   },
   {
     key: "integration",

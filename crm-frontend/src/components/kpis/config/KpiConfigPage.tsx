@@ -6,6 +6,7 @@ import { useKpiConfig } from "@/hooks/useKpiConfig";
 import { KpiConfigTabs } from "./KpiConfigTabs";
 import { KpiGateConfigsTab } from "./KpiGateConfigsTab";
 import { KpiGroupsTab } from "./KpiGroupsTab";
+import { KpiIcpGroupsTab } from "./KpiIcpGroupsTab";
 import { KpiMetricsTab } from "./KpiMetricsTab";
 import { KpiPeriodHeader, KpiHeaderActions } from "./KpiPeriodHeader";
 import { KpiRewardTiersTab } from "./KpiRewardTiersTab";
@@ -174,6 +175,8 @@ export function KpiConfigPage() {
               )}
 
               {config.activeTab === "groups" && <KpiGroupsTab config={config} />}
+
+              {config.activeTab === "icp" && <KpiIcpGroupsTab config={config} />}
 
               {config.activeTab === "gates" && (
                 <KpiGateConfigsTab config={config} />

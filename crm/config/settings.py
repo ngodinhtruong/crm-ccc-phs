@@ -83,7 +83,8 @@ INSTALLED_APPS = [
     # "apps.dashboard",
     "apps.sale_admin",
     "apps.kpis",
-    "apps.external_errors"
+    "apps.external_errors",
+    "apps.ekyc",
 ]
 
 MIDDLEWARE = [

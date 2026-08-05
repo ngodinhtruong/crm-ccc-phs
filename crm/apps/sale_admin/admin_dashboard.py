@@ -232,7 +232,6 @@ def _transactions_for_period(account_ids: set[int], period: PeriodRange):
             "branch_id",
             "branch__branch_name",
             "branch__branch_code",
-            "product_code",
         )
         .annotate(
             transaction_value=Sum("transaction_value"),
@@ -266,7 +265,6 @@ def _build_account_transaction_map(transactions) -> dict[str, dict[str, Any]]:
             "transaction_value": ZERO,
             "transaction_fee": ZERO,
             "order_count": 0,
-            "product_fee": defaultdict(Decimal),
             "branch_id": None,
             "branch_name": None,
             "customer_name": None,
@@ -282,9 +280,6 @@ def _build_account_transaction_map(transactions) -> dict[str, dict[str, Any]]:
         item["transaction_value"] += _decimal(row.get("transaction_value"))
         item["transaction_fee"] += _decimal(row.get("transaction_fee"))
         item["order_count"] += _number(row.get("order_count"))
-
-        product_code = str(row.get("product_code") or "Không xác định").strip() or "Không xác định"
-        item["product_fee"][product_code] += _decimal(row.get("transaction_fee"))
 
         if row.get("branch_id") and not item["branch_id"]:
             item["branch_id"] = row["branch_id"]
@@ -964,7 +959,7 @@ def get_sale_admin_report_payload(request) -> dict[str, Any]:
         "fee_by_branch": _build_fee_by_branch(branch_ranking, previous, period),
         "top_employees": top_employees,
         "top_accounts": top_accounts,
-        "product_fee": _build_product_fee(current_account_map),
+        "product_fee": [],
         "icp_distribution": _build_icp_distribution(current_records),
         "customer_group_distribution": _build_customer_group_distribution(current_records, current_account_map),
         "criteria": _build_criteria(),

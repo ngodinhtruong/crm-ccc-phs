@@ -71,12 +71,39 @@ export const saleAdminApi = {
     return getListData<SaInterestLevel>(response.data);
   },
 
-  getIcpGroups: async (): Promise<SaIcpGroup[]> => {
+  getIcpGroups: async (includeInactive?: boolean): Promise<SaIcpGroup[]> => {
     const response = await api.get<SaIcpGroup[] | PaginatedResponse<SaIcpGroup>>(
-      SA_ICP_GROUP_ENDPOINT
+      SA_ICP_GROUP_ENDPOINT,
+      includeInactive ? { params: { include_inactive: true } } : undefined
     );
 
     return getListData<SaIcpGroup>(response.data);
+  },
+
+  createIcpGroup: async (payload: Partial<SaIcpGroup>): Promise<SaIcpGroup> => {
+    const response = await api.post<SaIcpGroup>(
+      SA_ICP_GROUP_ENDPOINT,
+      payload
+    );
+    return response.data;
+  },
+
+  updateIcpGroup: async (
+    id: number,
+    payload: Partial<SaIcpGroup>
+  ): Promise<SaIcpGroup> => {
+    const response = await api.patch<SaIcpGroup>(
+      `${SA_ICP_GROUP_ENDPOINT}${id}/`,
+      payload,
+      { params: { include_inactive: true } }
+    );
+    return response.data;
+  },
+
+  deleteIcpGroup: async (id: number): Promise<void> => {
+    await api.delete(`${SA_ICP_GROUP_ENDPOINT}${id}/`, {
+      params: { include_inactive: true },
+    });
   },
 
   searchCustomerAccounts: async (
