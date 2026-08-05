@@ -61,6 +61,54 @@ const COLORS = [
   "#dc2626", // Dark Red
 ];
 
+function EmptyChartAxisPlaceholder({
+  message = "Không có dữ liệu trong khoảng thời gian này",
+  height = 320,
+  type = "bar",
+  categories = ["T4/2026", "T5/2026", "T6/2026", "T7/2026", "T8/2026"],
+}: {
+  message?: string;
+  height?: number;
+  type?: "bar" | "horizontal" | "line";
+  categories?: string[];
+}) {
+  const dummyData = categories.map((cat) => ({
+    name: cat,
+    value: 0,
+  }));
+
+  return (
+    <div className="relative w-full" style={{ height }}>
+      <ResponsiveContainer width="100%" height="100%">
+        {type === "horizontal" ? (
+          <BarChart layout="vertical" data={dummyData} margin={{ left: 10, right: 30, top: 10, bottom: 10 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+            <XAxis type="number" tick={{ fontSize: 11, fill: "#94a3b8" }} domain={[0, 10]} />
+            <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "#94a3b8" }} width={85} />
+          </BarChart>
+        ) : type === "line" ? (
+          <LineChart data={dummyData} margin={{ left: 10, right: 20, top: 10, bottom: 10 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+            <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#94a3b8" }} />
+            <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} domain={[0, 10]} />
+          </LineChart>
+        ) : (
+          <BarChart data={dummyData} margin={{ left: 10, right: 20, top: 10, bottom: 10 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+            <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#94a3b8" }} />
+            <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} domain={[0, 10]} />
+          </BarChart>
+        )}
+      </ResponsiveContainer>
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <span className="rounded-xl border border-slate-200 bg-white/90 px-3.5 py-1.5 text-xs font-semibold text-slate-500 shadow-2xs backdrop-blur-xs">
+          {message}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function getDashboardAvailableMonths(charts: CccCharts): string[] {
   const months = new Set<string>();
 
@@ -330,15 +378,6 @@ function TicketResultChartCard({
     ];
   }, [rawMonthly, selectedMonth]);
 
-  if (isEmpty(rawMonthly)) {
-    return <EmptyState message="Không có dữ liệu kết quả xử lý ticket." />;
-  }
-
-  const totalsSum = rawMonthly.reduce((acc, curr) => acc + curr.total, 0);
-  const processedSum = rawMonthly.reduce((acc, curr) => acc + curr.processed, 0);
-  const cancelledSum = rawMonthly.reduce((acc, curr) => acc + curr.cancelled, 0);
-  const processedRate = totalsSum > 0 ? ((processedSum / totalsSum) * 100).toFixed(1) : "0";
-
   const handleChartClick = (state: any) => {
     if (state && state.activeLabel) {
       setSelectedMonth(state.activeLabel);
@@ -346,30 +385,24 @@ function TicketResultChartCard({
   };
 
   const isAggregatedOrCompared = granularity !== "MONTH" || compareMode !== "NONE";
-
   const periodLabelText = granularity === "QUARTER" ? "theo Quý" : granularity === "YEAR" ? "theo Năm" : "theo Tháng";
   const compareLabelText = compareMode === "YOY" ? " (So sánh Cùng kỳ Năm trước - YoY)" : compareMode === "QOQ" ? " (So sánh Kỳ liền trước - QoQ)" : "";
 
+  if (isEmpty(rawMonthly)) {
+    return (
+      <div className="space-y-4">
+        <ChartCard
+          title={`Xu hướng & Kết quả xử lý Ticket ${periodLabelText}${compareLabelText}`}
+          description="Biểu đồ xu hướng tổng sản lượng ticket tiếp nhận và xử lý qua các kỳ"
+        >
+          <EmptyChartAxisPlaceholder message="Không có dữ liệu kết quả xử lý ticket trong kỳ." />
+        </ChartCard>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div className="rounded-xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-white p-3.5 shadow-sm">
-          <p className="text-[11px] font-medium text-slate-500">Tổng Ticket Tiếp Nhận</p>
-          <p className="mt-1 text-xl font-black text-emerald-700">{formatNumber(totalsSum)}</p>
-        </div>
-        <div className="rounded-xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-white p-3.5 shadow-sm">
-          <p className="text-[11px] font-medium text-slate-500">Tổng Ticket Đã Xử Lý</p>
-          <p className="mt-1 text-xl font-black text-emerald-700">{formatNumber(processedSum)}</p>
-        </div>
-        <div className="rounded-xl border border-amber-100 bg-gradient-to-br from-amber-50 to-white p-3.5 shadow-sm">
-          <p className="text-[11px] font-medium text-slate-500">Tỷ Lệ Xử Lý Thành Công</p>
-          <p className="mt-1 text-xl font-black text-amber-700">{processedRate}%</p>
-        </div>
-        <div className="rounded-xl border border-rose-100 bg-gradient-to-br from-rose-50 to-white p-3.5 shadow-sm">
-          <p className="text-[11px] font-medium text-slate-500">Tổng Ticket Hủy / Spam</p>
-          <p className="mt-1 text-xl font-black text-rose-600">{formatNumber(cancelledSum)}</p>
-        </div>
-      </div>
 
       <ChartCard
         title={
@@ -533,6 +566,18 @@ function SourceDonutChartCard({
 
   const totalSum = useMemo(() => chartData.reduce((acc, curr) => acc + curr.value, 0), [chartData]);
 
+  if (isEmpty(chartData)) {
+    return (
+      <ChartCard
+        title="Tỷ trọng Ticket theo Nguồn"
+        description="Xếp hạng cơ cấu tổng lượng ticket từ các kênh tiếp nhận"
+        className="xl:col-span-5"
+      >
+        <EmptyChartAxisPlaceholder message="Không có dữ liệu phân tích theo nguồn" type="horizontal" categories={["Web", "App", "Hotline", "Email"]} />
+      </ChartCard>
+    );
+  }
+
   return (
     <ChartCard
       title="Tỷ trọng Ticket theo Nguồn"
@@ -619,6 +664,18 @@ function SourceTrendChartCard({
     return pivotData.monthDimensions.filter((m) => m === selectedMonth);
   }, [selectedMonth, pivotData.monthDimensions]);
 
+  if (isEmpty(pivotData.rows)) {
+    return (
+      <ChartCard
+        title="Phân bổ Ticket đã xử lý theo Nguồn"
+        description="Trục hoành: Nguồn tiếp nhận | Trục tung: Số lượng ticket (5 cột tháng nhóm cho mỗi nguồn)"
+        className="xl:col-span-7"
+      >
+        <EmptyChartAxisPlaceholder message="Không có dữ liệu phân bổ theo nguồn" type="bar" categories={["Web", "App", "Hotline", "Email"]} />
+      </ChartCard>
+    );
+  }
+
   return (
     <ChartCard
       title="Phân bổ Ticket đã xử lý theo Nguồn"
@@ -694,7 +751,6 @@ function SourceAnalysisCharts({
   compareMode?: CompareMode;
 }) {
   const items = charts.report_source || [];
-  if (isEmpty(items)) return <EmptyState message="Không có dữ liệu phân tích theo nguồn." />;
 
   return (
     <div className="grid gap-4 xl:grid-cols-12">
@@ -742,6 +798,17 @@ function CategoryProcessedChartCard({
       setSelectedMonth(state.activeLabel);
     }
   };
+
+  if (isEmpty(processedPivot.rows)) {
+    return (
+      <ChartCard
+        title={`Ticket đã xử lý theo Danh mục ${granularity === "QUARTER" ? "(Theo Quý)" : granularity === "YEAR" ? "(Theo Năm)" : ""}`}
+        description="Nhấp đúp vào cột kỳ bất kỳ để xem biểu đồ Donut chi tiết của kỳ đó"
+      >
+        <EmptyChartAxisPlaceholder message="Không có dữ liệu phân tích theo danh mục" type="bar" height={340} />
+      </ChartCard>
+    );
+  }
 
   return (
     <ChartCard
@@ -861,6 +928,17 @@ function CategoryCancelledChartCard({
     }
   };
 
+  if (isEmpty(cancelledPivot.rows)) {
+    return (
+      <ChartCard
+        title={`Spam / Đã hủy theo Danh mục ${granularity === "QUARTER" ? "(Theo Quý)" : granularity === "YEAR" ? "(Theo Năm)" : ""}`}
+        description="Nhấp đúp vào cột kỳ bất kỳ để xem biểu đồ Donut chi tiết của kỳ đó"
+      >
+        <EmptyChartAxisPlaceholder message="Không có dữ liệu phân tích theo danh mục" type="bar" height={340} />
+      </ChartCard>
+    );
+  }
+
   return (
     <ChartCard
       title={
@@ -955,7 +1033,24 @@ function CategoryAnalysisCharts({
   compareMode?: CompareMode;
 }) {
   const items = charts.report_category || [];
-  if (isEmpty(items)) return <EmptyState message="Không có dữ liệu phân tích theo danh mục." />;
+  if (isEmpty(items)) {
+    return (
+      <div className="grid gap-4 xl:grid-cols-2">
+        <ChartCard
+          title="Ticket đã xử lý theo Danh mục"
+          description="Cơ cấu phân bổ ticket xử lý theo các nhóm danh mục"
+        >
+          <EmptyState message="Không có dữ liệu phân tích theo danh mục." />
+        </ChartCard>
+        <ChartCard
+          title="Spam / Đã hủy theo Danh mục"
+          description="Cơ cấu phân bổ ticket bị hủy / spam theo các nhóm danh mục"
+        >
+          <EmptyState message="Không có dữ liệu phân tích theo danh mục." />
+        </ChartCard>
+      </div>
+    );
+  }
 
   return (
     <div className="grid gap-4 xl:grid-cols-2">
@@ -1022,6 +1117,17 @@ function UnitProcessedChartCard({
       setSelectedMonth(state.activeLabel);
     }
   };
+
+  if (isEmpty(aggregatedItems)) {
+    return (
+      <ChartCard
+        title={`Ticket đã xử lý theo Đơn vị ${granularity === "QUARTER" ? "(Theo Quý)" : granularity === "YEAR" ? "(Theo Năm)" : ""}`}
+        description="Nhấp đúp vào cột kỳ bất kỳ để xem biểu đồ Donut chi tiết của kỳ đó"
+      >
+        <EmptyChartAxisPlaceholder message="Không có dữ liệu phân tích theo đơn vị xử lý" type="bar" height={310} />
+      </ChartCard>
+    );
+  }
 
   return (
     <ChartCard
@@ -1137,6 +1243,17 @@ function UnitCancelledChartCard({
     }
   };
 
+  if (isEmpty(aggregatedItems)) {
+    return (
+      <ChartCard
+        title={`Spam / Đã hủy theo Đơn vị xử lý ${granularity === "QUARTER" ? "(Theo Quý)" : granularity === "YEAR" ? "(Theo Năm)" : ""}`}
+        description="Nhấp đúp vào cột kỳ bất kỳ để xem biểu đồ Donut chi tiết của kỳ đó"
+      >
+        <EmptyChartAxisPlaceholder message="Không có dữ liệu phân tích theo đơn vị xử lý" type="bar" height={310} />
+      </ChartCard>
+    );
+  }
+
   return (
     <ChartCard
       title={
@@ -1232,7 +1349,24 @@ function UnitAnalysisCharts({
   compareMode?: CompareMode;
 }) {
   const items = charts.report_unit || [];
-  if (isEmpty(items)) return <EmptyState message="Không có dữ liệu phân tích theo đơn vị xử lý." />;
+  if (isEmpty(items)) {
+    return (
+      <div className="grid gap-4 xl:grid-cols-2">
+        <ChartCard
+          title="Ticket đã xử lý theo Đơn vị"
+          description="Cơ cấu ticket đã xử lý theo từng đơn vị"
+        >
+          <EmptyState message="Không có dữ liệu phân tích theo đơn vị xử lý." />
+        </ChartCard>
+        <ChartCard
+          title="Spam / Đã hủy theo Đơn vị xử lý"
+          description="Cơ cấu ticket hủy / spam theo từng đơn vị"
+        >
+          <EmptyState message="Không có dữ liệu phân tích theo đơn vị xử lý." />
+        </ChartCard>
+      </div>
+    );
+  }
 
   return (
     <div className="grid gap-4 xl:grid-cols-2">
@@ -1260,8 +1394,8 @@ function SingleTimeChartCard({
 }) {
   if (isEmpty(items)) {
     return (
-      <ChartCard title={title}>
-        <EmptyState message="Không có dữ liệu thời gian xử lý." />
+      <ChartCard title={title} description="Đơn vị: Ngày hoặc Giờ/Phút nếu < 1 ngày. So sánh xu hướng rút ngắn thời gian xử lý qua 2 kỳ.">
+        <EmptyChartAxisPlaceholder message="Không có dữ liệu thời gian xử lý" type="line" height={320} categories={["Chung", "Hệ thống", "Khác"]} />
       </ChartCard>
     );
   }
@@ -1388,7 +1522,7 @@ function SlaCategoryOverdueChartCard({ category, globalViewMode }: { category: a
       description="Nhận diện các mảng dịch vụ phát sinh quá hạn SLA nhiều nhất"
     >
       {isEmpty(category) ? (
-        <EmptyState message="Không phát sinh ticket trễ hạn." />
+        <EmptyChartAxisPlaceholder message="Không phát sinh ticket trễ hạn" type="horizontal" height={260} categories={["Tài khoản", "Giao dịch", "Chung"]} />
       ) : (
         <div className="h-[260px]">
           <ResponsiveContainer width="100%" height="100%">
@@ -1410,54 +1544,6 @@ function SlaCategoryOverdueChartCard({ category, globalViewMode }: { category: a
   );
 }
 
-function SlaUnitOverdueTableCard({ unitMonth, globalViewMode, granularity = "MONTH" }: { unitMonth: any[]; globalViewMode?: ChartViewMode; granularity?: GranularityMode }) {
-  const displayItems = useMemo(() => {
-    if (granularity === "MONTH") return unitMonth;
-    const map = new Map<string, { month_label: string; unit_name: string; overdue: number }>();
-    for (const item of unitMonth) {
-      const pLabel = getPeriodLabelFromItem(item, granularity);
-      const key = `${pLabel}-${item.unit_name}`;
-      if (!map.has(key)) {
-        map.set(key, { month_label: pLabel, unit_name: item.unit_name, overdue: 0 });
-      }
-      map.get(key)!.overdue += item.overdue || 0;
-    }
-    return Array.from(map.values());
-  }, [unitMonth, granularity]);
-
-  return (
-    <ChartCard
-      title="Thống kê Ticket Trễ hạn theo Đơn vị"
-      description="Bảng theo dõi chi tiết số lượng ticket trễ hạn phân bổ theo từng đơn vị xử lý"
-    >
-      {isEmpty(displayItems) ? (
-        <EmptyState message="Không có tác vụ PBLQ trễ hạn trong khoảng thời gian này." />
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-left text-xs">
-            <thead className="bg-slate-50 text-slate-700">
-              <tr>
-                <th className="px-4 py-2.5 font-bold">Kỳ</th>
-                <th className="px-4 py-2.5 font-bold">Đơn vị xử lý</th>
-                <th className="px-4 py-2.5 text-right font-bold">Số ticket trễ hạn</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {displayItems.map((item, index) => (
-                <tr key={`${item.month_label}-${item.unit_name}-${index}`} className="hover:bg-slate-50/80">
-                  <td className="px-4 py-2.5 font-semibold text-slate-700">{item.month_label}</td>
-                  <td className="px-4 py-2.5 text-slate-600">{item.unit_name}</td>
-                  <td className="px-4 py-2.5 text-right font-bold text-rose-600">{formatNumber(item.overdue)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </ChartCard>
-  );
-}
-
 function SlaCharts({
   charts,
   globalViewMode,
@@ -1470,13 +1556,24 @@ function SlaCharts({
   compareMode?: CompareMode;
 }) {
   const sla = charts.report_sla;
-  if (!sla) return <EmptyState message="Không có dữ liệu SLA." />;
+
+  if (!sla) {
+    return (
+      <div className="grid gap-4 xl:grid-cols-2">
+        <ChartCard title="Tỷ lệ Tuân thủ SLA" description="Đánh giá chất lượng cam kết thời gian đáp ứng">
+          <EmptyChartAxisPlaceholder message="Không có dữ liệu SLA" type="bar" height={240} />
+        </ChartCard>
+        <ChartCard title="Phân loại Ticket Trễ hạn theo Danh mục" description="Nhận diện các mảng dịch vụ phát sinh quá hạn SLA nhiều nhất">
+          <EmptyChartAxisPlaceholder message="Không có dữ liệu SLA" type="horizontal" height={260} categories={["Tài khoản", "Giao dịch", "Chung"]} />
+        </ChartCard>
+      </div>
+    );
+  }
 
   return (
     <div className="grid gap-4 xl:grid-cols-2">
       <SlaGaugeChartCard monthly={sla.monthly || []} globalViewMode={globalViewMode} />
       <SlaCategoryOverdueChartCard category={sla.overdue_by_category || []} globalViewMode={globalViewMode} />
-      <SlaUnitOverdueTableCard unitMonth={sla.overdue_by_unit_month || []} globalViewMode={globalViewMode} granularity={granularity} />
     </div>
   );
 }
@@ -1501,6 +1598,17 @@ function EmployeeRankedChartCard({ itemsSorted, globalViewMode }: { itemsSorted:
       .sort((a, b) => b.processed - a.processed)
       .slice(0, 15);
   }, [itemsSorted]);
+
+  if (isEmpty(displayData)) {
+    return (
+      <ChartCard
+        title="Xếp hạng Kết quả Xử lý theo NVCS"
+        description="Sắp xếp theo sản lượng ticket đã hoàn tất"
+      >
+        <EmptyChartAxisPlaceholder message="Không có dữ liệu theo từng NVCS" type="horizontal" height={340} categories={["NVCS 01", "NVCS 02", "NVCS 03"]} />
+      </ChartCard>
+    );
+  }
 
   return (
     <ChartCard
@@ -1562,6 +1670,17 @@ function EmployeeTimeChartCard({ itemsSorted, globalViewMode }: { itemsSorted: a
       .slice(0, 15);
   }, [itemsSorted]);
 
+  if (isEmpty(displayData)) {
+    return (
+      <ChartCard
+        title="Thời gian Tiếp nhận & Xử lý trung bình theo NVCS"
+        description="Đơn vị: Ngày hoặc Giờ/Phút nếu < 1 ngày"
+      >
+        <EmptyChartAxisPlaceholder message="Không có dữ liệu theo từng NVCS" type="horizontal" height={340} categories={["NVCS 01", "NVCS 02", "NVCS 03"]} />
+      </ChartCard>
+    );
+  }
+
   return (
     <ChartCard
       title="Thời gian Tiếp nhận & Xử lý trung bình theo NVCS"
@@ -1602,8 +1721,6 @@ function EmployeeCharts({
   const rawItems = charts.report_employee || [];
   const itemsSorted = useMemo(() => [...rawItems].sort((a, b) => (b.processed || 0) - (a.processed || 0)), [rawItems]);
 
-  if (isEmpty(itemsSorted)) return <EmptyState message="Không có dữ liệu theo từng NVCS." />;
-
   return (
     <div className="grid gap-4 xl:grid-cols-2">
       <EmployeeRankedChartCard itemsSorted={itemsSorted} globalViewMode={globalViewMode} />
@@ -1635,7 +1752,13 @@ function RootCausePieCard({
     [charts.root_cause_breakdown]
   );
 
-  if (isEmpty(data)) return null;
+  if (isEmpty(data)) {
+    return (
+      <ChartCard title="Cơ cấu Nhóm lỗi phát sinh phổ biến">
+        <EmptyChartAxisPlaceholder message="Không có dữ liệu nhóm lỗi" type="bar" height={320} categories={["Hệ thống", "Nghiệp vụ", "Khác"]} />
+      </ChartCard>
+    );
+  }
 
   return (
     <ChartCard

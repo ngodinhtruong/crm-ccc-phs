@@ -147,7 +147,7 @@ export function DashboardLayout({
                     isPinned ? "pl-0 lg:pl-[300px]" : contentClassName
                 }`}
             >
-                <div className="sticky top-[56px] z-20 flex h-11 items-center justify-between border-b border-slate-200 bg-white/95 px-4 backdrop-blur-sm shadow-xs">
+                <div className="sticky top-[56px] z-30 flex min-h-[44px] flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-slate-200 bg-white/95 px-4 py-1.5 backdrop-blur-sm shadow-xs">
                     <div className="flex min-w-0 flex-1 items-center gap-3">
                         <Breadcrumbs
                             items={navigationBreadcrumbs.items}

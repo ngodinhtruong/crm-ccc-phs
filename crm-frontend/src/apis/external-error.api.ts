@@ -17,6 +17,7 @@ import {
   ExternalErrorManualCreatePayload,
   ExternalErrorRawImportPayload,
   ExternalErrorRecord,
+  ExternalErrorRecordAuditLog,
   ExternalErrorRecurringResponse,
   ExternalErrorSummary,
   ExternalErrorWidget,
@@ -183,6 +184,26 @@ export const externalErrorApi = {
     return response.data;
   },
 
+  getAuditLogs: async (
+    id: number | string
+  ): Promise<ExternalErrorRecordAuditLog[]> => {
+    const response = await api.get<ExternalErrorRecordAuditLog[]>(
+      `${RECORDS_ENDPOINT}${id}/audit-logs/`
+    );
+    return response.data;
+  },
+
+  updateRecord: async (
+    id: number | string,
+    payload: Partial<ExternalErrorRecord>
+  ): Promise<ExternalErrorRecord> => {
+    const response = await api.patch<ExternalErrorRecord>(
+      `${RECORDS_ENDPOINT}${id}/`,
+      payload
+    );
+    return response.data;
+  },
+
   createRecord: async (
     payload: ExternalErrorManualCreatePayload
   ): Promise<ExternalErrorRecord> => {
@@ -267,6 +288,15 @@ export const externalErrorApi = {
     >(BATCHES_ENDPOINT);
 
     return normalizePaginated(response.data).results;
+  },
+
+  classifyBatch: async (
+    batchId: number
+  ): Promise<{ detail: string; task_id: string; batch: ExternalErrorBatch }> => {
+    const response = await api.post(
+      `${BATCHES_ENDPOINT}${batchId}/classify/`
+    );
+    return response.data;
   },
 
   importExcel: async (

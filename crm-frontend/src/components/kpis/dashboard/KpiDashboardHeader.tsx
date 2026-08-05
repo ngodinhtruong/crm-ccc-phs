@@ -1,6 +1,7 @@
 "use client";
 
-import { RefreshCw, RotateCw, UserRound } from "lucide-react";
+import { useState } from "react";
+import { Filter, RefreshCw, RotateCw, UserRound, X } from "lucide-react";
 
 import { KpiDashboardController } from "@/hooks/useKpiDashboard";
 import { formatDateTime } from "./KpiDashboardUtils";
@@ -12,105 +13,147 @@ function getProfileLabel(profileCode?: string) {
   return profileCode || "-";
 }
 
-export function KpiDashboardHeader({
+export function KpiDashboardHeaderActions({
   dashboard,
 }: {
   dashboard: KpiDashboardController;
 }) {
+  const [filterOpen, setFilterOpen] = useState(false);
+
   const viewingEmployee =
     dashboard.scope === "BRANCH" && dashboard.selectedEmployeeName;
 
+  const activeFilterCount = dashboard.selectedPeriodId ? 1 : 0;
+
   return (
-    <div className="border-b bg-white px-4 py-3">
-      <div className="grid grid-cols-12 gap-3">
-        <div className="col-span-12 md:col-span-4">
-          <label className="mb-1 block text-xs font-semibold text-slate-600">
-            Kỳ KPI
-          </label>
-          <select
-            value={dashboard.selectedPeriodId}
-            onChange={(event) => dashboard.setSelectedPeriodId(event.target.value)}
-            className="h-9 w-full rounded border border-slate-300 bg-white px-3 text-xs font-medium text-slate-700 outline-none focus:border-sky-400"
-          >
-            <option value="">Chọn kỳ KPI</option>
-            {dashboard.periods.map((period) => (
-              <option key={period.id} value={period.id}>
-                {period.period_code} - {period.period_name} ({period.status})
-              </option>
-            ))}
-          </select>
-        </div>
+    <div className="flex flex-wrap items-center gap-2">
+      {/* Bộ lọc Popover Button */}
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setFilterOpen((v) => !v)}
+          className="flex h-8 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 transition"
+        >
+          <Filter size={14} className="text-slate-500" />
+          Bộ lọc
+          {activeFilterCount > 0 && (
+            <span className="rounded-full bg-[#10b981] px-1.5 py-0.2 text-[10px] font-bold text-white">
+              {activeFilterCount}
+            </span>
+          )}
+        </button>
 
-        <div className="col-span-12 md:col-span-4">
-          <label className="mb-1 block text-xs font-semibold text-slate-600">
-            Đối tượng xem
-          </label>
-          <div className="flex h-9 items-center gap-2 rounded border border-slate-300 bg-slate-50 px-3 text-xs font-medium text-slate-700">
-            <UserRound size={14} className="text-sky-600" />
-            {viewingEmployee ? dashboard.selectedEmployeeName : "KPI cá nhân của tôi"}
-          </div>
-        </div>
+        {filterOpen && (
+          <div className="absolute right-0 top-10 z-50 w-[360px] rounded-xl border border-slate-200 bg-white p-4 shadow-xl">
+            <div className="mb-3 flex items-center justify-between border-b border-slate-100 pb-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                Bộ lọc KPI
+              </span>
+              <button
+                type="button"
+                onClick={() => setFilterOpen(false)}
+                className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+              >
+                <X size={15} />
+              </button>
+            </div>
 
-        <div className="col-span-12 md:col-span-4">
-          <label className="mb-1 block text-xs font-semibold text-slate-600">
-            Bộ KPI áp dụng
-          </label>
-          <div className="flex h-9 items-center rounded border border-slate-300 bg-slate-50 px-3 text-xs font-medium text-slate-700">
-            {getProfileLabel(dashboard.selectedProfileCode)}
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-600">
+                  Kỳ KPI
+                </label>
+                <select
+                  value={dashboard.selectedPeriodId}
+                  onChange={(e) => dashboard.setSelectedPeriodId(e.target.value)}
+                  className="h-9 w-full rounded-lg border border-slate-300 bg-white px-3 text-xs font-medium text-slate-700 outline-none focus:border-emerald-500"
+                >
+                  <option value="">Chọn kỳ KPI</option>
+                  {dashboard.periods.map((period) => (
+                    <option key={period.id} value={period.id}>
+                      {period.period_code} - {period.period_name} ({period.status})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-600">
+                  Đối tượng xem
+                </label>
+                <div className="flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-medium text-slate-700">
+                  <UserRound size={14} className="text-[#059669]" />
+                  {viewingEmployee ? dashboard.selectedEmployeeName : "KPI cá nhân của tôi"}
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-600">
+                  Bộ KPI áp dụng
+                </label>
+                <div className="flex h-9 items-center rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-medium text-slate-700">
+                  {getProfileLabel(dashboard.selectedProfileCode)}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-slate-100 bg-slate-50 p-2.5 text-[11px] text-slate-600">
+                <div>
+                  Kỳ chốt điểm:{" "}
+                  <strong className="text-slate-800">
+                    {dashboard.selectedPeriod
+                      ? `${dashboard.selectedPeriod.start_date} → ${dashboard.selectedPeriod.end_date}`
+                      : "-"}
+                  </strong>
+                </div>
+                <div className="mt-1">
+                  Cập nhật:{" "}
+                  <strong className="text-slate-800">
+                    {formatDateTime(dashboard.lastUpdatedAt)}
+                  </strong>
+                </div>
+                <div className="mt-1 text-slate-400 font-medium">
+                  Tự động cập nhật nền mỗi 60 giây
+                </div>
+              </div>
+
+              <div className="flex justify-end border-t border-slate-100 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setFilterOpen(false)}
+                  className="h-8 rounded-lg bg-[#10b981] px-4 text-xs font-bold text-white hover:bg-[#059669]"
+                >
+                  Áp dụng
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t pt-3">
-        <div className="text-xs text-slate-500">
-          {dashboard.selectedPeriod ? (
-            <>
-              Kỳ chốt điểm: {dashboard.selectedPeriod.start_date} → {dashboard.selectedPeriod.end_date}
-            </>
-          ) : (
-            <>Mặc định hệ thống tự chọn kỳ KPI theo tháng hiện tại</>
-          )}
-          <span className="mx-2 text-slate-300">|</span>
-          Cập nhật: {formatDateTime(dashboard.lastUpdatedAt)}
-          {dashboard.backgroundRefreshing && (
-            <span className="ml-2 text-sky-600">Đang cập nhật nền...</span>
-          )}
-        </div>
+      {viewingEmployee && (
+        <button
+          type="button"
+          onClick={dashboard.viewSelfDashboard}
+          className="flex h-8 items-center gap-1 rounded-lg border border-sky-300 bg-white px-3 text-xs font-semibold text-sky-600 shadow-2xs hover:bg-sky-50 transition"
+        >
+          KPI của tôi
+        </button>
+      )}
 
-        <div className="flex items-center gap-2">
-          {viewingEmployee && (
-            <button
-              type="button"
-              onClick={dashboard.viewSelfDashboard}
-              className="flex h-8 items-center gap-1 rounded border border-sky-300 bg-white px-3 text-xs font-semibold text-sky-600 hover:bg-sky-50"
-            >
-              KPI của tôi
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={dashboard.refresh}
-            disabled={dashboard.loadingDetail && !dashboard.hasDashboardData}
-            className="flex h-8 items-center gap-1 rounded border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-60"
-          >
-            <RefreshCw size={14} />
-            Tải lại
-          </button>
-
-          {dashboard.canCalculateAuto && (
-            <button
-              type="button"
-              onClick={dashboard.recalculate}
-              disabled={dashboard.calculating || !dashboard.selectedPeriodId}
-              className="flex h-8 items-center gap-1 rounded bg-[#10b981] px-3 text-xs font-semibold text-white shadow-sm hover:bg-[#059669] disabled:opacity-60"
-            >
-              <RotateCw size={14} />
-              {dashboard.calculating ? "Đang tính..." : "Tính lại CRM"}
-            </button>
-          )}
-        </div>
-      </div>
+      {dashboard.canCalculateAuto && (
+        <button
+          type="button"
+          onClick={dashboard.recalculate}
+          disabled={dashboard.calculating || !dashboard.selectedPeriodId}
+          className="flex h-8 items-center gap-1.5 rounded-lg bg-[#10b981] px-3.5 text-xs font-semibold text-white shadow-2xs hover:bg-[#059669] disabled:opacity-60 transition"
+        >
+          <RotateCw size={13} />
+          {dashboard.calculating ? "Đang tính..." : "Tính lại CRM"}
+        </button>
+      )}
     </div>
   );
 }
+
+export { KpiDashboardHeaderActions as KpiDashboardHeader };
+

@@ -46,7 +46,11 @@ let masterDataCache: MasterDataCacheEntry | null = null;
 let masterDataRequest: Promise<MasterData> | null = null;
 
 function getCurrentYearStart() {
-  return `${new Date().getFullYear()}-01-01`;
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth() - 4, 1);
+  const year = start.getFullYear();
+  const month = String(start.getMonth() + 1).padStart(2, "0");
+  return `${year}-${month}-01`;
 }
 
 function getCurrentDate() {
@@ -76,10 +80,16 @@ function getCurrentMonthEnd() {
 }
 
 function buildDefaultParams(initialStatus = ""): CccDashboardParams {
+  let savedFrom = "";
+  let savedTo = "";
+  if (typeof window !== "undefined") {
+    savedFrom = sessionStorage.getItem("ccc_dashboard_date_from") || "";
+    savedTo = sessionStorage.getItem("ccc_dashboard_date_to") || "";
+  }
   return {
     period: "",
-    date_from: getCurrentYearStart(),
-    date_to: getCurrentDate(),
+    date_from: savedFrom || getCurrentYearStart(),
+    date_to: savedTo || getCurrentDate(),
     status: initialStatus,
     recent_limit: 10,
   };
@@ -344,10 +354,19 @@ export function useCccDashboard(initialStatus: string = "") {
   }, [masterLoaded]);
 
   const search = useCallback(() => {
-    void loadDashboard(buildParams());
+    const params = buildParams();
+    if (typeof window !== "undefined" && params.date_from && params.date_to) {
+      sessionStorage.setItem("ccc_dashboard_date_from", params.date_from);
+      sessionStorage.setItem("ccc_dashboard_date_to", params.date_to);
+    }
+    void loadDashboard(params);
   }, [buildParams, loadDashboard]);
 
   const clearFilter = useCallback(() => {
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("ccc_dashboard_date_from");
+      sessionStorage.removeItem("ccc_dashboard_date_to");
+    }
     const params = buildDefaultParams(initialStatus);
 
     setPeriod("");

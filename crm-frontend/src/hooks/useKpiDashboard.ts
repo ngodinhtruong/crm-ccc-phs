@@ -511,6 +511,68 @@ export function useKpiDashboard() {
     [metricSections]
   );
 
+  const computedScores = useMemo(() => {
+    let manualScore = activeSummary?.manual_score != null ? toNumber(activeSummary.manual_score) : null;
+    let autoScore = activeSummary?.auto_score != null ? toNumber(activeSummary.auto_score) : null;
+    let totalScore = activeSummary?.total_score != null ? toNumber(activeSummary.total_score) : null;
+
+    if ((manualScore === null || manualScore === 0) && manualSections.length > 0) {
+      let sum = 0;
+      let hasValue = false;
+      manualSections.forEach((sec) => {
+        sec.groups.forEach((grp) => {
+          grp.metrics.forEach((m) => {
+            const wScore = toNumber(m.result?.weighted_score);
+            if (wScore !== null) {
+              sum += wScore;
+              hasValue = true;
+            } else if (m.result?.score != null && m.metric.weight_percent) {
+              const sc = toNumber(m.result.score) || 0;
+              const wp = toNumber(m.metric.weight_percent) || 0;
+              sum += (sc * wp) / 100;
+              hasValue = true;
+            }
+          });
+        });
+      });
+      if (hasValue && sum > 0) manualScore = sum;
+    }
+
+    if ((autoScore === null || autoScore === 0) && autoSections.length > 0) {
+      let sum = 0;
+      let hasValue = false;
+      autoSections.forEach((sec) => {
+        sec.groups.forEach((grp) => {
+          grp.metrics.forEach((m) => {
+            const wScore = toNumber(m.result?.weighted_score);
+            if (wScore !== null) {
+              sum += wScore;
+              hasValue = true;
+            } else if (m.progressPercent !== null && m.metric.weight_percent) {
+              const sc = m.progressPercent;
+              const wp = toNumber(m.metric.weight_percent) || 0;
+              sum += (sc * wp) / 100;
+              hasValue = true;
+            }
+          });
+        });
+      });
+      if (hasValue && sum > 0) autoScore = sum;
+    }
+
+    if (totalScore === null || totalScore === 0) {
+      if (manualScore !== null || autoScore !== null) {
+        totalScore = (manualScore || 0) + (autoScore || 0);
+      }
+    }
+
+    return {
+      manualScore,
+      autoScore,
+      totalScore,
+    };
+  }, [activeSummary, manualSections, autoSections]);
+
   const gateItems = useMemo(
     () => buildGateItems(filteredGateResults),
     [filteredGateResults]
@@ -773,6 +835,7 @@ export function useKpiDashboard() {
     selectedEmployeeName,
 
     activeSummary,
+    computedScores,
     teamMembers,
     metricSections,
     manualSections,

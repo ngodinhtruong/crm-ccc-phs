@@ -306,44 +306,51 @@ function SystemOverviewGrid({
   const botDoneRate = totalReceived > 0 ? Math.round((botDone / totalReceived) * 100) : 0;
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       {/* 1. Ticket CCC Card */}
       <Link
         href="/tickets"
-        className="group relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md"
+        className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-emerald-100/80 bg-white p-4.5 shadow-xs transition-all duration-300 hover:-translate-y-1 hover:border-emerald-300 hover:shadow-xl hover:shadow-emerald-500/10"
       >
-        <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-emerald-500 to-teal-600" />
-        <div className="flex items-start justify-between">
-          <div>
-            <span className="inline-flex items-center gap-1.5 rounded-md bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700">
-              <Ticket size={13} />
+        <div className="absolute right-0 top-0 h-24 w-24 translate-x-8 -translate-y-8 rounded-full bg-emerald-500/5 transition-transform duration-500 group-hover:scale-150" />
+        
+        <div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800 ring-1 ring-emerald-500/20">
+              <div className="flex h-5 w-5 items-center justify-center rounded-lg bg-emerald-500 text-white shadow-xs">
+                <Ticket size={12} />
+              </div>
               Tickets CCC
             </span>
-            <p className="mt-2.5 text-2xl font-black tracking-tight text-slate-800">
+            <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-slate-50 text-slate-400 transition-all duration-300 group-hover:bg-emerald-600 group-hover:text-white group-hover:shadow-md group-hover:shadow-emerald-500/30">
+              <ArrowUpRight size={15} />
+            </div>
+          </div>
+
+          <div className="mt-3.5 flex items-baseline gap-2">
+            <p className="text-3xl font-black tracking-tight text-slate-900">
               {formatNumber(overview?.total_tickets || 0)}
             </p>
-          </div>
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 transition group-hover:bg-emerald-600 group-hover:text-white">
-            <ArrowUpRight size={17} />
+            <span className="text-xs font-medium text-slate-400">tổng số</span>
           </div>
         </div>
 
-        <div className="mt-3 grid grid-cols-3 gap-1 border-t border-slate-100 pt-2 text-xs">
-          <div>
-            <span className="text-[11px] text-slate-400">Chờ XL:</span>
-            <p className="text-xs font-extrabold text-amber-600">
+        <div className="mt-4 grid grid-cols-3 gap-1.5 border-t border-slate-100 pt-3 text-xs">
+          <div className="rounded-lg bg-slate-50 px-2 py-1.5">
+            <span className="block text-[10px] font-medium text-slate-400">Chờ XL</span>
+            <p className="text-xs font-black text-amber-600">
               {formatNumber(overview?.pending_processing || 0)}
             </p>
           </div>
-          <div>
-            <span className="text-[11px] text-slate-400">Đã giải quyết:</span>
-            <p className="text-xs font-extrabold text-emerald-600">
+          <div className="rounded-lg bg-slate-50 px-2 py-1.5">
+            <span className="block text-[10px] font-medium text-slate-400">Đã xong</span>
+            <p className="text-xs font-black text-emerald-600">
               {formatNumber(overview?.resolved_tickets || 0)}
             </p>
           </div>
-          <div>
-            <span className="text-[11px] text-slate-400">Đã liên kết:</span>
-            <p className="text-xs font-extrabold text-blue-600">
+          <div className="rounded-lg bg-slate-50 px-2 py-1.5">
+            <span className="block text-[10px] font-medium text-slate-400">Đã liên kết</span>
+            <p className="text-xs font-black text-blue-600">
               {formatNumber(overview?.linked_tickets || 0)}
             </p>
           </div>
@@ -353,28 +360,35 @@ function SystemOverviewGrid({
       {/* 2. System Users Card */}
       <Link
         href="/accounts/users"
-        className="group relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-md"
+        className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-sky-100/80 bg-white p-4.5 shadow-xs transition-all duration-300 hover:-translate-y-1 hover:border-sky-300 hover:shadow-xl hover:shadow-sky-500/10"
       >
-        <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-sky-500 to-blue-600" />
-        <div className="flex items-start justify-between">
-          <div>
-            <span className="inline-flex items-center gap-1.5 rounded-md bg-sky-50 px-2.5 py-1 text-[11px] font-bold text-sky-700">
-              <Users size={13} />
-              Người dùng hệ thống
+        <div className="absolute right-0 top-0 h-24 w-24 translate-x-8 -translate-y-8 rounded-full bg-sky-500/5 transition-transform duration-500 group-hover:scale-150" />
+
+        <div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-xl bg-sky-50 px-2.5 py-1 text-xs font-bold text-sky-800 ring-1 ring-sky-500/20">
+              <div className="flex h-5 w-5 items-center justify-center rounded-lg bg-sky-500 text-white shadow-xs">
+                <Users size={12} />
+              </div>
+              Người Dùng Hệ Thống
             </span>
-            <p className="mt-2.5 text-2xl font-black tracking-tight text-slate-800">
+            <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-slate-50 text-slate-400 transition-all duration-300 group-hover:bg-sky-600 group-hover:text-white group-hover:shadow-md group-hover:shadow-sky-500/30">
+              <ArrowUpRight size={15} />
+            </div>
+          </div>
+
+          <div className="mt-3.5 flex items-baseline gap-2">
+            <p className="text-3xl font-black tracking-tight text-slate-900">
               {systemMetrics.loading ? "..." : formatNumber(systemMetrics.totalUsers || 0)}
             </p>
-          </div>
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-50 text-sky-600 transition group-hover:bg-sky-600 group-hover:text-white">
-            <ArrowUpRight size={17} />
+            <span className="text-xs font-medium text-slate-400">tài khoản</span>
           </div>
         </div>
 
-        <div className="mt-3 border-t border-slate-100 pt-2 text-xs text-slate-500">
+        <div className="mt-4 rounded-xl border border-sky-100/60 bg-sky-50/50 p-2.5 text-xs">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] text-slate-400">Tài khoản CRM active:</span>
-            <span className="font-extrabold text-slate-700">
+            <span className="text-[11px] font-semibold text-slate-500">Tài khoản CRM Active:</span>
+            <span className="font-extrabold text-sky-700">
               {systemMetrics.loading ? "..." : `${formatNumber(systemMetrics.totalUsers || 0)} user`}
             </span>
           </div>
@@ -382,37 +396,44 @@ function SystemOverviewGrid({
         </div>
       </Link>
 
-      {/* 3. Chatbot Card */}
+      {/* 3. Chatbot AI Card */}
       <Link
         href="/chatbots/dashboard"
-        className="group relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-purple-300 hover:shadow-md"
+        className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-purple-100/80 bg-white p-4.5 shadow-xs transition-all duration-300 hover:-translate-y-1 hover:border-purple-300 hover:shadow-xl hover:shadow-purple-500/10"
       >
-        <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-purple-500 to-pink-600" />
-        <div className="flex items-start justify-between">
-          <div>
-            <span className="inline-flex items-center gap-1.5 rounded-md bg-purple-50 px-2.5 py-1 text-[11px] font-bold text-purple-700">
-              <BotMessageSquare size={13} />
-              Trợ lý Chatbot AI
+        <div className="absolute right-0 top-0 h-24 w-24 translate-x-8 -translate-y-8 rounded-full bg-purple-500/5 transition-transform duration-500 group-hover:scale-150" />
+
+        <div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-xl bg-purple-50 px-2.5 py-1 text-xs font-bold text-purple-800 ring-1 ring-purple-500/20">
+              <div className="flex h-5 w-5 items-center justify-center rounded-lg bg-purple-600 text-white shadow-xs">
+                <BotMessageSquare size={12} />
+              </div>
+              Trợ Lý Chatbot AI
             </span>
-            <p className="mt-2.5 text-2xl font-black tracking-tight text-slate-800">
+            <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-slate-50 text-slate-400 transition-all duration-300 group-hover:bg-purple-600 group-hover:text-white group-hover:shadow-md group-hover:shadow-purple-500/30">
+              <ArrowUpRight size={15} />
+            </div>
+          </div>
+
+          <div className="mt-3.5 flex items-baseline gap-2">
+            <p className="text-3xl font-black tracking-tight text-slate-900">
               {systemMetrics.loading ? "..." : formatNumber(systemMetrics.chatbotReceived || 0)}
             </p>
-          </div>
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-50 text-purple-600 transition group-hover:bg-purple-600 group-hover:text-white">
-            <ArrowUpRight size={17} />
+            <span className="text-xs font-medium text-slate-400">phiên chat</span>
           </div>
         </div>
 
-        <div className="mt-3 grid grid-cols-2 gap-1 border-t border-slate-100 pt-2 text-xs">
-          <div>
-            <span className="text-[11px] text-slate-400">Bot xử lý:</span>
-            <p className="font-extrabold text-purple-700">
+        <div className="mt-4 grid grid-cols-2 gap-2 border-t border-slate-100 pt-3 text-xs">
+          <div className="rounded-lg bg-slate-50 px-2.5 py-1.5">
+            <span className="block text-[10px] font-medium text-slate-400">Bot xử lý xong</span>
+            <p className="text-xs font-black text-purple-700">
               {systemMetrics.loading ? "..." : `${formatNumber(systemMetrics.chatbotBotDone || 0)} (${botDoneRate}%)`}
             </p>
           </div>
-          <div>
-            <span className="text-[11px] text-slate-400">Chuyển CCC:</span>
-            <p className="font-extrabold text-indigo-600">
+          <div className="rounded-lg bg-slate-50 px-2.5 py-1.5">
+            <span className="block text-[10px] font-medium text-slate-400">Chuyển CCC</span>
+            <p className="text-xs font-black text-indigo-600">
               {systemMetrics.loading ? "..." : formatNumber(systemMetrics.chatbotCcc || 0)}
             </p>
           </div>
@@ -422,91 +443,45 @@ function SystemOverviewGrid({
       {/* 4. External Errors Card */}
       <Link
         href="/external-errors/dashboard"
-        className="group relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-amber-300 hover:shadow-md"
+        className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-amber-100/80 bg-white p-4.5 shadow-xs transition-all duration-300 hover:-translate-y-1 hover:border-amber-300 hover:shadow-xl hover:shadow-amber-500/10"
       >
-        <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-amber-500 to-rose-600" />
-        <div className="flex items-start justify-between">
-          <div>
-            <span className="inline-flex items-center gap-1.5 rounded-md bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-700">
-              <AlertTriangle size={13} />
-              Lỗi hệ thống / Bên ngoài
+        <div className="absolute right-0 top-0 h-24 w-24 translate-x-8 -translate-y-8 rounded-full bg-amber-500/5 transition-transform duration-500 group-hover:scale-150" />
+
+        <div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-xl bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-800 ring-1 ring-amber-500/20">
+              <div className="flex h-5 w-5 items-center justify-center rounded-lg bg-amber-500 text-white shadow-xs">
+                <AlertTriangle size={12} />
+              </div>
+              Lỗi Hệ Thống / Bên Ngoài
             </span>
-            <p className="mt-2.5 text-2xl font-black tracking-tight text-slate-800">
+            <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-slate-50 text-slate-400 transition-all duration-300 group-hover:bg-amber-600 group-hover:text-white group-hover:shadow-md group-hover:shadow-amber-500/30">
+              <ArrowUpRight size={15} />
+            </div>
+          </div>
+
+          <div className="mt-3.5 flex items-baseline gap-2">
+            <p className="text-3xl font-black tracking-tight text-slate-900">
               {systemMetrics.loading ? "..." : formatNumber(systemMetrics.externalTotalErrors || 0)}
             </p>
-          </div>
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-600 transition group-hover:bg-amber-600 group-hover:text-white">
-            <ArrowUpRight size={17} />
+            <span className="text-xs font-medium text-slate-400">sự cố phát sinh</span>
           </div>
         </div>
 
-        <div className="mt-3 grid grid-cols-2 gap-1 border-t border-slate-100 pt-2 text-xs">
-          <div>
-            <span className="text-[11px] text-slate-400">Cần rà soát:</span>
-            <p className="font-extrabold text-rose-600">
+        <div className="mt-4 grid grid-cols-2 gap-2 border-t border-slate-100 pt-3 text-xs">
+          <div className="rounded-lg bg-slate-50 px-2.5 py-1.5">
+            <span className="block text-[10px] font-medium text-slate-400">Cần rà soát</span>
+            <p className="text-xs font-black text-rose-600">
               {systemMetrics.loading ? "..." : formatNumber(systemMetrics.externalNeedReview || 0)}
             </p>
           </div>
-          <div>
-            <span className="text-[11px] text-slate-400">Đã phân loại:</span>
-            <p className="font-extrabold text-emerald-600">
+          <div className="rounded-lg bg-slate-50 px-2.5 py-1.5">
+            <span className="block text-[10px] font-medium text-slate-400">Đã phân loại</span>
+            <p className="text-xs font-black text-emerald-600">
               {systemMetrics.loading ? "..." : `${systemMetrics.externalClassificationRate || 0}%`}
             </p>
           </div>
         </div>
-      </Link>
-    </div>
-  );
-}
-
-function TicketTabSummary({
-  dashboard,
-}: {
-  dashboard: ReturnType<typeof useCccDashboard>;
-}) {
-  const tabs = dashboard.data?.my_ticket_tabs;
-
-  return (
-    <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-      <Link
-        href="/tickets"
-        className="rounded-md border border-slate-200 bg-white p-4 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50"
-      >
-        <p className="text-xs font-medium text-slate-500">Danh sách Ticket</p>
-        <p className="mt-2 text-2xl font-bold text-slate-800">
-          {formatNumber(tabs?.all || 0)}
-        </p>
-        <p className="mt-1 text-[11px] text-slate-500">
-          Tất cả ticket theo phạm vi quyền
-        </p>
-      </Link>
-
-      <Link
-        href="/tickets?account_link_status=LINKED"
-        className="rounded-md border border-emerald-100 bg-white p-4 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50"
-      >
-        <p className="text-xs font-medium text-slate-500">Có TK liên kết</p>
-        <p className="mt-2 text-2xl font-bold text-emerald-700">
-          {formatNumber(tabs?.linked || 0)}
-        </p>
-        <p className="mt-1 text-[11px] text-slate-500">
-          Ticket đã xác định tài khoản lưu ký
-        </p>
-      </Link>
-
-      <Link
-        href="/tickets?account_link_status=UNLINKED"
-        className="rounded-md border border-amber-100 bg-white p-4 shadow-sm transition hover:border-amber-200 hover:bg-amber-50"
-      >
-        <p className="text-xs font-medium text-slate-500">
-          Chưa có TK liên kết
-        </p>
-        <p className="mt-2 text-2xl font-bold text-amber-700">
-          {formatNumber(tabs?.unlinked || 0)}
-        </p>
-        <p className="mt-1 text-[11px] text-slate-500">
-          Ticket cần đối chiếu tài khoản
-        </p>
       </Link>
     </div>
   );
@@ -561,8 +536,14 @@ export function CccDashboardPage() {
       try {
         const [usersRes, chatbotRes, errorRes] = await Promise.allSettled([
           userService.getUsers({ page: "1" }),
-          chatbotDashboardService.getOverview(),
-          externalErrorService.getDashboardOverview(),
+          chatbotDashboardService.getOverview({
+            start_date: dashboard.dateFrom || undefined,
+            end_date: dashboard.dateTo || undefined,
+          }),
+          externalErrorService.getDashboardOverview({
+            date_from: dashboard.dateFrom || undefined,
+            date_to: dashboard.dateTo || undefined,
+          }),
         ]);
 
         if (!isMounted) return;
@@ -600,7 +581,7 @@ export function CccDashboardPage() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [dashboard.dateFrom, dashboard.dateTo]);
 
   const report = dashboard.data?.report;
   const reportMonthCount = getMonthCount(report?.range_from, report?.range_to);
@@ -638,7 +619,7 @@ export function CccDashboardPage() {
         { label: "Dashboard Ticket CCC" },
       ]}
       rightAction={
-        <div className="relative flex flex-wrap items-center gap-2">
+        <div className="relative flex flex-wrap items-center justify-end gap-2">
           <CccPeriodControls
             granularity={granularity}
             onGranularityChange={setGranularity}
@@ -648,21 +629,21 @@ export function CccDashboardPage() {
 
           <Link
             href="/tickets"
-            className="flex h-8 items-center gap-1 rounded border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+            className="flex h-8 items-center gap-1.5 rounded-lg border border-slate-300/80 bg-white px-3 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 hover:border-slate-400 transition"
           >
-            <Ticket size={15} />
+            <Ticket size={14} className="text-emerald-600" />
             Danh sách ticket
           </Link>
 
           <button
             type="button"
             onClick={toggleFilter}
-            className={`relative flex h-8 items-center gap-1 rounded border px-3 text-xs font-semibold ${filterOpen || dashboard.activeFilterCount > 0
+            className={`relative flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold shadow-2xs transition ${filterOpen || dashboard.activeFilterCount > 0
                 ? "border-[#10b981] bg-emerald-50 text-[#059669]"
-                : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
+                : "border-slate-300/80 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-400"
               }`}
           >
-            <SlidersHorizontal size={15} />
+            <SlidersHorizontal size={14} />
             Bộ lọc
             {dashboard.activeFilterCount > 0 && (
               <span className="ml-1 rounded-full bg-[#10b981] px-1.5 py-0.5 text-[10px] font-bold text-white">
@@ -682,74 +663,81 @@ export function CccDashboardPage() {
             type="button"
             onClick={dashboard.reload}
             disabled={busy}
-            className="flex h-8 items-center gap-1 rounded bg-[#10b981] px-3 text-xs font-semibold text-white hover:bg-[#059669] disabled:opacity-50"
+            className="flex h-8 items-center gap-1.5 rounded-lg bg-gradient-to-r from-emerald-500 to-emerald-600 px-3.5 text-xs font-semibold text-white shadow-sm hover:from-emerald-600 hover:to-emerald-700 disabled:opacity-50 transition"
             title="Bỏ qua cache và tải dữ liệu mới từ backend"
           >
-            <RefreshCw size={15} className={busy ? "animate-spin" : ""} />
+            <RefreshCw size={14} className={busy ? "animate-spin" : ""} />
             Làm mới
           </button>
         </div>
       }
     >
-      <div className="space-y-5">
-        <div className="rounded-md border border-slate-200 bg-gradient-to-r from-lime-50 via-white to-sky-50 px-4 py-3 shadow-sm">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div className="min-w-0">
-              <h1 className="text-xl font-black uppercase tracking-tight text-slate-900">
-                Dashboard Ticket CCC
-              </h1>
+      <div className="space-y-6">
+        {/* Executive Header Banner - Green & White theme */}
+        <div className="relative overflow-hidden rounded-2xl border border-emerald-100 bg-gradient-to-r from-emerald-50 via-white to-teal-50 p-4.5 shadow-xs">
+          <div className="relative flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-xs shadow-emerald-500/80 animate-pulse" />
+                <h1 className="text-xl font-black uppercase tracking-tight text-slate-900">
+                  Dashboard Ticket CCC
+                </h1>
+              </div>
 
-              <div className="mt-2 flex flex-wrap items-center gap-2">
+              <div className="mt-2 flex flex-wrap items-center gap-2.5 text-xs">
                 {report && (
-                  <span className="inline-flex items-center rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100">
+                  <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-100/80 px-3 py-1 font-bold text-emerald-800 border border-emerald-200">
                     Báo cáo {reportMonthCount} tháng
                   </span>
                 )}
 
                 {report && (
-                  <span className="text-xs text-slate-500">
+                  <span className="font-semibold text-slate-600">
                     {formatDate(report.range_from)} - {formatDate(report.range_to)}
                   </span>
                 )}
 
                 <span className="hidden text-slate-300 md:inline">•</span>
 
-                <span className="text-xs text-slate-500">
+                <span className="text-slate-500">
                   Cập nhật: {formatDateTime(dashboard.data?.generated_at)}
                 </span>
               </div>
             </div>
 
             {dashboard.fetching && dashboard.data && (
-              <span className="inline-flex shrink-0 items-center gap-2 rounded-md bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-100">
-                <RefreshCw size={13} className="animate-spin" />
+              <span className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-emerald-100 px-3.5 py-1.5 text-xs font-semibold text-emerald-700 border border-emerald-200 shadow-2xs">
+                <RefreshCw size={14} className="animate-spin text-emerald-600" />
                 Đang cập nhật dữ liệu...
               </span>
             )}
           </div>
         </div>
 
-        {/* 1. Core Unified System Executive Summary Grid (4 Cards) */}
-        <SystemOverviewGrid
-          dashboard={dashboard}
-          systemMetrics={systemMetrics}
-        />
+        {/* 1. System Overview Cards (Left 2x2) & Pending Ticket Table (Right) */}
+        <div className="grid grid-cols-12 gap-5 items-start">
+          <div className="col-span-12 xl:col-span-5">
+            <SystemOverviewGrid
+              dashboard={dashboard}
+              systemMetrics={systemMetrics}
+            />
+          </div>
 
-        {/* 2. Ticket Status & Account Linking Quick Access */}
-        <TicketTabSummary dashboard={dashboard} />
+          <div className="col-span-12 xl:col-span-7">
+            {dashboard.data && (
+              <TicketListTable
+                title="Ticket chưa xử lý"
+                description="Danh sách các ticket đang chờ xử lý theo bộ lọc hiện tại."
+                filters={dashboard.appliedParams}
+                refreshKey={dashboard.data.generated_at}
+              />
+            )}
+          </div>
+        </div>
 
         {dashboard.error && <ErrorBlock message={dashboard.error} />}
 
         {dashboard.loading && !dashboard.data && <LoadingBlock />}
-
-        {dashboard.data && (
-          <TicketListTable
-            title="Ticket chưa xử lý"
-            description="Danh sách các ticket đang chờ xử lý theo bộ lọc hiện tại."
-            filters={dashboard.appliedParams}
-            refreshKey={dashboard.data.generated_at}
-          />
-        )}
 
         {dashboard.data && (
           <CccDashboardCharts

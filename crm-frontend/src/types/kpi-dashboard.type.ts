@@ -179,8 +179,10 @@ export type KpiUserSummaryItem = {
   user_email?: string | null;
   employee?: number | null;
   employee_name?: string | null;
+  employee_position?: string | null;
   branch?: number | null;
   branch_name?: string | null;
+  role_names?: string[] | null;
   manual_score?: string | null;
   auto_score?: string | null;
   total_score?: string | null;

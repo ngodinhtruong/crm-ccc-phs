@@ -14,6 +14,25 @@ export type ExternalErrorClassificationStatus =
 
 export type ExternalErrorSourceType = "EXCEL" | "API" | "MANUAL";
 
+export const PROCESSING_STATUS_OPTIONS = [
+  { value: "Tiếp nhận", label: "Tiếp nhận" },
+  { value: "Đang xử lý", label: "Đang xử lý" },
+  { value: "Đã xử lý", label: "Đã xử lý" },
+];
+
+export type ExternalErrorRecordAuditLog = {
+  id: number;
+  record: number;
+  action_type: string;
+  old_data: Record<string, any> | null;
+  new_data: Record<string, any> | null;
+  changed_fields: Record<string, { old: any; new: any }> | null;
+  changed_by_user: number | null;
+  changed_by_username: string | null;
+  changed_at: string;
+  note: string | null;
+};
+
 export type ExternalErrorGroup = {
   id: number;
   group_code: string;
@@ -209,11 +228,13 @@ export type ExternalErrorBulkClassifyPayload = {
 };
 
 export type ExternalErrorBulkClassifyResponse = {
+  detail?: string;
+  task_id?: string;
   total: number;
   classified: number;
   need_review?: number;
   failed: number;
-  errors: Array<{ id: number; error: string }>;
+  errors?: Array<{ id: number; error: string }>;
 };
 
 export type ExternalErrorRawImportRow = {
@@ -311,6 +332,7 @@ export type ExternalErrorRecurringItem = {
   error_groups?: string[];
   error_codes?: string[];
   cause_groups?: string[];
+  solutions?: string[];
 };
 
 // Alias giữ tương thích với các component dashboard hiện tại.

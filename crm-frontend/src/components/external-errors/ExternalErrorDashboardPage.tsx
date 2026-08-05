@@ -6,6 +6,7 @@ import { memo, useState } from "react";
 import { AlertTriangle, ListChecks, RefreshCw, SlidersHorizontal, Upload, X } from "lucide-react";
 
 import {
+  CccPeriodControls,
   DateRangeFilter,
   FilterSelect,
   SearchInput,
@@ -266,6 +267,138 @@ function FilterPopover({
   );
 }
 
+const ExecutiveOverviewGrid = memo(function ExecutiveOverviewGrid({
+  summary,
+}: {
+  summary: any;
+}) {
+  const total = summary?.total_errors || 0;
+  const classified = summary?.classified_errors || 0;
+  const classifiedRate = formatPercent(summary?.classification_rate || 0);
+  const unclassified = summary?.unclassified_errors || 0;
+
+  const causeClassified = summary?.cause_classified_errors || 0;
+  const causeClassifiedRate = formatPercent(summary?.cause_classification_rate || 0);
+
+  const needReview = summary?.need_review_errors || 0;
+  const causeNeedReview = summary?.cause_need_review_errors || 0;
+
+  const errorTypesCount = summary?.by_error_type?.length || 0;
+  const recurringCount = summary?.recurring_issue_count || 0;
+
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {/* Card 1: Tổng Quan Lỗi */}
+      <div className="relative overflow-hidden rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50/70 via-white to-white p-4 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+        <div className="flex items-start justify-between">
+          <div>
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Tổng Quan Lỗi Import</span>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="text-2xl font-black tracking-tight text-emerald-900">{formatNumber(total)}</span>
+              <span className="text-xs font-medium text-slate-500">dòng lỗi</span>
+            </div>
+          </div>
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 shadow-2xs">
+            <AlertTriangle size={18} />
+          </div>
+        </div>
+
+        <div className="mt-3.5 grid grid-cols-2 gap-2 border-t border-emerald-100/60 pt-3">
+          <div className="rounded-lg bg-emerald-100/40 p-2">
+            <span className="block text-[11px] font-medium text-slate-500">Đã phân loại</span>
+            <span className="text-xs font-bold text-emerald-800">{formatNumber(classified)} ({classifiedRate})</span>
+          </div>
+          <div className="rounded-lg bg-amber-100/40 p-2">
+            <span className="block text-[11px] font-medium text-slate-500">Chưa phân loại</span>
+            <span className="text-xs font-bold text-amber-800">{formatNumber(unclassified)}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Card 2: Phân Loại LLM & Nguyên Nhân */}
+      <div className="relative overflow-hidden rounded-2xl border border-sky-100 bg-gradient-to-br from-sky-50/70 via-white to-white p-4 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+        <div className="flex items-start justify-between">
+          <div>
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Phân Loại LLM Bedrock</span>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="text-2xl font-black tracking-tight text-sky-900">{formatNumber(causeClassified)}</span>
+              <span className="text-xs font-medium text-slate-500">nguyên nhân</span>
+            </div>
+          </div>
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-500/10 text-sky-600 shadow-2xs">
+            <ListChecks size={18} />
+          </div>
+        </div>
+
+        <div className="mt-3.5 grid grid-cols-2 gap-2 border-t border-sky-100/60 pt-3">
+          <div className="rounded-lg bg-sky-100/40 p-2">
+            <span className="block text-[11px] font-medium text-slate-500">Tỷ lệ hoàn tất</span>
+            <span className="text-xs font-bold text-sky-800">{causeClassifiedRate}</span>
+          </div>
+          <div className="rounded-lg bg-purple-100/40 p-2">
+            <span className="block text-[11px] font-medium text-slate-500">Nhóm lỗi</span>
+            <span className="text-xs font-bold text-purple-800">{formatNumber(errorTypesCount)} nhóm</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Card 3: Cần Kiểm Tra & Xác Nhận */}
+      <div className="relative overflow-hidden rounded-2xl border border-rose-100 bg-gradient-to-br from-rose-50/70 via-white to-white p-4 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+        <div className="flex items-start justify-between">
+          <div>
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Dữ Liệu Cần Kiểm Tra</span>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="text-2xl font-black tracking-tight text-rose-900">{formatNumber(needReview)}</span>
+              <span className="text-xs font-medium text-slate-500">lỗi cần soát</span>
+            </div>
+          </div>
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-500/10 text-rose-600 shadow-2xs">
+            <SlidersHorizontal size={18} />
+          </div>
+        </div>
+
+        <div className="mt-3.5 grid grid-cols-2 gap-2 border-t border-rose-100/60 pt-3">
+          <div className="rounded-lg bg-rose-100/40 p-2">
+            <span className="block text-[11px] font-medium text-slate-500">LLM chưa chắc</span>
+            <span className="text-xs font-bold text-rose-800">{formatNumber(needReview)}</span>
+          </div>
+          <div className="rounded-lg bg-amber-100/40 p-2">
+            <span className="block text-[11px] font-medium text-slate-500">Kiểm tra nguyên nhân</span>
+            <span className="text-xs font-bold text-amber-800">{formatNumber(causeNeedReview)}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Card 4: Lỗi Lặp Lại & Phổ Biến */}
+      <div className="relative overflow-hidden rounded-2xl border border-purple-100 bg-gradient-to-br from-purple-50/70 via-white to-white p-4 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+        <div className="flex items-start justify-between">
+          <div>
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Sự Cố & Lỗi Lặp Lại</span>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="text-2xl font-black tracking-tight text-purple-900">{formatNumber(recurringCount)}</span>
+              <span className="text-xs font-medium text-slate-500">sự cố</span>
+            </div>
+          </div>
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-500/10 text-purple-600 shadow-2xs">
+            <RefreshCw size={18} />
+          </div>
+        </div>
+
+        <div className="mt-3.5 grid grid-cols-2 gap-2 border-t border-purple-100/60 pt-3">
+          <div className="rounded-lg bg-purple-100/40 p-2">
+            <span className="block text-[11px] font-medium text-slate-500">Normalized Issue</span>
+            <span className="text-xs font-bold text-purple-800">{formatNumber(recurringCount)}</span>
+          </div>
+          <div className="rounded-lg bg-teal-100/40 p-2">
+            <span className="block text-[11px] font-medium text-slate-500">Nhóm phân loại</span>
+            <span className="text-xs font-bold text-teal-800">{formatNumber(errorTypesCount)}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+});
+
 export function ExternalErrorDashboardPage() {
   const dashboard = useExternalErrorDashboard();
   const [filterOpen, setFilterOpen] = useState(false);
@@ -284,7 +417,14 @@ export function ExternalErrorDashboardPage() {
       sidebarDefaultExpandedGroupKey="ccc-external-errors"
       sidebarDefaultActiveChildKey="external-error-dashboard"
       rightAction={
-        <div className="relative flex items-center gap-2">
+        <div className="relative flex flex-wrap items-center gap-2">
+          <CccPeriodControls
+            granularity={dashboard.granularity}
+            onGranularityChange={dashboard.setGranularity}
+            compareMode={dashboard.compareMode}
+            onCompareModeChange={dashboard.setCompareMode}
+          />
+
           <Link
             href="/external-errors"
             className="flex h-8 items-center gap-1 rounded border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50"
@@ -337,14 +477,16 @@ export function ExternalErrorDashboardPage() {
       }
     >
       <div className="space-y-4">
-        <div className="rounded-md border border-slate-200 bg-gradient-to-r from-sky-50 via-white to-amber-50 p-5 shadow-sm">
-          <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white text-[#059669] shadow-sm ring-1 ring-emerald-100">
-              <AlertTriangle size={22} />
+        <div className="relative overflow-hidden rounded-2xl border border-emerald-100 bg-gradient-to-r from-emerald-50 via-white to-teal-50 p-4.5 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-[#059669] shadow-2xs">
+              <AlertTriangle size={20} />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-slate-800">Dashboard lỗi bên ngoài</h1>
-              <p className="mt-1 text-sm text-slate-500">
+              <h1 className="text-xl font-black uppercase tracking-tight text-slate-900">
+                Dashboard Lỗi Bên Ngoài
+              </h1>
+              <p className="mt-0.5 text-xs text-slate-500">
                 Thống kê dữ liệu lỗi thô đã xử lý xong, được clean và phân loại bằng AWS Bedrock LLM.
               </p>
             </div>
@@ -368,17 +510,7 @@ export function ExternalErrorDashboardPage() {
           <DashboardLoadingSkeleton />
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 xl:grid-cols-8">
-              <SummaryCard label="Tổng số lỗi" value={formatNumber(summary?.total_errors || 0)} subLabel="Dòng lỗi đã import" />
-              <SummaryCard label="Đã phân loại" value={formatNumber(summary?.classified_errors || 0)} subLabel={`${formatPercent(summary?.classification_rate || 0)} dữ liệu`} tone="emerald" />
-              <SummaryCard label="Đã phân loại nguyên nhân" value={formatNumber(summary?.cause_classified_errors || 0)} subLabel={`${formatPercent(summary?.cause_classification_rate || 0)} dữ liệu`} tone="sky" />
-              <SummaryCard label="Chưa phân loại" value={formatNumber(summary?.unclassified_errors || 0)} subLabel="Chờ LLM xử lý" tone="amber" />
-              <SummaryCard label="Cần kiểm tra" value={formatNumber(summary?.need_review_errors || 0)} subLabel="LLM chưa chắc chắn" tone="rose" />
-              <SummaryCard label="Kiểm tra nguyên nhân" value={formatNumber(summary?.cause_need_review_errors || 0)} subLabel="Nguyên nhân cần xác nhận" tone="amber" />
-              <SummaryCard label="Nhóm lỗi" value={formatNumber(summary?.by_error_type?.length || 0)} subLabel="Nhóm đang phát sinh" tone="violet" />
-              <SummaryCard label="Lỗi lặp lại" value={formatNumber(summary?.recurring_issue_count || 0)} subLabel="Normalized issue" tone="slate" />
-            </div>
-
+            <ExecutiveOverviewGrid summary={summary} />
             <ExternalErrorDashboardCharts charts={dashboard.charts} recurringIssues={dashboard.recurringIssues} />
           </>
         )}

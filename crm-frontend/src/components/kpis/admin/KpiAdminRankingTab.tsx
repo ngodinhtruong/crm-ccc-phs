@@ -177,6 +177,18 @@ export function KpiAdminRankingTab({ admin }: { admin: KpiAdminController }) {
                       const actual = result?.actual_value ?? result?.score ?? null;
                       const target = result?.target_value;
 
+                      if (!result) {
+                        return (
+                          <td
+                            key={metric.id}
+                            className="border-b px-2 py-3 text-center"
+                            title={`${metric.metric_code} - ${metric.metric_name}`}
+                          >
+                            <div className="text-sm text-slate-300">—</div>
+                          </td>
+                        );
+                      }
+
                       return (
                         <td key={metric.id} className="border-b px-2 py-3 text-center" title={`${metric.metric_code} - ${metric.metric_name}`}>
                           <div className="text-sm font-bold text-slate-800">{formatNumber(actual, 0)}</div>

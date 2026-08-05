@@ -43,7 +43,6 @@ const AUTO_REFRESH_MS = 120_000;
 /** Khoảng của preset "5 tháng gần đây": từ đầu tháng cách đây 4 tháng tới nay. */
 function getPresetFilters(): ChatbotDashboardFilters {
   const now = new Date();
-
   const start = new Date(now.getFullYear(), now.getMonth() - 4, 1);
   const end = now;
 
@@ -94,11 +93,21 @@ const EMPTY_FILTERS: ChatbotDashboardFilters = {
   granularity: "auto",
 };
 
-/** Bộ lọc lúc mở trang và sau khi bấm "Xóa lọc": xem theo tháng của năm nay. */
+/** Bộ lọc lúc mở trang và sau khi bấm "Xóa lọc": xem từ đầu năm tới hiện tại. */
 function getDefaultFilters(): ChatbotDashboardFilters {
+  const preset = getPresetFilters();
+  let savedStart = "";
+  let savedEnd = "";
+  if (typeof window !== "undefined") {
+    savedStart = sessionStorage.getItem("chatbot_dashboard_start_date") || "";
+    savedEnd = sessionStorage.getItem("chatbot_dashboard_end_date") || "";
+  }
+
   return {
     ...EMPTY_FILTERS,
-    ...getGranularityFilters(DEFAULT_GRANULARITY),
+    ...preset,
+    start_date: savedStart || preset.start_date,
+    end_date: savedEnd || preset.end_date,
     granularity: DEFAULT_GRANULARITY,
   };
 }
@@ -254,6 +263,10 @@ export function useChatbotDashboard() {
   /** Preset "5 tháng gần đây": khoảng lệch ranh giới năm nên để mốc tự động. */
   const applyQuickPreset = () => {
     const nextFilters = { ...EMPTY_FILTERS, ...getPresetFilters() };
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("chatbot_dashboard_start_date", nextFilters.start_date || "");
+      sessionStorage.setItem("chatbot_dashboard_end_date", nextFilters.end_date || "");
+    }
 
     setFilters(nextFilters);
     void loadData(nextFilters);
@@ -261,6 +274,10 @@ export function useChatbotDashboard() {
 
   /** Xóa lọc = quay lại mặc định: xem theo tháng, từ đầu năm tới hiện tại. */
   const clearFilters = () => {
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("chatbot_dashboard_start_date");
+      sessionStorage.removeItem("chatbot_dashboard_end_date");
+    }
     const nextFilters = getDefaultFilters();
 
     setFilters(nextFilters);
@@ -284,6 +301,11 @@ export function useChatbotDashboard() {
             granularity: mode,
           };
 
+    if (typeof window !== "undefined" && nextFilters.start_date && nextFilters.end_date) {
+      sessionStorage.setItem("chatbot_dashboard_start_date", nextFilters.start_date);
+      sessionStorage.setItem("chatbot_dashboard_end_date", nextFilters.end_date);
+    }
+
     setFilters(nextFilters);
     void loadData(nextFilters);
   };
@@ -299,6 +321,11 @@ export function useChatbotDashboard() {
       ...filters,
       granularity: "auto",
     };
+
+    if (typeof window !== "undefined" && nextFilters.start_date && nextFilters.end_date) {
+      sessionStorage.setItem("chatbot_dashboard_start_date", nextFilters.start_date);
+      sessionStorage.setItem("chatbot_dashboard_end_date", nextFilters.end_date);
+    }
 
     setFilters(nextFilters);
     void loadData(nextFilters);

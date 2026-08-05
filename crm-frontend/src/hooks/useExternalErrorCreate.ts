@@ -14,6 +14,8 @@ type FormState = {
   device: string;
   result: string;
   content: string;
+  cause: string;
+  solution: string;
   autoClassify: boolean;
 };
 
@@ -30,6 +32,8 @@ const initialForm = (): FormState => ({
   device: "",
   result: "",
   content: "",
+  cause: "",
+  solution: "",
   autoClassify: true,
 });
 
@@ -84,6 +88,8 @@ export function useExternalErrorCreate() {
         device: form.device.trim(),
         result: form.result.trim(),
         content: form.content.trim(),
+        cause: form.cause.trim() || undefined,
+        solution: form.solution.trim() || undefined,
         auto_classify: form.autoClassify,
       });
 

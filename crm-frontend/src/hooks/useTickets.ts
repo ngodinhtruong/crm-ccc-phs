@@ -43,28 +43,36 @@ export function useTickets() {
     const [errorTypes, setErrorTypes] = useState<TicketErrorTypeOption[]>([]);
 
     // Grouping all filter states into one object to optimize renders and make reset cleaner
-    const [filters, setFilters] = useState({
-        ticketCode: "",
-        classificationMethod: "",
-        accountLinkStatus: "",
-        accountNumber: "",
-        supportCategory: "",
-        classification: "",
-        currentStatus: "",
-        source: "",
-        priority: "",
-        isErrorTicket: "",
-        errorGroup: "",
-        errorType: "",
-        relatedSystem: "",
-        companyName: "",
-        customerName: "",
-        customerPhone: "",
-        customerEmail: "",
-        ownerUserName: "",
-        requestContent: "",
-        createdFrom: "",
-        createdTo: "",
+    const [filters, setFilters] = useState(() => {
+        let savedFrom = "";
+        let savedTo = "";
+        if (typeof window !== "undefined") {
+            savedFrom = sessionStorage.getItem("ticket_list_createdFrom") || "";
+            savedTo = sessionStorage.getItem("ticket_list_createdTo") || "";
+        }
+        return {
+            ticketCode: "",
+            classificationMethod: "",
+            accountLinkStatus: "",
+            accountNumber: "",
+            supportCategory: "",
+            classification: "",
+            currentStatus: "",
+            source: "",
+            priority: "",
+            isErrorTicket: "",
+            errorGroup: "",
+            errorType: "",
+            relatedSystem: "",
+            companyName: "",
+            customerName: "",
+            customerPhone: "",
+            customerEmail: "",
+            ownerUserName: "",
+            requestContent: "",
+            createdFrom: savedFrom,
+            createdTo: savedTo,
+        };
     });
 
     // Individual getters for backwards compatibility
@@ -168,10 +176,12 @@ export function useTickets() {
     }, []);
 
     const setCreatedFrom = useCallback((val: string) => {
+        if (typeof window !== "undefined") sessionStorage.setItem("ticket_list_createdFrom", val);
         setFilters((prev) => ({ ...prev, createdFrom: val }));
     }, []);
 
     const setCreatedTo = useCallback((val: string) => {
+        if (typeof window !== "undefined") sessionStorage.setItem("ticket_list_createdTo", val);
         setFilters((prev) => ({ ...prev, createdTo: val }));
     }, []);
 

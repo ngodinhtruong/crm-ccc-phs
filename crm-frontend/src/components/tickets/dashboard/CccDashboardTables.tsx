@@ -27,13 +27,18 @@ function TableCard({
   children: ReactNode;
 }) {
   return (
-    <div className="rounded-md border border-slate-200 bg-white shadow-sm">
-      <div className="flex items-start justify-between gap-3 border-b px-4 py-3">
-        <div>
-          <h3 className="text-sm font-semibold text-slate-800">{title}</h3>
-          {description && (
-            <p className="mt-0.5 text-xs text-slate-500">{description}</p>
-          )}
+    <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-xs">
+      <div className="flex items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/60 px-4.5 py-3">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-amber-500 text-white font-black text-xs shadow-xs">
+            !
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-slate-900">{title}</h3>
+            {description && (
+              <p className="mt-0.5 text-[11px] text-slate-500">{description}</p>
+            )}
+          </div>
         </div>
       </div>
 
@@ -263,20 +268,20 @@ export function TicketListTable({
   return (
     <TableCard title={title} description={description}>
       <div
-        className="max-h-[256px] overflow-auto overscroll-contain"
+        className="max-h-[310px] overflow-auto overscroll-contain"
         aria-busy={loading}
       >
-        <table className="w-full min-w-[1120px] table-fixed text-left text-xs">
+        <table className="w-full min-w-[960px] table-fixed text-left text-xs">
           <thead className="sticky top-0 z-10 border-b bg-[#f8fafc] text-slate-600 shadow-sm">
             <tr className="h-9">
-              <th className="w-[130px] px-3 py-2 font-semibold">Mã Ticket</th>
-              <th className="w-[170px] px-3 py-2 font-semibold">Chi nhánh xử lý</th>
-              <th className="w-[160px] px-3 py-2 font-semibold">Phân loại</th>
-              <th className="w-[180px] px-3 py-2 font-semibold">Công ty</th>
-              <th className="w-[130px] px-3 py-2 font-semibold">Tình trạng</th>
-              <th className="w-[240px] px-3 py-2 font-semibold">Mô tả</th>
-              <th className="w-[150px] px-3 py-2 font-semibold">Nguồn Ticket</th>
-              <th className="w-[120px] px-3 py-2 font-semibold">Ngày tạo</th>
+              <th className="w-[110px] px-3 py-2 font-semibold">Mã Ticket</th>
+              <th className="w-[140px] px-3 py-2 font-semibold">Chi nhánh xử lý</th>
+              <th className="w-[130px] px-3 py-2 font-semibold">Phân loại</th>
+              <th className="w-[140px] px-3 py-2 font-semibold">Công ty</th>
+              <th className="w-[110px] px-3 py-2 font-semibold">Tình trạng</th>
+              <th className="w-[180px] px-3 py-2 font-semibold">Mô tả</th>
+              <th className="w-[120px] px-3 py-2 font-semibold">Nguồn Ticket</th>
+              <th className="w-[110px] px-3 py-2 font-semibold">Ngày tạo</th>
             </tr>
           </thead>
 

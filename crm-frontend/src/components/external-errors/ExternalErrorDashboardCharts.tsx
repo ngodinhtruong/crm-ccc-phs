@@ -318,7 +318,7 @@ function RecurringIssuesTable({ items }: { items: ExternalErrorRecurringIssue[] 
   return (
     <ChartCard title="Vấn đề lặp lại" description="Các lỗi có normalized issue xuất hiện từ 2 lần trở lên." className="xl:col-span-2">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[880px] text-left text-xs">
+        <table className="w-full min-w-[960px] text-left text-xs">
           <thead className="border-b bg-[#f8fafc] text-slate-600">
             <tr>
               <th className="px-3 py-2 font-semibold">Vấn đề</th>
@@ -326,12 +326,13 @@ function RecurringIssuesTable({ items }: { items: ExternalErrorRecurringIssue[] 
               <th className="px-3 py-2 font-semibold">Thiết bị liên quan</th>
               <th className="px-3 py-2 font-semibold">Loại lỗi</th>
               <th className="px-3 py-2 font-semibold">Nhóm nguyên nhân</th>
+              <th className="px-3 py-2 font-semibold">Giải pháp</th>
             </tr>
           </thead>
           <tbody>
             {items.length === 0 && (
               <tr>
-                <td colSpan={5} className="h-24 text-center text-slate-500">Chưa có vấn đề lặp lại.</td>
+                <td colSpan={6} className="h-24 text-center text-slate-500">Chưa có vấn đề lặp lại.</td>
               </tr>
             )}
             {items.map((item, index) => (
@@ -341,6 +342,9 @@ function RecurringIssuesTable({ items }: { items: ExternalErrorRecurringIssue[] 
                 <td className="px-3 py-3 text-slate-600">{item.devices?.join(", ") || "-"}</td>
                 <td className="px-3 py-3 text-slate-600">{item.error_types?.join(", ") || "-"}</td>
                 <td className="px-3 py-3 text-slate-600">{item.cause_groups?.join(", ") || "-"}</td>
+                <td className="px-3 py-3 text-slate-600 max-w-[220px] truncate" title={item.solutions?.join("; ") || ""}>
+                  {item.solutions?.join(", ") || "-"}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -385,7 +389,7 @@ export const ExternalErrorDashboardCharts = memo(function ExternalErrorDashboard
 
       <ColumnChart
         chart={charts.byErrorType}
-        title="Phân loại lỗi bằng LLM"
+        title="Top các lỗi xuất hiện"
         description="Cơ cấu 8 nhóm lỗi sau khi clean và phân loại."
       />
 

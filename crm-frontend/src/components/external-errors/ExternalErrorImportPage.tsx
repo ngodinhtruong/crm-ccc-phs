@@ -38,8 +38,8 @@ export function ExternalErrorImportPage() {
             Import lỗi từ Excel
           </h1>
           <p className="mt-1 text-xs text-slate-500">
-            Hệ thống đọc 7 cột: Ngày nhận, Ngày hoàn thành, Nguồn,
-            Thiết bị, Kết quả xử lý, Nội dung và Nguyên nhân.
+            Hệ thống đọc 8 cột: Ngày nhận, Ngày hoàn thành, Nguồn,
+            Thiết bị, Kết quả xử lý, Nội dung, Nguyên nhân và Giải pháp.
           </p>
         </div>
 
@@ -153,13 +153,13 @@ export function ExternalErrorImportPage() {
                 dùng thời điểm import.
               </li>
               <li>
-                • Thiếu ngày hoàn thành và chưa khắc phục sẽ bỏ qua.
+                • Thiếu ngày hoàn thành và chưa khắc phục sẽ lưu Ngày hoàn thành để trống (vẫn tiếp nhận record).
               </li>
               <li>
-                • Cột Nguyên nhân được lưu và clean trước khi Celery phân loại.
+                • Cột Nguyên nhân & Giải pháp được lưu và làm sạch dữ liệu.
               </li>
               <li>
-                • Các cột ngoài 7 cột quy định không được import.
+                • Các cột ngoài 8 cột quy định sẽ không được import.
               </li>
             </ul>
           </div>

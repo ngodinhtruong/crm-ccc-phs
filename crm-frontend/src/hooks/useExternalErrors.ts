@@ -28,13 +28,41 @@ export function useExternalErrors() {
   const [page, setPage] = useState(1);
 
   const [q, setQ] = useState("");
-  const [dateField, setDateField] = useState("received_date");
-  const [dateFrom, setDateFrom] = useState(
-    () => getYearToCurrentDateRange().dateFrom
-  );
-  const [dateTo, setDateTo] = useState(
-    () => getYearToCurrentDateRange().dateTo
-  );
+  const [dateField, setDateFieldState] = useState(() => {
+    if (typeof window !== "undefined") {
+      return sessionStorage.getItem("ext_err_list_dateField") || "received_date";
+    }
+    return "received_date";
+  });
+  const [dateFrom, setDateFromState] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = sessionStorage.getItem("ext_err_list_dateFrom");
+      if (saved) return saved;
+    }
+    return getYearToCurrentDateRange().dateFrom;
+  });
+  const [dateTo, setDateToState] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = sessionStorage.getItem("ext_err_list_dateTo");
+      if (saved) return saved;
+    }
+    return getYearToCurrentDateRange().dateTo;
+  });
+
+  const setDateField = (value: string) => {
+    setDateFieldState(value);
+    if (typeof window !== "undefined") sessionStorage.setItem("ext_err_list_dateField", value);
+  };
+
+  const setDateFrom = (value: string) => {
+    setDateFromState(value);
+    if (typeof window !== "undefined") sessionStorage.setItem("ext_err_list_dateFrom", value);
+  };
+
+  const setDateTo = (value: string) => {
+    setDateToState(value);
+    if (typeof window !== "undefined") sessionStorage.setItem("ext_err_list_dateTo", value);
+  };
   const [source, setSource] = useState("");
   const [device, setDevice] = useState("");
   const [errorGroup, setErrorGroup] = useState("");
@@ -179,6 +207,11 @@ export function useExternalErrors() {
 
   const clearFilter = () => {
     const currentYearRange = getYearToCurrentDateRange();
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("ext_err_list_dateField");
+      sessionStorage.removeItem("ext_err_list_dateFrom");
+      sessionStorage.removeItem("ext_err_list_dateTo");
+    }
 
     setQ("");
     setDateField("received_date");
@@ -258,24 +291,61 @@ export function useExternalErrors() {
       setNotice("");
       setError("");
 
-      const errorStats = await externalErrorService.bulkClassify({
-        all_matching: true,
-        force,
-      });
-      const causeStats = await externalErrorService.bulkClassifyCauses({
+      const res = await externalErrorService.bulkClassify({
         all_matching: true,
         force,
       });
 
       setNotice(
-        `Đã xử lý ${errorStats.total} dòng lỗi và ${causeStats.total} dòng nguyên nhân. ` +
-          `Lỗi phân loại thất bại: ${errorStats.failed}; nguyên nhân thất bại: ${causeStats.failed}.`
+        res.detail || `Đã đẩy tác vụ Phân loại tất cả các dòng vào hàng chờ Celery.`
       );
       await loadRecords(page);
     } catch (err) {
       setError(
         getErrorMessage(err, "Phân loại hàng loạt thất bại")
       );
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const bulkClassifySelected = async (ids: number[], force = false) => {
+    if (ids.length === 0) return;
+    try {
+      setActionLoading(true);
+      setNotice("");
+      setError("");
+
+      const res = await externalErrorService.bulkClassify({
+        ids,
+        force,
+      });
+
+      setNotice(
+        res.detail || `Đã đẩy tác vụ Phân loại ${ids.length} dòng được chọn vào hàng chờ Celery.`
+      );
+      await loadRecords(page);
+    } catch (err) {
+      setError(
+        getErrorMessage(err, "Phân loại các dòng đã chọn thất bại")
+      );
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const classifyBatch = async (batchId: number) => {
+    try {
+      setActionLoading(true);
+      setNotice("");
+      setError("");
+
+      const result = await externalErrorService.classifyBatch(batchId);
+      setNotice(result.detail || `Đã đẩy tác vụ Phân loại Batch #${batchId} vào hàng chờ Celery.`);
+      await loadRecords(page);
+      await loadCatalogs();
+    } catch (err) {
+      setError(getErrorMessage(err, "Đẩy tác vụ phân loại qua Celery thất bại"));
     } finally {
       setActionLoading(false);
     }
@@ -361,5 +431,7 @@ export function useExternalErrors() {
     classifyRecord,
     confirmRecord,
     bulkClassifyMatching,
+    bulkClassifySelected,
+    classifyBatch,
   };
 }

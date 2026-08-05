@@ -72,13 +72,23 @@ export function getYearToCurrentMonthDateRange(
   };
 }
 
+export function getLast5MonthsDateRange(
+  referenceDate = new Date()
+): DateRangeValue {
+  const start = new Date(
+    referenceDate.getFullYear(),
+    referenceDate.getMonth() - 4,
+    1
+  );
+
+  return {
+    dateFrom: formatDateInput(start),
+    dateTo: formatDateInput(referenceDate),
+  };
+}
+
 export function getYearToCurrentDateRange(
   referenceDate = new Date()
 ): DateRangeValue {
-  const firstDayOfYear = new Date(referenceDate.getFullYear(), 0, 1);
-
-  return {
-    dateFrom: formatDateInput(firstDayOfYear),
-    dateTo: formatDateInput(referenceDate),
-  };
+  return getLast5MonthsDateRange(referenceDate);
 }
