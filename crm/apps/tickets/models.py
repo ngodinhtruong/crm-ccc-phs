@@ -821,7 +821,43 @@ class TicketAttachment(models.Model):
         db_table = "ticket_attachments"
 
 
+class SurveySendStatus:
+    """Kết quả của một lần gửi khảo sát ra kênh ngoài (Zalo ZNS...)."""
+
+    SUCCESS = "SUCCESS"
+    FAILED = "FAILED"
+
+    LABELS = {
+        SUCCESS: "Thành công",
+        FAILED: "Thất bại",
+    }
+
+    # Nhãn tiếng Việt trong file Excel xuất từ Zalo -> mã chuẩn.
+    FROM_LABEL = {label.lower(): code for code, label in LABELS.items()}
+
+    CHOICES = tuple(LABELS.items())
+
+
+class SurveyEntrySource:
+    """Bản ghi khảo sát vào hệ thống bằng đường nào."""
+
+    MANUAL = "MANUAL"
+    IMPORT = "IMPORT"
+
+    CHOICES = (
+        (MANUAL, "Nhập tay"),
+        (IMPORT, "Import Excel"),
+    )
+
+
 class TicketFeedback(TimeStampedModel):
+    """
+    Kết quả khảo sát CHÍNH THỨC của một ticket — mỗi ticket đúng một bản.
+
+    Chỉ ghi khi gửi thành công; gửi thất bại thì chưa tính và còn được gửi
+    lại. Mọi lần gửi, kể cả thất bại, nằm ở :class:`TicketSurveyLog`.
+    """
+
     ticket = models.OneToOneField(
         Ticket,
         on_delete=models.CASCADE,
@@ -841,14 +877,152 @@ class TicketFeedback(TimeStampedModel):
     # NOT_SENT / SENT / RESPONDED
     survey_status = models.CharField(max_length=50, null=True, blank=True)
 
+    # null = chưa khảo sát; 0 = khách chấm 0 điểm (hai thứ khác nhau).
     rating_score = models.IntegerField(null=True, blank=True)
     rating_note = models.TextField(null=True, blank=True)
 
     sent_at = models.DateTimeField(null=True, blank=True)
     responded_at = models.DateTimeField(null=True, blank=True)
 
+    # Thông tin lần gửi, lấy từ file khảo sát của kênh ngoài.
+    phone = models.CharField(max_length=50, null=True, blank=True)
+    message_name = models.CharField(max_length=255, null=True, blank=True)
+    message_type = models.CharField(max_length=100, null=True, blank=True)
+    message_template = models.CharField(max_length=255, null=True, blank=True)
+
+    # Cột "Ticket" trong file khảo sát: chữ tự do, khi thì tên nhóm hỗ trợ
+    # ("Hỗ trợ Giao dịch"), khi thì tiêu đề ticket. Không map máy được nên giữ
+    # nguyên văn để người nhập đối chiếu, còn ticket thật thì chọn tay.
+    ticket_ref_text = models.CharField(max_length=255, null=True, blank=True)
+
     class Meta:
         db_table = "ticket_feedbacks"
+
+
+class TicketSurveyLog(TimeStampedModel):
+    """
+    Lịch sử mọi lần gửi khảo sát của một ticket, cả thành công lẫn thất bại.
+
+    Tách khỏi :class:`TicketFeedback` vì bảng kia là kết quả chính thức và chỉ
+    có một dòng cho mỗi ticket; còn một ticket có thể bị gửi hỏng vài lần rồi
+    mới thành công, và các lần hỏng đó vẫn phải tra lại được.
+    """
+
+    ticket = models.ForeignKey(
+        Ticket,
+        on_delete=models.CASCADE,
+        related_name="survey_logs",
+    )
+
+    # Trỏ tới bản chính thức khi lần gửi này thành công; lần thất bại để trống.
+    feedback = models.ForeignKey(
+        TicketFeedback,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="logs",
+    )
+
+    customer = models.ForeignKey(
+        "customers.Customer",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="ticket_survey_logs",
+    )
+
+    # Tên khách như trong file gửi lên — giữ lại vì có dòng ghi "Hằng",
+    # "Cường" mà không khớp được khách nào trong CRM.
+    customer_name_text = models.CharField(max_length=255, null=True, blank=True)
+
+    send_status = models.CharField(
+        max_length=20,
+        choices=SurveySendStatus.CHOICES,
+        db_index=True,
+    )
+    sent_at = models.DateTimeField(null=True, blank=True, db_index=True)
+
+    phone = models.CharField(max_length=50, null=True, blank=True)
+    message_name = models.CharField(max_length=255, null=True, blank=True)
+    message_type = models.CharField(max_length=100, null=True, blank=True)
+    message_template = models.CharField(max_length=255, null=True, blank=True)
+    ticket_ref_text = models.CharField(max_length=255, null=True, blank=True)
+
+    rating_score = models.IntegerField(null=True, blank=True)
+    rating_note = models.TextField(null=True, blank=True)
+
+    entry_source = models.CharField(
+        max_length=20,
+        choices=SurveyEntrySource.CHOICES,
+        default=SurveyEntrySource.MANUAL,
+    )
+    created_by_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="ticket_survey_logs",
+    )
+
+    class Meta:
+        db_table = "ticket_survey_logs"
+        ordering = ["-sent_at", "-id"]
+        indexes = [
+            models.Index(fields=["ticket", "send_status"]),
+        ]
+
+    def __str__(self):
+        return f"{self.ticket_id} - {self.send_status}"
+
+
+class TicketSurveyAuditLog(models.Model):
+    """
+    Ai đã sửa một dòng khảo sát, và sửa những gì.
+
+    Khảo sát là số liệu báo cáo CSAT nên sửa được nhưng phải truy được: giữ
+    ảnh chụp trước/sau cùng danh sách trường đã đổi, theo đúng cách app lỗi
+    bên ngoài đang làm với ``ExternalErrorRecordAuditLog``.
+    """
+
+    ACTION_CREATE = "CREATE"
+    ACTION_UPDATE = "UPDATE"
+
+    ACTION_CHOICES = [
+        (ACTION_CREATE, "Nhập mới"),
+        (ACTION_UPDATE, "Chỉnh sửa"),
+    ]
+
+    survey_log = models.ForeignKey(
+        TicketSurveyLog,
+        on_delete=models.CASCADE,
+        related_name="audit_logs",
+    )
+
+    action_type = models.CharField(max_length=20, choices=ACTION_CHOICES)
+
+    old_data = models.JSONField(null=True, blank=True)
+    new_data = models.JSONField(null=True, blank=True)
+
+    # {tên_trường: {"label": ..., "old": ..., "new": ...}} — kèm nhãn tiếng
+    # Việt để lịch sử cũ vẫn đọc được sau này dù code có đổi tên trường.
+    changed_fields = models.JSONField(null=True, blank=True)
+
+    changed_by_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="ticket_survey_audit_logs",
+    )
+    changed_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    note = models.TextField(null=True, blank=True)
+
+    class Meta:
+        db_table = "ticket_survey_audit_logs"
+        ordering = ["-changed_at", "-id"]
+
+    def __str__(self):
+        return f"{self.action_type} khảo sát #{self.survey_log_id}"
 
 
 class Tag(models.Model):

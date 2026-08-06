@@ -7,6 +7,7 @@ from apps.tickets.ccc_dashboard import (
     TicketCccDashboardPendingTicketsAPIView,
 )
 
+from apps.tickets.surveys.views import TicketSurveyViewSet
 from apps.tickets.views import (
     TicketViewSet,
     TicketSupportCategoryViewSet,
@@ -52,6 +53,9 @@ router.register(
 
 router.register("error-groups", TicketErrorGroupViewSet, basename="ticket-error-group")
 router.register("error-types", TicketErrorTypeViewSet, basename="ticket-error-type")
+
+# Khảo sát CSAT gắn với ticket.
+router.register("surveys", TicketSurveyViewSet, basename="ticket-survey")
 
 urlpatterns = router.urls + [
     path("ccc-dashboard/", TicketCccDashboardAPIView.as_view(), name="ticket-ccc-dashboard"),
