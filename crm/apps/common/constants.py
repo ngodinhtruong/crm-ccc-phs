@@ -87,6 +87,13 @@ class PermissionCode:
     TICKET_ERROR_REPORT_EXPORT = "TICKET_ERROR_REPORT_EXPORT"
     TICKET_ERROR_MASTER_MANAGE = "TICKET_ERROR_MASTER_MANAGE"
 
+    # Khảo sát CSAT. Tách xem và nhập vì chỉ CCC được nhập, còn cấp quản lý
+    # vẫn cần xem điểm. Sửa tách riêng khỏi nhập để sau này siết được "nhập
+    # thì ai cũng nhập, sửa thì chỉ giám sát" mà không phải đụng vào code.
+    SURVEY_VIEW = "SURVEY_VIEW"
+    SURVEY_ENTRY = "SURVEY_ENTRY"
+    SURVEY_UPDATE = "SURVEY_UPDATE"
+
     SLA_CREATE = "SLA_CREATE"
     SLA_AMEND = "SLA_AMEND"
     SLA_ACTIVATE_DEACTIVATE = "SLA_ACTIVATE_DEACTIVATE"

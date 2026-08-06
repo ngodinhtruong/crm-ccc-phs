@@ -11,21 +11,27 @@ import {
   X,
 } from "lucide-react";
 
+import { surveyApi } from "@/apis/survey.api";
 import { ticketApi } from "@/apis/ticket.api";
 import { ConversationModal } from "@/components/chatbot-dashboard/ConversationModal";
 import { chatbotDashboardService } from "@/services/chatbot-dashboard.service";
 import { SlaBreachReasonModal } from "@/components/tickets/detail/SlaBreachReasonModal";
+import {
+  EDITABLE_TABS,
+  getTicketDetailTab,
+  TicketDetailTabs,
+  TicketTabComingSoon,
+  type TicketDetailTabKey,
+} from "@/components/tickets/detail/TicketDetailTabs";
 import { TicketHistoryModal } from "@/components/tickets/detail/TicketHistoryModal";
+import { TicketHistoryTimeline } from "@/components/tickets/detail/TicketHistoryTimeline";
 import { TicketStatusFlow } from "@/components/tickets/detail/TicketStatusFlow";
+import { TicketSurveyPanel } from "@/components/tickets/detail/TicketSurveyPanel";
 import {
   TICKET_STATUS_OPTIONS,
   TICKET_STATUS_PILL,
 } from "@/constants/ticket-detail.constant";
-import {
-  Opt,
-  optName,
-  useTicketEditForm,
-} from "@/hooks/useTicketEditForm";
+import { Opt, optName, useTicketEditForm } from "@/hooks/useTicketEditForm";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
 import { ChatbotTicketItem } from "@/types/chatbot-dashboard.type";
 import { TicketDetail, TicketStatusCode } from "@/types/ticket.type";
@@ -51,7 +57,9 @@ function Field({
         {label}
       </div>
       <div className="col-span-2 text-xs text-slate-800">
-        {editing && edit ? edit : empty ? (
+        {editing && edit ? (
+          edit
+        ) : empty ? (
           <span className="text-slate-300">—</span>
         ) : (
           view
@@ -96,15 +104,12 @@ type TicketDetailWithSourceRef = TicketDetail & {
 };
 
 function getSourceRefId(ticket: TicketDetail): string {
-  return (
-    (ticket as TicketDetailWithSourceRef).source_ref_id?.trim() || ""
-  );
+  return (ticket as TicketDetailWithSourceRef).source_ref_id?.trim() || "";
 }
 
 function isChatbotGeneratedTicket(ticket: TicketDetail): boolean {
   return (
-    ticket.classification_method === "AUTO" &&
-    Boolean(getSourceRefId(ticket))
+    ticket.classification_method === "AUTO" && Boolean(getSourceRefId(ticket))
   );
 }
 
@@ -202,7 +207,7 @@ export function TicketDetailPage({ id }: { id: number }) {
         router.push(
           isChatbotGeneratedTicket(ticket)
             ? CHATBOT_TICKET_LIST_URL
-            : "/tickets"
+            : "/tickets",
         )
       }
     />
@@ -242,10 +247,43 @@ function TicketDetailInner({
   const sessionId = getSourceRefId(ticket);
   const isChatbotTicket =
     ticket.classification_method === "AUTO" && Boolean(sessionId);
-  const ticketListHref = isChatbotTicket
-    ? CHATBOT_TICKET_LIST_URL
-    : "/tickets";
-  const [customerQuestions, setCustomerQuestions] = useState<string[] | null>(null);
+  const ticketListHref = isChatbotTicket ? CHATBOT_TICKET_LIST_URL : "/tickets";
+  const [customerQuestions, setCustomerQuestions] = useState<string[] | null>(
+    null,
+  );
+
+  const [activeTab, setActiveTab] = useState<TicketDetailTabKey>("overview");
+  const [surveyCount, setSurveyCount] = useState(0);
+  const activeTabDef = getTicketDetailTab(activeTab);
+
+  // Đếm số lần gửi khảo sát để hiện ngay trên tab. Lỗi thì bỏ qua: người
+  // không có quyền xem khảo sát vẫn phải mở được ticket bình thường.
+  useEffect(() => {
+    let active = true;
+
+    surveyApi
+      .list({ ticket: ticket.id, page_size: 1 })
+      .then((data) => {
+        if (active) setSurveyCount(data.count);
+      })
+      .catch(() => {
+        if (active) setSurveyCount(0);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [ticket.id]);
+
+  const startEditing = () => {
+    // Bấm "Cập nhật tình trạng" khi đang ở tab Nhật ký thì thanh Lưu hiện ra
+    // mà không có ô nào để sửa.
+    if (!EDITABLE_TABS.includes(activeTab)) {
+      setActiveTab("overview");
+    }
+
+    setEditing(true);
+  };
 
   useEffect(() => {
     let active = true;
@@ -342,7 +380,7 @@ function TicketDetailInner({
               {!editing && (
                 <button
                   type="button"
-                  onClick={() => setEditing(true)}
+                  onClick={startEditing}
                   className="flex items-center gap-1.5 rounded-lg bg-emerald-500 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-600"
                 >
                   <Pencil size={13} />
@@ -353,403 +391,450 @@ function TicketDetailInner({
           </div>
 
           <TicketStatusFlow status={statusCode} />
+
+          <TicketDetailTabs
+            active={activeTab}
+            onChange={setActiveTab}
+            surveyCount={surveyCount}
+          />
         </div>
 
         {/* Inline hội thoại chatbot đã được loại bỏ; dùng popup để xem lịch sử */}
 
-        {/* Thông tin chung */}
-        <Section title="Thông tin chung">
-          <div className="grid grid-cols-1 md:grid-cols-2 md:gap-x-6">
-            <Field label="Mã Ticket" editing={false} view={ticket.ticket_code} />
-            <Field label="Tiêu đề" editing={false} view={ticket.title} />
+        {activeTab === "history" && (
+          <Section title="Nhật ký thay đổi">
+            <TicketHistoryTimeline ticketId={ticket.id} />
+          </Section>
+        )}
 
-            <Field
-              label="Danh mục hỗ trợ"
-              editing={editing}
-              view={
-                ticket.support_category_name && (
-                  <span className="rounded-md bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-700">
-                    {ticket.support_category_name}
-                  </span>
-                )
-              }
-              edit={
-                <EditSelect
-                  value={f.category}
-                  onChange={(v) => {
-                    f.setCategory(v);
-                    f.setClassification(null);
-                    f.setSlaPolicy(null);
-                  }}
-                  options={f.categories}
-                  keys={["category_name", "name"]}
-                  placeholder="-- Chọn danh mục --"
-                />
-              }
-            />
-            <Field
-              label="Phân loại"
-              editing={editing}
-              view={ticket.classification_name}
-              edit={
-                <EditSelect
-                  value={f.classification}
-                  onChange={f.setClassification}
-                  options={f.filteredClassifications}
-                  keys={["classification_name", "name"]}
-                  placeholder="-- Chọn phân loại --"
-                />
-              }
-            />
+        {activeTab === "survey" && (
+          <Section title="Kết quả khảo sát CSAT">
+            <TicketSurveyPanel ticketId={ticket.id} />
+          </Section>
+        )}
 
-            <Field
-              label="Tình trạng"
-              editing={editing}
-              view={
-                statusCode && (
-                  <span
-                    className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                      TICKET_STATUS_PILL[statusCode] ||
-                      "bg-slate-100 text-slate-600"
-                    }`}
-                  >
-                    {ticket.current_status_name}
-                  </span>
-                )
-              }
-              edit={
-                <select
-                  value={f.status}
-                  onChange={(e) =>
-                    f.setStatus(e.target.value as TicketStatusCode)
+        {activeTabDef.comingSoon && (
+          <Section title={activeTabDef.label}>
+            <TicketTabComingSoon label={activeTabDef.label} />
+          </Section>
+        )}
+
+        {activeTab === "overview" && (
+          <>
+            {/* Thông tin chung */}
+            <Section title="Thông tin chung">
+              <div className="grid grid-cols-1 md:grid-cols-2 md:gap-x-6">
+                <Field
+                  label="Mã Ticket"
+                  editing={false}
+                  view={ticket.ticket_code}
+                />
+                <Field label="Tiêu đề" editing={false} view={ticket.title} />
+
+                <Field
+                  label="Danh mục hỗ trợ"
+                  editing={editing}
+                  view={
+                    ticket.support_category_name && (
+                      <span className="rounded-md bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-700">
+                        {ticket.support_category_name}
+                      </span>
+                    )
                   }
-                  className={SELECT_CLS}
-                >
-                  {TICKET_STATUS_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              }
-            />
-            <Field
-              label="Mức ưu tiên"
-              editing={editing}
-              view={ticket.priority_name}
-              edit={
-                <EditSelect
-                  value={f.priority}
-                  onChange={f.setPriority}
-                  options={f.priorities}
-                  keys={["priority_name", "name"]}
-                  placeholder="-- Chọn ưu tiên --"
+                  edit={
+                    <EditSelect
+                      value={f.category}
+                      onChange={(v) => {
+                        f.setCategory(v);
+                        f.setClassification(null);
+                        f.setSlaPolicy(null);
+                      }}
+                      options={f.categories}
+                      keys={["category_name", "name"]}
+                      placeholder="-- Chọn danh mục --"
+                    />
+                  }
                 />
-              }
-            />
-
-            <Field
-              label="Nguồn"
-              editing={editing}
-              view={ticket.source_name}
-              edit={
-                <EditSelect
-                  value={f.source}
-                  onChange={f.setSource}
-                  options={f.sources}
-                  keys={["source_name", "name"]}
-                  placeholder="-- Chọn nguồn --"
+                <Field
+                  label="Phân loại"
+                  editing={editing}
+                  view={ticket.classification_name}
+                  edit={
+                    <EditSelect
+                      value={f.classification}
+                      onChange={f.setClassification}
+                      options={f.filteredClassifications}
+                      keys={["classification_name", "name"]}
+                      placeholder="-- Chọn phân loại --"
+                    />
+                  }
                 />
-              }
-            />
-          </div>
-        </Section>
 
-        {/* Thông tin liên hệ (chỉ xem) */}
-        <Section title="Thông tin liên hệ">
-          <div className="grid grid-cols-1 md:grid-cols-2 md:gap-x-6">
-            <Field
-              label="Khách hàng"
-              editing={false}
-              view={ticket.customer_name}
-            />
-            <Field label="Công ty" editing={false} view={ticket.company_name} />
-            <Field
-              label="Số tài khoản"
-              editing={false}
-              view={
-                ticket.display_account_number || ticket.customer_account_number
-              }
-            />
-            <Field
-              label="Trạng thái TK"
-              editing={false}
-              view={
-                ticket.account_link_status === "LINKED" ? (
-                  <span className="font-semibold text-emerald-600">
-                    Đã liên kết KH
-                  </span>
-                ) : (
-                  <span className="font-semibold text-amber-600">
-                    Chưa có TK liên kết
-                  </span>
-                )
-              }
-            />
-          </div>
-        </Section>
+                <Field
+                  label="Tình trạng"
+                  editing={editing}
+                  view={
+                    statusCode && (
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                          TICKET_STATUS_PILL[statusCode] ||
+                          "bg-slate-100 text-slate-600"
+                        }`}
+                      >
+                        {ticket.current_status_name}
+                      </span>
+                    )
+                  }
+                  edit={
+                    <select
+                      value={f.status}
+                      onChange={(e) =>
+                        f.setStatus(e.target.value as TicketStatusCode)
+                      }
+                      className={SELECT_CLS}
+                    >
+                      {TICKET_STATUS_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  }
+                />
+                <Field
+                  label="Mức ưu tiên"
+                  editing={editing}
+                  view={ticket.priority_name}
+                  edit={
+                    <EditSelect
+                      value={f.priority}
+                      onChange={f.setPriority}
+                      options={f.priorities}
+                      keys={["priority_name", "name"]}
+                      placeholder="-- Chọn ưu tiên --"
+                    />
+                  }
+                />
 
-        {/* Thông tin mô tả */}
-        <Section title="Thông tin mô tả">
-          {/* Hiển thị khối hiển thị CHỈ câu hỏi của khách (không show đáp án) - lấy từ preview messages */}
-          {customerQuestions && customerQuestions.length > 0 && (
-            <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-5 py-3 text-xs text-amber-700">
-              <div className="text-[11px] font-semibold uppercase text-amber-700">
-                CÂU HỎI CỦA KHÁCH HÀNG
+                <Field
+                  label="Nguồn"
+                  editing={editing}
+                  view={ticket.source_name}
+                  edit={
+                    <EditSelect
+                      value={f.source}
+                      onChange={f.setSource}
+                      options={f.sources}
+                      keys={["source_name", "name"]}
+                      placeholder="-- Chọn nguồn --"
+                    />
+                  }
+                />
               </div>
-              <div className="mt-1 whitespace-pre-wrap text-xs text-amber-900">
-                {customerQuestions.map((q, i) => (
-                  <div key={i} className={i ? "mt-2" : ""}>
-                    {q}
+            </Section>
+
+            {/* Thông tin liên hệ (chỉ xem) */}
+            <Section title="Thông tin liên hệ">
+              <div className="grid grid-cols-1 md:grid-cols-2 md:gap-x-6">
+                <Field
+                  label="Khách hàng"
+                  editing={false}
+                  view={ticket.customer_name}
+                />
+                <Field
+                  label="Công ty"
+                  editing={false}
+                  view={ticket.company_name}
+                />
+                <Field
+                  label="Số tài khoản"
+                  editing={false}
+                  view={
+                    ticket.display_account_number ||
+                    ticket.customer_account_number
+                  }
+                />
+                <Field
+                  label="Trạng thái TK"
+                  editing={false}
+                  view={
+                    ticket.account_link_status === "LINKED" ? (
+                      <span className="font-semibold text-emerald-600">
+                        Đã liên kết KH
+                      </span>
+                    ) : (
+                      <span className="font-semibold text-amber-600">
+                        Chưa có TK liên kết
+                      </span>
+                    )
+                  }
+                />
+              </div>
+            </Section>
+
+            {/* Thông tin mô tả */}
+            <Section title="Thông tin mô tả">
+              {/* Hiển thị khối hiển thị CHỈ câu hỏi của khách (không show đáp án) - lấy từ preview messages */}
+              {customerQuestions && customerQuestions.length > 0 && (
+                <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-5 py-3 text-xs text-amber-700">
+                  <div className="text-[11px] font-semibold uppercase text-amber-700">
+                    CÂU HỎI CỦA KHÁCH HÀNG
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
+                  <div className="mt-1 whitespace-pre-wrap text-xs text-amber-900">
+                    {customerQuestions.map((q, i) => (
+                      <div key={i} className={i ? "mt-2" : ""}>
+                        {q}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-          {/* Đối với ticket sinh từ chatbot, ẩn trường "Nội dung yêu cầu" chi tiết ngoài modal;
+              {/* Đối với ticket sinh từ chatbot, ẩn trường "Nội dung yêu cầu" chi tiết ngoài modal;
               người xử lý có thể bấm "Xem lịch sử trò chuyện" để xem đầy đủ Q/A */}
-          {!isChatbotTicket && (
-            <Field
-              label="Nội dung yêu cầu"
-              editing={editing}
-              view={<span className="whitespace-pre-wrap">{ticket.request_content}</span>}
-              edit={
-                <textarea
-                  value={f.requestContent}
-                  onChange={(e) => f.setRequestContent(e.target.value)}
-                  rows={3}
-                  className={INPUT_CLS}
+              {!isChatbotTicket && (
+                <Field
+                  label="Nội dung yêu cầu"
+                  editing={editing}
+                  view={
+                    <span className="whitespace-pre-wrap">
+                      {ticket.request_content}
+                    </span>
+                  }
+                  edit={
+                    <textarea
+                      value={f.requestContent}
+                      onChange={(e) => f.setRequestContent(e.target.value)}
+                      rows={3}
+                      className={INPUT_CLS}
+                    />
+                  }
                 />
-              }
-            />
-          )}
+              )}
 
-          <Field
-            label="phản hồi sau khi liên hệ"
-            editing={editing}
-            view={
-              <span className="whitespace-pre-wrap">{ticket.final_response}</span>
-            }
-            edit={
-              <textarea
-                value={f.finalResponse}
-                onChange={(e) => f.setFinalResponse(e.target.value)}
-                rows={3}
-                placeholder="Nội dung trả lời chính thức gửi khách hàng..."
-                className={INPUT_CLS}
+              <Field
+                label="phản hồi sau khi liên hệ"
+                editing={editing}
+                view={
+                  <span className="whitespace-pre-wrap">
+                    {ticket.final_response}
+                  </span>
+                }
+                edit={
+                  <textarea
+                    value={f.finalResponse}
+                    onChange={(e) => f.setFinalResponse(e.target.value)}
+                    rows={3}
+                    placeholder="Nội dung trả lời chính thức gửi khách hàng..."
+                    className={INPUT_CLS}
+                  />
+                }
               />
-            }
-          />
 
-          {/* Nút mở popup lịch sử hội thoại (hiển thị modal có thể kéo để xem toàn bộ) */}
-          {isChatbotTicket && sessionId && (
-            <div className="mt-3">
-              <button
-                type="button"
-                onClick={() => setShowConversation(true)}
-                className="flex w-fit items-center gap-2 rounded-lg bg-[#10b981] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#059669]"
-              >
-                <MessageSquareText size={14} />
-                Xem lịch sử trò chuyện
-              </button>
-            </div>
-          )}
-        </Section>
+              {/* Nút mở popup lịch sử hội thoại (hiển thị modal có thể kéo để xem toàn bộ) */}
+              {isChatbotTicket && sessionId && (
+                <div className="mt-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowConversation(true)}
+                    className="flex w-fit items-center gap-2 rounded-lg bg-[#10b981] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#059669]"
+                  >
+                    <MessageSquareText size={14} />
+                    Xem lịch sử trò chuyện
+                  </button>
+                </div>
+              )}
+            </Section>
+          </>
+        )}
 
-        {/* Giải pháp xử lý */}
-        <Section title="Giải pháp xử lý">
-          <Field
-            label="Hướng xử lý"
-            editing={editing}
-            view={
-              <span className="whitespace-pre-wrap">
-                {ticket.handling_solution}
-              </span>
-            }
-            edit={
-              <textarea
-                value={f.solution}
-                onChange={(e) => f.setSolution(e.target.value)}
-                rows={3}
-                className={INPUT_CLS}
+        {activeTab === "detail" && (
+          <>
+            {/* Giải pháp xử lý */}
+            <Section title="Giải pháp xử lý">
+              <Field
+                label="Hướng xử lý"
+                editing={editing}
+                view={
+                  <span className="whitespace-pre-wrap">
+                    {ticket.handling_solution}
+                  </span>
+                }
+                edit={
+                  <textarea
+                    value={f.solution}
+                    onChange={(e) => f.setSolution(e.target.value)}
+                    rows={3}
+                    className={INPUT_CLS}
+                  />
+                }
               />
-            }
-          />
-        </Section>
+            </Section>
 
-        {/* Thông tin lỗi */}
-        <Section title="Thông tin lỗi">
-          <div className="grid grid-cols-1 md:grid-cols-2 md:gap-x-6">
-            <Field
-              label="Nhóm lỗi"
-              editing={editing}
-              view={ticket.error_group_name}
-              edit={
-                <EditSelect
-                  value={f.errorGroup}
-                  onChange={(v) => {
-                    f.setErrorGroup(v);
-                    f.setErrorType(null);
-                  }}
-                  options={f.errorGroups}
-                  keys={["group_name", "name"]}
-                  placeholder="-- Chọn nhóm lỗi --"
+            {/* Thông tin lỗi */}
+            <Section title="Thông tin lỗi">
+              <div className="grid grid-cols-1 md:grid-cols-2 md:gap-x-6">
+                <Field
+                  label="Nhóm lỗi"
+                  editing={editing}
+                  view={ticket.error_group_name}
+                  edit={
+                    <EditSelect
+                      value={f.errorGroup}
+                      onChange={(v) => {
+                        f.setErrorGroup(v);
+                        f.setErrorType(null);
+                      }}
+                      options={f.errorGroups}
+                      keys={["group_name", "name"]}
+                      placeholder="-- Chọn nhóm lỗi --"
+                    />
+                  }
                 />
-              }
-            />
-            <Field
-              label="Loại lỗi"
-              editing={editing}
-              view={ticket.error_type_name}
-              edit={
-                <EditSelect
-                  value={f.errorType}
-                  onChange={f.setErrorType}
-                  options={f.filteredErrorTypes}
-                  keys={["type_name", "name"]}
-                  placeholder="-- Chọn loại lỗi --"
+                <Field
+                  label="Loại lỗi"
+                  editing={editing}
+                  view={ticket.error_type_name}
+                  edit={
+                    <EditSelect
+                      value={f.errorType}
+                      onChange={f.setErrorType}
+                      options={f.filteredErrorTypes}
+                      keys={["type_name", "name"]}
+                      placeholder="-- Chọn loại lỗi --"
+                    />
+                  }
                 />
-              }
-            />
-            <Field
-              label="Hệ thống liên quan"
-              editing={editing}
-              view={ticket.related_system}
-              edit={
-                <input
-                  value={f.relatedSystem}
-                  onChange={(e) => f.setRelatedSystem(e.target.value)}
-                  placeholder="BASE / FLEX / APP / CRM..."
-                  className={INPUT_CLS}
+                <Field
+                  label="Hệ thống liên quan"
+                  editing={editing}
+                  view={ticket.related_system}
+                  edit={
+                    <input
+                      value={f.relatedSystem}
+                      onChange={(e) => f.setRelatedSystem(e.target.value)}
+                      placeholder="BASE / FLEX / APP / CRM..."
+                      className={INPUT_CLS}
+                    />
+                  }
                 />
-              }
-            />
-            <Field
-              label="Ghi chú lỗi"
-              editing={editing}
-              view={ticket.error_note}
-              edit={
-                <input
-                  value={f.errorNote}
-                  onChange={(e) => f.setErrorNote(e.target.value)}
-                  className={INPUT_CLS}
+                <Field
+                  label="Ghi chú lỗi"
+                  editing={editing}
+                  view={ticket.error_note}
+                  edit={
+                    <input
+                      value={f.errorNote}
+                      onChange={(e) => f.setErrorNote(e.target.value)}
+                      className={INPUT_CLS}
+                    />
+                  }
                 />
-              }
-            />
-          </div>
-        </Section>
+              </div>
+            </Section>
 
-        {/* Quản lý SLA */}
-        <Section title="Quản lý SLA">
-          <div className="grid grid-cols-1 md:grid-cols-2 md:gap-x-6">
-            <Field
-              label="Danh mục SLA"
-              editing={editing}
-              view={ticket.sla_policy_name}
-              edit={
-                <EditSelect
-                  value={f.slaPolicy}
-                  onChange={f.setSlaPolicy}
-                  options={f.filteredSlaPolicies}
-                  keys={["sla_name", "name"]}
-                  placeholder="-- Chọn danh mục SLA --"
+            {/* Quản lý SLA */}
+            <Section title="Quản lý SLA">
+              <div className="grid grid-cols-1 md:grid-cols-2 md:gap-x-6">
+                <Field
+                  label="Danh mục SLA"
+                  editing={editing}
+                  view={ticket.sla_policy_name}
+                  edit={
+                    <EditSelect
+                      value={f.slaPolicy}
+                      onChange={f.setSlaPolicy}
+                      options={f.filteredSlaPolicies}
+                      keys={["sla_name", "name"]}
+                      placeholder="-- Chọn danh mục SLA --"
+                    />
+                  }
                 />
-              }
-            />
-            <Field
-              label="Có gửi khảo sát"
-              editing={editing}
-              view={ticket.send_survey ? "Có" : "Không"}
-              edit={
-                <input
-                  type="checkbox"
-                  checked={f.sendSurvey}
-                  onChange={(e) => f.setSendSurvey(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300"
+                <Field
+                  label="Có gửi khảo sát"
+                  editing={editing}
+                  view={ticket.send_survey ? "Có" : "Không"}
+                  edit={
+                    <input
+                      type="checkbox"
+                      checked={f.sendSurvey}
+                      onChange={(e) => f.setSendSurvey(e.target.checked)}
+                      className="h-4 w-4 rounded border-slate-300"
+                    />
+                  }
                 />
-              }
-            />
-            <Field
-              label="Ngày tiếp nhận"
-              editing={false}
-              view={formatDateTime(ticket.accepted_at)}
-            />
-            <Field
-              label="Ngày hoàn thành"
-              editing={false}
-              view={formatDateTime(ticket.done_at)}
-            />
-          </div>
-        </Section>
+                <Field
+                  label="Ngày tiếp nhận"
+                  editing={false}
+                  view={formatDateTime(ticket.accepted_at)}
+                />
+                <Field
+                  label="Ngày hoàn thành"
+                  editing={false}
+                  view={formatDateTime(ticket.done_at)}
+                />
+              </div>
+            </Section>
 
-        {/* Thông tin quản lý */}
-        <Section title="Thông tin quản lý">
-          <div className="grid grid-cols-1 md:grid-cols-2 md:gap-x-6">
-            <Field
-              label="Giao cho"
-              editing={editing}
-              view={ticket.owner_user_name}
-              edit={
-                <EditSelect
-                  value={f.owner}
-                  onChange={f.setOwner}
-                  options={f.users}
-                  keys={["employee_name", "username", "email"]}
-                  placeholder="-- Chọn người xử lý --"
+            {/* Thông tin quản lý */}
+            <Section title="Thông tin quản lý">
+              <div className="grid grid-cols-1 md:grid-cols-2 md:gap-x-6">
+                <Field
+                  label="Giao cho"
+                  editing={editing}
+                  view={ticket.owner_user_name}
+                  edit={
+                    <EditSelect
+                      value={f.owner}
+                      onChange={f.setOwner}
+                      options={f.users}
+                      keys={["employee_name", "username", "email"]}
+                      placeholder="-- Chọn người xử lý --"
+                    />
+                  }
                 />
-              }
-            />
-            <Field
-              label="Phân công xử lý"
-              editing={editing}
-              view={ticket.assigned_unit_name}
-              edit={
-                <EditSelect
-                  value={f.unit}
-                  onChange={f.setUnit}
-                  options={f.units}
-                  keys={["unit_name", "name"]}
-                  placeholder="-- Chọn đơn vị --"
+                <Field
+                  label="Phân công xử lý"
+                  editing={editing}
+                  view={ticket.assigned_unit_name}
+                  edit={
+                    <EditSelect
+                      value={f.unit}
+                      onChange={f.setUnit}
+                      options={f.units}
+                      keys={["unit_name", "name"]}
+                      placeholder="-- Chọn đơn vị --"
+                    />
+                  }
                 />
-              }
-            />
-            <Field
-              label="Chi nhánh xử lý"
-              editing={editing}
-              view={ticket.handling_branch_name}
-              edit={
-                <EditSelect
-                  value={f.branch}
-                  onChange={f.setBranch}
-                  options={f.branches}
-                  keys={["branch_name", "name"]}
-                  placeholder="-- Chọn chi nhánh --"
+                <Field
+                  label="Chi nhánh xử lý"
+                  editing={editing}
+                  view={ticket.handling_branch_name}
+                  edit={
+                    <EditSelect
+                      value={f.branch}
+                      onChange={f.setBranch}
+                      options={f.branches}
+                      keys={["branch_name", "name"]}
+                      placeholder="-- Chọn chi nhánh --"
+                    />
+                  }
                 />
-              }
-            />
-            <Field
-              label="Ngày tạo"
-              editing={false}
-              view={formatDateTime(ticket.created_at)}
-            />
-            <Field
-              label="Lần sửa đổi cuối"
-              editing={false}
-              view={formatDateTime(ticket.updated_at)}
-            />
-          </div>
-        </Section>
+                <Field
+                  label="Ngày tạo"
+                  editing={false}
+                  view={formatDateTime(ticket.created_at)}
+                />
+                <Field
+                  label="Lần sửa đổi cuối"
+                  editing={false}
+                  view={formatDateTime(ticket.updated_at)}
+                />
+              </div>
+            </Section>
+          </>
+        )}
 
         {f.error && (
           <div className="rounded-lg bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-600">

@@ -115,12 +115,6 @@ const mainMenuItemsByWorkspace: Record<WorkspaceCode, MainMenuItem[]> = {
       icon: BotMessageSquare,
     },
 
-    // {
-    //   title: "KHẢO SÁT",
-    //   href: "/surveys",
-    //   icon: ClipboardList,
-    //   panel: "surveys",
-    // },
     {
       title: "CSKH",
       href: "/tickets",
@@ -132,6 +126,12 @@ const mainMenuItemsByWorkspace: Record<WorkspaceCode, MainMenuItem[]> = {
       href: "/external-errors/dashboard",
       icon: AlertTriangle,
       panel: "external_errors",
+    },
+    {
+      title: "KHẢO SÁT",
+      href: "/surveys",
+      icon: ClipboardList,
+      panel: "surveys",
     },
     {
       title: "QUẢN LÝ eKYC",
@@ -239,38 +239,24 @@ const panelGroupsByWorkspace: Record<
       },
     ],
 
-    // surveys: [
-    //   {
-    //     title: "MARKETING",
-    //     items: [
-    //       {
-    //         title: "Mẫu Email",
-    //         href: "/marketing/email-templates",
-    //         icon: Mail,
-    //       },
-    //       {
-    //         title: "Mẫu tin nhắn",
-    //         href: "/marketing/message-templates",
-    //         icon: MessageSquare,
-    //       },
-    //       {
-    //         title: "Chiến dịch",
-    //         href: "/marketing/campaigns",
-    //         icon: Megaphone,
-    //       },
-    //       {
-    //         title: "Danh sách Khảo sát",
-    //         href: "/surveys",
-    //         icon: ClipboardList,
-    //       },
-    //       {
-    //         title: "Kết quả khảo sát",
-    //         href: "/surveys/results",
-    //         icon: FileCheck2,
-    //       },
-    //     ],
-    //   },
-    // ],
+    surveys: [
+      {
+        title: "KHẢO SÁT",
+        items: [
+          {
+            title: "Kết quả khảo sát",
+            href: "/surveys",
+            icon: ClipboardList,
+          },
+          {
+            title: "Dashboard CSAT",
+            href: "/surveys/dashboard",
+            icon: Gauge,
+          },
+        ],
+      },
+    ],
+
 
     tickets: [
       {
