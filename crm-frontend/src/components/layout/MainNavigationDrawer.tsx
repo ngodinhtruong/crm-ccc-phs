@@ -60,6 +60,7 @@ type PanelKey =
   | "tickets"
   | "external_errors"
   | "ekyc"
+  | "failed_ekyc"
   | "reports"
   | "utilities"
   | "settings"
@@ -137,6 +138,13 @@ const mainMenuItemsByWorkspace: Record<WorkspaceCode, MainMenuItem[]> = {
       href: "/ekyc/dashboard",
       icon: ShieldCheck,
       panel: "ekyc",
+    },
+    {
+      title: "FAILED eKYC",
+      href: "/failed-ekyc/dashboard",
+      icon: AlertTriangle,
+      panel: "failed_ekyc",
+      cccOrAdminOnly: true,
     },
     {
       title: "QUẢN LÝ USER",
@@ -381,6 +389,18 @@ const panelGroupsByWorkspace: Record<
       },
     ],
 
+    failed_ekyc: [
+      {
+        title: "FAILED eKYC",
+        items: [
+          { title: "Dashboard Failed eKYC", href: "/failed-ekyc/dashboard", icon: BarChart3, cccOrAdminOnly: true },
+          { title: "Danh sách Failed eKYC", href: "/failed-ekyc", icon: ClipboardList, cccOrAdminOnly: true },
+          { title: "Nhập Failed eKYC mới", href: "/failed-ekyc/create", icon: FileCheck2, cccOrAdminOnly: true },
+          { title: "Import Excel", href: "/failed-ekyc/import", icon: FileSpreadsheet, cccOrAdminOnly: true },
+        ],
+      },
+    ],
+
     //   reports: [
     //     {
     //       title: "BÁO CÁO",
@@ -602,6 +622,7 @@ const panelTitleMap: Record<PanelKey, string> = {
   tickets: "CSKH",
   external_errors: "LỖI BÊN NGOÀI",
   ekyc: "QUẢN LÝ eKYC",
+  failed_ekyc: "FAILED eKYC",
   reports: "BÁO CÁO",
   utilities: "TIỆN ÍCH",
   settings: "CẤU HÌNH",
@@ -626,6 +647,13 @@ const SA_OR_SUP_PERMISSION_CODES = new Set([
   "SA_KPI_VIEW_BRANCH",
   "KPI_DASHBOARD_VIEW_SELF",
   "KPI_DASHBOARD_VIEW_BRANCH",
+]);
+
+const GLOBAL_ADMIN_ROLE_CODES = new Set([
+  "SYSTEM_ADMIN",
+  "ADMIN",
+  "SA_ADMIN",
+  "BOM",
 ]);
 
 function getRoleCodes(user?: CurrentUser | null) {
@@ -670,7 +698,7 @@ function isGlobalAdmin(user?: CurrentUser | null) {
   return Boolean(
     typedUser.is_superuser ||
     typedUser.is_global_admin ||
-    roleCodes.includes("SYSTEM_ADMIN")
+    roleCodes.some((roleCode) => GLOBAL_ADMIN_ROLE_CODES.has(roleCode))
   );
 }
 

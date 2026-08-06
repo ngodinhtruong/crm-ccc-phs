@@ -85,6 +85,7 @@ INSTALLED_APPS = [
     "apps.kpis",
     "apps.external_errors",
     "apps.ekyc",
+    "apps.failed_ekyc",
 ]
 
 MIDDLEWARE = [

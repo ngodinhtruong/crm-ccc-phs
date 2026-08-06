@@ -138,6 +138,17 @@ const menuGroups: SidebarGroup[] = [
     ],
   },
   {
+    key: "failed-ekyc",
+    title: "FAILED eKYC",
+    icon: ShieldCheck,
+    children: [
+      { key: "failed-ekyc-dashboard", title: "Dashboard Failed eKYC", href: "/failed-ekyc/dashboard" },
+      { key: "failed-ekyc-list", title: "Danh sách Failed eKYC", href: "/failed-ekyc" },
+      { key: "failed-ekyc-create", title: "Nhập Failed eKYC mới", href: "/failed-ekyc/create" },
+      { key: "failed-ekyc-import", title: "Import Excel", href: "/failed-ekyc/import" },
+    ],
+  },
+  {
     key: "integration",
     title: "TÍCH HỢP",
     icon: Plug,

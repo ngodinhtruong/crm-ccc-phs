@@ -44,4 +44,5 @@ urlpatterns = [
 
     #ekyc
     path("api/ekyc/", include("apps.ekyc.urls")),
+    path("api/failed-ekyc/", include("apps.failed_ekyc.urls")),
 ]

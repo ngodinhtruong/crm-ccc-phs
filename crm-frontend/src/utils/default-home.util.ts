@@ -17,6 +17,13 @@ const SA_OR_SUP_PERMISSION_CODES = new Set([
   "KPI_DASHBOARD_VIEW_BRANCH",
 ]);
 
+const GLOBAL_ADMIN_ROLE_CODES = new Set([
+  "SYSTEM_ADMIN",
+  "ADMIN",
+  "SA_ADMIN",
+  "BOM",
+]);
+
 function getRoleCodes(user?: CurrentUser | null): string[] {
   if (!user) return [];
 
@@ -44,8 +51,7 @@ export function isSystemOrGlobalAdmin(user?: CurrentUser | null): boolean {
   return Boolean(
     user.is_superuser ||
       user.is_global_admin ||
-      roleCodes.includes("SYSTEM_ADMIN") ||
-      roleCodes.includes("SA_ADMIN")
+      roleCodes.some((roleCode) => GLOBAL_ADMIN_ROLE_CODES.has(roleCode))
   );
 }
 

@@ -26,11 +26,17 @@ function getRoleCodes(user: CurrentUser) {
 
 function isGlobalAdmin(user: CurrentUser) {
   const roleCodes = getRoleCodes(user);
+  const adminRoleCodes = new Set([
+    "SYSTEM_ADMIN",
+    "ADMIN",
+    "SA_ADMIN",
+    "BOM",
+  ]);
 
   return (
     user.is_superuser ||
     user.is_global_admin ||
-    roleCodes.includes("SYSTEM_ADMIN")
+    roleCodes.some((roleCode) => adminRoleCodes.has(roleCode))
   );
 }
 
@@ -56,6 +62,7 @@ function isCccPath(pathname: string) {
     pathname.startsWith("/chatbots") ||
     pathname.startsWith("/dashboard") ||
     pathname.startsWith("/ekyc") ||
+    pathname.startsWith("/failed-ekyc") ||
     isExternalErrorPath(pathname)
   );
 }
