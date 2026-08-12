@@ -196,6 +196,8 @@ export type ExternalErrorListParams = {
   date_field?: string;
   date_from?: string;
   date_to?: string;
+  granularity?: string;
+  compare_mode?: string;
   source?: string;
   device?: string;
   issue?: string;

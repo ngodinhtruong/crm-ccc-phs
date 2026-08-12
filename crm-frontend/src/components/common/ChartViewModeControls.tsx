@@ -13,8 +13,8 @@ export interface ChartViewModeControlsProps {
 export interface CccPeriodControlsProps {
   granularity: GranularityMode;
   onGranularityChange: (g: GranularityMode) => void;
-  compareMode: CompareMode;
-  onCompareModeChange: (c: CompareMode) => void;
+  compareMode?: CompareMode;
+  onCompareModeChange?: (c: CompareMode) => void;
   className?: string;
 }
 
@@ -28,71 +28,63 @@ export function CccPeriodControls({
   onCompareModeChange,
   className = "",
 }: CccPeriodControlsProps) {
+  const handleSelectGranularity = (g: GranularityMode) => {
+    onGranularityChange(g);
+    if (onCompareModeChange) {
+      if (g === "YEAR") {
+        onCompareModeChange("YOY");
+      } else {
+        onCompareModeChange("QOQ");
+      }
+    }
+  };
+
   return (
-    <div className={`flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white p-1 shadow-xs ${className}`}>
-      {/* Granularity Selector */}
+    <div className={`flex flex-wrap items-center gap-1.5 rounded-lg border border-slate-200 bg-white p-1 shadow-xs ${className}`}>
+      {/* Granularity Selector with Auto Comparison */}
       <div className="flex items-center gap-1">
         <span className="flex items-center gap-1 text-[11px] font-bold text-slate-500 pl-1.5 pr-0.5">
-          <Calendar className="h-3 w-3 text-sky-600" />
+          <Calendar className="h-3.5 w-3.5 text-sky-600" />
           Kỳ:
         </span>
         <div className="inline-flex rounded-md bg-slate-100 p-0.5">
           <button
             type="button"
-            onClick={() => onGranularityChange("MONTH")}
-            className={`rounded px-2 py-0.5 text-xs font-semibold transition-all ${
+            onClick={() => handleSelectGranularity("MONTH")}
+            className={`rounded px-2.5 py-1 text-xs font-semibold transition-all ${
               granularity === "MONTH"
                 ? "bg-white text-sky-700 shadow-2xs"
                 : "text-slate-600 hover:text-slate-900"
             }`}
-            title="Hiển thị theo Tháng"
+            title="Hiển thị theo Tháng (Tự động so sánh tháng liền trước - MoM)"
           >
             Tháng
           </button>
           <button
             type="button"
-            onClick={() => onGranularityChange("QUARTER")}
-            className={`rounded px-2 py-0.5 text-xs font-semibold transition-all ${
+            onClick={() => handleSelectGranularity("QUARTER")}
+            className={`rounded px-2.5 py-1 text-xs font-semibold transition-all ${
               granularity === "QUARTER"
                 ? "bg-white text-sky-700 shadow-2xs"
                 : "text-slate-600 hover:text-slate-900"
             }`}
-            title="Hiển thị gộp theo Quý (Q1..Q4)"
+            title="Hiển thị theo Quý (Tự động so sánh quý liền trước - QoQ)"
           >
             Quý
           </button>
           <button
             type="button"
-            onClick={() => onGranularityChange("YEAR")}
-            className={`rounded px-2 py-0.5 text-xs font-semibold transition-all ${
+            onClick={() => handleSelectGranularity("YEAR")}
+            className={`rounded px-2.5 py-1 text-xs font-semibold transition-all ${
               granularity === "YEAR"
                 ? "bg-white text-sky-700 shadow-2xs"
                 : "text-slate-600 hover:text-slate-900"
             }`}
-            title="Hiển thị gộp theo Năm"
+            title="Hiển thị theo Năm (Tự động so sánh năm trước - YoY)"
           >
             Năm
           </button>
         </div>
-      </div>
-
-      <div className="h-4 w-[1px] bg-slate-200" />
-
-      {/* Compare Mode Selector */}
-      <div className="flex items-center gap-1">
-        <span className="flex items-center gap-1 text-[11px] font-bold text-slate-500 pl-1 pr-0.5">
-          <GitCompare className="h-3 w-3 text-amber-600" />
-          So sánh:
-        </span>
-        <select
-          value={compareMode}
-          onChange={(e) => onCompareModeChange(e.target.value as CompareMode)}
-          className="h-7 rounded border border-slate-200 bg-slate-50 px-2 text-xs font-bold text-slate-700 outline-none focus:border-sky-500 focus:bg-white"
-        >
-          <option value="NONE">Không so sánh</option>
-          <option value="YOY">Cùng kỳ năm trước (YoY)</option>
-          <option value="QOQ">Kỳ liền trước (QoQ / MoM)</option>
-        </select>
       </div>
     </div>
   );

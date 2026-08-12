@@ -290,6 +290,9 @@ export type CccDashboardReportEmployeeItem = {
   ekyc: number;
   avg_cs_days: number | null;
   avg_related_days: number | null;
+  month_key?: string;
+  month_label?: string;
+  period_label?: string;
 };
 
 export type CccDashboardCharts = {

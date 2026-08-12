@@ -30,43 +30,56 @@ import { getLast5MonthsDateRange } from "@/utils/date.util";
 interface EkycDashboardViewProps {
   granularity?: GranularityMode;
   compareMode?: CompareMode;
+  dateFrom?: string;
+  dateTo?: string;
 }
 
 export function EkycDashboardView({
   granularity = "MONTH",
   compareMode = "NONE",
+  dateFrom: propDateFrom,
+  dateTo: propDateTo,
 }: EkycDashboardViewProps) {
   const defaultDateRange = getLast5MonthsDateRange();
   const [data, setData] = useState<EkycDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [dateFrom, setDateFrom] = useState(defaultDateRange.dateFrom);
-  const [dateTo, setDateTo] = useState(defaultDateRange.dateTo);
+  const [dateFrom, setDateFrom] = useState(propDateFrom || defaultDateRange.dateFrom);
+  const [dateTo, setDateTo] = useState(propDateTo || defaultDateRange.dateTo);
+
+  useEffect(() => {
+    if (propDateFrom) setDateFrom(propDateFrom);
+    if (propDateTo) setDateTo(propDateTo);
+  }, [propDateFrom, propDateTo]);
 
   const hasValidDateRange = Boolean(
     dateFrom && dateTo && dateFrom <= dateTo
   );
 
-  const fetchDashboard = async () => {
-    setLoading(true);
-    try {
-      const res = await ekycApi.getDashboard({
-        call_date_from: dateFrom,
-        call_date_to: dateTo,
-        granularity,
-        compare_mode: compareMode,
-      });
-      setData(res);
-    } catch {
-      // silent
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
+    let isMounted = true;
+    const fetchDashboard = async () => {
+      setLoading(true);
+      try {
+        const res = await ekycApi.getDashboard({
+          call_date_from: dateFrom,
+          call_date_to: dateTo,
+          granularity,
+          compare_mode: compareMode,
+        });
+        if (isMounted) setData(res);
+      } catch {
+        // silent
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
     if (hasValidDateRange) {
-      fetchDashboard();
+      void fetchDashboard();
     }
+    return () => {
+      isMounted = false;
+    };
   }, [granularity, compareMode, dateFrom, dateTo, hasValidDateRange]);
 
   if (loading) {
@@ -104,40 +117,7 @@ export function EkycDashboardView({
   const keyPressedPercent = total > 0 ? ((keyPressedCount / total) * 100).toFixed(1) : "0";
 
   return (
-    <div className="space-y-6">
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:max-w-xl">
-            <DateRangeFilter
-              fromLabel="Từ ngày gọi"
-              toLabel="Đến ngày gọi"
-              fromValue={dateFrom}
-              toValue={dateTo}
-              onFromChange={setDateFrom}
-              onToChange={setDateTo}
-            />
-          </div>
-
-          <button
-            type="button"
-            onClick={() => {
-              const range = getLast5MonthsDateRange();
-              setDateFrom(range.dateFrom);
-              setDateTo(range.dateTo);
-            }}
-            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
-          >
-            <RefreshCw size={14} />
-            Đặt lại 5 tháng gần nhất
-          </button>
-        </div>
-
-        {!hasValidDateRange && (
-          <p className="mt-2 text-xs font-medium text-rose-600">
-            Ngày bắt đầu phải nhỏ hơn hoặc bằng ngày kết thúc.
-          </p>
-        )}
-      </div>
+    <div className="space-y-5">
 
       {/* Top summary cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

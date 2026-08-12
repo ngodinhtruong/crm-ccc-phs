@@ -1004,3 +1004,130 @@ endif
 :Hiển thị KPI cá nhân, chi tiết điểm và ranking;
 stop
 @enduml
+
+
+===== 13_quan_ly_ekyc.puml =====
+
+@startuml
+title Activity 13 - Quản lý, import và chăm sóc eKYC
+|Nhân viên CCC / CS|
+start
+:Mở phân hệ quản lý eKYC;
+if (Hình thức ghi nhận?) then (Nhập thủ công)
+  :Tra cứu khách hàng theo số tài khoản;
+  :Nhập ngày gọi, follow, PIC, tình trạng, kết quả và ghi chú;
+  |Backend eKYC|
+  :Kiểm tra quyền, chuẩn hóa và lưu EkycRecord;
+else (Import Excel)
+  :Đọc workbook và ánh xạ cột;
+  while (Còn dòng dữ liệu?) is (Có)
+    :Chuẩn hóa và kiểm tra dòng;
+    :Tra cứu khách hàng và tạo EkycRecord;
+  endwhile (Không)
+  :Trả kết quả import theo dòng;
+endif
+|Frontend Next.js|
+:Hiển thị danh sách, bộ lọc và phân trang;
+|Nhân viên CCC / CS|
+:Cập nhật kết quả chăm sóc nếu cần;
+if (Tác vụ?) then (Dashboard)
+  :Xem KPI và biểu đồ eKYC;
+elseif (Export)
+  :Tải file Excel theo bộ lọc;
+else (Kết thúc)
+endif
+stop
+@enduml
+
+
+===== 14_xu_ly_failed_ekyc.puml =====
+
+@startuml
+title Activity 14 - Tiếp nhận và xử lý Failed eKYC
+|Nhân viên CCC / Admin|
+start
+:Mở phân hệ Failed eKYC;
+|Backend Django|
+:Kiểm tra role Admin / CCC;
+if (Được phép?) then (Có)
+else (Không)
+  :Trả lỗi 403;
+  stop
+endif
+|Nhân viên CCC / Admin|
+if (Nguồn dữ liệu?) then (Nhập thủ công)
+  :Nhập Step, lỗi và thông tin khách hàng nếu có;
+  |Backend Failed eKYC|
+  :Chuẩn hóa và lưu FailedEkycRecord;
+else (Import Excel)
+  :Đọc workbook và ánh xạ header;
+  while (Còn dòng dữ liệu?) is (Có)
+    if (Dòng hoàn toàn trống?) then (Có)
+      :Bỏ qua;
+    else (Không)
+      :Chuẩn hóa Step, ngày và follow;
+      :Cho phép Account, Email, Phone trống;
+      :Đưa bản ghi vào danh sách tạo;
+    endif
+  endwhile (Không)
+  :Tạo hàng loạt trong transaction;
+endif
+|Nhân viên CCC / Admin|
+:Cập nhật PIC, ngày gọi, follow,
+tình trạng, kết quả và CS comment;
+:Xem Dashboard hoặc export theo bộ lọc;
+stop
+@enduml
+
+
+===== 15_quan_ly_khao_sat_csat.puml =====
+
+@startuml
+title Activity 15 - Ghi nhận và quản lý khảo sát CSAT
+|Nhân viên CCC / Admin|
+start
+:Mở phân hệ Khảo sát;
+|Backend Survey|
+:Kiểm tra quyền và phạm vi ticket;
+if (Được phép?) then (Có)
+else (Không)
+  :Trả lỗi 403;
+  stop
+endif
+|Nhân viên CCC / Admin|
+if (Nguồn dữ liệu?) then (Nhập thủ công)
+  :Tra cứu và chọn ticket của khách
+  trong tháng gửi khảo sát;
+  :Nhập trạng thái gửi, điểm và mô tả;
+else (Import Excel)
+  :Tải file và xem trước dữ liệu;
+  |Backend Survey|
+  :Chuẩn hóa dòng và gợi ý ticket;
+  |Nhân viên CCC / Admin|
+  :Xác nhận ticket cho từng dòng;
+endif
+|Backend Survey|
+while (Còn dòng cần ghi?) is (Có)
+  if (Ticket đã khảo sát thành công?) then (Có)
+    :Ghi lỗi trùng khảo sát;
+  else (Không)
+    :Lưu TicketSurveyLog;
+    if (Gửi thành công?) then (Có)
+      :Cập nhật TicketFeedback;
+    else (Thất bại)
+      :Cho phép gửi lại;
+    endif
+    :Tạo Audit Log;
+  endif
+endwhile (Không)
+|Frontend Next.js|
+:Hiển thị danh sách và bộ lọc;
+|Nhân viên CCC / Admin|
+if (Tác vụ?) then (Cập nhật)
+  :Sửa kết quả và xem lịch sử;
+elseif (Dashboard) then (Dashboard)
+  :Xem KPI, CSAT và biểu đồ so sánh;
+else (Kết thúc)
+endif
+stop
+@enduml

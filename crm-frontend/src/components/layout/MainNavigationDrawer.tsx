@@ -146,11 +146,7 @@ const mainMenuItemsByWorkspace: Record<WorkspaceCode, MainMenuItem[]> = {
       panel: "failed_ekyc",
       cccOrAdminOnly: true,
     },
-    {
-      title: "QUẢN LÝ USER",
-      href: "/accounts/users",
-      icon: UserCog,
-    },
+
     // {
     //   title: "BÁO CÁO",
     //   href: "/reports",
@@ -947,6 +943,24 @@ export function MainNavigationDrawer({
 
                   <ChevronRight size={24} className="text-white/60" />
                 </button>
+
+                {admin && (
+                  <Link
+                    href="/accounts/users"
+                    onMouseEnter={() => {
+                      setActivePanel(null);
+                      setActivePanelWorkspace(null);
+                    }}
+                    onClick={() => handleNavigate(activeWorkspace)}
+                    className="flex h-[40px] items-center gap-4 px-5 text-white/80 transition hover:bg-white/10 hover:text-white"
+                  >
+                    <UserCog size={27} className="shrink-0 text-white/70" />
+
+                    <span className="flex-1 text-[10px] font-semibold tracking-wide">
+                      QUẢN LÝ USER
+                    </span>
+                  </Link>
+                )}
                 {/* <Link
                   href="/dashboard"
                   onMouseEnter={() => {

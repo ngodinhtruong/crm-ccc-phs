@@ -63,7 +63,7 @@ const COLORS = [
 
 function EmptyChartAxisPlaceholder({
   message = "Không có dữ liệu trong khoảng thời gian này",
-  height = 320,
+  height = 220,
   type = "bar",
   categories = ["T4/2026", "T5/2026", "T6/2026", "T7/2026", "T8/2026"],
 }: {
@@ -384,9 +384,9 @@ function TicketResultChartCard({
     }
   };
 
-  const isAggregatedOrCompared = granularity !== "MONTH" || compareMode !== "NONE";
+  const isAggregatedOrCompared = granularity !== "MONTH";
   const periodLabelText = granularity === "QUARTER" ? "theo Quý" : granularity === "YEAR" ? "theo Năm" : "theo Tháng";
-  const compareLabelText = compareMode === "YOY" ? " (So sánh Cùng kỳ Năm trước - YoY)" : compareMode === "QOQ" ? " (So sánh Kỳ liền trước - QoQ)" : "";
+  const compareLabelText = compareMode === "YOY" ? " (So sánh YoY)" : "";
 
   if (isEmpty(rawMonthly)) {
     return (
@@ -414,7 +414,7 @@ function TicketResultChartCard({
           selectedMonth
             ? "Nhấp đúp hoặc bấm nút 'Quay lại' để xem xu hướng tất cả các kỳ"
             : isAggregatedOrCompared
-            ? "Biểu đồ cột ghép nhóm so sánh sản lượng ticket xử lý giữa kỳ hiện tại và kỳ đối chiếu"
+            ? "Biểu đồ cột ghép nhóm so sánh sản lượng ticket xử lý giữa các kỳ"
             : "Nhấp đúp vào cột tháng bất kỳ để xem biểu đồ Donut chi tiết của tháng đó"
         }
         headerRight={
@@ -429,111 +429,163 @@ function TicketResultChartCard({
           ) : undefined
         }
       >
-        <div className="h-[320px]">
-          <ResponsiveContainer width="100%" height="100%">
-            {selectedMonth ? (
-              <PieChart onDoubleClick={() => setSelectedMonth(null)}>
-                <Pie
-                  data={monthDonutData}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={55}
-                  outerRadius={85}
-                  paddingAngle={3}
-                  isAnimationActive={false}
-                  label={({ name, value, percent }) =>
-                    percent && percent >= 0.02 ? `${name}: ${formatNumber(value)} (${(percent * 100).toFixed(1)}%)` : ""
-                  }
-                >
-                  {monthDonutData.map((entry, index) => (
-                    <Cell key={index} fill={entry.color || COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip content={<ValueTooltip />} />
-                <Legend
-                  wrapperStyle={{ fontSize: 11 }}
-                  formatter={(value: string, entry: any) => {
-                    const item = entry.payload;
-                    const total = monthDonutData.reduce((acc, curr) => acc + curr.value, 0);
-                    const pct = total > 0 ? ((item.value / total) * 100).toFixed(1) : "0";
-                    return `${value}: ${formatNumber(item.value)} (${pct}%)`;
-                  }}
-                />
-              </PieChart>
-            ) : isAggregatedOrCompared ? (
-              <BarChart data={chartData} margin={{ top: 20, right: 20, left: 10, bottom: 10 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis dataKey="label" tick={{ fontSize: 11, fontWeight: 600 }} />
-                <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                <Tooltip content={<ValueTooltip />} />
-                <Legend wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
-                <Bar dataKey="processed" name="Đã xử lý (Kỳ này)" fill="#10b981" radius={[4, 4, 0, 0]} barSize={24} isAnimationActive={false}>
-                  <LabelList
-                    dataKey="processed"
-                    position="top"
-                    content={(props: any) => {
-                      const { x, y, width, value, index } = props;
-                      if (!value && value !== 0) return null;
-                      const item = chartData[index];
-                      const growth = item?.growth_processed;
-                      let text = formatNumber(value);
-                      if (growth !== null && growth !== undefined) {
-                        const arrow = growth >= 0 ? "▲" : "▼";
-                        text += ` (${arrow}${growth}%)`;
-                      }
-                      return (
-                        <text
-                          x={Number(x) + Number(width) / 2}
-                          y={Number(y) - 6}
-                          fill="#10b981"
-                          textAnchor="middle"
-                          fontSize={10}
-                          fontWeight={700}
-                        >
-                          {text}
-                        </text>
-                      );
+        {(isExpanded) => (
+          <div className={isExpanded ? "h-[480px]" : "h-[220px]"}>
+            <ResponsiveContainer width="100%" height="100%">
+              {selectedMonth ? (
+                <PieChart onDoubleClick={() => setSelectedMonth(null)}>
+                  <Pie
+                    data={monthDonutData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={55}
+                    outerRadius={85}
+                    paddingAngle={3}
+                    isAnimationActive={false}
+                    label={({ name, value, percent }) =>
+                      percent && percent >= 0.02 ? `${name}: ${formatNumber(value)} (${(percent * 100).toFixed(1)}%)` : ""
+                    }
+                  >
+                    {monthDonutData.map((entry, index) => (
+                      <Cell key={index} fill={entry.color || COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<ValueTooltip />} />
+                  <Legend
+                    wrapperStyle={{ fontSize: 11 }}
+                    formatter={(value: string, entry: any) => {
+                      const item = entry.payload;
+                      const total = monthDonutData.reduce((acc, curr) => acc + curr.value, 0);
+                      const pct = total > 0 ? ((item.value / total) * 100).toFixed(1) : "0";
+                      return `${value}: ${formatNumber(item.value)} (${pct}%)`;
                     }}
                   />
-                </Bar>
-                {compareMode !== "NONE" && (
-                  <Bar dataKey="compare_processed" name={`Đã xử lý (${compareMode === "YOY" ? "Cùng kỳ năm trước" : "Kỳ liền trước"})`} fill="#94a3b8" radius={[4, 4, 0, 0]} barSize={24} isAnimationActive={false}>
-                    <LabelList dataKey="compare_processed" position="top" style={{ fontSize: 10, fill: "#64748b", fontWeight: 600 }} formatter={(val: any) => (val ? formatNumber(Number(val)) : "")} />
+                </PieChart>
+              ) : isAggregatedOrCompared ? (
+                <BarChart data={chartData} margin={{ top: 20, right: 20, left: 10, bottom: 10 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <XAxis dataKey="label" tick={{ fontSize: 11, fontWeight: 600 }} />
+                  <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                  <Tooltip content={<ValueTooltip />} />
+                  <Legend wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
+                  <Bar dataKey="processed" name="Đã xử lý (Kỳ này)" fill="#10b981" radius={[4, 4, 0, 0]} barSize={24} isAnimationActive={false}>
+                    <LabelList dataKey="processed" position="top" style={{ fontSize: 10, fill: '#10b981', fontWeight: 700 }} formatter={(val: any) => (val && Number(val) > 0 ? formatNumber(Number(val)) : "")} />
                   </Bar>
-                )}
-                <Bar dataKey="cancelled" name="Spam / Đã hủy" fill="#ef4444" radius={[4, 4, 0, 0]} barSize={24} isAnimationActive={false} />
-              </BarChart>
-            ) : (
-              <ComposedChart
-                data={chartData}
-                onDoubleClick={handleChartClick}
-                onClick={handleChartClick}
-                className="cursor-pointer"
-              >
-                <defs>
-                  <linearGradient id="totalGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.25} />
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0.02} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis dataKey="label" tick={{ fontSize: 11, fontWeight: 600 }} />
-                <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                <Tooltip content={<ValueTooltip />} />
-                <Legend wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
-                <Area type="monotone" dataKey="total" name="Tổng ticket tiếp nhận" fill="url(#totalGradient)" stroke="#10b981" strokeWidth={2} isAnimationActive={false} />
-                <Bar dataKey="processed" name="Đã xử lý" fill="#10b981" radius={[4, 4, 0, 0]} barSize={24} isAnimationActive={false}>
-                  <LabelList dataKey="processed" position="top" style={{ fontSize: 10, fill: '#10b981', fontWeight: 700 }} formatter={(val: any) => (val && Number(val) > 0 ? val : "")} />
-                </Bar>
-                <Bar dataKey="cancelled" name="Spam / Đã hủy" fill="#ef4444" radius={[4, 4, 0, 0]} barSize={24} isAnimationActive={false}>
-                  <LabelList dataKey="cancelled" position="top" style={{ fontSize: 10, fill: '#ef4444', fontWeight: 700 }} formatter={(val: any) => (val && Number(val) > 0 ? val : "")} />
-                </Bar>
-              </ComposedChart>
-            )}
-          </ResponsiveContainer>
-        </div>
+                  {compareMode === "YOY" && (
+                    <Bar dataKey="compare_processed" name="Đã xử lý (Cùng kỳ năm trước)" fill="#94a3b8" radius={[4, 4, 0, 0]} barSize={24} isAnimationActive={false}>
+                      <LabelList dataKey="compare_processed" position="top" style={{ fontSize: 10, fill: "#64748b", fontWeight: 600 }} formatter={(val: any) => (val ? formatNumber(Number(val)) : "")} />
+                    </Bar>
+                  )}
+                  <Bar dataKey="cancelled" name="Spam / Đã hủy" fill="#ef4444" radius={[4, 4, 0, 0]} barSize={24} isAnimationActive={false}>
+                    <LabelList dataKey="cancelled" position="top" style={{ fontSize: 10, fill: '#ef4444', fontWeight: 700 }} formatter={(val: any) => (val && Number(val) > 0 ? formatNumber(Number(val)) : "")} />
+                  </Bar>
+                </BarChart>
+              ) : (
+                <ComposedChart
+                  data={chartData}
+                  onDoubleClick={handleChartClick}
+                  onClick={handleChartClick}
+                  className="cursor-pointer"
+                >
+                  <defs>
+                    <linearGradient id="totalGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0.02} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <XAxis dataKey="label" tick={{ fontSize: 11, fontWeight: 600 }} />
+                  <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                  <Tooltip content={<ValueTooltip />} />
+                  <Legend wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
+                  <Area type="monotone" dataKey="total" name="Tổng ticket tiếp nhận" fill="url(#totalGradient)" stroke="#10b981" strokeWidth={2} isAnimationActive={false} />
+                  <Bar dataKey="processed" name="Đã xử lý" fill="#10b981" radius={[4, 4, 0, 0]} barSize={24} isAnimationActive={false}>
+                    <LabelList
+                      dataKey="processed"
+                      position="top"
+                      content={(props: any) => {
+                        const { x, y, width, value } = props;
+                        if (!value && value !== 0) return null;
+                        const numText = formatNumber(value);
+                        const cx = Number(x) + Number(width) / 2;
+                        const cy = Number(y) - 6;
+                        return (
+                          <g className="pointer-events-none">
+                            <text
+                              x={cx}
+                              y={cy}
+                              fill="none"
+                              stroke="#ffffff"
+                              strokeWidth={4}
+                              strokeLinejoin="round"
+                              textAnchor="middle"
+                              fontSize={10}
+                              fontWeight={800}
+                            >
+                              {numText}
+                            </text>
+                            <text
+                              x={cx}
+                              y={cy}
+                              fill="#059669"
+                              textAnchor="middle"
+                              fontSize={10}
+                              fontWeight={800}
+                            >
+                              {numText}
+                            </text>
+                          </g>
+                        );
+                      }}
+                    />
+                  </Bar>
+                  <Bar dataKey="cancelled" name="Spam / Đã hủy" fill="#ef4444" radius={[4, 4, 0, 0]} barSize={24} isAnimationActive={false}>
+                    <LabelList
+                      dataKey="cancelled"
+                      position="top"
+                      content={(props: any) => {
+                        const { x, y, width, value } = props;
+                        if (!value && value !== 0) return null;
+                        const numText = formatNumber(value);
+                        const cx = Number(x) + Number(width) / 2;
+                        const cy = Number(y) - 6;
+                        return (
+                          <g className="pointer-events-none">
+                            <text
+                              x={cx}
+                              y={cy}
+                              fill="none"
+                              stroke="#ffffff"
+                              strokeWidth={4}
+                              strokeLinejoin="round"
+                              textAnchor="middle"
+                              fontSize={10}
+                              fontWeight={800}
+                            >
+                              {numText}
+                            </text>
+                            <text
+                              x={cx}
+                              y={cy}
+                              fill="#dc2626"
+                              textAnchor="middle"
+                              fontSize={10}
+                              fontWeight={800}
+                            >
+                              {numText}
+                            </text>
+                          </g>
+                        );
+                      }}
+                    />
+                  </Bar>
+                </ComposedChart>
+              )}
+            </ResponsiveContainer>
+          </div>
+        )}
       </ChartCard>
     </div>
   );
@@ -582,36 +634,37 @@ function SourceDonutChartCard({
     <ChartCard
       title="Tỷ trọng Ticket theo Nguồn"
       description="Xếp hạng cơ cấu tổng lượng ticket từ các kênh tiếp nhận"
-      className="xl:col-span-5"
     >
-      <div className="h-[320px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart
-            layout="vertical"
-            data={chartData}
-            margin={{ left: 20, right: 65, top: 10, bottom: 10 }}
-          >
-            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
-            <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-            <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fontWeight: 600 }} width={90} />
-            <Tooltip content={<ValueTooltip />} />
-            <Bar dataKey="value" name="Số lượng ticket" radius={[0, 4, 4, 0]} isAnimationActive={false}>
-              {chartData.map((_, index) => (
-                <Cell key={index} fill={COLORS[index % COLORS.length]} />
-              ))}
-              <LabelList
-                dataKey="value"
-                position="right"
-                style={{ fontSize: 10, fontWeight: 700, fill: "#334155" }}
-                formatter={(val: any) => {
-                  const pct = totalSum > 0 ? ((Number(val) / totalSum) * 100).toFixed(1) : "0";
-                  return val ? `${formatNumber(val)} (${pct}%)` : "";
-                }}
-              />
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+      {(isExpanded) => (
+        <div className={isExpanded ? "h-[480px]" : "h-[220px]"}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              layout="vertical"
+              data={chartData}
+              margin={{ left: 10, right: 55, top: 10, bottom: 10 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+              <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
+              <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fontWeight: 600 }} width={80} />
+              <Tooltip content={<ValueTooltip />} />
+              <Bar dataKey="value" name="Số lượng ticket" radius={[0, 4, 4, 0]} isAnimationActive={false}>
+                {chartData.map((_, index) => (
+                  <Cell key={index} fill={COLORS[index % COLORS.length]} />
+                ))}
+                <LabelList
+                  dataKey="value"
+                  position="right"
+                  style={{ fontSize: 10, fontWeight: 700, fill: "#334155" }}
+                  formatter={(val: any) => {
+                    const pct = totalSum > 0 ? ((Number(val) / totalSum) * 100).toFixed(1) : "0";
+                    return val ? `${formatNumber(val)} (${pct}%)` : "";
+                  }}
+                />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
     </ChartCard>
   );
 }
@@ -680,7 +733,6 @@ function SourceTrendChartCard({
     <ChartCard
       title="Phân bổ Ticket đã xử lý theo Nguồn"
       description="Trục hoành: Nguồn tiếp nhận | Trục tung: Số lượng ticket (5 cột tháng nhóm cho mỗi nguồn)"
-      className="xl:col-span-7"
       headerRight={
         <div className="flex items-center gap-2">
           <label className="text-xs font-semibold text-slate-500">Xem tháng:</label>
@@ -699,42 +751,44 @@ function SourceTrendChartCard({
         </div>
       }
     >
-      <div className="h-[320px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart
-            data={pivotData.rows}
-            margin={{ left: 10, right: 20, top: 20, bottom: 10 }}
-          >
-            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-            <XAxis dataKey="source" tick={{ fontSize: 11, fontWeight: 600 }} />
-            <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-            <Tooltip content={<ValueTooltip />} />
-            <Legend wrapperStyle={{ fontSize: 11 }} />
-            {displayedMonths.map((month, index) => {
-              const monthIndexInAll = pivotData.monthDimensions.indexOf(month);
-              const color = COLORS[monthIndexInAll % COLORS.length];
-              return (
-                <Bar
-                  key={month}
-                  dataKey={month}
-                  name={month}
-                  fill={color}
-                  radius={[4, 4, 0, 0]}
-                  barSize={displayedMonths.length === 1 ? 28 : undefined}
-                  isAnimationActive={false}
-                >
-                  <LabelList
+      {(isExpanded) => (
+        <div className={isExpanded ? "h-[480px]" : "h-[220px]"}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              data={pivotData.rows}
+              margin={{ left: 10, right: 20, top: 20, bottom: 10 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis dataKey="source" tick={{ fontSize: 11, fontWeight: 600 }} />
+              <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+              <Tooltip content={<ValueTooltip />} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              {displayedMonths.map((month, index) => {
+                const monthIndexInAll = pivotData.monthDimensions.indexOf(month);
+                const color = COLORS[monthIndexInAll % COLORS.length];
+                return (
+                  <Bar
+                    key={month}
                     dataKey={month}
-                    position="top"
-                    style={{ fontSize: 10, fill: color, fontWeight: 700 }}
-                    formatter={(val: any) => (val && Number(val) > 0 ? val : "")}
-                  />
-                </Bar>
-              );
-            })}
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+                    name={month}
+                    fill={color}
+                    radius={[4, 4, 0, 0]}
+                    barSize={displayedMonths.length === 1 ? 28 : undefined}
+                    isAnimationActive={false}
+                  >
+                    <LabelList
+                      dataKey={month}
+                      position="top"
+                      style={{ fontSize: 10, fill: color, fontWeight: 700 }}
+                      formatter={(val: any) => (val && Number(val) > 0 ? val : "")}
+                    />
+                  </Bar>
+                );
+              })}
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
     </ChartCard>
   );
 }
@@ -753,10 +807,10 @@ function SourceAnalysisCharts({
   const items = charts.report_source || [];
 
   return (
-    <div className="grid gap-4 xl:grid-cols-12">
+    <>
       <SourceDonutChartCard items={items} globalViewMode={globalViewMode} />
       <SourceTrendChartCard items={items} globalViewMode={globalViewMode} granularity={granularity} compareMode={compareMode} />
-    </div>
+    </>
   );
 }
 
@@ -834,60 +888,62 @@ function CategoryProcessedChartCard({
         ) : undefined
       }
     >
-      <div className="h-[340px]">
-        <ResponsiveContainer width="100%" height="100%">
-          {selectedMonth ? (
-            <PieChart onDoubleClick={() => setSelectedMonth(null)}>
-              <Pie
-                data={monthDonutData}
-                dataKey="value"
-                nameKey="name"
-                cx="50%"
-                cy="50%"
-                innerRadius={55}
-                outerRadius={85}
-                paddingAngle={3}
-                isAnimationActive={false}
-                label={({ name, value, percent }) =>
-                  percent && percent >= 0.02 ? `${name}: ${formatNumber(value)} (${(percent * 100).toFixed(1)}%)` : ""
-                }
+      {(isExpanded) => (
+        <div className={isExpanded ? "h-[480px]" : "h-[220px]"}>
+          <ResponsiveContainer width="100%" height="100%">
+            {selectedMonth ? (
+              <PieChart onDoubleClick={() => setSelectedMonth(null)}>
+                <Pie
+                  data={monthDonutData}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={55}
+                  outerRadius={85}
+                  paddingAngle={3}
+                  isAnimationActive={false}
+                  label={({ name, value, percent }) =>
+                    percent && percent >= 0.02 ? `${name}: ${formatNumber(value)} (${(percent * 100).toFixed(1)}%)` : ""
+                  }
+                >
+                  {monthDonutData.map((_, index) => (
+                    <Cell key={index} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip content={<ValueTooltip />} />
+                <Legend
+                  wrapperStyle={{ fontSize: 11 }}
+                  formatter={(value: string, entry: any) => {
+                    const item = entry.payload;
+                    const total = monthDonutData.reduce((acc, curr) => acc + curr.value, 0);
+                    const pct = total > 0 ? ((item.value / total) * 100).toFixed(1) : "0";
+                    return `${value}: ${formatNumber(item.value)} (${pct}%)`;
+                  }}
+                />
+              </PieChart>
+            ) : (
+              <BarChart
+                data={processedPivot.rows}
+                onDoubleClick={handleChartClick}
+                onClick={handleChartClick}
+                className="cursor-pointer"
               >
-                {monthDonutData.map((_, index) => (
-                  <Cell key={index} fill={COLORS[index % COLORS.length]} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis dataKey="month" tick={{ fontSize: 11, fontWeight: 600 }} />
+                <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                <Tooltip content={<ValueTooltip />} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                {processedPivot.dimensions.map((dimension, index) => (
+                  <Bar key={dimension} dataKey={dimension} name={dimension} stackId="processed" fill={COLORS[index % COLORS.length]} isAnimationActive={false}>
+                    <LabelList dataKey={dimension} position="center" style={{ fontSize: 9, fill: "#ffffff", fontWeight: 700 }} formatter={(val: any) => (val && Number(val) > 0 ? val : "")} />
+                  </Bar>
                 ))}
-              </Pie>
-              <Tooltip content={<ValueTooltip />} />
-              <Legend
-                wrapperStyle={{ fontSize: 11 }}
-                formatter={(value: string, entry: any) => {
-                  const item = entry.payload;
-                  const total = monthDonutData.reduce((acc, curr) => acc + curr.value, 0);
-                  const pct = total > 0 ? ((item.value / total) * 100).toFixed(1) : "0";
-                  return `${value}: ${formatNumber(item.value)} (${pct}%)`;
-                }}
-              />
-            </PieChart>
-          ) : (
-            <BarChart
-              data={processedPivot.rows}
-              onDoubleClick={handleChartClick}
-              onClick={handleChartClick}
-              className="cursor-pointer"
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis dataKey="month" tick={{ fontSize: 11, fontWeight: 600 }} />
-              <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-              <Tooltip content={<ValueTooltip />} />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              {processedPivot.dimensions.map((dimension, index) => (
-                <Bar key={dimension} dataKey={dimension} name={dimension} stackId="processed" fill={COLORS[index % COLORS.length]} isAnimationActive={false}>
-                  <LabelList dataKey={dimension} position="center" style={{ fontSize: 9, fill: "#ffffff", fontWeight: 700 }} formatter={(val: any) => (val && Number(val) > 0 ? val : "")} />
-                </Bar>
-              ))}
-            </BarChart>
-          )}
-        </ResponsiveContainer>
-      </div>
+              </BarChart>
+            )}
+          </ResponsiveContainer>
+        </div>
+      )}
     </ChartCard>
   );
 }
@@ -963,60 +1019,62 @@ function CategoryCancelledChartCard({
         ) : undefined
       }
     >
-      <div className="h-[340px]">
-        <ResponsiveContainer width="100%" height="100%">
-          {selectedMonth ? (
-            <PieChart onDoubleClick={() => setSelectedMonth(null)}>
-              <Pie
-                data={monthDonutData}
-                dataKey="value"
-                nameKey="name"
-                cx="50%"
-                cy="50%"
-                innerRadius={55}
-                outerRadius={85}
-                paddingAngle={3}
-                isAnimationActive={false}
-                label={({ name, value, percent }) =>
-                  percent && percent >= 0.02 ? `${name}: ${formatNumber(value)} (${(percent * 100).toFixed(1)}%)` : ""
-                }
+      {(isExpanded) => (
+        <div className={isExpanded ? "h-[480px]" : "h-[220px]"}>
+          <ResponsiveContainer width="100%" height="100%">
+            {selectedMonth ? (
+              <PieChart onDoubleClick={() => setSelectedMonth(null)}>
+                <Pie
+                  data={monthDonutData}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={55}
+                  outerRadius={85}
+                  paddingAngle={3}
+                  isAnimationActive={false}
+                  label={({ name, value, percent }) =>
+                    percent && percent >= 0.02 ? `${name}: ${formatNumber(value)} (${(percent * 100).toFixed(1)}%)` : ""
+                  }
+                >
+                  {monthDonutData.map((_, index) => (
+                    <Cell key={index} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip content={<ValueTooltip />} />
+                <Legend
+                  wrapperStyle={{ fontSize: 11 }}
+                  formatter={(value: string, entry: any) => {
+                    const item = entry.payload;
+                    const total = monthDonutData.reduce((acc, curr) => acc + curr.value, 0);
+                    const pct = total > 0 ? ((item.value / total) * 100).toFixed(1) : "0";
+                    return `${value}: ${formatNumber(item.value)} (${pct}%)`;
+                  }}
+                />
+              </PieChart>
+            ) : (
+              <BarChart
+                data={cancelledPivot.rows}
+                onDoubleClick={handleChartClick}
+                onClick={handleChartClick}
+                className="cursor-pointer"
               >
-                {monthDonutData.map((_, index) => (
-                  <Cell key={index} fill={COLORS[index % COLORS.length]} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis dataKey="month" tick={{ fontSize: 11, fontWeight: 600 }} />
+                <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                <Tooltip content={<ValueTooltip />} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                {cancelledPivot.dimensions.map((dimension, index) => (
+                  <Bar key={dimension} dataKey={dimension} name={dimension} stackId="cancelled" fill={COLORS[index % COLORS.length]} isAnimationActive={false}>
+                    <LabelList dataKey={dimension} position="center" style={{ fontSize: 9, fill: "#ffffff", fontWeight: 700 }} formatter={(val: any) => (val && Number(val) > 0 ? val : "")} />
+                  </Bar>
                 ))}
-              </Pie>
-              <Tooltip content={<ValueTooltip />} />
-              <Legend
-                wrapperStyle={{ fontSize: 11 }}
-                formatter={(value: string, entry: any) => {
-                  const item = entry.payload;
-                  const total = monthDonutData.reduce((acc, curr) => acc + curr.value, 0);
-                  const pct = total > 0 ? ((item.value / total) * 100).toFixed(1) : "0";
-                  return `${value}: ${formatNumber(item.value)} (${pct}%)`;
-                }}
-              />
-            </PieChart>
-          ) : (
-            <BarChart
-              data={cancelledPivot.rows}
-              onDoubleClick={handleChartClick}
-              onClick={handleChartClick}
-              className="cursor-pointer"
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis dataKey="month" tick={{ fontSize: 11, fontWeight: 600 }} />
-              <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-              <Tooltip content={<ValueTooltip />} />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              {cancelledPivot.dimensions.map((dimension, index) => (
-                <Bar key={dimension} dataKey={dimension} name={dimension} stackId="cancelled" fill={COLORS[index % COLORS.length]} isAnimationActive={false}>
-                  <LabelList dataKey={dimension} position="center" style={{ fontSize: 9, fill: "#ffffff", fontWeight: 700 }} formatter={(val: any) => (val && Number(val) > 0 ? val : "")} />
-                </Bar>
-              ))}
-            </BarChart>
-          )}
-        </ResponsiveContainer>
-      </div>
+              </BarChart>
+            )}
+          </ResponsiveContainer>
+        </div>
+      )}
     </ChartCard>
   );
 }
@@ -1035,28 +1093,28 @@ function CategoryAnalysisCharts({
   const items = charts.report_category || [];
   if (isEmpty(items)) {
     return (
-      <div className="grid gap-4 xl:grid-cols-2">
+      <>
         <ChartCard
           title="Ticket đã xử lý theo Danh mục"
           description="Cơ cấu phân bổ ticket xử lý theo các nhóm danh mục"
         >
-          <EmptyState message="Không có dữ liệu phân tích theo danh mục." />
+          <EmptyChartAxisPlaceholder message="Không có dữ liệu phân tích theo danh mục." height={220} />
         </ChartCard>
         <ChartCard
           title="Spam / Đã hủy theo Danh mục"
           description="Cơ cấu phân bổ ticket bị hủy / spam theo các nhóm danh mục"
         >
-          <EmptyState message="Không có dữ liệu phân tích theo danh mục." />
+          <EmptyChartAxisPlaceholder message="Không có dữ liệu phân tích theo danh mục." height={220} />
         </ChartCard>
-      </div>
+      </>
     );
   }
 
   return (
-    <div className="grid gap-4 xl:grid-cols-2">
+    <>
       <CategoryProcessedChartCard items={items} globalViewMode={globalViewMode} granularity={granularity} compareMode={compareMode} />
       <CategoryCancelledChartCard items={items} globalViewMode={globalViewMode} granularity={granularity} compareMode={compareMode} />
-    </div>
+    </>
   );
 }
 
@@ -1153,61 +1211,63 @@ function UnitProcessedChartCard({
         ) : undefined
       }
     >
-      <div className="h-[310px]">
-        <ResponsiveContainer width="100%" height="100%">
-          {selectedMonth ? (
-            <PieChart onDoubleClick={() => setSelectedMonth(null)}>
-              <Pie
-                data={monthDonutData}
-                dataKey="value"
-                nameKey="name"
-                cx="50%"
-                cy="50%"
-                innerRadius={55}
-                outerRadius={85}
-                paddingAngle={3}
-                isAnimationActive={false}
-                label={({ name, value, percent }) =>
-                  percent && percent >= 0.02 ? `${name}: ${formatNumber(value)} (${(percent * 100).toFixed(1)}%)` : ""
-                }
+      {(isExpanded) => (
+        <div className={isExpanded ? "h-[480px]" : "h-[220px]"}>
+          <ResponsiveContainer width="100%" height="100%">
+            {selectedMonth ? (
+              <PieChart onDoubleClick={() => setSelectedMonth(null)}>
+                <Pie
+                  data={monthDonutData}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={55}
+                  outerRadius={85}
+                  paddingAngle={3}
+                  isAnimationActive={false}
+                  label={({ name, value, percent }) =>
+                    percent && percent >= 0.02 ? `${name}: ${formatNumber(value)} (${(percent * 100).toFixed(1)}%)` : ""
+                  }
+                >
+                  {monthDonutData.map((entry, index) => (
+                    <Cell key={index} fill={entry.color || COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip content={<ValueTooltip />} />
+                <Legend
+                  wrapperStyle={{ fontSize: 11 }}
+                  formatter={(value: string, entry: any) => {
+                    const item = entry.payload;
+                    const total = monthDonutData.reduce((acc, curr) => acc + curr.value, 0);
+                    const pct = total > 0 ? ((item.value / total) * 100).toFixed(1) : "0";
+                    return `${value}: ${formatNumber(item.value)} (${pct}%)`;
+                  }}
+                />
+              </PieChart>
+            ) : (
+              <BarChart
+                data={aggregatedItems}
+                onDoubleClick={handleChartClick}
+                onClick={handleChartClick}
+                className="cursor-pointer"
               >
-                {monthDonutData.map((entry, index) => (
-                  <Cell key={index} fill={entry.color || COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip content={<ValueTooltip />} />
-              <Legend
-                wrapperStyle={{ fontSize: 11 }}
-                formatter={(value: string, entry: any) => {
-                  const item = entry.payload;
-                  const total = monthDonutData.reduce((acc, curr) => acc + curr.value, 0);
-                  const pct = total > 0 ? ((item.value / total) * 100).toFixed(1) : "0";
-                  return `${value}: ${formatNumber(item.value)} (${pct}%)`;
-                }}
-              />
-            </PieChart>
-          ) : (
-            <BarChart
-              data={aggregatedItems}
-              onDoubleClick={handleChartClick}
-              onClick={handleChartClick}
-              className="cursor-pointer"
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis dataKey="month_label" tick={{ fontSize: 11, fontWeight: 600 }} />
-              <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-              <Tooltip content={<ValueTooltip />} />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Bar dataKey="cs_processed" name="TT.CSKH trực tiếp xử lý" fill="#10b981" radius={[4, 4, 0, 0]} isAnimationActive={false}>
-                <LabelList dataKey="cs_processed" position="top" style={{ fontSize: 10, fill: '#475569', fontWeight: 600 }} />
-              </Bar>
-              <Bar dataKey="related_processed" name="Chuyển PBLQ phối hợp" fill="#f59e0b" radius={[4, 4, 0, 0]} isAnimationActive={false}>
-                <LabelList dataKey="related_processed" position="top" style={{ fontSize: 10, fill: '#475569', fontWeight: 600 }} />
-              </Bar>
-            </BarChart>
-          )}
-        </ResponsiveContainer>
-      </div>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis dataKey="month_label" tick={{ fontSize: 11, fontWeight: 600 }} />
+                <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                <Tooltip content={<ValueTooltip />} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Bar dataKey="cs_processed" name="TT.CSKH trực tiếp xử lý" fill="#10b981" radius={[4, 4, 0, 0]} isAnimationActive={false}>
+                  <LabelList dataKey="cs_processed" position="top" style={{ fontSize: 10, fill: '#475569', fontWeight: 600 }} />
+                </Bar>
+                <Bar dataKey="related_processed" name="Chuyển PBLQ phối hợp" fill="#f59e0b" radius={[4, 4, 0, 0]} isAnimationActive={false}>
+                  <LabelList dataKey="related_processed" position="top" style={{ fontSize: 10, fill: '#475569', fontWeight: 600 }} />
+                </Bar>
+              </BarChart>
+            )}
+          </ResponsiveContainer>
+        </div>
+      )}
     </ChartCard>
   );
 }
@@ -1278,61 +1338,63 @@ function UnitCancelledChartCard({
         ) : undefined
       }
     >
-      <div className="h-[310px]">
-        <ResponsiveContainer width="100%" height="100%">
-          {selectedMonth ? (
-            <PieChart onDoubleClick={() => setSelectedMonth(null)}>
-              <Pie
-                data={monthDonutData}
-                dataKey="value"
-                nameKey="name"
-                cx="50%"
-                cy="50%"
-                innerRadius={55}
-                outerRadius={85}
-                paddingAngle={3}
-                isAnimationActive={false}
-                label={({ name, value, percent }) =>
-                  percent && percent >= 0.02 ? `${name}: ${formatNumber(value)} (${(percent * 100).toFixed(1)}%)` : ""
-                }
+      {(isExpanded) => (
+        <div className={isExpanded ? "h-[480px]" : "h-[220px]"}>
+          <ResponsiveContainer width="100%" height="100%">
+            {selectedMonth ? (
+              <PieChart onDoubleClick={() => setSelectedMonth(null)}>
+                <Pie
+                  data={monthDonutData}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={55}
+                  outerRadius={85}
+                  paddingAngle={3}
+                  isAnimationActive={false}
+                  label={({ name, value, percent }) =>
+                    percent && percent >= 0.02 ? `${name}: ${formatNumber(value)} (${(percent * 100).toFixed(1)}%)` : ""
+                  }
+                >
+                  {monthDonutData.map((entry, index) => (
+                    <Cell key={index} fill={entry.color || COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip content={<ValueTooltip />} />
+                <Legend
+                  wrapperStyle={{ fontSize: 11 }}
+                  formatter={(value: string, entry: any) => {
+                    const item = entry.payload;
+                    const total = monthDonutData.reduce((acc, curr) => acc + curr.value, 0);
+                    const pct = total > 0 ? ((item.value / total) * 100).toFixed(1) : "0";
+                    return `${value}: ${formatNumber(item.value)} (${pct}%)`;
+                  }}
+                />
+              </PieChart>
+            ) : (
+              <BarChart
+                data={aggregatedItems}
+                onDoubleClick={handleChartClick}
+                onClick={handleChartClick}
+                className="cursor-pointer"
               >
-                {monthDonutData.map((entry, index) => (
-                  <Cell key={index} fill={entry.color || COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip content={<ValueTooltip />} />
-              <Legend
-                wrapperStyle={{ fontSize: 11 }}
-                formatter={(value: string, entry: any) => {
-                  const item = entry.payload;
-                  const total = monthDonutData.reduce((acc, curr) => acc + curr.value, 0);
-                  const pct = total > 0 ? ((item.value / total) * 100).toFixed(1) : "0";
-                  return `${value}: ${formatNumber(item.value)} (${pct}%)`;
-                }}
-              />
-            </PieChart>
-          ) : (
-            <BarChart
-              data={aggregatedItems}
-              onDoubleClick={handleChartClick}
-              onClick={handleChartClick}
-              className="cursor-pointer"
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis dataKey="month_label" tick={{ fontSize: 11, fontWeight: 600 }} />
-              <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-              <Tooltip content={<ValueTooltip />} />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Bar dataKey="cs_cancelled" name="TT.CSKH ghi nhận" fill="#10b981" radius={[4, 4, 0, 0]} isAnimationActive={false}>
-                <LabelList dataKey="cs_cancelled" position="top" style={{ fontSize: 10, fill: '#475569', fontWeight: 600 }} />
-              </Bar>
-              <Bar dataKey="related_cancelled" name="PBLQ ghi nhận" fill="#ef4444" radius={[4, 4, 0, 0]} isAnimationActive={false}>
-                <LabelList dataKey="related_cancelled" position="top" style={{ fontSize: 10, fill: '#475569', fontWeight: 600 }} />
-              </Bar>
-            </BarChart>
-          )}
-        </ResponsiveContainer>
-      </div>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis dataKey="month_label" tick={{ fontSize: 11, fontWeight: 600 }} />
+                <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                <Tooltip content={<ValueTooltip />} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Bar dataKey="cs_cancelled" name="TT.CSKH ghi nhận" fill="#10b981" radius={[4, 4, 0, 0]} isAnimationActive={false}>
+                  <LabelList dataKey="cs_cancelled" position="top" style={{ fontSize: 10, fill: '#475569', fontWeight: 600 }} />
+                </Bar>
+                <Bar dataKey="related_cancelled" name="PBLQ ghi nhận" fill="#ef4444" radius={[4, 4, 0, 0]} isAnimationActive={false}>
+                  <LabelList dataKey="related_cancelled" position="top" style={{ fontSize: 10, fill: '#475569', fontWeight: 600 }} />
+                </Bar>
+              </BarChart>
+            )}
+          </ResponsiveContainer>
+        </div>
+      )}
     </ChartCard>
   );
 }
@@ -1351,28 +1413,28 @@ function UnitAnalysisCharts({
   const items = charts.report_unit || [];
   if (isEmpty(items)) {
     return (
-      <div className="grid gap-4 xl:grid-cols-2">
+      <>
         <ChartCard
           title="Ticket đã xử lý theo Đơn vị"
           description="Cơ cấu ticket đã xử lý theo từng đơn vị"
         >
-          <EmptyState message="Không có dữ liệu phân tích theo đơn vị xử lý." />
+          <EmptyChartAxisPlaceholder message="Không có dữ liệu phân tích theo đơn vị xử lý." height={220} />
         </ChartCard>
         <ChartCard
           title="Spam / Đã hủy theo Đơn vị xử lý"
           description="Cơ cấu ticket hủy / spam theo từng đơn vị"
         >
-          <EmptyState message="Không có dữ liệu phân tích theo đơn vị xử lý." />
+          <EmptyChartAxisPlaceholder message="Không có dữ liệu phân tích theo đơn vị xử lý." height={220} />
         </ChartCard>
-      </div>
+      </>
     );
   }
 
   return (
-    <div className="grid gap-4 xl:grid-cols-2">
+    <>
       <UnitProcessedChartCard items={items} globalViewMode={globalViewMode} granularity={granularity} compareMode={compareMode} />
       <UnitCancelledChartCard items={items} globalViewMode={globalViewMode} granularity={granularity} compareMode={compareMode} />
-    </div>
+    </>
   );
 }
 
@@ -1411,19 +1473,21 @@ function SingleTimeChartCard({
       title={title}
       description="Đơn vị: Ngày hoặc Giờ/Phút nếu < 1 ngày. So sánh xu hướng rút ngắn thời gian xử lý qua 2 kỳ."
     >
-      <div className="h-[320px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ left: 10, right: 20 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-            <XAxis dataKey="category_name" tick={{ fontSize: 10, fontWeight: 600 }} />
-            <YAxis tick={{ fontSize: 11 }} />
-            <Tooltip content={<DaysTooltip />} />
-            <Legend wrapperStyle={{ fontSize: 11 }} />
-            <Line type="monotone" dataKey="previous_avg_days" name={previousLabel} stroke="#64748b" strokeDasharray="4 4" strokeWidth={2} dot={{ r: 4 }} isAnimationActive={false} />
-            <Line type="monotone" dataKey="current_avg_days" name={currentLabel} stroke="#f59e0b" strokeWidth={3} dot={{ r: 5, fill: "#f59e0b" }} isAnimationActive={false} />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
+      {(isExpanded) => (
+        <div className={isExpanded ? "h-[480px]" : "h-[220px]"}>
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={data} margin={{ left: 10, right: 20 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis dataKey="category_name" tick={{ fontSize: 10, fontWeight: 600 }} />
+              <YAxis tick={{ fontSize: 11 }} />
+              <Tooltip content={<DaysTooltip />} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Line type="monotone" dataKey="previous_avg_days" name={previousLabel} stroke="#64748b" strokeDasharray="4 4" strokeWidth={2} dot={{ r: 4 }} isAnimationActive={false} />
+              <Line type="monotone" dataKey="current_avg_days" name={currentLabel} stroke="#f59e0b" strokeWidth={3} dot={{ r: 5, fill: "#f59e0b" }} isAnimationActive={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
     </ChartCard>
   );
 }
@@ -1443,10 +1507,10 @@ function TimeAnalysisCharts({
   const previousLabel = compareMode === "YOY" ? "Cùng kỳ năm trước" : compareMode === "QOQ" ? "Kỳ liền trước" : "Kỳ trước";
 
   return (
-    <div className="grid gap-4 xl:grid-cols-2">
+    <>
       <SingleTimeChartCard title="Thời gian trung bình CS xử lý tiếp nhận" items={time?.cs_by_category || []} globalViewMode={globalViewMode} previousLabel={previousLabel} />
       <SingleTimeChartCard title="Thời gian trung bình phối hợp CS & PBLQ" items={time?.related_by_category || []} globalViewMode={globalViewMode} previousLabel={previousLabel} />
-    </div>
+    </>
   );
 }
 
@@ -1458,6 +1522,39 @@ function SlaGaugeChartCard({ monthly, globalViewMode }: { monthly: any[]; global
   const onTimeSla = monthly.reduce((acc, curr) => acc + (curr.on_time || 0), 0);
   const overdueSla = monthly.reduce((acc, curr) => acc + (curr.overdue || 0), 0);
   const slaComplianceRate = totalSla > 0 ? ((onTimeSla / totalSla) * 100).toFixed(1) : "0";
+
+  const { onTimeGrowth, overdueGrowth } = useMemo(() => {
+    if (!monthly || monthly.length < 2) {
+      return { onTimeGrowth: null, overdueGrowth: null };
+    }
+
+    const currentItem = monthly[monthly.length - 1];
+    const prevItem = monthly[monthly.length - 2];
+
+    const currentOnTime = currentItem.on_time ?? 0;
+    const prevOnTime = prevItem.on_time ?? 0;
+    let onTimeG: number | null = null;
+    if (prevOnTime > 0) {
+      onTimeG = Math.round(((currentOnTime - prevOnTime) / prevOnTime) * 100);
+    } else if (currentOnTime > 0) {
+      onTimeG = 100;
+    } else {
+      onTimeG = 0;
+    }
+
+    const currentOverdue = currentItem.overdue ?? 0;
+    const prevOverdue = prevItem.overdue ?? 0;
+    let overdueG: number | null = null;
+    if (prevOverdue > 0) {
+      overdueG = Math.round(((currentOverdue - prevOverdue) / prevOverdue) * 100);
+    } else if (currentOverdue > 0) {
+      overdueG = 100;
+    } else {
+      overdueG = 0;
+    }
+
+    return { onTimeGrowth: onTimeG, overdueGrowth: overdueG };
+  }, [monthly]);
 
   const slaGaugeData = [
     { name: "Đúng hạn (On-time)", value: onTimeSla, color: "#10b981" },
@@ -1475,41 +1572,65 @@ function SlaGaugeChartCard({ monthly, globalViewMode }: { monthly: any[]; global
       }
     >
       {isEmpty(monthly) ? (
-        <EmptyState message="Không có ticket có SLA." />
+        <EmptyChartAxisPlaceholder message="Không có dữ liệu SLA." height={220} />
       ) : (
-        <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-          <div className="relative h-[240px] w-full sm:w-1/2">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={slaGaugeData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={85} startAngle={180} endAngle={0} paddingAngle={3} isAnimationActive={false}>
-                  {slaGaugeData.map((entry, index) => (
-                    <Cell key={index} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip content={<ValueTooltip />} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="absolute inset-0 flex flex-col items-center justify-end pb-8">
-              <span className="text-2xl font-black text-slate-800">{slaComplianceRate}%</span>
-              <span className="text-[11px] font-medium text-slate-500">Đạt SLA</span>
+        (isExpanded) => (
+          <div className={`flex flex-col items-center justify-center gap-2 ${isExpanded ? "h-[480px] sm:flex-row" : "h-[220px]"}`}>
+            <div className={`relative w-full ${isExpanded ? "h-[350px] sm:w-1/2" : "h-[140px]"}`}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={slaGaugeData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={isExpanded ? 70 : 40} outerRadius={isExpanded ? 110 : 60} startAngle={180} endAngle={0} paddingAngle={3} isAnimationActive={false}>
+                    {slaGaugeData.map((entry, index) => (
+                      <Cell key={index} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<ValueTooltip />} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className={`absolute inset-0 flex flex-col items-center justify-end ${isExpanded ? "pb-12" : "pb-2"}`}>
+                <span className={`${isExpanded ? "text-3xl" : "text-xl"} font-black text-slate-800`}>{slaComplianceRate}%</span>
+                <span className="text-[10px] font-medium text-slate-500">Đạt SLA</span>
+              </div>
             </div>
-          </div>
 
-          <div className="w-full space-y-2.5 sm:w-1/2">
-            <div className="rounded-lg border border-emerald-100 bg-emerald-50/50 p-3">
-              <div className="flex items-center justify-between text-xs font-semibold text-emerald-800">
-                <span>Không trễ hạn</span>
-                <span>{formatNumber(onTimeSla)} ticket ({totalSla > 0 ? ((onTimeSla / totalSla) * 100).toFixed(1) : 0}%)</span>
+            <div className={`w-full space-y-1.5 ${isExpanded ? "sm:w-1/2" : ""}`}>
+              <div className="rounded-lg border border-emerald-100 bg-emerald-50/50 p-2 text-xs">
+                <div className="flex items-center justify-between font-semibold text-emerald-800">
+                  <span>Không trễ hạn</span>
+                  <div className="flex items-center gap-1.5">
+                    <span>{formatNumber(onTimeSla)} ({totalSla > 0 ? ((onTimeSla / totalSla) * 100).toFixed(1) : 0}%)</span>
+                    {onTimeGrowth !== null && (
+                      onTimeGrowth > 0 ? (
+                        <span className="text-emerald-600 font-extrabold text-[10px]">▲+{onTimeGrowth}%</span>
+                      ) : onTimeGrowth < 0 ? (
+                        <span className="text-rose-600 font-extrabold text-[10px]">▼{onTimeGrowth}%</span>
+                      ) : (
+                        <span className="text-slate-400 font-extrabold text-[10px]">0%</span>
+                      )
+                    )}
+                  </div>
+                </div>
               </div>
-            </div>
-            <div className="rounded-lg border border-rose-100 bg-rose-50/50 p-3">
-              <div className="flex items-center justify-between text-xs font-semibold text-rose-800">
-                <span>Trễ hạn</span>
-                <span>{formatNumber(overdueSla)} ticket ({totalSla > 0 ? ((overdueSla / totalSla) * 100).toFixed(1) : 0}%)</span>
+              <div className="rounded-lg border border-rose-100 bg-rose-50/50 p-2 text-xs">
+                <div className="flex items-center justify-between font-semibold text-rose-800">
+                  <span>Trễ hạn</span>
+                  <div className="flex items-center gap-1.5">
+                    <span>{formatNumber(overdueSla)} ({totalSla > 0 ? ((overdueSla / totalSla) * 100).toFixed(1) : 0}%)</span>
+                    {overdueGrowth !== null && (
+                      overdueGrowth > 0 ? (
+                        <span className="text-rose-600 font-extrabold text-[10px]">▲+{overdueGrowth}%</span>
+                      ) : overdueGrowth < 0 ? (
+                        <span className="text-emerald-600 font-extrabold text-[10px]">▼{overdueGrowth}%</span>
+                      ) : (
+                        <span className="text-slate-400 font-extrabold text-[10px]">0%</span>
+                      )
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )
       )}
     </ChartCard>
   );
@@ -1522,23 +1643,25 @@ function SlaCategoryOverdueChartCard({ category, globalViewMode }: { category: a
       description="Nhận diện các mảng dịch vụ phát sinh quá hạn SLA nhiều nhất"
     >
       {isEmpty(category) ? (
-        <EmptyChartAxisPlaceholder message="Không phát sinh ticket trễ hạn" type="horizontal" height={260} categories={["Tài khoản", "Giao dịch", "Chung"]} />
+        <EmptyChartAxisPlaceholder message="Không phát sinh ticket trễ hạn" type="horizontal" height={220} categories={["Tài khoản", "Giao dịch", "Chung"]} />
       ) : (
-        <div className="h-[260px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={category} layout="vertical" margin={{ left: 10, right: 30 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis type="number" tick={{ fontSize: 11 }} />
-              <YAxis dataKey="category_name" type="category" tick={{ fontSize: 10, fontWeight: 600 }} width={120} />
-              <Tooltip content={<ValueTooltip />} />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Bar dataKey="not_overdue" name="Không trễ hạn" fill="#10b981" stackId="sla" isAnimationActive={false} />
-              <Bar dataKey="overdue" name="Trễ hạn" fill="#ef4444" stackId="sla" radius={[0, 4, 4, 0]} isAnimationActive={false}>
-                <LabelList dataKey="overdue" position="right" style={{ fontSize: 10, fill: '#ef4444', fontWeight: 700 }} formatter={(v: any) => (v && Number(v) > 0 ? v : "")} />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+        (isExpanded) => (
+          <div className={isExpanded ? "h-[480px]" : "h-[220px]"}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={category} layout="vertical" margin={{ left: 10, right: 30 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis type="number" tick={{ fontSize: 11 }} />
+                <YAxis dataKey="category_name" type="category" tick={{ fontSize: 10, fontWeight: 600 }} width={120} />
+                <Tooltip content={<ValueTooltip />} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Bar dataKey="not_overdue" name="Không trễ hạn" fill="#10b981" stackId="sla" isAnimationActive={false} />
+                <Bar dataKey="overdue" name="Trễ hạn" fill="#ef4444" stackId="sla" radius={[0, 4, 4, 0]} isAnimationActive={false}>
+                  <LabelList dataKey="overdue" position="right" style={{ fontSize: 10, fill: '#ef4444', fontWeight: 700 }} formatter={(v: any) => (v && Number(v) > 0 ? v : "")} />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )
       )}
     </ChartCard>
   );
@@ -1559,22 +1682,22 @@ function SlaCharts({
 
   if (!sla) {
     return (
-      <div className="grid gap-4 xl:grid-cols-2">
+      <>
         <ChartCard title="Tỷ lệ Tuân thủ SLA" description="Đánh giá chất lượng cam kết thời gian đáp ứng">
-          <EmptyChartAxisPlaceholder message="Không có dữ liệu SLA" type="bar" height={240} />
+          <EmptyChartAxisPlaceholder message="Không có dữ liệu SLA" type="bar" height={220} />
         </ChartCard>
         <ChartCard title="Phân loại Ticket Trễ hạn theo Danh mục" description="Nhận diện các mảng dịch vụ phát sinh quá hạn SLA nhiều nhất">
-          <EmptyChartAxisPlaceholder message="Không có dữ liệu SLA" type="horizontal" height={260} categories={["Tài khoản", "Giao dịch", "Chung"]} />
+          <EmptyChartAxisPlaceholder message="Không có dữ liệu SLA" type="horizontal" height={220} categories={["Tài khoản", "Giao dịch", "Chung"]} />
         </ChartCard>
-      </div>
+      </>
     );
   }
 
   return (
-    <div className="grid gap-4 xl:grid-cols-2">
+    <>
       <SlaGaugeChartCard monthly={sla.monthly || []} globalViewMode={globalViewMode} />
       <SlaCategoryOverdueChartCard category={sla.overdue_by_category || []} globalViewMode={globalViewMode} />
-    </div>
+    </>
   );
 }
 
@@ -1615,29 +1738,31 @@ function EmployeeRankedChartCard({ itemsSorted, globalViewMode }: { itemsSorted:
       title="Xếp hạng Kết quả Xử lý theo NVCS"
       description="Sắp xếp theo sản lượng ticket đã hoàn tất"
     >
-      <div className="h-[340px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={displayData} layout="vertical" margin={{ left: 10, right: 30 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-            <XAxis type="number" tick={{ fontSize: 11 }} />
-            <YAxis dataKey="employee_name" type="category" tick={{ fontSize: 11, fontWeight: 600 }} width={110} />
-            <Tooltip content={<ValueTooltip />} />
-            <Legend wrapperStyle={{ fontSize: 11 }} />
-            <Bar dataKey="processed" name="Ticket xử lý" fill="#10b981" stackId="emp" isAnimationActive={false}>
-              <LabelList dataKey="processed" position="center" style={{ fontSize: 9, fill: "#ffffff", fontWeight: 700 }} formatter={(v: any) => (v && Number(v) > 0 ? v : "")} />
-            </Bar>
-            <Bar dataKey="related_processed" name="Chuyển PBLQ" fill="#f59e0b" stackId="emp" isAnimationActive={false}>
-              <LabelList dataKey="related_processed" position="center" style={{ fontSize: 9, fill: "#ffffff", fontWeight: 700 }} formatter={(v: any) => (v && Number(v) > 0 ? v : "")} />
-            </Bar>
-            <Bar dataKey="cancelled" name="Ticket hủy" fill="#ef4444" stackId="emp" isAnimationActive={false}>
-              <LabelList dataKey="cancelled" position="center" style={{ fontSize: 9, fill: "#ffffff", fontWeight: 700 }} formatter={(v: any) => (v && Number(v) > 0 ? v : "")} />
-            </Bar>
-            <Bar dataKey="ekyc" name="Gọi eKYC" fill="#0097cf" stackId="emp" radius={[0, 4, 4, 0]} isAnimationActive={false}>
-              <LabelList dataKey="ekyc" position="center" style={{ fontSize: 9, fill: "#ffffff", fontWeight: 700 }} formatter={(v: any) => (v && Number(v) > 0 ? v : "")} />
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+      {(isExpanded) => (
+        <div className={isExpanded ? "h-[480px]" : "h-[220px]"}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={displayData} layout="vertical" margin={{ left: 10, right: 30 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis type="number" tick={{ fontSize: 11 }} />
+              <YAxis dataKey="employee_name" type="category" tick={{ fontSize: 11, fontWeight: 600 }} width={110} />
+              <Tooltip content={<ValueTooltip />} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Bar dataKey="processed" name="Ticket xử lý" fill="#10b981" stackId="emp" isAnimationActive={false}>
+                <LabelList dataKey="processed" position="center" style={{ fontSize: 9, fill: "#ffffff", fontWeight: 700 }} formatter={(v: any) => (v && Number(v) > 0 ? v : "")} />
+              </Bar>
+              <Bar dataKey="related_processed" name="Chuyển PBLQ" fill="#f59e0b" stackId="emp" isAnimationActive={false}>
+                <LabelList dataKey="related_processed" position="center" style={{ fontSize: 9, fill: "#ffffff", fontWeight: 700 }} formatter={(v: any) => (v && Number(v) > 0 ? v : "")} />
+              </Bar>
+              <Bar dataKey="cancelled" name="Ticket hủy" fill="#ef4444" stackId="emp" isAnimationActive={false}>
+                <LabelList dataKey="cancelled" position="center" style={{ fontSize: 9, fill: "#ffffff", fontWeight: 700 }} formatter={(v: any) => (v && Number(v) > 0 ? v : "")} />
+              </Bar>
+              <Bar dataKey="ekyc" name="Gọi eKYC" fill="#0097cf" stackId="emp" radius={[0, 4, 4, 0]} isAnimationActive={false}>
+                <LabelList dataKey="ekyc" position="center" style={{ fontSize: 9, fill: "#ffffff", fontWeight: 700 }} formatter={(v: any) => (v && Number(v) > 0 ? v : "")} />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
     </ChartCard>
   );
 }
@@ -1686,23 +1811,25 @@ function EmployeeTimeChartCard({ itemsSorted, globalViewMode }: { itemsSorted: a
       title="Thời gian Tiếp nhận & Xử lý trung bình theo NVCS"
       description="Đơn vị: Ngày hoặc Giờ/Phút nếu < 1 ngày"
     >
-      <div className="h-[340px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={displayData} layout="vertical" margin={{ left: 10, right: 35 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-            <XAxis type="number" tick={{ fontSize: 11 }} />
-            <YAxis dataKey="employee_name" type="category" tick={{ fontSize: 11, fontWeight: 600 }} width={110} />
-            <Tooltip content={<DaysTooltip />} />
-            <Legend wrapperStyle={{ fontSize: 11 }} />
-            <Bar dataKey="avg_cs_days" name="Thời gian CS xử lý" fill="#8b5cf6" radius={[0, 4, 4, 0]} isAnimationActive={false}>
-              <LabelList dataKey="avg_cs_days" position="right" style={{ fontSize: 10, fill: "#8b5cf6", fontWeight: 700 }} formatter={(v: any) => (v ? formatDays(v) : "")} />
-            </Bar>
-            <Bar dataKey="avg_related_days" name="Thời gian chuyển PBLQ" fill="#06b6d4" radius={[0, 4, 4, 0]} isAnimationActive={false}>
-              <LabelList dataKey="avg_related_days" position="right" style={{ fontSize: 10, fill: "#06b6d4", fontWeight: 700 }} formatter={(v: any) => (v ? formatDays(v) : "")} />
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+      {(isExpanded) => (
+        <div className={isExpanded ? "h-[480px]" : "h-[220px]"}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={displayData} layout="vertical" margin={{ left: 10, right: 35 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis type="number" tick={{ fontSize: 11 }} />
+              <YAxis dataKey="employee_name" type="category" tick={{ fontSize: 11, fontWeight: 600 }} width={110} />
+              <Tooltip content={<DaysTooltip />} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Bar dataKey="avg_cs_days" name="Thời gian CS xử lý" fill="#8b5cf6" radius={[0, 4, 4, 0]} isAnimationActive={false}>
+                <LabelList dataKey="avg_cs_days" position="right" style={{ fontSize: 10, fill: "#8b5cf6", fontWeight: 700 }} formatter={(v: any) => (v ? formatDays(v) : "")} />
+              </Bar>
+              <Bar dataKey="avg_related_days" name="Thời gian chuyển PBLQ" fill="#06b6d4" radius={[0, 4, 4, 0]} isAnimationActive={false}>
+                <LabelList dataKey="avg_related_days" position="right" style={{ fontSize: 10, fill: "#06b6d4", fontWeight: 700 }} formatter={(v: any) => (v ? formatDays(v) : "")} />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
     </ChartCard>
   );
 }
@@ -1722,10 +1849,10 @@ function EmployeeCharts({
   const itemsSorted = useMemo(() => [...rawItems].sort((a, b) => (b.processed || 0) - (a.processed || 0)), [rawItems]);
 
   return (
-    <div className="grid gap-4 xl:grid-cols-2">
+    <>
       <EmployeeRankedChartCard itemsSorted={itemsSorted} globalViewMode={globalViewMode} />
       <EmployeeTimeChartCard itemsSorted={itemsSorted} globalViewMode={globalViewMode} />
-    </div>
+    </>
   );
 }
 
@@ -1764,40 +1891,42 @@ function RootCausePieCard({
     <ChartCard
       title="Cơ cấu Nhóm lỗi phát sinh phổ biến"
     >
-      <div className="h-[320px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie
-              data={data}
-              dataKey="value"
-              nameKey="name"
-              cx="50%"
-              cy="50%"
-              innerRadius={55}
-              outerRadius={85}
-              paddingAngle={2}
-              isAnimationActive={false}
-              label={({ name, value, percent }) =>
-                percent && percent >= 0.02 ? `${name}: ${formatNumber(value)} (${(percent * 100).toFixed(1)}%)` : ""
-              }
-            >
-              {data.map((_, index) => (
-                <Cell key={index} fill={COLORS[index % COLORS.length]} />
-              ))}
-            </Pie>
-            <Tooltip content={<ValueTooltip />} />
-            <Legend
-              wrapperStyle={{ fontSize: 11 }}
-              formatter={(value: string, entry: any) => {
-                const item = entry.payload;
-                const total = data.reduce((acc, curr) => acc + curr.value, 0);
-                const pct = total > 0 ? ((item.value / total) * 100).toFixed(1) : "0";
-                return `${value}: ${formatNumber(item.value)} (${pct}%)`;
-              }}
-            />
-          </PieChart>
-        </ResponsiveContainer>
-      </div>
+      {(isExpanded) => (
+        <div className={isExpanded ? "h-[480px]" : "h-[220px]"}>
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={data}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                innerRadius={55}
+                outerRadius={85}
+                paddingAngle={2}
+                isAnimationActive={false}
+                label={({ name, value, percent }) =>
+                  percent && percent >= 0.02 ? `${name}: ${formatNumber(value)} (${(percent * 100).toFixed(1)}%)` : ""
+                }
+              >
+                {data.map((_, index) => (
+                  <Cell key={index} fill={COLORS[index % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip content={<ValueTooltip />} />
+              <Legend
+                wrapperStyle={{ fontSize: 11 }}
+                formatter={(value: string, entry: any) => {
+                  const item = entry.payload;
+                  const total = data.reduce((acc, curr) => acc + curr.value, 0);
+                  const pct = total > 0 ? ((item.value / total) * 100).toFixed(1) : "0";
+                  return `${value}: ${formatNumber(item.value)} (${pct}%)`;
+                }}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      )}
     </ChartCard>
   );
 }
@@ -1817,35 +1946,47 @@ export const CccDashboardCharts = memo(function CccDashboardCharts({
   compareMode?: CompareMode;
 }) {
   return (
-    <div className="space-y-6">
-      <TicketResultChartCard charts={charts} globalViewMode={globalViewMode} granularity={granularity} compareMode={compareMode} />
-
-      <LazyDashboardSection minHeight={400}>
-        <SourceAnalysisCharts charts={charts} globalViewMode={globalViewMode} granularity={granularity} compareMode={compareMode} />
+    <div className="space-y-4">
+      {/* Row 1 */}
+      <LazyDashboardSection minHeight={260}>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <TicketResultChartCard charts={charts} globalViewMode={globalViewMode} granularity={granularity} compareMode={compareMode} />
+          <SourceDonutChartCard items={charts.report_source || []} globalViewMode={globalViewMode} />
+          <SourceTrendChartCard items={charts.report_source || []} globalViewMode={globalViewMode} granularity={granularity} compareMode={compareMode} />
+        </div>
       </LazyDashboardSection>
 
-      <LazyDashboardSection minHeight={420}>
-        <CategoryAnalysisCharts charts={charts} globalViewMode={globalViewMode} granularity={granularity} compareMode={compareMode} />
+      {/* Row 2 */}
+      <LazyDashboardSection minHeight={260}>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <CategoryProcessedChartCard items={charts.report_category || []} globalViewMode={globalViewMode} granularity={granularity} compareMode={compareMode} />
+          <CategoryCancelledChartCard items={charts.report_category || []} globalViewMode={globalViewMode} granularity={granularity} compareMode={compareMode} />
+          <UnitProcessedChartCard items={charts.report_unit || []} globalViewMode={globalViewMode} granularity={granularity} compareMode={compareMode} />
+        </div>
       </LazyDashboardSection>
 
-      <LazyDashboardSection minHeight={400}>
-        <UnitAnalysisCharts charts={charts} globalViewMode={globalViewMode} granularity={granularity} compareMode={compareMode} />
+      {/* Row 3 */}
+      <LazyDashboardSection minHeight={260}>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <UnitCancelledChartCard items={charts.report_unit || []} globalViewMode={globalViewMode} granularity={granularity} compareMode={compareMode} />
+          <TimeAnalysisCharts charts={charts} globalViewMode={globalViewMode} granularity={granularity} compareMode={compareMode} />
+        </div>
       </LazyDashboardSection>
 
-      <LazyDashboardSection minHeight={400}>
-        <TimeAnalysisCharts charts={charts} globalViewMode={globalViewMode} granularity={granularity} compareMode={compareMode} />
+      {/* Row 4 */}
+      <LazyDashboardSection minHeight={260}>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <SlaGaugeChartCard monthly={charts.report_sla?.monthly || []} globalViewMode={globalViewMode} />
+          <SlaCategoryOverdueChartCard category={charts.report_sla?.overdue_by_category || []} globalViewMode={globalViewMode} />
+          <RootCausePieCard charts={charts} globalViewMode={globalViewMode} granularity={granularity} compareMode={compareMode} />
+        </div>
       </LazyDashboardSection>
 
-      <LazyDashboardSection minHeight={480}>
-        <SlaCharts charts={charts} globalViewMode={globalViewMode} granularity={granularity} compareMode={compareMode} />
-      </LazyDashboardSection>
-
-      <LazyDashboardSection minHeight={420}>
-        <EmployeeCharts charts={charts} globalViewMode={globalViewMode} granularity={granularity} compareMode={compareMode} />
-      </LazyDashboardSection>
-
-      <LazyDashboardSection minHeight={320}>
-        <RootCausePieCard charts={charts} globalViewMode={globalViewMode} granularity={granularity} compareMode={compareMode} />
+      {/* Row 5 */}
+      <LazyDashboardSection minHeight={260}>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <EmployeeCharts charts={charts} globalViewMode={globalViewMode} granularity={granularity} compareMode={compareMode} />
+        </div>
       </LazyDashboardSection>
     </div>
   );

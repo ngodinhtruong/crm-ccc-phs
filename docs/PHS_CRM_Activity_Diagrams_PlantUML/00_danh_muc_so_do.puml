@@ -31,5 +31,8 @@ start
 :10. Khởi tạo và kích hoạt kỳ KPI;
 :11. Thiết lập chỉ tiêu KPI;
 :12. Tính điểm và xếp hạng KPI;
+:13. Quản lý, import và chăm sóc eKYC;
+:14. Tiếp nhận và xử lý Failed eKYC;
+:15. Ghi nhận và quản lý khảo sát CSAT;
 stop
 @enduml

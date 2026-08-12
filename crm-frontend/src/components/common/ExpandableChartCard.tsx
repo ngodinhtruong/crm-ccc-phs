@@ -69,19 +69,21 @@ export function ExpandableChartCard({
     <>
       {/* Standard Inline Chart Card */}
       <div
-        className={`group relative rounded-xl border border-slate-200/80 bg-white shadow-sm transition-all hover:shadow-md ${className}`}
+        className={`group relative flex flex-col justify-between h-full rounded-xl border border-slate-200/80 bg-white shadow-xs transition-all hover:shadow-md ${className}`}
       >
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-5 py-3.5">
-          <div className="flex-1 pr-2">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-[#059669]">
+        <div className="flex h-14 items-center justify-between gap-2 border-b border-slate-100 px-4 py-2.5">
+          <div className="flex-1 min-w-0 pr-2">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-[#059669] truncate" title={title}>
               {title}
             </h3>
             {description && (
-              <p className="mt-0.5 text-xs text-slate-500">{description}</p>
+              <p className="mt-0.5 text-[11px] text-slate-500 truncate" title={description}>
+                {description}
+              </p>
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1.5">
             {headerRight}
 
             {allowExpand && (
@@ -98,7 +100,7 @@ export function ExpandableChartCard({
           </div>
         </div>
 
-        <div className="p-5">{renderContent(false)}</div>
+        <div className="p-4 flex-1 flex flex-col justify-center">{renderContent(false)}</div>
       </div>
 
       {/* Expanded Modal Overlay & Container */}

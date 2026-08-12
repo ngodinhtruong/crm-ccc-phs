@@ -65,19 +65,15 @@ let catalogRequest:
 
 function createDefaultFilters(): DashboardFilterState {
   const currentYearRange = getYearToCurrentDateRange();
-  let savedFrom = "";
-  let savedTo = "";
-  let savedField = "received_date";
   if (typeof window !== "undefined") {
-    savedFrom = sessionStorage.getItem("ext_err_dashboard_dateFrom") || "";
-    savedTo = sessionStorage.getItem("ext_err_dashboard_dateTo") || "";
-    savedField = sessionStorage.getItem("ext_err_dashboard_dateField") || "received_date";
+    sessionStorage.removeItem("ext_err_dashboard_dateFrom");
+    sessionStorage.removeItem("ext_err_dashboard_dateTo");
   }
 
   return {
-    dateField: savedField || "received_date",
-    dateFrom: savedFrom || currentYearRange.dateFrom,
-    dateTo: savedTo || currentYearRange.dateTo,
+    dateField: "received_date",
+    dateFrom: currentYearRange.dateFrom,
+    dateTo: currentYearRange.dateTo,
     source: "",
     device: "",
     errorType: "",
@@ -167,12 +163,7 @@ function getGranularityDateRange(g: GranularityMode) {
   };
 
   if (g === "MONTH") {
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    return {
-      dateFrom: formatDate(firstDay),
-      dateTo: formatDate(lastDay),
-    };
+    return getYearToCurrentDateRange();
   }
   if (g === "QUARTER") {
     const qStartMonth = Math.floor(month / 3) * 3;
@@ -184,12 +175,7 @@ function getGranularityDateRange(g: GranularityMode) {
     };
   }
   // YEAR
-  const firstDay = new Date(year, 0, 1);
-  const lastDay = new Date(year, 11, 31);
-  return {
-    dateFrom: formatDate(firstDay),
-    dateTo: formatDate(lastDay),
-  };
+  return getYearToCurrentDateRange();
 }
 
 export function useExternalErrorDashboard() {
@@ -466,21 +452,6 @@ export function useExternalErrorDashboard() {
 
   const setGranularity = useCallback((g: GranularityMode) => {
     setGranularityState(g);
-    const range = getGranularityDateRange(g);
-    setDraftFilters((curr) => ({
-      ...curr,
-      dateFrom: range.dateFrom,
-      dateTo: range.dateTo,
-    }));
-    setAppliedFilters((curr) => ({
-      ...curr,
-      dateFrom: range.dateFrom,
-      dateTo: range.dateTo,
-    }));
-    if (typeof window !== "undefined") {
-      sessionStorage.setItem("ext_err_dashboard_dateFrom", range.dateFrom);
-      sessionStorage.setItem("ext_err_dashboard_dateTo", range.dateTo);
-    }
   }, []);
 
   const setCompareMode = useCallback((c: CompareMode) => {

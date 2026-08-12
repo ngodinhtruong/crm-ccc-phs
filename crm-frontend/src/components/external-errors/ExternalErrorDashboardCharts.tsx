@@ -371,7 +371,7 @@ export const ExternalErrorDashboardCharts = memo(function ExternalErrorDashboard
   recurringIssues: ExternalErrorRecurringIssue[];
 }) {
   return (
-    <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       <RecurringIssuesTable items={recurringIssues} />
       <HorizontalBarChart
         chart={charts.byDevice}

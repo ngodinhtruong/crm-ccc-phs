@@ -49,7 +49,7 @@ export function LazyDashboardSection({
         children
       ) : (
         <div
-          className="h-full min-h-[240px] animate-pulse rounded-md border border-slate-200 bg-slate-50"
+          className="h-full min-h-[240px] rounded-md border border-slate-200 bg-slate-50"
           aria-hidden="true"
         />
       )}

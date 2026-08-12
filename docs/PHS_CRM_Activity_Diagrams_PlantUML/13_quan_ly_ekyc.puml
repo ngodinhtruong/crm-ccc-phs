@@ -1,0 +1,101 @@
+@startuml
+skinparam backgroundColor transparent
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam activity {
+  BackgroundColor #F8F9FA
+  BorderColor #495057
+  DiamondBackgroundColor #FFF3BF
+  DiamondBorderColor #E67700
+  StartColor #2B8A3E
+  EndColor #C92A2A
+  BarColor #495057
+  FontColor #212529
+}
+skinparam ArrowColor #495057
+skinparam NoteBackgroundColor #FFF9DB
+skinparam NoteBorderColor #E67700
+
+title Activity 13 - Quản lý, import và chăm sóc eKYC
+
+|Nhân viên CCC / CS|
+start
+:Mở phân hệ quản lý eKYC;
+if (Hình thức ghi nhận?) then (Nhập thủ công)
+  :Chọn hoặc nhập số tài khoản lưu ký;
+  |Frontend Next.js|
+  :Gọi API tra cứu khách hàng;
+  |Backend eKYC|
+  :Tìm CustomerAccount và thông tin khách hàng;
+  if (Tìm thấy tài khoản?) then (Có)
+    :Trả tên khách hàng, chi nhánh,
+    môi giới và số điện thoại;
+  else (Không)
+    :Trả thông báo không tìm thấy;
+  endif
+  |Nhân viên CCC / CS|
+  :Nhập ngày gọi, số lần follow,
+  PIC, tình trạng, kết quả và ghi chú;
+  |Frontend Next.js|
+  :Kiểm tra trường bắt buộc;
+  :Gửi yêu cầu tạo bản ghi eKYC;
+  |Backend eKYC|
+  :Kiểm tra quyền truy cập eKYC;
+  :Chuẩn hóa số tài khoản;
+  :Liên kết Customer và CustomerAccount nếu có;
+  :Lưu EkycRecord và người tạo;
+else (Import Excel)
+  |Nhân viên CCC / CS|
+  :Chọn file Excel;
+  |Frontend Next.js|
+  :Kiểm tra loại file và gửi multipart request;
+  |Backend eKYC|
+  :Kiểm tra quyền truy cập eKYC;
+  :Đọc workbook và nhận diện các cột;
+  if (Có cột số tài khoản?) then (Có)
+  else (Không)
+    :Trả lỗi cấu trúc file;
+    stop
+  endif
+  while (Còn dòng dữ liệu?) is (Có)
+    :Chuẩn hóa tài khoản, ngày gọi,
+    số lần follow, PIC và kết quả;
+    :Tra cứu khách hàng theo tài khoản;
+    if (Dòng hợp lệ?) then (Có)
+      :Đưa EkycRecord vào danh sách tạo;
+    else (Không)
+      :Ghi nhận số dòng và lý do lỗi;
+    endif
+  endwhile (Không)
+  :Tạo hàng loạt EkycRecord;
+  :Trả số dòng thành công và danh sách lỗi;
+endif
+
+|Frontend Next.js|
+:Hiển thị danh sách eKYC;
+:Tìm kiếm, lọc và phân trang;
+if (Cần cập nhật kết quả gọi?) then (Có)
+  |Nhân viên CCC / CS|
+  :Sửa follow, PIC, tình trạng,
+  kết quả hoặc ghi chú;
+  |Backend eKYC|
+  :Kiểm tra quyền và cập nhật bản ghi;
+else (Không)
+endif
+
+|Nhân viên CCC / CS|
+if (Tác vụ tiếp theo?) then (Dashboard)
+  |Backend eKYC|
+  :Tổng hợp số lượng, trạng thái,
+  kết quả và xu hướng theo kỳ;
+  |Frontend Next.js|
+  :Hiển thị KPI và biểu đồ eKYC;
+elseif (Export Excel) then (Export)
+  |Backend eKYC|
+  :Áp dụng bộ lọc và tạo file Excel;
+  |Frontend Next.js|
+  :Tải file export;
+else (Kết thúc)
+endif
+stop
+@enduml

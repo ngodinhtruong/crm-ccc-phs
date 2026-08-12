@@ -17,6 +17,9 @@ Bộ file được viết bằng **PlantUML**, dựa trên backend `apps` và fr
 - `10_khoi_tao_kich_hoat_ky_kpi.puml`
 - `11_thiet_lap_chi_tieu_kpi.puml`
 - `12_tinh_diem_xep_hang_kpi.puml`
+- `13_quan_ly_ekyc.puml`
+- `14_xu_ly_failed_ekyc.puml`
+- `15_quan_ly_khao_sat_csat.puml`
 
 ## Mở trong VS Code
 

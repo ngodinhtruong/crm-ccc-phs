@@ -195,33 +195,22 @@ export function EkycDashboardCharts({ trends }: EkycChartsProps) {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Row 1 */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <ChartCard title="Tổng số lượng eKYC">
-          <ChartTongSoLuong trends={trends} />
-        </ChartCard>
-        <ChartCard title="Kết quả CS gọi khảo sát eKYC">
-          <ChartKetQuaCSGoi trends={trends} />
-        </ChartCard>
-      </div>
-
-      {/* Row 2 */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <ChartCard title="Tổng số lượng khảo sát">
-          <ChartTongSoKhaoSat trends={trends} />
-        </ChartCard>
-        <ChartCard title="Kết quả kết nối">
-          <ChartKetQuaKetNoi trends={trends} />
-        </ChartCard>
-      </div>
-
-      {/* Row 3 */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <ChartCard title="Kết quả KH phản hồi">
-          <ChartKetQuaKhPhanHoi trends={trends} />
-        </ChartCard>
-      </div>
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <ChartCard title="Tổng số lượng eKYC">
+        <ChartTongSoLuong trends={trends} />
+      </ChartCard>
+      <ChartCard title="Kết quả CS gọi khảo sát eKYC">
+        <ChartKetQuaCSGoi trends={trends} />
+      </ChartCard>
+      <ChartCard title="Tổng số lượng khảo sát">
+        <ChartTongSoKhaoSat trends={trends} />
+      </ChartCard>
+      <ChartCard title="Kết quả kết nối">
+        <ChartKetQuaKetNoi trends={trends} />
+      </ChartCard>
+      <ChartCard title="Kết quả KH phản hồi">
+        <ChartKetQuaKhPhanHoi trends={trends} />
+      </ChartCard>
     </div>
   );
 }
