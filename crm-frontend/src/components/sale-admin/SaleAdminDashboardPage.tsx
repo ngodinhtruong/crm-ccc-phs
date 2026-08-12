@@ -208,32 +208,22 @@ export function SaleAdminDashboardPage() {
       }
     >
       <div className="space-y-4">
-        <section className="overflow-hidden rounded-xl border border-slate-200 bg-gradient-to-r from-sky-50 via-white to-emerald-50 shadow-sm">
-          <div className="p-5">
-            <div className="flex flex-col justify-between gap-4 xl:flex-row xl:items-end">
-              <div className="max-w-3xl">
-                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#059669]">
-                  CRM Mini · Sale Admin Report
-                </p>
-                <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950">
-                  Báo cáo Sale Admin
-                </h1>
-                <p className="mt-1 text-sm leading-6 text-slate-600">
-                  Hiệu suất SA, xếp hạng chi nhánh, phân tích khách hàng giao dịch và phí phát sinh theo khoảng thời gian.
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-3 xl:items-end">
-
-                <p className="text-xs text-slate-500">
-                  Cập nhật: {formatDateTime(dashboard.data?.generated_at)}
-                </p>
-              </div>
+        <section className="rounded-lg border border-slate-200 bg-gradient-to-r from-sky-50 via-white to-emerald-50 px-4 py-2.5 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-base font-bold text-slate-900">
+                Báo cáo Sale Admin
+              </h1>
+              <ActiveFilterSummary dashboard={dashboard} activeFilterCount={activeFilterCount} periodLabel={periodLabel} />
             </div>
 
-            <div className="mt-4 grid gap-3 xl:grid-cols-[1fr_390px] xl:items-end">
-              <ActiveFilterSummary dashboard={dashboard} activeFilterCount={activeFilterCount} periodLabel={periodLabel} />
-              {dashboard.data && <HeroStats dashboard={dashboard} />}
+            <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+              {dashboard.data && (
+                <span className="font-semibold text-emerald-700 bg-white/80 px-2.5 py-0.5 rounded border border-emerald-100 shadow-2xs">
+                  {dashboard.data.branch_ranking.length} Chi nhánh · {dashboard.data.top_employees.length} NV · {dashboard.data.top_accounts.length} TK
+                </span>
+              )}
+              <span>Cập nhật: {formatDateTime(dashboard.data?.generated_at)}</span>
             </div>
           </div>
         </section>
@@ -249,6 +239,7 @@ export function SaleAdminDashboardPage() {
               compareMode={compareMode}
               granularity={granularity}
               historyData={dashboard.historyData}
+              branchTotal={dashboard.data.branch_total}
             />
 
             <div className="grid grid-cols-1 gap-4 2xl:grid-cols-12">

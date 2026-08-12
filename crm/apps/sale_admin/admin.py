@@ -4,6 +4,7 @@ from apps.sale_admin.models import (
     SaCallResult,
     SaInterestLevel,
     SaIcpGroup,
+    SaIcpRule,
     SaRecord,
     SaRecordAuditLog,
 )
@@ -52,6 +53,22 @@ class SaIcpGroupAdmin(admin.ModelAdmin):
     list_filter = ("icp_type", "is_potential", "is_active")
     search_fields = ("icp_code", "icp_name", "description")
     ordering = ("sort_order", "id")
+
+
+@admin.register(SaIcpRule)
+class SaIcpRuleAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "priority",
+        "call_result",
+        "interest_level",
+        "icp_group",
+        "is_active",
+        "description",
+    )
+    list_filter = ("is_active", "icp_group")
+    search_fields = ("call_result__result_name", "interest_level__level_name", "icp_group__icp_name")
+    ordering = ("priority", "id")
 
 
 @admin.register(SaRecord)

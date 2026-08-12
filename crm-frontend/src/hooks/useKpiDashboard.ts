@@ -321,7 +321,7 @@ function buildMetricSections({
                 section: section.id,
                 group_code: "KHAC",
                 group_name: "KPI khác",
-                group_type: "MIXED",
+                group_type: "MANUAL",
                 weight_percent: "0",
                 sort_order: 999,
                 is_active: true,

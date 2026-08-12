@@ -782,9 +782,9 @@ function getMonthCount(
 }
 
 export function CccDashboardPage() {
-  const dashboard = useCccDashboard();
-  const [filterOpen, setFilterOpen] = useState(false);
   const [activeDashboardTab, setActiveDashboardTab] = useState<"tickets" | "ekyc" | "errors" | "surveys">("tickets");
+  const dashboard = useCccDashboard("", { enabled: activeDashboardTab === "tickets" });
+  const [filterOpen, setFilterOpen] = useState(false);
   const [globalViewMode, setGlobalViewMode] = useState<ChartViewMode>("TREND_OVER_TIME");
   const [granularity, setGranularity] = useState<GranularityMode>("MONTH");
   const [compareMode, setCompareMode] = useState<CompareMode>("QOQ");
@@ -803,6 +803,8 @@ export function CccDashboardPage() {
   });
 
   useEffect(() => {
+    if (activeDashboardTab !== "tickets") return;
+
     let isMounted = true;
     const fetchMetrics = async () => {
       try {
@@ -869,7 +871,7 @@ export function CccDashboardPage() {
     return () => {
       isMounted = false;
     };
-  }, [dashboard.dateFrom, dashboard.dateTo]);
+  }, [activeDashboardTab, dashboard.dateFrom, dashboard.dateTo]);
 
   const report = dashboard.data?.report;
   const reportMonthCount = getMonthCount(report?.range_from, report?.range_to);

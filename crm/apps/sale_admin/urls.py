@@ -8,6 +8,7 @@ from apps.sale_admin.views import (
     SaCustomerAccountSuggestionAPIView,
     SaInterestLevelViewSet,
     SaIcpGroupViewSet,
+    SaIcpRuleViewSet,
     SaRecordAuditLogViewSet,
     SaRecordViewSet,
     SaVipClassificationOptionAPIView,
@@ -19,6 +20,7 @@ router.register("record-audit-logs", SaRecordAuditLogViewSet, basename="sa-recor
 router.register("call-results", SaCallResultViewSet, basename="sa-call-result")
 router.register("interest-levels", SaInterestLevelViewSet, basename="sa-interest-level")
 router.register("icp-groups", SaIcpGroupViewSet, basename="sa-icp-group")
+router.register("icp-rules", SaIcpRuleViewSet, basename="sa-icp-rule")
 
 urlpatterns = router.urls + [
     path("customer-account-suggestions/", SaCustomerAccountSuggestionAPIView.as_view(), name="sa-customer-account-suggestions"),

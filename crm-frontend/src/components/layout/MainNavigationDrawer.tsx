@@ -146,7 +146,6 @@ const mainMenuItemsByWorkspace: Record<WorkspaceCode, MainMenuItem[]> = {
       panel: "failed_ekyc",
       cccOrAdminOnly: true,
     },
-
     // {
     //   title: "BÁO CÁO",
     //   href: "/reports",
@@ -897,107 +896,72 @@ export function MainNavigationDrawer({
           </div>
 
           <nav className="py-3">
-            {canViewCccOnlyMenus && (
-              <div className="border-b border-white/10 pb-3">
-                <div className="px-5 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wide text-emerald-200">
-                  CHUNG
-                </div>
+            <div className="border-b border-white/10 pb-3">
+              <div className="px-5 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wide text-emerald-200">
+                CHUNG
+              </div>
 
-                <Link
-                  href="/customers/360"
-                  onMouseEnter={() => {
-                    setActivePanel(null);
-                    setActivePanelWorkspace(null);
-                  }}
-                  onClick={() => handleNavigate("CCC")}
-                  className="flex h-[40px] items-center gap-4 px-5 text-white/80 transition hover:bg-white/10 hover:text-white"
-                >
-                  <UsersRound size={27} className="shrink-0 text-white/70" />
-
-                  <span className="flex-1 text-[10px] font-semibold tracking-wide">
-                    CUSTOMER 360
-                  </span>
-                </Link>
-
-                <button
-                  type="button"
-                  onPointerEnter={(event) =>
-                    openPanel("customers", "CCC", event.currentTarget)
-                  }
-                  onFocus={(event) =>
-                    openPanel("customers", "CCC", event.currentTarget)
-                  }
-                  onClick={(event) =>
-                    openPanel("customers", "CCC", event.currentTarget)
-                  }
-                  className={`flex h-[40px] w-full items-center gap-4 px-5 text-left transition hover:bg-white/10 ${activePanel === "customers" && activePanelWorkspace === "CCC"
-                      ? "bg-white/10 text-white"
-                      : "text-white/80"
-                    }`}
-                >
-                  <UsersRound size={27} className="shrink-0 text-white/70" />
-
-                  <span className="flex-1 text-[10px] font-semibold tracking-wide">
-                    KHÁCH HÀNG
-                  </span>
-
-                  <ChevronRight size={24} className="text-white/60" />
-                </button>
-
-                {admin && (
+              {canViewCccOnlyMenus && (
+                <>
                   <Link
-                    href="/accounts/users"
+                    href="/customers/360"
                     onMouseEnter={() => {
                       setActivePanel(null);
                       setActivePanelWorkspace(null);
                     }}
-                    onClick={() => handleNavigate(activeWorkspace)}
+                    onClick={() => handleNavigate("CCC")}
                     className="flex h-[40px] items-center gap-4 px-5 text-white/80 transition hover:bg-white/10 hover:text-white"
                   >
-                    <UserCog size={27} className="shrink-0 text-white/70" />
+                    <UsersRound size={27} className="shrink-0 text-white/70" />
 
                     <span className="flex-1 text-[10px] font-semibold tracking-wide">
-                      QUẢN LÝ USER
+                      CUSTOMER 360
                     </span>
                   </Link>
-                )}
-                {/* <Link
-                  href="/dashboard"
-                  onMouseEnter={() => {
-                    setActivePanel(null);
-                    setActivePanelWorkspace(null);
-                  }}
-                  onClick={() => handleNavigate("CCC")}
-                  className="flex h-[40px] items-center gap-4 px-5 text-white/80 transition hover:bg-white/10 hover:text-white"
-                >
-                  <BarChart3 size={27} className="shrink-0 text-white/70" />
 
-                  <span className="flex-1 text-[10px] font-semibold tracking-wide">
-                    DASHBOARD TỔNG HỢP
-                  </span>
-                </Link> */}
+                  <button
+                    type="button"
+                    onPointerEnter={(event) =>
+                      openPanel("customers", "CCC", event.currentTarget)
+                    }
+                    onFocus={(event) =>
+                      openPanel("customers", "CCC", event.currentTarget)
+                    }
+                    onClick={(event) =>
+                      openPanel("customers", "CCC", event.currentTarget)
+                    }
+                    className={`flex h-[40px] w-full items-center gap-4 px-5 text-left transition hover:bg-white/10 ${activePanel === "customers" && activePanelWorkspace === "CCC"
+                        ? "bg-white/10 text-white"
+                        : "text-white/80"
+                      }`}
+                  >
+                    <UsersRound size={27} className="shrink-0 text-white/70" />
 
+                    <span className="flex-1 text-[10px] font-semibold tracking-wide">
+                      KHÁCH HÀNG
+                    </span>
 
+                    <ChevronRight size={24} className="text-white/60" />
+                  </button>
+                </>
+              )}
 
+              <Link
+                href="/accounts/users"
+                onMouseEnter={() => {
+                  setActivePanel(null);
+                  setActivePanelWorkspace(null);
+                }}
+                onClick={() => handleNavigate(activeWorkspace)}
+                className="flex h-[40px] items-center gap-4 px-5 text-white/80 transition hover:bg-white/10 hover:text-white"
+              >
+                <UserCog size={27} className="shrink-0 text-white/70" />
 
-
-                {/* <Link
-                  href="/sale-admin/dashboard"
-                  onMouseEnter={() => {
-                    setActivePanel(null);
-                    setActivePanelWorkspace(null);
-                  }}
-                  onClick={() => handleNavigate("SALE_ADMIN")}
-                  className="flex h-[40px] items-center gap-4 px-5 text-white/80 transition hover:bg-white/10 hover:text-white"
-                >
-                  <BarChart3 size={27} className="shrink-0 text-white/70" />
-
-                  <span className="flex-1 text-[10px] font-semibold tracking-wide">
-                    DASHBOARD SALE ADMIN
-                  </span>
-                </Link> */}
-              </div>
-            )}
+                <span className="flex-1 text-[10px] font-semibold tracking-wide">
+                  QUẢN LÝ USER
+                </span>
+              </Link>
+            </div>
 
             {availableWorkspaces.map((workspace) => {
               const menuItems = filterMenuItems(

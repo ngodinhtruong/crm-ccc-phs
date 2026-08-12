@@ -10,6 +10,7 @@ import { saleAdminService } from "@/services/sale-admin.service";
 import {
   SaCallResult,
   SaIcpGroup,
+  SaIcpRule,
   SaInterestLevel,
   SaRecordCreateFormState,
   SaCustomerAccountSuggestion,
@@ -17,6 +18,7 @@ import {
   SaRecordUpdatePayload,
   SaSelectOption,
 } from "@/types/sale-admin.type";
+import { evaluateIcpRule } from "@/utils/icp-rule.util";
 
 function toDateInputValue(value?: string | null) {
   if (!value) return "";
@@ -115,9 +117,11 @@ export function useSaRecordEdit(recordId: string) {
   const [callResults, setCallResults] = useState<SaCallResult[]>([]);
   const [interestLevels, setInterestLevels] = useState<SaInterestLevel[]>([]);
   const [icpGroups, setIcpGroups] = useState<SaIcpGroup[]>([]);
+  const [icpRules, setIcpRules] = useState<SaIcpRule[]>([]);
   const [accountStatusOptions, setAccountStatusOptions] = useState<SaSelectOption[]>([]);
   const [vipClassificationOptions, setVipClassificationOptions] = useState<SaSelectOption[]>([]);
   const [employeeOptions, setEmployeeOptions] = useState<SaSelectOption[]>([]);
+  const [isInitialRecordLoaded, setIsInitialRecordLoaded] = useState(false);
 
   const [loadingRecord, setLoadingRecord] = useState(true);
   const [loadingMaster, setLoadingMaster] = useState(true);
@@ -145,6 +149,7 @@ export function useSaRecordEdit(recordId: string) {
         callResultData,
         interestLevelData,
         icpGroupData,
+        icpRuleData,
         accountStatusData,
         vipClassificationData,
         employeeData,
@@ -152,6 +157,7 @@ export function useSaRecordEdit(recordId: string) {
         saleAdminService.getCallResults(),
         saleAdminService.getInterestLevels(),
         saleAdminService.getIcpGroups(),
+        saleAdminService.getIcpRules().catch(() => []),
         saleAdminService.getAccountStatusOptions(),
         saleAdminService.getVipClassificationOptions(),
         masterDataApi.getEmployees().catch(() => []),
@@ -160,6 +166,7 @@ export function useSaRecordEdit(recordId: string) {
       setCallResults(callResultData);
       setInterestLevels(interestLevelData);
       setIcpGroups(icpGroupData);
+      setIcpRules(icpRuleData);
       setAccountStatusOptions(accountStatusData);
       setVipClassificationOptions(vipClassificationData);
 
@@ -188,12 +195,34 @@ export function useSaRecordEdit(recordId: string) {
 
       setRecord(data);
       setForm(mapRecordToForm(data));
+      setIsInitialRecordLoaded(true);
     } catch (err) {
       setError(getErrorMessage(err, "Không tải được SA Record"));
     } finally {
       setLoadingRecord(false);
     }
   };
+
+  // Auto evaluate ICP Group based on callResult & interestLevel when user changes choices
+  useEffect(() => {
+    if (!isInitialRecordLoaded || !form.callResult) return;
+
+    const matchIcpId = evaluateIcpRule(
+      icpRules,
+      form.callResult,
+      form.interestLevel,
+      callResults,
+      interestLevels,
+      icpGroups
+    );
+
+    if (matchIcpId) {
+      setForm((prev) => {
+        if (prev.icpGroup === String(matchIcpId)) return prev;
+        return { ...prev, icpGroup: String(matchIcpId) };
+      });
+    }
+  }, [form.callResult, form.interestLevel, icpRules, callResults, interestLevels, icpGroups, isInitialRecordLoaded]);
 
   const validate = () => {
     if (!form.callResult) {

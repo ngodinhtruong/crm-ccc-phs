@@ -4,6 +4,7 @@ from django.db import transaction
 from apps.sale_admin.models import (
     SaCallResult,
     SaIcpGroup,
+    SaIcpRule,
     SaInterestLevel,
 )
 
@@ -165,6 +166,21 @@ ICP_GROUPS = [
 ]
 
 
+DEFAULT_ICP_RULES = [
+    ("ANSWERED", "VERY_INTERESTED", "A", 1, "Nghe máy – trao đổi + Rất quan tâm -> A – Rất tiềm năng"),
+    ("DIRECT", "VERY_INTERESTED", "A", 2, "Trực tiếp + Rất quan tâm -> A – Rất tiềm năng"),
+    ("ANSWERED", "INTERESTED", "B", 3, "Nghe máy – trao đổi + Quan tâm -> B – Tiềm năng"),
+    ("DIRECT", "INTERESTED", "B", 4, "Trực tiếp + Quan tâm -> B – Tiềm năng"),
+    ("ANSWERED", "NO_CURRENT_NEED", "C", 5, "Nghe máy – trao đổi + Chưa có nhu cầu -> C – Nuôi dưỡng"),
+    ("DIRECT", "NO_CURRENT_NEED", "C", 6, "Trực tiếp + Chưa có nhu cầu -> C – Nuôi dưỡng"),
+    ("ANSWERED", "NOT_INTERESTED", "D", 7, "Nghe máy – trao đổi + Không quan tâm -> D – Không tiềm năng"),
+    ("DIRECT", "NOT_INTERESTED", "D", 8, "Trực tiếp + Không quan tâm -> D – Không tiềm năng"),
+    ("NO_ANSWER", None, "E", 9, "Không nghe máy / không bắt máy -> E – Không nghe máy"),
+    ("INVALID_PHONE", None, "F", 10, "Thuê bao / số không tồn tại -> F – SĐT không hợp lệ"),
+    ("NO_CONTACT_INFO", None, "H", 11, "Không có thông tin liên hệ -> H – Tài khoản ảo"),
+]
+
+
 class Command(BaseCommand):
     help = (
         "Seed danh mục Sale Admin gồm kết quả cuộc gọi, "
@@ -173,22 +189,19 @@ class Command(BaseCommand):
 
     @transaction.atomic
     def handle(self, *args, **options):
-        self.stdout.write(
-            "Bắt đầu seed danh mục Sale Admin..."
-        )
+        self.stdout.write("Bat dau seed danh muc Sale Admin...")
 
         self.seed_call_results()
         self.seed_interest_levels()
         self.seed_icp_groups()
+        self.seed_icp_rules()
 
         self.stdout.write(
-            self.style.SUCCESS(
-                "Seed danh mục Sale Admin thành công."
-            )
+            self.style.SUCCESS("Seed danh muc Sale Admin thanh cong.")
         )
 
     def seed_call_results(self):
-        self.stdout.write("\nSeed kết quả cuộc gọi...")
+        self.stdout.write("\nSeed ket qua cuoc goi...")
 
         for code, name, sort_order in CALL_RESULTS:
             obj, created = SaCallResult.objects.update_or_create(
@@ -200,14 +213,10 @@ class Command(BaseCommand):
                 },
             )
 
-            self.print_result(
-                "Kết quả cuộc gọi",
-                obj.result_name,
-                created,
-            )
+            self.print_result("Ket qua cuoc goi", obj.result_code, created)
 
     def seed_interest_levels(self):
-        self.stdout.write("\nSeed mức độ quan tâm...")
+        self.stdout.write("\nSeed muc do quan tam...")
 
         for code, name, score, sort_order in INTEREST_LEVELS:
             obj, created = (
@@ -222,14 +231,10 @@ class Command(BaseCommand):
                 )
             )
 
-            self.print_result(
-                "Mức độ quan tâm",
-                obj.level_name,
-                created,
-            )
+            self.print_result("Muc do quan tam", obj.level_code, created)
 
     def seed_icp_groups(self):
-        self.stdout.write("\nSeed nhóm khách hàng ICP...")
+        self.stdout.write("\nSeed nhom khach hang ICP...")
 
         for item in ICP_GROUPS:
             obj, created = SaIcpGroup.objects.update_or_create(
@@ -245,15 +250,32 @@ class Command(BaseCommand):
                 },
             )
 
-            self.print_result(
-                "Nhóm khách hàng ICP",
-                str(obj),
-                created,
+            self.print_result("Nhom ICP", obj.icp_code, created)
+
+    def seed_icp_rules(self):
+        self.stdout.write("\nSeed quy tac gan ICP tu dong...")
+
+        for cr_code, il_code, icp_code, priority, desc in DEFAULT_ICP_RULES:
+            call_result = SaCallResult.objects.filter(result_code=cr_code).first()
+            interest_level = SaInterestLevel.objects.filter(level_code=il_code).first() if il_code else None
+            icp_group = SaIcpGroup.objects.filter(icp_code=icp_code).first()
+
+            if not icp_group:
+                continue
+
+            obj, created = SaIcpRule.objects.update_or_create(
+                call_result=call_result,
+                interest_level=interest_level,
+                defaults={
+                    "icp_group": icp_group,
+                    "priority": priority,
+                    "is_active": True,
+                    "description": desc,
+                },
             )
 
-    def print_result(self, group, name, created):
-        action = "Tạo mới" if created else "Cập nhật"
+            self.print_result("Quy tac ICP", f"Rule {priority}", created)
 
-        self.stdout.write(
-            f"[{group}] {action}: {name}"
-        )
+    def print_result(self, group, name, created):
+        action = "Tao moi" if created else "Cap nhat"
+        self.stdout.write(f"[{group}] {action}: {name}")

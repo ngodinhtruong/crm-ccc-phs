@@ -700,9 +700,9 @@ def _overview_counts(queryset, now):
     )
 
     return queryset.aggregate(
-        total=Count("id", distinct=True),
-        resolved=Count("id", filter=resolved_filter, distinct=True),
-        cancelled=Count("id", filter=cancelled_filter, distinct=True),
+        total=Count("id"),
+        resolved=Count("id", filter=resolved_filter),
+        cancelled=Count("id", filter=cancelled_filter),
         pending=Count(
             "id",
             filter=~Q(
@@ -710,22 +710,18 @@ def _overview_counts(queryset, now):
                     RESOLVED_STATUS_CODES | CANCELLED_STATUS_CODES
                 )
             ),
-            distinct=True,
         ),
         linked=Count(
             "id",
             filter=Q(account_link_status=TicketAccountLinkStatus.LINKED),
-            distinct=True,
         ),
         unlinked=Count(
             "id",
             filter=Q(account_link_status=TicketAccountLinkStatus.UNLINKED),
-            distinct=True,
         ),
         error=Count(
             "id",
             filter=Q(error_group__isnull=False) | Q(error_type__isnull=False),
-            distinct=True,
         ),
         overdue_sla=Count(
             "id",
@@ -776,20 +772,21 @@ def _average_resolution_minutes(queryset):
 
 def _resolution_minutes_list(queryset):
     values = []
-    rows = queryset.filter(
-        Q(current_status__status_code__in=list(RESOLVED_STATUS_CODES))
-        | Q(closed_at__isnull=False)
-        | Q(done_at__isnull=False)
-    ).values_list(
-        "created_at",
-        "closed_at",
-        "done_at",
-        "cancelled_at",
+    rows = (
+        queryset.filter(
+            Q(current_status__status_code__in=list(RESOLVED_STATUS_CODES))
+            | Q(closed_at__isnull=False)
+            | Q(done_at__isnull=False)
+        )
+        .values_list(
+            "created_at",
+            "closed_at",
+            "done_at",
+            "cancelled_at",
+        )[:5000]
     )
 
-    for created_at, closed_at, done_at, cancelled_at in rows.iterator(
-        chunk_size=2000
-    ):
+    for created_at, closed_at, done_at, cancelled_at in rows:
         end_at = closed_at or done_at or cancelled_at
         if created_at and end_at:
             values.append(int((end_at - created_at).total_seconds() // 60))

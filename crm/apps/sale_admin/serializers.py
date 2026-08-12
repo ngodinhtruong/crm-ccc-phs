@@ -7,6 +7,7 @@ from apps.sale_admin.models import (
     SaCallResult,
     SaInterestLevel,
     SaIcpGroup,
+    SaIcpRule,
     SaRecord,
     SaRecordAuditLog,
 )
@@ -28,6 +29,31 @@ class SaIcpGroupSerializer(serializers.ModelSerializer):
     class Meta:
         model = SaIcpGroup
         fields = "__all__"
+
+
+class SaIcpRuleSerializer(serializers.ModelSerializer):
+    call_result_name = serializers.CharField(source="call_result.result_name", read_only=True)
+    interest_level_name = serializers.CharField(source="interest_level.level_name", read_only=True)
+    icp_group_code = serializers.CharField(source="icp_group.icp_code", read_only=True)
+    icp_group_name = serializers.CharField(source="icp_group.icp_name", read_only=True)
+
+    class Meta:
+        model = SaIcpRule
+        fields = [
+            "id",
+            "call_result",
+            "call_result_name",
+            "interest_level",
+            "interest_level_name",
+            "icp_group",
+            "icp_group_code",
+            "icp_group_name",
+            "priority",
+            "is_active",
+            "description",
+            "created_at",
+            "updated_at",
+        ]
 
 
 class SaRecordAuditLogSerializer(serializers.ModelSerializer):

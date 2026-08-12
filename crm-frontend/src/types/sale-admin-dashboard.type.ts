@@ -34,6 +34,12 @@ export type SaAdminOverviewMetric = {
   previous_label?: string | null;
   growth_percent?: number | null;
   unit?: "COUNT" | "VND" | "PERCENT" | string | null;
+  sa_value?: number | string;
+  previous_sa_value?: number | string | null;
+  sa_growth_percent?: number | null;
+  broker_value?: number | string;
+  previous_broker_value?: number | string | null;
+  broker_growth_percent?: number | null;
 };
 
 export type SaAdminBranchRankingRow = {

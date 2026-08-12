@@ -7,7 +7,7 @@ export type PaginatedResponse<T> = {
 
 export type KpiPeriodStatus = "DRAFT" | "ACTIVE" | "LOCKED" | "CLOSED";
 export type KpiPeriodType = "MONTH" | "QUARTER" | "HALF_YEAR" | "YEAR";
-export type KpiGroupType = "MANUAL" | "AUTO" | "MIXED";
+export type KpiGroupType = "MANUAL" | "AUTO";
 
 export type KpiFrequency =
   | "DAILY"

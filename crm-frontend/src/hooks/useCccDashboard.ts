@@ -205,8 +205,13 @@ async function getMasterData(): Promise<MasterData> {
   return masterDataRequest;
 }
 
-export function useCccDashboard(initialStatus: string = "") {
+export function useCccDashboard(
+  initialStatus: string = "",
+  options: { enabled?: boolean } = {}
+) {
+  const { enabled = true } = options;
   const router = useRouter();
+  const hasLoadedRef = useRef(false);
 
   const initialParamsRef = useRef<CccDashboardParams>(
     buildDefaultParams(initialStatus)
@@ -412,15 +417,20 @@ export function useCccDashboard(initialStatus: string = "") {
       return;
     }
 
-    const params = buildDefaultParams(initialStatus);
-    initialParamsRef.current = params;
-    appliedParamsRef.current = params;
+    if (!enabled) return;
 
-    setStatus(initialStatus);
-    setDateFrom(params.date_from || "");
-    setDateTo(params.date_to || "");
-    void loadDashboard(params);
-  }, [initialStatus, loadDashboard, router]);
+    if (!hasLoadedRef.current) {
+      hasLoadedRef.current = true;
+      const params = buildDefaultParams(initialStatus);
+      initialParamsRef.current = params;
+      appliedParamsRef.current = params;
+
+      setStatus(initialStatus);
+      setDateFrom(params.date_from || "");
+      setDateTo(params.date_to || "");
+      void loadDashboard(params);
+    }
+  }, [enabled, initialStatus, loadDashboard, router]);
 
   useEffect(() => {
     if (!errorGroup) return;

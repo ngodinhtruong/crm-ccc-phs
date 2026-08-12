@@ -10,6 +10,7 @@ from apps.sale_admin.models import (
     SaCallResult,
     SaInterestLevel,
     SaIcpGroup,
+    SaIcpRule,
     SaRecord,
     SaRecordAuditLog,
 )
@@ -17,6 +18,7 @@ from apps.sale_admin.serializers import (
     SaCallResultSerializer,
     SaInterestLevelSerializer,
     SaIcpGroupSerializer,
+    SaIcpRuleSerializer,
     SaRecordAuditLogSerializer,
     SaRecordReadSerializer,
     SaRecordWriteSerializer,
@@ -226,6 +228,23 @@ class SaIcpGroupViewSet(viewsets.ModelViewSet):
             instance.save(update_fields=["is_active", "updated_at"])
         else:
             instance.delete()
+
+
+class SaIcpRuleViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = SaIcpRuleSerializer
+
+    def get_queryset(self):
+        queryset = SaIcpRule.objects.select_related(
+            "call_result", "interest_level", "icp_group"
+        ).order_by("priority", "id")
+        if self.action == "list":
+            include_inactive = self.request.query_params.get(
+                "include_inactive", ""
+            ).lower() in ("true", "1")
+            if not include_inactive:
+                queryset = queryset.filter(is_active=True)
+        return queryset
 
 
 class SaRecordViewSet(viewsets.ModelViewSet):

@@ -3,7 +3,6 @@
 import {
   AlertCircle,
   ArrowRightLeft,
-  Building2,
   CheckCircle2,
   PhoneCall,
   Search,
@@ -151,10 +150,10 @@ export function SaRecordAccountSection({
   create: SaRecordCreateController;
 }) {
   return (
-    <section className="rounded-lg border border-slate-200 border-l-4 border-l-[#10b981] bg-white p-4 shadow-sm">
-      <div className="mb-4 flex items-center gap-2 border-b border-slate-100 pb-3">
-        <div className="flex h-7 w-7 items-center justify-center rounded bg-emerald-50 text-[#059669]">
-          <UserCheck size={16} />
+    <section className="rounded-lg border border-slate-200 border-l-4 border-l-[#10b981] bg-white p-3.5 shadow-sm">
+      <div className="mb-2.5 flex items-center gap-2 border-b border-slate-100 pb-2">
+        <div className="flex h-6 w-6 items-center justify-center rounded bg-emerald-50 text-[#059669]">
+          <UserCheck size={15} />
         </div>
         <div>
           <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800">
@@ -166,7 +165,7 @@ export function SaRecordAccountSection({
         </div>
       </div>
 
-      <div className="grid grid-cols-12 gap-4">
+      <div className="grid grid-cols-12 gap-3">
         <div className="col-span-12 md:col-span-4">
           <FieldLabel required>Số tài khoản lưu ký</FieldLabel>
           <AccountSuggestionCombobox create={create} />
@@ -232,26 +231,6 @@ export function SaRecordAccountSection({
           </SelectInput>
         </div>
       </div>
-
-      {create.form.accountSelected && create.form.customerNameSnapshot && (
-        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-md border border-slate-200 bg-slate-50/70 p-3 text-xs">
-          <span className="font-semibold text-slate-600">Thông tin tóm tắt:</span>
-          <span className="inline-flex items-center gap-1 rounded bg-white px-2.5 py-1 font-bold text-slate-800 shadow-sm border border-slate-200">
-            <Building2 size={13} className="text-[#059669]" />
-            {create.form.customerNameSnapshot}
-          </span>
-          {create.form.branchNameSnapshot && (
-            <span className="inline-flex items-center gap-1 rounded bg-white px-2.5 py-1 font-medium text-slate-700 border border-slate-200">
-              Chi nhánh: {create.form.branchNameSnapshot}
-            </span>
-          )}
-          {create.form.accountStatus && (
-            <span className="rounded bg-[#10b981] px-2.5 py-1 font-semibold text-white">
-              {create.form.accountStatus}
-            </span>
-          )}
-        </div>
-      )}
     </section>
   );
 }
@@ -262,10 +241,10 @@ export function SaRecordCallSection({
   create: SaRecordCreateController;
 }) {
   return (
-    <section className="rounded-lg border border-slate-200 border-l-4 border-l-[#10b981] bg-white p-4 shadow-sm">
-      <div className="mb-4 flex items-center gap-2 border-b border-slate-100 pb-3">
-        <div className="flex h-7 w-7 items-center justify-center rounded bg-emerald-50 text-[#059669]">
-          <PhoneCall size={16} />
+    <section className="rounded-lg border border-slate-200 border-l-4 border-l-[#10b981] bg-white p-3.5 shadow-sm">
+      <div className="mb-2.5 flex items-center gap-2 border-b border-slate-100 pb-2">
+        <div className="flex h-6 w-6 items-center justify-center rounded bg-emerald-50 text-[#059669]">
+          <PhoneCall size={15} />
         </div>
         <div>
           <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800">
@@ -277,7 +256,7 @@ export function SaRecordCallSection({
         </div>
       </div>
 
-      <div className="grid grid-cols-12 gap-4">
+      <div className="grid grid-cols-12 gap-3">
         <div className="col-span-12 md:col-span-3">
           <FieldLabel required>Ngày gọi</FieldLabel>
           <TextInput
@@ -383,10 +362,10 @@ export function SaRecordTransactionSection({
   mode?: SaRecordFormMode;
 }) {
   return (
-    <section className="rounded-lg border border-slate-200 border-l-4 border-l-[#10b981] bg-white p-4 shadow-sm space-y-4">
-      <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-        <div className="flex h-7 w-7 items-center justify-center rounded bg-emerald-50 text-[#059669]">
-          <ArrowRightLeft size={16} />
+    <section className="rounded-lg border border-slate-200 border-l-4 border-l-[#10b981] bg-white p-3.5 shadow-sm space-y-3">
+      <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+        <div className="flex h-6 w-6 items-center justify-center rounded bg-emerald-50 text-[#059669]">
+          <ArrowRightLeft size={15} />
         </div>
         <div>
           <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800">
@@ -398,7 +377,7 @@ export function SaRecordTransactionSection({
         </div>
       </div>
 
-      <div className="grid grid-cols-12 gap-4">
+      <div className="grid grid-cols-12 gap-3">
         <div className="col-span-12 md:col-span-4">
           <FieldLabel>Giá trị giao dịch dự kiến (VNĐ)</FieldLabel>
           <TextInput

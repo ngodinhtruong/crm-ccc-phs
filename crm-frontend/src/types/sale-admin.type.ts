@@ -34,6 +34,22 @@ export type SaIcpGroup = {
     sort_order?: number | null;
 };
 
+export type SaIcpRule = {
+  id: number;
+  call_result?: number | null;
+  call_result_name?: string | null;
+  interest_level?: number | null;
+  interest_level_name?: string | null;
+  icp_group: number;
+  icp_group_code?: string | null;
+  icp_group_name?: string | null;
+  priority: number;
+  is_active: boolean;
+  description?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
 
 
 

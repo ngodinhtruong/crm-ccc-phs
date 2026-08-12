@@ -26,7 +26,7 @@ function RankingRow({ row, index, isTotal = false }: { row: SaAdminBranchRanking
     : `border-b border-slate-100 ${index % 2 === 0 ? "bg-white" : "bg-slate-50/40"} hover:bg-emerald-50/70`;
 
   return (
-    <tr className={`h-10 text-[11px] ${rowClass}`}>
+    <tr className={`h-8.5 border-b border-slate-100 ${rowClass}`}>
       <td className="sticky left-0 z-10 bg-inherit px-4 font-semibold text-slate-800">
         {isTotal ? "TOTAL" : row.branch_name}
       </td>
@@ -73,31 +73,31 @@ export function BranchRankingTable({
   year?: string | number;
   periodLabel?: string;
 }) {
-  const visibleRows = rows.slice(0, 12);
+  const visibleRows = rows.slice(0, 6);
 
   return (
-    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-      <div className="flex min-h-14 flex-col gap-2 border-b border-slate-100 bg-slate-50/70 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className="flex flex-col gap-2 border-b border-slate-100 bg-slate-50/70 px-3.5 py-2 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h2 className="text-sm font-bold text-slate-800">
+          <h2 className="text-xs font-bold text-slate-800">
             Xếp hạng Chi nhánh · {periodLabel || getPeriodLabel(month, year)}
           </h2>
-          <p className="mt-0.5 text-xs text-slate-500">Phí GD · TK kích hoạt · KH tiềm năng · MoM</p>
+          <p className="text-[11px] text-slate-500">Phí GD · TK kích hoạt · KH tiềm năng · MoM</p>
         </div>
         <div className="flex items-center gap-2 text-[11px] text-slate-500">
-          <span className="rounded-full bg-white px-2.5 py-1 font-semibold ring-1 ring-slate-200">
+          <span className="rounded-full bg-white px-2.5 py-0.5 font-semibold ring-1 ring-slate-200">
             {formatNumber(rows.length)} chi nhánh
           </span>
           {rows.length > visibleRows.length && (
-            <span className="rounded-full bg-emerald-50 px-2.5 py-1 font-semibold text-[#059669] ring-1 ring-emerald-100">
-              Hiển thị top {visibleRows.length}
+            <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 font-semibold text-[#059669] ring-1 ring-emerald-100">
+              Top {visibleRows.length}
             </span>
           )}
         </div>
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1180px] border-collapse text-left text-sm">
+        <table className="w-full min-w-[1180px] border-collapse text-left text-xs">
           <thead>
             <tr className="border-b border-slate-100 bg-slate-50 text-[11px] text-slate-500">
               <th className="sticky left-0 z-20 w-[210px] bg-slate-50 px-3 py-2 text-left" rowSpan={2}>Chi nhánh</th>

@@ -14,6 +14,11 @@ import {
   LineChart,
   Pie,
   PieChart,
+  PolarAngleAxis,
+  PolarGrid,
+  PolarRadiusAxis,
+  Radar,
+  RadarChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -1441,12 +1446,41 @@ function UnitAnalysisCharts({
 /* ====================================================================
  * 5. THỜI GIAN XỬ LÝ TRUNG BÌNH
  * ==================================================================== */
+function RadarDaysTooltip({ active, payload }: any) {
+  if (!active || !payload || !payload.length) return null;
+  const dataItem = payload[0]?.payload;
+
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white/95 p-2.5 text-xs shadow-md backdrop-blur-xs">
+      <p className="font-bold text-slate-800 mb-1">{dataItem?.category_name}</p>
+      {payload.map((p: any, i: number) => (
+        <div key={i} className="flex items-center justify-between gap-4 py-0.5 text-slate-600">
+          <span className="flex items-center gap-1.5 font-medium">
+            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: p.stroke || p.color }} />
+            {p.name}:
+          </span>
+          <span className="font-bold text-slate-900">{formatDays(p.value)}</span>
+        </div>
+      ))}
+      {dataItem?.percentChange !== null && dataItem?.percentChange !== undefined && (
+        <div className="mt-1.5 border-t border-slate-100 pt-1 text-[11px] font-semibold flex items-center justify-between gap-2">
+          <span className="text-slate-500">So với kỳ trước:</span>
+          <span className={dataItem.percentChange < 0 ? "text-rose-600 font-bold" : "text-emerald-600 font-bold"}>
+            {dataItem.percentChange > 0 ? "+" : ""}
+            {dataItem.percentChange}%
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SingleTimeChartCard({
   title,
   items,
   globalViewMode,
   currentLabel = "Kỳ hiện tại",
-  previousLabel = "Kỳ so sánh",
+  previousLabel = "Kỳ liền trước",
 }: {
   title: string;
   items: CccDashboardReportTimeCategoryItem[];
@@ -1462,11 +1496,31 @@ function SingleTimeChartCard({
     );
   }
 
-  const data = items.map((item) => ({
-    category_name: item.category_name,
-    current_avg_days: item.current_avg_days || 0,
-    previous_avg_days: item.previous_avg_days || 0,
-  }));
+  const totalCur = items.reduce((acc, item) => acc + (item.current_avg_days || 0), 0);
+  const totalPrev = items.reduce((acc, item) => acc + (item.previous_avg_days || 0), 0);
+  const overallCurrent = items.length > 0 ? totalCur / items.length : 0;
+  const overallPrevious = items.length > 0 ? totalPrev / items.length : 0;
+
+  let overallGrowth: number | null = null;
+  if (overallPrevious > 0) {
+    overallGrowth = Number((((overallCurrent - overallPrevious) / overallPrevious) * 100).toFixed(1));
+  }
+
+  const data = items.map((item) => {
+    const cur = item.current_avg_days || 0;
+    const prev = item.previous_avg_days || 0;
+    let percentChange: number | null = null;
+    if (prev > 0) {
+      percentChange = Number((((cur - prev) / prev) * 100).toFixed(1));
+    }
+
+    return {
+      category_name: item.category_name,
+      current_avg_days: cur,
+      previous_avg_days: prev,
+      percentChange,
+    };
+  });
 
   return (
     <ChartCard
@@ -1474,18 +1528,77 @@ function SingleTimeChartCard({
       description="Đơn vị: Ngày hoặc Giờ/Phút nếu < 1 ngày. So sánh xu hướng rút ngắn thời gian xử lý qua 2 kỳ."
     >
       {(isExpanded) => (
-        <div className={isExpanded ? "h-[480px]" : "h-[220px]"}>
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data} margin={{ left: 10, right: 20 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis dataKey="category_name" tick={{ fontSize: 10, fontWeight: 600 }} />
-              <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip content={<DaysTooltip />} />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Line type="monotone" dataKey="previous_avg_days" name={previousLabel} stroke="#64748b" strokeDasharray="4 4" strokeWidth={2} dot={{ r: 4 }} isAnimationActive={false} />
-              <Line type="monotone" dataKey="current_avg_days" name={currentLabel} stroke="#f59e0b" strokeWidth={3} dot={{ r: 5, fill: "#f59e0b" }} isAnimationActive={false} />
-            </LineChart>
-          </ResponsiveContainer>
+        <div className="flex flex-col h-full justify-between">
+          <div className={isExpanded ? "h-[360px]" : "h-[220px]"}>
+            <ResponsiveContainer width="100%" height="100%">
+              <RadarChart cx="50%" cy="50%" outerRadius={isExpanded ? "78%" : "68%"} data={data}>
+                <PolarGrid stroke="#cbd5e1" strokeDasharray="3 3" />
+                <PolarAngleAxis
+                  dataKey="category_name"
+                  tick={{ fontSize: 11, fontWeight: 600, fill: "#334155" }}
+                />
+                <PolarRadiusAxis
+                  angle={90}
+                  domain={[0, "auto"]}
+                  tick={{ fontSize: 10, fill: "#64748b" }}
+                />
+                <Tooltip content={<RadarDaysTooltip />} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Radar
+                  name={previousLabel}
+                  dataKey="previous_avg_days"
+                  stroke="#64748b"
+                  fill="#94a3b8"
+                  fillOpacity={0.25}
+                  strokeDasharray="4 4"
+                  strokeWidth={2}
+                  isAnimationActive={false}
+                />
+                <Radar
+                  name={currentLabel}
+                  dataKey="current_avg_days"
+                  stroke="#f59e0b"
+                  fill="#f59e0b"
+                  fillOpacity={0.35}
+                  strokeWidth={2.5}
+                  isAnimationActive={false}
+                />
+              </RadarChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="mt-2 grid grid-cols-2 gap-2 border-t border-slate-100 pt-2 text-xs">
+            {/* Left box: Kỳ liền trước */}
+            <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-2.5">
+              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
+                {previousLabel}
+              </span>
+              <p className="mt-0.5 text-base font-bold text-slate-700">
+                {formatDays(overallPrevious)}
+              </p>
+            </div>
+
+            {/* Right box: Kỳ hiện tại */}
+            <div className="rounded-lg border border-amber-100 bg-amber-50/50 p-2.5">
+              <div className="flex items-center justify-between gap-1">
+                <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
+                  {currentLabel} (TB)
+                </span>
+                {overallGrowth !== null && (
+                  <span
+                    className={`text-[11px] font-extrabold ${
+                      overallGrowth < 0 ? "text-rose-600" : "text-emerald-600"
+                    }`}
+                  >
+                    {overallGrowth > 0 ? "+" : ""}{overallGrowth}%
+                  </span>
+                )}
+              </div>
+              <p className="mt-0.5 text-base font-bold text-slate-900">
+                {formatDays(overallCurrent)}
+              </p>
+            </div>
+          </div>
         </div>
       )}
     </ChartCard>

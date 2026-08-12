@@ -188,8 +188,7 @@ function SectionBlock({
                 Thao tác
               </th>
               <th className="w-[120px] px-4 font-semibold">Mã nhóm</th>
-              <th className="w-[300px] px-4 font-semibold">Tên nhóm</th>
-              <th className="w-[140px] px-4 font-semibold">Loại</th>
+              <th className="w-[340px] px-4 font-semibold">Tên nhóm</th>
               <th className="w-[140px] px-4 font-semibold">Trọng số %</th>
               <th className="w-[120px] px-4 font-semibold">Trạng thái</th>
               <th className="w-[120px] px-4 font-semibold">Số KPI</th>
@@ -199,7 +198,7 @@ function SectionBlock({
           <tbody>
             {groups.length === 0 && (
               <tr>
-                <td colSpan={7} className="h-20 text-center text-slate-500">
+                <td colSpan={6} className="h-20 text-center text-slate-500">
                   Phần này chưa có nhóm KPI.
                 </td>
               </tr>
@@ -264,26 +263,6 @@ function SectionBlock({
                   </td>
 
                   <td className="px-4 text-slate-700">
-                    <select
-                      value={group.group_type}
-                      disabled={!config.canManage}
-                      onChange={(event) =>
-                        config.setGroupField(
-                          group.id,
-                          "group_type",
-                          event.target.value as KpiGroupType
-                        )
-                      }
-                      className="h-8 w-full rounded border border-slate-300 px-2 text-xs outline-none focus:border-emerald-500 disabled:bg-slate-50"
-                    >
-                      <option value="MANUAL">MANUAL</option>
-                      <option value="AUTO">AUTO</option>
-                      <option value="MIXED">MIXED</option>
-                    </select>
-                    
-                  </td>
-
-                  <td className="px-4 text-slate-700">
                     <input
                       value={group.weight_percent}
                       disabled={!config.canManage}
@@ -329,7 +308,6 @@ export function KpiGroupsTab({ config }: { config: KpiConfigController }) {
   const [groupSectionId, setGroupSectionId] = useState("");
   const [groupCode, setGroupCode] = useState("");
   const [groupName, setGroupName] = useState("");
-  const [groupType, setGroupType] = useState<KpiGroupType>("MANUAL");
 
   const sectionsWithGroups = useMemo(() => {
     return config.sectionRows.map((section) => ({
@@ -359,18 +337,21 @@ export function KpiGroupsTab({ config }: { config: KpiConfigController }) {
 
     if (!targetSectionId || !normalizedGroupCode || !groupName.trim()) return;
 
+    const targetSection = config.sectionRows.find((s) => String(s.id) === String(targetSectionId));
+    const computedGroupType: KpiGroupType =
+      targetSection?.section_code.toUpperCase().includes("B") ? "AUTO" : "MANUAL";
+
     await config.addGroup({
       section: Number(targetSectionId),
       group_code: normalizedGroupCode,
       group_name: groupName.trim(),
-      group_type: groupType,
+      group_type: computedGroupType,
       sort_order: config.groupRows.length + 1,
     });
 
     setGroupSectionId("");
     setGroupCode("");
     setGroupName("");
-    setGroupType("MANUAL");
   };
 
   return (
@@ -431,25 +412,15 @@ export function KpiGroupsTab({ config }: { config: KpiConfigController }) {
                 onChange={(event) => setGroupCode(event.target.value)}
                 onBlur={() => setGroupCode(normalizeKpiCode(groupCode))}
                 placeholder="Mã nhóm"
-                className="col-span-12 h-9 rounded border border-slate-300 px-3 text-xs outline-none focus:border-emerald-500 md:col-span-2"
+                className="col-span-12 h-9 rounded border border-slate-300 px-3 text-xs outline-none focus:border-emerald-500 md:col-span-3"
               />
 
               <input
                 value={groupName}
                 onChange={(event) => setGroupName(event.target.value)}
                 placeholder="Tên nhóm KPI"
-                className="col-span-12 h-9 rounded border border-slate-300 px-3 text-xs outline-none focus:border-emerald-500 md:col-span-3"
+                className="col-span-12 h-9 rounded border border-slate-300 px-3 text-xs outline-none focus:border-emerald-500 md:col-span-4"
               />
-
-              <select
-                value={groupType}
-                onChange={(event) => setGroupType(event.target.value as KpiGroupType)}
-                className="col-span-12 h-9 rounded border border-slate-300 px-3 text-xs outline-none focus:border-emerald-500 md:col-span-2"
-              >
-                <option value="MANUAL">MANUAL</option>
-                <option value="AUTO">AUTO</option>
-                <option value="MIXED">MIXED</option>
-              </select>
 
               <button
                 type="button"

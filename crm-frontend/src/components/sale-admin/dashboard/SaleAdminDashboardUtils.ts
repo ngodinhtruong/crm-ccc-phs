@@ -64,11 +64,11 @@ export function formatCompactNumber(value?: string | number | null) {
 export function formatMoney(value?: string | number | null) {
   const numberValue = toNumber(value);
 
-  if (!numberValue) return "0 VND";
+  if (!numberValue) return "0";
 
-  return `${new Intl.NumberFormat("vi-VN", {
+  return new Intl.NumberFormat("vi-VN", {
     maximumFractionDigits: 0,
-  }).format(numberValue)} VND`;
+  }).format(numberValue);
 }
 
 export function formatCompactMoney(value?: string | number | null) {

@@ -5,6 +5,7 @@ import {
   PaginatedResponse,
   SaCallResult,
   SaIcpGroup,
+  SaIcpRule,
   SaInterestLevel,
   SaRecordItem,
   SaRecordListParams,
@@ -20,6 +21,7 @@ const SA_RECORD_AUDIT_LOG_ENDPOINT = "/api/sale-admin/record-audit-logs/";
 const SA_CALL_RESULT_ENDPOINT = "/api/sale-admin/call-results/";
 const SA_INTEREST_LEVEL_ENDPOINT = "/api/sale-admin/interest-levels/";
 const SA_ICP_GROUP_ENDPOINT = "/api/sale-admin/icp-groups/";
+const SA_ICP_RULE_ENDPOINT = "/api/sale-admin/icp-rules/";
 const SA_ACCOUNT_SUGGESTION_ENDPOINT = "/api/sale-admin/customer-account-suggestions/";
 const SA_ACCOUNT_STATUS_OPTION_ENDPOINT = "/api/sale-admin/account-status-options/";
 const SA_VIP_CLASSIFICATION_OPTION_ENDPOINT = "/api/sale-admin/vip-classification-options/";
@@ -102,6 +104,41 @@ export const saleAdminApi = {
 
   deleteIcpGroup: async (id: number): Promise<void> => {
     await api.delete(`${SA_ICP_GROUP_ENDPOINT}${id}/`, {
+      params: { include_inactive: true },
+    });
+  },
+
+  getIcpRules: async (includeInactive = false): Promise<SaIcpRule[]> => {
+    const response = await api.get<
+      SaIcpRule[] | PaginatedResponse<SaIcpRule>
+    >(SA_ICP_RULE_ENDPOINT, {
+      params: { include_inactive: includeInactive },
+    });
+    return getListData<SaIcpRule>(response.data);
+  },
+
+  createIcpRule: async (payload: Partial<SaIcpRule>): Promise<SaIcpRule> => {
+    const response = await api.post<SaIcpRule>(
+      SA_ICP_RULE_ENDPOINT,
+      payload
+    );
+    return response.data;
+  },
+
+  updateIcpRule: async (
+    id: number,
+    payload: Partial<SaIcpRule>
+  ): Promise<SaIcpRule> => {
+    const response = await api.patch<SaIcpRule>(
+      `${SA_ICP_RULE_ENDPOINT}${id}/`,
+      payload,
+      { params: { include_inactive: true } }
+    );
+    return response.data;
+  },
+
+  deleteIcpRule: async (id: number): Promise<void> => {
+    await api.delete(`${SA_ICP_RULE_ENDPOINT}${id}/`, {
       params: { include_inactive: true },
     });
   },

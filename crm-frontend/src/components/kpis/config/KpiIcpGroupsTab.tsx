@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Edit, Plus, Power, Trash2, X } from "lucide-react";
+import { Edit, Plus, Power, Trash2, X, Sliders, ShieldCheck } from "lucide-react";
 import { KpiConfigController } from "@/hooks/useKpiConfig";
-import { SaIcpGroup } from "@/types/sale-admin.type";
+import { SaIcpGroup, SaIcpRule } from "@/types/sale-admin.type";
 
 function StatusBadge({ active }: { active: boolean }) {
   if (active) {
@@ -21,22 +21,36 @@ function StatusBadge({ active }: { active: boolean }) {
   );
 }
 
-type ModalState =
+type GroupModalState =
   | { mode: "create" }
   | { mode: "edit"; item: SaIcpGroup }
   | null;
 
+type RuleModalState =
+  | { mode: "create" }
+  | { mode: "edit"; item: SaIcpRule }
+  | null;
+
 export function KpiIcpGroupsTab({ config }: { config: KpiConfigController }) {
-  const [modal, setModal] = useState<ModalState>(null);
+  const [groupModal, setGroupModal] = useState<GroupModalState>(null);
+  const [ruleModal, setRuleModal] = useState<RuleModalState>(null);
   const [showInactive, setShowInactive] = useState(true);
 
-  // Form states
+  // Group Form states
   const [icpCode, setIcpCode] = useState("");
   const [icpName, setIcpName] = useState("");
-  const [description, setDescription] = useState("");
+  const [groupDescription, setGroupDescription] = useState("");
   const [isPotential, setIsPotential] = useState(false);
-  const [isActive, setIsActive] = useState(true);
-  const [sortOrder, setSortOrder] = useState<number | "">(1);
+  const [isGroupActive, setIsGroupActive] = useState(true);
+  const [groupSortOrder, setGroupSortOrder] = useState<number | "">(1);
+
+  // Rule Form states
+  const [ruleCallResult, setRuleCallResult] = useState<string>("");
+  const [ruleInterestLevel, setRuleInterestLevel] = useState<string>("");
+  const [ruleIcpGroup, setRuleIcpGroup] = useState<string>("");
+  const [rulePriority, setRulePriority] = useState<number | "">(1);
+  const [isRuleActive, setIsRuleActive] = useState(true);
+  const [ruleDescription, setRuleDescription] = useState("");
 
   const displayedGroups = useMemo(() => {
     let list = config.icpGroups || [];
@@ -46,27 +60,36 @@ export function KpiIcpGroupsTab({ config }: { config: KpiConfigController }) {
     return [...list].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0) || a.id - b.id);
   }, [config.icpGroups, showInactive]);
 
-  const openCreateModal = () => {
+  const displayedRules = useMemo(() => {
+    let list = config.icpRules || [];
+    if (!showInactive) {
+      list = list.filter((item) => item.is_active);
+    }
+    return [...list].sort((a, b) => (a.priority || 0) - (b.priority || 0) || a.id - b.id);
+  }, [config.icpRules, showInactive]);
+
+  // ICP Group Handlers
+  const openCreateGroupModal = () => {
     setIcpCode("");
     setIcpName("");
-    setDescription("");
+    setGroupDescription("");
     setIsPotential(true);
-    setIsActive(true);
-    setSortOrder((config.icpGroups?.length || 0) + 1);
-    setModal({ mode: "create" });
+    setIsGroupActive(true);
+    setGroupSortOrder((config.icpGroups?.length || 0) + 1);
+    setGroupModal({ mode: "create" });
   };
 
-  const openEditModal = (item: SaIcpGroup) => {
+  const openEditGroupModal = (item: SaIcpGroup) => {
     setIcpCode(item.icp_code || "");
     setIcpName(item.icp_name || "");
-    setDescription(item.description || "");
+    setGroupDescription(item.description || "");
     setIsPotential(Boolean(item.is_potential));
-    setIsActive(Boolean(item.is_active));
-    setSortOrder(item.sort_order ?? 1);
-    setModal({ mode: "edit", item });
+    setIsGroupActive(Boolean(item.is_active));
+    setGroupSortOrder(item.sort_order ?? 1);
+    setGroupModal({ mode: "edit", item });
   };
 
-  const handleSave = async (e: React.FormEvent) => {
+  const handleGroupSave = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!icpCode.trim() || !icpName.trim()) {
@@ -77,27 +100,27 @@ export function KpiIcpGroupsTab({ config }: { config: KpiConfigController }) {
     const payload: Partial<SaIcpGroup> = {
       icp_code: icpCode.trim().toUpperCase(),
       icp_name: icpName.trim(),
-      description: description.trim() || null,
+      description: groupDescription.trim() || null,
       is_potential: isPotential,
-      is_active: isActive,
-      sort_order: sortOrder !== "" ? Number(sortOrder) : 0,
+      is_active: isGroupActive,
+      sort_order: groupSortOrder !== "" ? Number(groupSortOrder) : 0,
     };
 
     try {
-      if (modal?.mode === "create") {
+      if (groupModal?.mode === "create") {
         await config.createIcpGroup(payload);
-      } else if (modal?.mode === "edit") {
-        await config.updateIcpGroup(modal.item.id, payload);
+      } else if (groupModal?.mode === "edit") {
+        await config.updateIcpGroup(groupModal.item.id, payload);
       }
-      setModal(null);
+      setGroupModal(null);
     } catch {
       // Error handled by hook notice/error
     }
   };
 
-  const handleSoftDelete = async (item: SaIcpGroup) => {
+  const handleGroupSoftDelete = async (item: SaIcpGroup) => {
     const confirmText = item.is_active
-      ? `Bạn có chắc chắn muốn ngưng sử dụng phân khúc "${item.icp_code} - ${item.icp_name}"?\n(Các bản ghi cũ đã gán vẫn giữ nguyên dữ liệu)`
+      ? `Bạn có chắc chắn muốn ngưng sử dụng phân khúc "${item.icp_code} - ${item.icp_name}"?`
       : `Bạn có chắc chắn muốn mở lại phân khúc "${item.icp_code} - ${item.icp_name}"?`;
 
     if (window.confirm(confirmText)) {
@@ -113,150 +136,321 @@ export function KpiIcpGroupsTab({ config }: { config: KpiConfigController }) {
     }
   };
 
+  // Rule Handlers
+  const openCreateRuleModal = () => {
+    setRuleCallResult("");
+    setRuleInterestLevel("");
+    setRuleIcpGroup(config.icpGroups?.[0]?.id ? String(config.icpGroups[0].id) : "");
+    setRulePriority((config.icpRules?.length || 0) + 1);
+    setIsRuleActive(true);
+    setRuleDescription("");
+    setRuleModal({ mode: "create" });
+  };
+
+  const openEditRuleModal = (item: SaIcpRule) => {
+    setRuleCallResult(item.call_result ? String(item.call_result) : "");
+    setRuleInterestLevel(item.interest_level ? String(item.interest_level) : "");
+    setRuleIcpGroup(item.icp_group ? String(item.icp_group) : "");
+    setRulePriority(item.priority ?? 1);
+    setIsRuleActive(Boolean(item.is_active));
+    setRuleDescription(item.description || "");
+    setRuleModal({ mode: "edit", item });
+  };
+
+  const handleRuleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!ruleIcpGroup) {
+      alert("Vui lòng chọn Nhóm ICP được gán!");
+      return;
+    }
+
+    const payload: Partial<SaIcpRule> = {
+      call_result: ruleCallResult ? Number(ruleCallResult) : null,
+      interest_level: ruleInterestLevel ? Number(ruleInterestLevel) : null,
+      icp_group: Number(ruleIcpGroup),
+      priority: rulePriority !== "" ? Number(rulePriority) : 1,
+      is_active: isRuleActive,
+      description: ruleDescription.trim() || null,
+    };
+
+    try {
+      if (ruleModal?.mode === "create") {
+        await config.createIcpRule(payload);
+      } else if (ruleModal?.mode === "edit") {
+        await config.updateIcpRule(ruleModal.item.id, payload);
+      }
+      setRuleModal(null);
+    } catch {
+      // Error handled by hook notice/error
+    }
+  };
+
+  const handleRuleDelete = async (item: SaIcpRule) => {
+    if (window.confirm("Bạn có chắc chắn muốn xóa quy tắc gán ICP này?")) {
+      try {
+        await config.deleteIcpRule(item.id);
+      } catch {
+        // Error handled in hook
+      }
+    }
+  };
+
   return (
-    <div className="space-y-4 p-4">
-      {/* Header & Controls */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50/50 p-3">
-        <div>
-          <h3 className="text-sm font-bold text-slate-800">
-            Danh mục Phân khúc Khách hàng (ICP)
-          </h3>
-          <p className="text-xs text-slate-500">
-            Cấu hình các phân nhóm ICP hiển thị trên hệ thống (ví dụ: A - Rất tiềm năng, B - Tiềm năng, C - Nuôi dưỡng...)
-          </p>
+    <div className="space-y-4 p-3 sm:p-4">
+      {/* 1. DANH MỤC PHÂN KHÚC ICP */}
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50/50 p-3">
+          <div>
+            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-emerald-600" />
+              1. Danh mục Phân khúc Khách hàng (ICP)
+            </h3>
+            <p className="text-xs text-slate-500">
+              Cấu hình các phân nhóm ICP hiển thị trên hệ thống (ví dụ: A - Rất tiềm năng, B - Tiềm năng...)
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showInactive}
+                onChange={(e) => setShowInactive(e.target.checked)}
+                className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+              />
+              Hiển thị mục đã ngưng dùng
+            </label>
+
+            <button
+              type="button"
+              onClick={openCreateGroupModal}
+              className="inline-flex items-center gap-1.5 rounded-md bg-[#10b981] px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-600 transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+              Thêm phân khúc ICP
+            </button>
+          </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={showInactive}
-              onChange={(e) => setShowInactive(e.target.checked)}
-              className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-            />
-            Hiển thị mục đã ngưng dùng
-          </label>
+        {/* ICP Groups Table */}
+        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+          {config.loadingIcp ? (
+            <div className="p-8 text-center text-sm text-slate-500">
+              Đang tải danh sách phân khúc ICP...
+            </div>
+          ) : displayedGroups.length === 0 ? (
+            <div className="p-8 text-center text-sm text-slate-500">
+              Chưa có phân khúc ICP nào. Bấm nút &quot;Thêm phân khúc ICP&quot; để tạo mới.
+            </div>
+          ) : (
+            <table className="w-full text-left text-xs text-slate-700">
+              <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                <tr>
+                  <th className="px-4 py-2.5 w-16 text-center">Thứ tự</th>
+                  <th className="px-4 py-2.5 w-28">Mã ICP</th>
+                  <th className="px-4 py-2.5">Tên phân khúc</th>
+                  <th className="px-4 py-2.5 w-28 text-center">Tiềm năng</th>
+                  <th className="px-4 py-2.5 w-28 text-center">Trạng thái</th>
+                  <th className="px-4 py-2.5 w-28 text-right">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {displayedGroups.map((item) => (
+                  <tr
+                    key={item.id}
+                    className={`hover:bg-slate-50/80 transition-colors ${
+                      !item.is_active ? "bg-slate-50/50 text-slate-400 opacity-75" : ""
+                    }`}
+                  >
+                    <td className="px-4 py-3 text-center font-mono text-slate-500">
+                      {item.sort_order ?? "-"}
+                    </td>
+                    <td className="px-4 py-3 font-semibold text-slate-900">
+                      {item.icp_code}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-slate-800">{item.icp_name}</div>
+                      {item.description && (
+                        <div className="mt-0.5 text-[11px] text-slate-500 max-w-md truncate">
+                          {item.description}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {item.is_potential ? (
+                        <span className="inline-block text-emerald-600 font-bold">✓</span>
+                      ) : (
+                        <span className="inline-block text-slate-300">-</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <StatusBadge active={item.is_active} />
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => openEditGroupModal(item)}
+                          className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                          title="Chỉnh sửa"
+                        >
+                          <Edit className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleGroupSoftDelete(item)}
+                          className={`rounded p-1 ${
+                            item.is_active
+                              ? "text-rose-500 hover:bg-rose-50 hover:text-rose-600"
+                              : "text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
+                          }`}
+                          title={item.is_active ? "Ngưng sử dụng" : "Mở lại"}
+                        >
+                          <Power className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+
+      {/* 2. QUY TẮC GÁN ICP TỰ ĐỘNG */}
+      <div className="space-y-3 pt-3 border-t border-slate-200">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-indigo-100 bg-indigo-50/40 p-3">
+          <div>
+            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+              <Sliders className="h-4 w-4 text-indigo-600" />
+              2. Quy tắc Gán ICP Tự động (ICP Mapping Rules)
+            </h3>
+            <p className="text-xs text-slate-500">
+              Quy định luật tự động chọn phân nhóm ICP khi người dùng chọn Kết quả cuộc gọi & Mức độ quan tâm trong Form Record.
+            </p>
+          </div>
 
           <button
             type="button"
-            onClick={openCreateModal}
-            className="inline-flex items-center gap-1.5 rounded-md bg-[#10b981] px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-600 transition-colors"
+            onClick={openCreateRuleModal}
+            className="inline-flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors"
           >
             <Plus className="h-4 w-4" />
-            Thêm phân khúc ICP
+            Thêm quy tắc ICP mới
           </button>
+        </div>
+
+        {/* ICP Rules Table */}
+        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+          {config.loadingIcpRules ? (
+            <div className="p-8 text-center text-sm text-slate-500">
+              Đang tải quy tắc gán ICP tự động...
+            </div>
+          ) : displayedRules.length === 0 ? (
+            <div className="p-8 text-center text-sm text-slate-500">
+              Chưa có quy tắc nào. Bấm nút &quot;Thêm quy tắc ICP mới&quot; để tạo luật tự động.
+            </div>
+          ) : (
+            <table className="w-full text-left text-xs text-slate-700">
+              <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                <tr>
+                  <th className="px-4 py-2.5 w-16 text-center">Độ ưu tiên</th>
+                  <th className="px-4 py-2.5">Kết quả cuộc gọi</th>
+                  <th className="px-4 py-2.5">Mức độ quan tâm</th>
+                  <th className="px-4 py-2.5 font-bold text-indigo-700">Gán Nhóm ICP</th>
+                  <th className="px-4 py-2.5 w-28 text-center">Trạng thái</th>
+                  <th className="px-4 py-2.5 w-28 text-right">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {displayedRules.map((item) => (
+                  <tr
+                    key={item.id}
+                    className={`hover:bg-slate-50/80 transition-colors ${
+                      !item.is_active ? "bg-slate-50/50 text-slate-400 opacity-75" : ""
+                    }`}
+                  >
+                    <td className="px-4 py-3 text-center font-mono font-bold text-indigo-600">
+                      {item.priority ?? "-"}
+                    </td>
+                    <td className="px-4 py-3 font-medium text-slate-800">
+                      {item.call_result_name ? (
+                        <span className="inline-flex rounded bg-blue-50 px-2 py-0.5 text-blue-700 font-semibold">
+                          {item.call_result_name}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 italic">(Bất kỳ / Tất cả)</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 font-medium text-slate-800">
+                      {item.interest_level_name ? (
+                        <span className="inline-flex rounded bg-amber-50 px-2 py-0.5 text-amber-700 font-semibold">
+                          {item.interest_level_name}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 italic">(Bất kỳ / Không xét)</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 font-bold text-emerald-700">
+                      {item.icp_group_code && item.icp_group_name ? (
+                        <span className="inline-flex rounded bg-emerald-50 px-2 py-0.5 text-emerald-800 font-bold border border-emerald-200">
+                          {item.icp_group_code} – {item.icp_group_name}
+                        </span>
+                      ) : (
+                        item.icp_group
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <StatusBadge active={item.is_active} />
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => openEditRuleModal(item)}
+                          className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                          title="Chỉnh sửa quy tắc"
+                        >
+                          <Edit className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRuleDelete(item)}
+                          className="rounded p-1 text-rose-500 hover:bg-rose-50 hover:text-rose-600"
+                          title="Xóa quy tắc"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
 
-      {/* Main Table */}
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-        {config.loadingIcp ? (
-          <div className="p-8 text-center text-sm text-slate-500">
-            Đang tải danh sách phân khúc ICP...
-          </div>
-        ) : displayedGroups.length === 0 ? (
-          <div className="p-8 text-center text-sm text-slate-500">
-            Chưa có phân khúc ICP nào. Bấm nút &quot;Thêm phân khúc ICP&quot; để tạo mới.
-          </div>
-        ) : (
-          <table className="w-full text-left text-xs text-slate-700">
-            <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
-              <tr>
-                <th className="px-4 py-2.5 w-16 text-center">Thứ tự</th>
-                <th className="px-4 py-2.5 w-28">Mã ICP</th>
-                <th className="px-4 py-2.5">Tên phân khúc</th>
-                <th className="px-4 py-2.5 w-28 text-center">Tiềm năng</th>
-                <th className="px-4 py-2.5 w-28 text-center">Trạng thái</th>
-                <th className="px-4 py-2.5 w-28 text-right">Thao tác</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {displayedGroups.map((item) => (
-                <tr
-                  key={item.id}
-                  className={`hover:bg-slate-50/80 transition-colors ${
-                    !item.is_active ? "bg-slate-50/50 text-slate-400 opacity-75" : ""
-                  }`}
-                >
-                  <td className="px-4 py-3 text-center font-mono text-slate-500">
-                    {item.sort_order ?? "-"}
-                  </td>
-                  <td className="px-4 py-3 font-semibold text-slate-900">
-                    {item.icp_code}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="font-medium text-slate-800">{item.icp_name}</div>
-                    {item.description && (
-                      <div className="mt-0.5 text-[11px] text-slate-500 max-w-md truncate">
-                        {item.description}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    {item.is_potential ? (
-                      <span className="inline-block text-emerald-600 font-bold">✓</span>
-                    ) : (
-                      <span className="inline-block text-slate-300">-</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <StatusBadge active={item.is_active} />
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <button
-                        type="button"
-                        onClick={() => openEditModal(item)}
-                        className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
-                        title="Chỉnh sửa"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleSoftDelete(item)}
-                        className={`rounded p-1 ${
-                          item.is_active
-                            ? "text-rose-500 hover:bg-rose-50 hover:text-rose-700"
-                            : "text-emerald-600 hover:bg-emerald-50"
-                        }`}
-                        title={item.is_active ? "Ngưng sử dụng (Xóa mềm)" : "Mở lại"}
-                      >
-                        {item.is_active ? (
-                          <Trash2 className="h-4 w-4" />
-                        ) : (
-                          <Power className="h-4 w-4" />
-                        )}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      {/* Create / Edit Modal */}
-      {modal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-          <div className="w-full max-w-lg overflow-hidden rounded-xl bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 bg-slate-50">
+      {/* ICP Group Modal */}
+      {groupModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
               <h3 className="text-base font-bold text-slate-800">
-                {modal.mode === "create"
-                  ? "Thêm phân khúc ICP mới"
-                  : `Chỉnh sửa phân khúc ICP: ${modal.item.icp_code}`}
+                {groupModal.mode === "create" ? "Thêm Phân khúc ICP Mới" : "Chỉnh sửa Phân khúc ICP"}
               </h3>
               <button
                 type="button"
-                onClick={() => setModal(null)}
-                className="rounded p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-600"
+                onClick={() => setGroupModal(null)}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSave} className="p-5 space-y-4 text-xs">
+            <form onSubmit={handleGroupSave} className="mt-4 space-y-4 text-xs">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="mb-1 block font-semibold text-slate-700">
@@ -271,15 +465,12 @@ export function KpiIcpGroupsTab({ config }: { config: KpiConfigController }) {
                     required
                   />
                 </div>
-
                 <div>
-                  <label className="mb-1 block font-semibold text-slate-700">
-                    Sắp xếp (Sort order)
-                  </label>
+                  <label className="mb-1 block font-semibold text-slate-700">Thứ tự hiển thị</label>
                   <input
                     type="number"
-                    value={sortOrder}
-                    onChange={(e) => setSortOrder(e.target.value ? Number(e.target.value) : "")}
+                    value={groupSortOrder}
+                    onChange={(e) => setGroupSortOrder(e.target.value ? Number(e.target.value) : "")}
                     className="w-full rounded border border-slate-300 px-3 py-2 focus:border-emerald-500 focus:outline-none"
                   />
                 </div>
@@ -303,8 +494,8 @@ export function KpiIcpGroupsTab({ config }: { config: KpiConfigController }) {
                 <label className="mb-1 block font-semibold text-slate-700">Ghi chú / Mô tả</label>
                 <textarea
                   rows={3}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
+                  value={groupDescription}
+                  onChange={(e) => setGroupDescription(e.target.value)}
                   placeholder="Mô tả về nhóm phân khúc này..."
                   className="w-full rounded border border-slate-300 px-3 py-2 focus:border-emerald-500 focus:outline-none"
                 />
@@ -324,8 +515,8 @@ export function KpiIcpGroupsTab({ config }: { config: KpiConfigController }) {
                 <label className="flex items-center gap-2 cursor-pointer font-medium text-slate-700">
                   <input
                     type="checkbox"
-                    checked={isActive}
-                    onChange={(e) => setIsActive(e.target.checked)}
+                    checked={isGroupActive}
+                    onChange={(e) => setIsGroupActive(e.target.checked)}
                     className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
                   />
                   Đang hoạt động (Kích hoạt)
@@ -335,7 +526,7 @@ export function KpiIcpGroupsTab({ config }: { config: KpiConfigController }) {
               <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
                 <button
                   type="button"
-                  onClick={() => setModal(null)}
+                  onClick={() => setGroupModal(null)}
                   className="rounded-md border border-slate-300 px-4 py-2 font-semibold text-slate-600 hover:bg-slate-100"
                 >
                   Hủy bỏ
@@ -347,8 +538,141 @@ export function KpiIcpGroupsTab({ config }: { config: KpiConfigController }) {
                 >
                   {config.saving
                     ? "Đang lưu..."
-                    : modal.mode === "create"
+                    : groupModal.mode === "create"
                     ? "Tạo phân khúc"
+                    : "Cập nhật"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ICP Rule Modal */}
+      {ruleModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <h3 className="text-base font-bold text-slate-800">
+                {ruleModal.mode === "create" ? "Thêm Quy tắc Gán ICP Mới" : "Chỉnh sửa Quy tắc Gán ICP"}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setRuleModal(null)}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleRuleSave} className="mt-4 space-y-4 text-xs">
+              <div>
+                <label className="mb-1 block font-semibold text-slate-700">
+                  1. Kết quả cuộc gọi
+                </label>
+                <select
+                  value={ruleCallResult}
+                  onChange={(e) => setRuleCallResult(e.target.value)}
+                  className="w-full rounded border border-slate-300 px-3 py-2 focus:border-indigo-500 focus:outline-none"
+                >
+                  <option value="">(Tất cả / Bất kỳ kết quả)</option>
+                  {(config.callResults || []).map((cr) => (
+                    <option key={cr.id} value={cr.id}>
+                      {cr.result_name} ({cr.result_code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block font-semibold text-slate-700">
+                  2. Mức độ quan tâm
+                </label>
+                <select
+                  value={ruleInterestLevel}
+                  onChange={(e) => setRuleInterestLevel(e.target.value)}
+                  className="w-full rounded border border-slate-300 px-3 py-2 focus:border-indigo-500 focus:outline-none"
+                >
+                  <option value="">(Tất cả / Không xét mức độ)</option>
+                  {(config.interestLevels || []).map((il) => (
+                    <option key={il.id} value={il.id}>
+                      {il.level_name} ({il.level_code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block font-semibold text-slate-700">
+                  3. Nhóm ICP được tự động chọn <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  value={ruleIcpGroup}
+                  onChange={(e) => setRuleIcpGroup(e.target.value)}
+                  className="w-full rounded border border-slate-300 px-3 py-2 font-bold text-emerald-800 focus:border-emerald-500 focus:outline-none"
+                  required
+                >
+                  <option value="">-- Chọn nhóm ICP --</option>
+                  {(config.icpGroups || []).map((grp) => (
+                    <option key={grp.id} value={grp.id}>
+                      {grp.icp_code} – {grp.icp_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="mb-1 block font-semibold text-slate-700">Thứ tự ưu tiên</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={rulePriority}
+                    onChange={(e) => setRulePriority(e.target.value ? Number(e.target.value) : "")}
+                    className="w-full rounded border border-slate-300 px-3 py-2 focus:border-indigo-500 focus:outline-none"
+                  />
+                </div>
+                <div className="flex items-center pt-5">
+                  <label className="flex items-center gap-2 cursor-pointer font-medium text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={isRuleActive}
+                      onChange={(e) => setIsRuleActive(e.target.checked)}
+                      className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    Bật quy tắc này
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block font-semibold text-slate-700">Ghi chú quy tắc</label>
+                <input
+                  type="text"
+                  value={ruleDescription}
+                  onChange={(e) => setRuleDescription(e.target.value)}
+                  placeholder="Ví dụ: Ưu tiên cuộc gọi trực tiếp..."
+                  className="w-full rounded border border-slate-300 px-3 py-2 focus:border-indigo-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setRuleModal(null)}
+                  className="rounded-md border border-slate-300 px-4 py-2 font-semibold text-slate-600 hover:bg-slate-100"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="submit"
+                  disabled={config.saving}
+                  className="rounded-md bg-indigo-600 px-4 py-2 font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {config.saving
+                    ? "Đang lưu..."
+                    : ruleModal.mode === "create"
+                    ? "Tạo quy tắc"
                     : "Cập nhật"}
                 </button>
               </div>

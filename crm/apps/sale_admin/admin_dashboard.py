@@ -391,6 +391,47 @@ def _build_branch_options(user, scoped_records):
     ]
 
 
+def _calculate_sa_broker_splits(records, transactions, period_start, period_end):
+    sa_value = ZERO
+    sa_fee = ZERO
+    broker_value = ZERO
+    broker_fee = ZERO
+
+    latest_record_map = _latest_records_by_account(records)
+    account_map = _build_account_transaction_map(transactions)
+
+    for account_no, totals in account_map.items():
+        value = _decimal(totals["transaction_value"])
+        fee = _decimal(totals["transaction_fee"])
+        record = latest_record_map.get(account_no)
+        if record and (record.handover_to_broker or record.broker_user_id or record.broker_employee_id):
+            handover_date = record.broker_handover_at.date() if record.broker_handover_at else record.call_date
+            if record.customer_account_id:
+                tx_split = TransactionLog.objects.filter(
+                    customer_account_id=record.customer_account_id,
+                    transaction_date__gte=period_start,
+                    transaction_date__lt=period_end,
+                    order_status__in=MATCHED_ORDER_STATUSES,
+                ).aggregate(
+                    broker_v=Sum("transaction_value", filter=Q(transaction_date__gte=handover_date)),
+                    broker_f=Sum("transaction_fee", filter=Q(transaction_date__gte=handover_date)),
+                    sa_v=Sum("transaction_value", filter=Q(transaction_date__lt=handover_date)),
+                    sa_f=Sum("transaction_fee", filter=Q(transaction_date__lt=handover_date)),
+                )
+                broker_value += _decimal(tx_split.get("broker_v"))
+                broker_fee += _decimal(tx_split.get("broker_f"))
+                sa_value += _decimal(tx_split.get("sa_v"))
+                sa_fee += _decimal(tx_split.get("sa_f"))
+            else:
+                broker_value += value
+                broker_fee += fee
+        else:
+            sa_value += value
+            sa_fee += fee
+
+    return sa_value, broker_value, sa_fee, broker_fee
+
+
 def _build_overview(period: PeriodRange, previous_period: PeriodRange, current_records, previous_records, current_transactions, previous_transactions, current_active_accounts: set[str], previous_active_accounts: set[str]):
     current_totals = _transaction_totals(current_transactions)
     previous_totals = _transaction_totals(previous_transactions)
@@ -400,6 +441,13 @@ def _build_overview(period: PeriodRange, previous_period: PeriodRange, current_r
 
     current_reactivated = len(current_active_accounts)
     previous_reactivated = len(previous_active_accounts)
+
+    cur_sa_v, cur_br_v, cur_sa_f, cur_br_f = _calculate_sa_broker_splits(
+        current_records, current_transactions, period.start, period.end
+    )
+    prev_sa_v, prev_br_v, prev_sa_f, prev_br_f = _calculate_sa_broker_splits(
+        previous_records, previous_transactions, previous_period.start, previous_period.end
+    )
 
     return [
         {
@@ -425,18 +473,30 @@ def _build_overview(period: PeriodRange, previous_period: PeriodRange, current_r
             "label": "Giá trị GD",
             "value": _money(current_totals["transaction_value"]),
             "previous_value": _money(previous_totals["transaction_value"]),
-            "previous_label": f"{previous_period.label}: {_money(previous_totals['transaction_value'])} VNĐ",
+            "previous_label": f"{previous_period.label}: {_money(previous_totals['transaction_value'])}",
             "growth_percent": _growth_percent(current_totals["transaction_value"], previous_totals["transaction_value"]),
             "unit": "VND",
+            "sa_value": _money(cur_sa_v),
+            "previous_sa_value": _money(prev_sa_v),
+            "sa_growth_percent": _growth_percent(cur_sa_v, prev_sa_v),
+            "broker_value": _money(cur_br_v),
+            "previous_broker_value": _money(prev_br_v),
+            "broker_growth_percent": _growth_percent(cur_br_v, prev_br_v),
         },
         {
             "key": "transaction_fee",
             "label": "Phí GD thực tế",
             "value": _money(current_totals["transaction_fee"]),
             "previous_value": _money(previous_totals["transaction_fee"]),
-            "previous_label": f"{previous_period.label}: {_money(previous_totals['transaction_fee'])} VNĐ",
+            "previous_label": f"{previous_period.label}: {_money(previous_totals['transaction_fee'])}",
             "growth_percent": _growth_percent(current_totals["transaction_fee"], previous_totals["transaction_fee"]),
             "unit": "VND",
+            "sa_value": _money(cur_sa_f),
+            "previous_sa_value": _money(prev_sa_f),
+            "sa_growth_percent": _growth_percent(cur_sa_f, prev_sa_f),
+            "broker_value": _money(cur_br_f),
+            "previous_broker_value": _money(prev_br_f),
+            "broker_growth_percent": _growth_percent(cur_br_f, prev_br_f),
         },
     ]
 

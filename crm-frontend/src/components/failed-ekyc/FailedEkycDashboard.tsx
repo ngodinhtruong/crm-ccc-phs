@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2, Loader2, PhoneCall, RotateCcw } from "lucide-react";
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ComposedChart, LabelList, Legend, Line, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { failedEkycApi } from "@/apis/failed-ekyc.api";
 import { CompareMode, GranularityMode } from "@/components/tickets/dashboard/CccDashboardUtils";
 import { FailedEkycDashboardData } from "@/types/failed-ekyc.type";
@@ -37,7 +37,35 @@ export function FailedEkycDashboard({granularity="MONTH",compareMode="NONE",date
       <ChartCard title="Xu hướng Failed eKYC phát sinh"><ResponsiveContainer width="100%" height={240}><AreaChart data={data?.daily_trends||[]} margin={{top:20,right:10,left:0,bottom:0}}><defs><linearGradient id="failedTrend" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#10b981" stopOpacity={0.45}/><stop offset="95%" stopColor="#10b981" stopOpacity={0.04}/></linearGradient></defs><CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#e2e8f0"/><XAxis dataKey="date" tick={{fontSize:11}}/><YAxis allowDecimals={false} tick={{fontSize:11}}/><Tooltip/><Area type="monotone" dataKey="count" name="Số case phát sinh" stroke="#059669" strokeWidth={3} fill="url(#failedTrend)" dot={{r:4,fill:"#059669"}} label={barValueLabel} isAnimationActive={false}/></AreaChart></ResponsiveContainer></ChartCard>
       <ChartCard title="Tỷ lệ liên hệ"><ResponsiveContainer width="100%" height={240}><PieChart><Pie data={contactRatio} dataKey="value" nameKey="name" cx="50%" cy="48%" innerRadius={50} outerRadius={80} paddingAngle={3} label isAnimationActive={false}>{contactRatio.map(item=><Cell key={item.name} fill={item.color}/>)}</Pie><Tooltip/><Legend verticalAlign="bottom" wrapperStyle={{fontSize:11}}/></PieChart></ResponsiveContainer></ChartCard>
       <ChartCard title="Top lỗi phổ biến"><ResponsiveContainer width="100%" height={240}><BarChart data={data?.top_errors||[]} layout="vertical" margin={{top:5,right:35,left:15,bottom:5}}><CartesianGrid horizontal={false} strokeDasharray="3 3" stroke="#e2e8f0"/><XAxis type="number" allowDecimals={false} tick={{fontSize:11}}/><YAxis type="category" dataKey="error" width={110} tick={{fontSize:10}}/><Tooltip/><Bar dataKey="count" name="Số case" fill="#0f766e" radius={[0,4,4,0]} label={{position:"right",fontSize:10,fontWeight:700,fill:"#334155"}} isAnimationActive={false}/></BarChart></ResponsiveContainer></ChartCard>
-      <ChartCard title="Hiệu quả xử lý theo PIC"><ResponsiveContainer width="100%" height={240}><BarChart data={data?.pic_performance||[]} layout="vertical" margin={{top:5,right:35,left:10,bottom:5}}><CartesianGrid horizontal={false} strokeDasharray="3 3" stroke="#e2e8f0"/><XAxis type="number" allowDecimals={false} tick={{fontSize:11}}/><YAxis type="category" dataKey="pic" width={80} tick={{fontSize:10}}/><Tooltip/><Legend wrapperStyle={{fontSize:11}}/><Bar dataKey="total" name="Tổng case" fill="#94a3b8" isAnimationActive={false}/><Bar dataKey="contacted" name="Đã liên hệ" fill="#0891b2" isAnimationActive={false}/><Bar dataKey="successful" name="Thành công" fill="#10b981" isAnimationActive={false}/></BarChart></ResponsiveContainer></ChartCard>
+      <ChartCard title="Hiệu quả xử lý theo PIC">
+        <ResponsiveContainer width="100%" height={240}>
+          <ComposedChart data={data?.pic_performance || []} barCategoryGap="25%" margin={{ top: 20, right: 10, left: 0, bottom: 5 }}>
+            <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#e2e8f0" />
+            <XAxis dataKey="pic" tick={{ fontSize: 11 }} padding={{ left: 20, right: 20 }} />
+            <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+            <Tooltip />
+            <Legend wrapperStyle={{ fontSize: 11 }} />
+            <Bar dataKey="contacted" name="Đã liên hệ" fill="#0891b2" radius={[3, 3, 0, 0]} isAnimationActive={false}>
+              <LabelList dataKey="contacted" position="top" style={{ fontSize: 10, fontWeight: 700, fill: "#0891b2" }} />
+            </Bar>
+            <Bar dataKey="successful" name="Thành công" fill="#10b981" radius={[3, 3, 0, 0]} isAnimationActive={false}>
+              <LabelList dataKey="successful" position="top" style={{ fontSize: 10, fontWeight: 700, fill: "#10b981" }} />
+            </Bar>
+            <Line
+              type="monotone"
+              dataKey="total"
+              name="Tổng case"
+              stroke="#64748b"
+              strokeWidth={3}
+              dot={{ fill: "#64748b", r: 5, stroke: "#fff", strokeWidth: 2 }}
+              activeDot={{ r: 7 }}
+              isAnimationActive={false}
+            >
+              <LabelList dataKey="total" position="top" style={{ fontSize: 10, fontWeight: 700, fill: "#475569" }} />
+            </Line>
+          </ComposedChart>
+        </ResponsiveContainer>
+      </ChartCard>
       <ChartCard title="Tổng số lượng khảo sát"><ResponsiveContainer width="100%" height={240}><BarChart data={data?.daily_trends||[]} margin={{top:20}}><CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#e2e8f0"/><XAxis dataKey="date" tick={{fontSize:11}}/><YAxis allowDecimals={false} tick={{fontSize:11}}/><Tooltip/><Bar dataKey="count" name="Tổng số lượng" fill="#43a047" radius={[3,3,0,0]} isAnimationActive={false} label={barValueLabel}/></BarChart></ResponsiveContainer></ChartCard>
       <ChartCard title="Kết quả CS liên hệ"><ResponsiveContainer width="100%" height={240}><BarChart data={data?.daily_trends||[]} margin={{top:20}}><CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#e2e8f0"/><XAxis dataKey="date" tick={{fontSize:11}}/><YAxis allowDecimals={false} tick={{fontSize:11}}/><Tooltip/><Legend wrapperStyle={{fontSize:11}}/><Bar dataKey="contact_success" name="Liên hệ KH thành công" fill="#2e7d32" isAnimationActive={false} label={barValueLabel}/><Bar dataKey="contact_failed" name="Không liên hệ được KH" fill="#e65100" isAnimationActive={false} label={barValueLabel}/><Bar dataKey="not_called" name="Không gọi" fill="#29838a" isAnimationActive={false} label={barValueLabel}/></BarChart></ResponsiveContainer></ChartCard>
       <ChartCard title="Chi tiết kết quả không gọi"><ResponsiveContainer width="100%" height={240}><BarChart data={data?.no_call_details||[]} margin={{top:20}}><CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#e2e8f0"/><XAxis dataKey="category" tick={{fontSize:11}}/><YAxis allowDecimals={false} tick={{fontSize:11}}/><Tooltip/><Bar dataKey="count" name="Số lượng" fill="#65951b" radius={[3,3,0,0]} isAnimationActive={false} label={barValueLabel}/></BarChart></ResponsiveContainer></ChartCard>

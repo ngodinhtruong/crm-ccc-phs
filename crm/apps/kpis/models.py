@@ -278,12 +278,10 @@ class KpiSection(TimeStampedModel):
 class KpiGroup(TimeStampedModel):
     GROUP_TYPE_MANUAL = "MANUAL"
     GROUP_TYPE_AUTO = "AUTO"
-    GROUP_TYPE_MIXED = "MIXED"
 
     GROUP_TYPE_CHOICES = [
         (GROUP_TYPE_MANUAL, "Nhập tay"),
         (GROUP_TYPE_AUTO, "Tự động"),
-        (GROUP_TYPE_MIXED, "Hỗn hợp"),
     ]
 
     period = models.ForeignKey(

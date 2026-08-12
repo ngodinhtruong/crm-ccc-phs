@@ -11,10 +11,12 @@ import {
   SaCallResult,
   SaCustomerAccountSuggestion,
   SaIcpGroup,
+  SaIcpRule,
   SaInterestLevel,
   SaRecordCreateFormState,
   SaSelectOption,
 } from "@/types/sale-admin.type";
+import { evaluateIcpRule } from "@/utils/icp-rule.util";
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
@@ -108,6 +110,7 @@ export function useSaRecordCreate() {
   const [callResults, setCallResults] = useState<SaCallResult[]>([]);
   const [interestLevels, setInterestLevels] = useState<SaInterestLevel[]>([]);
   const [icpGroups, setIcpGroups] = useState<SaIcpGroup[]>([]);
+  const [icpRules, setIcpRules] = useState<SaIcpRule[]>([]);
   const [accountStatusOptions, setAccountStatusOptions] = useState<SaSelectOption[]>([]);
   const [vipClassificationOptions, setVipClassificationOptions] = useState<SaSelectOption[]>([]);
 
@@ -209,6 +212,7 @@ export function useSaRecordCreate() {
         callResultData,
         interestLevelData,
         icpGroupData,
+        icpRuleData,
         accountStatusData,
         vipClassificationData,
         employeeData,
@@ -216,6 +220,7 @@ export function useSaRecordCreate() {
         saleAdminService.getCallResults(),
         saleAdminService.getInterestLevels(),
         saleAdminService.getIcpGroups(),
+        saleAdminService.getIcpRules().catch(() => []),
         saleAdminService.getAccountStatusOptions(),
         saleAdminService.getVipClassificationOptions(),
         masterDataApi.getEmployees().catch(() => []),
@@ -224,6 +229,7 @@ export function useSaRecordCreate() {
       setCallResults(callResultData);
       setInterestLevels(interestLevelData);
       setIcpGroups(icpGroupData);
+      setIcpRules(icpRuleData);
       setAccountStatusOptions(accountStatusData);
       setVipClassificationOptions(vipClassificationData);
 
@@ -248,6 +254,27 @@ export function useSaRecordCreate() {
     void loadMasterData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
+
+  // Auto evaluate ICP Group based on callResult & interestLevel
+  useEffect(() => {
+    if (!form.callResult) return;
+
+    const matchIcpId = evaluateIcpRule(
+      icpRules,
+      form.callResult,
+      form.interestLevel,
+      callResults,
+      interestLevels,
+      icpGroups
+    );
+
+    if (matchIcpId) {
+      setForm((prev) => {
+        if (prev.icpGroup === String(matchIcpId)) return prev;
+        return { ...prev, icpGroup: String(matchIcpId) };
+      });
+    }
+  }, [form.callResult, form.interestLevel, icpRules, callResults, interestLevels, icpGroups]);
 
   useEffect(() => {
     const keyword = normalizeAccountNoInput(debouncedAccountQuery || "");

@@ -9,7 +9,7 @@ import {
 } from "@/hooks/useCurrentUserPermissions";
 import { kpiService } from "@/services/kpi.service";
 import { saleAdminApi } from "@/apis/sale-admin.api";
-import { SaIcpGroup } from "@/types/sale-admin.type";
+import { SaCallResult, SaIcpGroup, SaIcpRule, SaInterestLevel } from "@/types/sale-admin.type";
 import {
   KpiGateConfigPayload,
   KpiGateDefinitionItem,
@@ -161,7 +161,11 @@ export function useKpiConfig() {
     useState<KpiWeightValidation | null>(null);
 
   const [icpGroups, setIcpGroups] = useState<SaIcpGroup[]>([]);
+  const [icpRules, setIcpRules] = useState<SaIcpRule[]>([]);
+  const [callResults, setCallResults] = useState<SaCallResult[]>([]);
+  const [interestLevels, setInterestLevels] = useState<SaInterestLevel[]>([]);
   const [loadingIcp, setLoadingIcp] = useState(false);
+  const [loadingIcpRules, setLoadingIcpRules] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -396,12 +400,22 @@ export function useKpiConfig() {
   const fetchIcpGroups = useCallback(async () => {
     try {
       setLoadingIcp(true);
-      const groups = await saleAdminApi.getIcpGroups(true);
+      setLoadingIcpRules(true);
+      const [groups, rules, crs, ils] = await Promise.all([
+        saleAdminApi.getIcpGroups(true),
+        saleAdminApi.getIcpRules(true),
+        saleAdminApi.getCallResults(),
+        saleAdminApi.getInterestLevels(),
+      ]);
       setIcpGroups(groups);
+      setIcpRules(rules);
+      setCallResults(crs);
+      setInterestLevels(ils);
     } catch (err: unknown) {
-      console.error("Lỗi khi tải danh sách ICP groups:", err);
+      console.error("Lỗi khi tải dữ liệu ICP:", err);
     } finally {
       setLoadingIcp(false);
+      setLoadingIcpRules(false);
     }
   }, []);
 
@@ -455,6 +469,65 @@ export function useKpiConfig() {
         await fetchIcpGroups();
       } catch (err: unknown) {
         const errMsg = getErrorMessage(err, "Ngưng sử dụng phân khúc ICP thất bại");
+        setError(errMsg);
+        throw err;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [fetchIcpGroups]
+  );
+
+  const createIcpRule = useCallback(
+    async (payload: Partial<SaIcpRule>) => {
+      try {
+        setSaving(true);
+        setError("");
+        const created = await saleAdminApi.createIcpRule(payload);
+        setNotice(`Đã tạo quy tắc ICP: Ưu tiên ${created.priority}`);
+        await fetchIcpGroups();
+        return created;
+      } catch (err: unknown) {
+        const errMsg = getErrorMessage(err, "Tạo quy tắc ICP thất bại");
+        setError(errMsg);
+        throw err;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [fetchIcpGroups]
+  );
+
+  const updateIcpRule = useCallback(
+    async (id: number, payload: Partial<SaIcpRule>) => {
+      try {
+        setSaving(true);
+        setError("");
+        const updated = await saleAdminApi.updateIcpRule(id, payload);
+        setNotice(`Đã cập nhật quy tắc ICP thành công.`);
+        await fetchIcpGroups();
+        return updated;
+      } catch (err: unknown) {
+        const errMsg = getErrorMessage(err, "Cập nhật quy tắc ICP thất bại");
+        setError(errMsg);
+        throw err;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [fetchIcpGroups]
+  );
+
+  const deleteIcpRule = useCallback(
+    async (id: number) => {
+      try {
+        setSaving(true);
+        setError("");
+        await saleAdminApi.deleteIcpRule(id);
+        setNotice("Đã xóa quy tắc ICP thành công.");
+        await fetchIcpGroups();
+      } catch (err: unknown) {
+        const errMsg = getErrorMessage(err, "Xóa quy tắc ICP thất bại");
         setError(errMsg);
         throw err;
       } finally {
@@ -1181,11 +1254,18 @@ export function useKpiConfig() {
     markMetricInactive,
 
     icpGroups,
+    icpRules,
+    callResults,
+    interestLevels,
     loadingIcp,
+    loadingIcpRules,
     fetchIcpGroups,
     createIcpGroup,
     updateIcpGroup,
     deleteIcpGroup,
+    createIcpRule,
+    updateIcpRule,
+    deleteIcpRule,
 
     saveWeights,
     saveProfile,

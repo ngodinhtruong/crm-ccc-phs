@@ -351,3 +351,38 @@ class SaRecordAuditLog(models.Model):
 
     def __str__(self):
         return f"{self.sa_record_id} - {self.action_type}"
+
+
+class SaIcpRule(TimeStampedModel):
+    call_result = models.ForeignKey(
+        SaCallResult,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="icp_rules",
+    )
+    interest_level = models.ForeignKey(
+        SaInterestLevel,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="icp_rules",
+    )
+    icp_group = models.ForeignKey(
+        SaIcpGroup,
+        on_delete=models.CASCADE,
+        related_name="rules",
+    )
+    priority = models.IntegerField(default=1)
+    is_active = models.BooleanField(default=True)
+    description = models.CharField(max_length=255, null=True, blank=True)
+
+    class Meta:
+        db_table = "sa_icp_rules"
+        ordering = ["priority", "id"]
+
+    def __str__(self):
+        cr = self.call_result.result_name if self.call_result else "*"
+        il = self.interest_level.level_name if self.interest_level else "*"
+        icp = self.icp_group.icp_name if self.icp_group else "?"
+        return f"[{self.priority}] {cr} + {il} -> {icp}"
