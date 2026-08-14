@@ -140,3 +140,19 @@ class ScopeType:
     BRANCH = "BRANCH"
     MULTI_BRANCH = "MULTI_BRANCH"
     ALL = "ALL"
+
+
+# Lệnh coi như đã khớp — mọi số liệu giá trị giao dịch đều lọc theo bộ này.
+#
+# Nguồn đẩy sang không thống nhất một bộ mã (core dùng MATCHED, file đối soát
+# dùng FILLED/EXECUTED), nên phải nhận cả ba cách gọi. Đây là bản duy nhất;
+# trước đây tuple này bị chép y hệt ở ba module dashboard và sửa một chỗ thì
+# hai chỗ kia lệch theo.
+MATCHED_ORDER_STATUSES = (
+    "MATCHED",
+    "PARTIALLY_MATCHED",
+    "COMPLETED",
+    "FILLED",
+    "PARTIALLY_FILLED",
+    "EXECUTED",
+)

@@ -30,6 +30,8 @@ from apps.accounts.scopes import (
     filter_companies_by_user,
     filter_customers_by_user,
 )
+from apps.common.constants import PermissionCode
+from apps.customers.insight_360 import build_customer_360
 
 class CustomerTypeViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
@@ -261,12 +263,15 @@ class MembershipTierViewSet(viewsets.ModelViewSet):
 class CustomerViewSet(viewsets.ModelViewSet):
     permission_classes = [HasActionPermission]
     serializer_class = CustomerSerializer
-    
+
     permission_action_map = {
         "create": "CUSTOMER_CREATE",
         "update": "CUSTOMER_AMEND",
         "partial_update": "CUSTOMER_AMEND",
         "destroy": "CUSTOMER_AMEND",
+        # Màn 360 gộp cả giao dịch, cuộc gọi và điểm khảo sát của khách nên
+        # phải có quyền riêng, không dùng chung quyền xem hồ sơ khách.
+        "insight_360": PermissionCode.CUSTOMER_360_VIEW,
     }
 
     def get_queryset(self):
@@ -463,6 +468,17 @@ class CustomerViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         serializer.save(updated_by_user=self.request.user)
+
+    @action(detail=True, methods=["get"], url_path="insight-360")
+    def insight_360(self, request, pk=None):
+        """
+        Số liệu tổng hợp cho màn Customer 360.
+
+        Dùng ``get_object()`` chứ không truy thẳng theo pk: hàm đó đã chạy qua
+        ``get_queryset()``, tức đã lọc theo phạm vi dữ liệu của người dùng, nên
+        khách ngoài phạm vi trả 404 thay vì lộ số liệu.
+        """
+        return Response(build_customer_360(self.get_object()))
 
 
 class CustomerAccountViewSet(viewsets.ModelViewSet):

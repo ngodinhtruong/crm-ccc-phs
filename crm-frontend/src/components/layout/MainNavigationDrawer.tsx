@@ -773,6 +773,12 @@ export function MainNavigationDrawer({
   const canViewCccOnlyMenus = admin || availableWorkspaces.includes("CCC");
   const kpiDashboardUser = isSaleAdminKpiDashboardUser(currentUser);
 
+  // Customer 360 gộp cả giao dịch, cuộc gọi và điểm khảo sát nên có quyền
+  // riêng; ở trong workspace CCC là chưa đủ để thấy menu này.
+  const canViewCustomer360 =
+    canViewCccOnlyMenus &&
+    (admin || getPermissionCodes(currentUser).includes("CUSTOMER_360_VIEW"));
+
   const openPanel = (
     panel: PanelKey,
     workspace: WorkspaceCode,
@@ -903,21 +909,23 @@ export function MainNavigationDrawer({
 
               {canViewCccOnlyMenus && (
                 <>
-                  <Link
-                    href="/customers/360"
-                    onMouseEnter={() => {
-                      setActivePanel(null);
-                      setActivePanelWorkspace(null);
-                    }}
-                    onClick={() => handleNavigate("CCC")}
-                    className="flex h-[40px] items-center gap-4 px-5 text-white/80 transition hover:bg-white/10 hover:text-white"
-                  >
-                    <UsersRound size={27} className="shrink-0 text-white/70" />
+                  {canViewCustomer360 && (
+                    <Link
+                      href="/customers/360"
+                      onMouseEnter={() => {
+                        setActivePanel(null);
+                        setActivePanelWorkspace(null);
+                      }}
+                      onClick={() => handleNavigate("CCC")}
+                      className="flex h-[40px] items-center gap-4 px-5 text-white/80 transition hover:bg-white/10 hover:text-white"
+                    >
+                      <UsersRound size={27} className="shrink-0 text-white/70" />
 
-                    <span className="flex-1 text-[10px] font-semibold tracking-wide">
-                      CUSTOMER 360
-                    </span>
-                  </Link>
+                      <span className="flex-1 text-[10px] font-semibold tracking-wide">
+                        CUSTOMER 360
+                      </span>
+                    </Link>
+                  )}
 
                   <button
                     type="button"

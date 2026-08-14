@@ -14,6 +14,7 @@ import {
   PaginatedResponse,
   SelectOption,
 } from "@/types/customer.type";
+import { Customer360 } from "@/types/customer-360.type";
 
 export const customerApi = {
   getCustomers: async (
@@ -32,6 +33,15 @@ export const customerApi = {
   getCustomerById: async (id: number): Promise<CustomerDetail> => {
     const response = await api.get<CustomerDetail>(
       `/api/customers/customers/${id}/`
+    );
+
+    return response.data;
+  },
+
+  /** Số liệu tổng hợp cho màn 360. Cần quyền CUSTOMER_360_VIEW. */
+  getCustomer360: async (id: number): Promise<Customer360> => {
+    const response = await api.get<Customer360>(
+      `/api/customers/customers/${id}/insight-360/`
     );
 
     return response.data;

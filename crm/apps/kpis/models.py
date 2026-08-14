@@ -798,6 +798,15 @@ class TransactionLog(TimeStampedModel):
     transaction_value = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal("0.00"))
     transaction_fee = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal("0.00"))
     order_status = models.CharField(max_length=50, db_index=True)
+
+    # Hai cột có trong file giao dịch gốc nhưng nguồn hiện chưa đẩy sang: tiểu
+    # khoản (hậu tố sau số tài khoản) và thuế bán. Để trống cho tới khi nguồn
+    # cấp dữ liệu; không module nào đang đọc nên không đặt default 0 — 0 đồng
+    # thuế và "chưa có số liệu thuế" là hai chuyện khác nhau.
+    sub_account = models.CharField(max_length=20, null=True, blank=True)
+    sell_tax = models.DecimalField(
+        max_digits=20, decimal_places=2, null=True, blank=True
+    )
     product_code = models.CharField(max_length=100, null=True, blank=True)
     source_system = models.CharField(max_length=100, null=True, blank=True)
 
