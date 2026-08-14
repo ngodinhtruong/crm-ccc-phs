@@ -254,8 +254,9 @@ export function SurveyDashboardSection({
           DASHBOARD KẾT QUẢ KHẢO SÁT CSAT
         </h2>
         <p className="text-xs text-slate-500">
-          {data.period.label} · {formatIsoDate(data.period.start)} –{" "}
-          {formatIsoDate(data.period.end)}
+          {data.granularity === "custom"
+            ? data.period.label
+            : `${data.period.label} · ${formatIsoDate(data.period.start)} – ${formatIsoDate(data.period.end)}`}
         </p>
       </div>
 

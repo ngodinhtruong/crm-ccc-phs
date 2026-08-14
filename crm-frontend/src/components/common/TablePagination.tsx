@@ -12,6 +12,9 @@ export function TablePagination({
   onPageSizeChange,
   onPrevious,
   onNext,
+  simplified = false,
+  hidePageSizeSelect = false,
+  hideRecordSummary = false,
 }: {
   fromRecord: number;
   toRecord: number;
@@ -24,16 +27,23 @@ export function TablePagination({
   onPageSizeChange?: (pageSize: number) => void;
   onPrevious: () => void;
   onNext: () => void;
+  simplified?: boolean;
+  hidePageSizeSelect?: boolean;
+  hideRecordSummary?: boolean;
 }) {
   const canPrevious = page > 1 && !loading;
   const canNext = page < totalPages && !loading;
-  const showPageSizeSelect =
-    typeof pageSize === "number" && typeof onPageSizeChange === "function";
+  const showSelect =
+    !simplified &&
+    !hidePageSizeSelect &&
+    typeof pageSize === "number" &&
+    typeof onPageSizeChange === "function";
+  const showSummary = !simplified && !hideRecordSummary;
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-700">
       <div className="flex flex-wrap items-center gap-3">
-        {showPageSizeSelect && (
+        {showSelect && (
           <label className="flex items-center gap-2">
             <span className="text-slate-500">Hiển thị</span>
             <select
@@ -53,12 +63,14 @@ export function TablePagination({
           </label>
         )}
 
-        <span>
-          {fromRecord} - {toRecord} /{" "}
-          <span className="font-semibold">{count}</span>
-        </span>
+        {showSummary && (
+          <span>
+            {fromRecord} - {toRecord} /{" "}
+            <span className="font-semibold">{count}</span>
+          </span>
+        )}
 
-        <span className="text-slate-400">
+        <span className="text-slate-500 font-medium">
           Trang {count === 0 ? 0 : page}/{count === 0 ? 0 : totalPages}
         </span>
       </div>

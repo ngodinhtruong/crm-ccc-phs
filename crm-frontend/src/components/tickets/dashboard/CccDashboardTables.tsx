@@ -20,15 +20,17 @@ import { formatDate } from "./CccDashboardUtils";
 function TableCard({
   title,
   description,
+  headerRight,
   children,
 }: {
   title: string;
   description?: string;
+  headerRight?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-xs">
-      <div className="flex items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/60 px-3 py-1.5">
+    <div className="flex h-full flex-col overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-xs">
+      <div className="flex items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/60 px-3 py-1.5 shrink-0">
         <div className="flex items-center gap-2">
           <div className="flex h-5 w-5 items-center justify-center rounded-md bg-amber-500 text-white font-black text-[10px] shadow-xs">
             !
@@ -40,9 +42,11 @@ function TableCard({
             )}
           </div>
         </div>
+
+        {headerRight && <div>{headerRight}</div>}
       </div>
 
-      {children}
+      <div className="flex-1 overflow-hidden flex flex-col">{children}</div>
     </div>
   );
 }
@@ -266,9 +270,32 @@ export function TicketListTable({
     visibleItems.length === 0;
 
   return (
-    <TableCard title={title} description={description}>
+    <TableCard
+      title={title}
+      description={description}
+      headerRight={
+        <TablePagination
+          simplified
+          fromRecord={fromRecord}
+          toRecord={toRecord}
+          count={count}
+          page={currentPage}
+          totalPages={totalPages}
+          loading={loading}
+          pageSize={pageSize}
+          pageSizeOptions={CCC_PENDING_TICKET_PAGE_SIZES}
+          onPageSizeChange={changePageSize}
+          onPrevious={() => setPage((current) => Math.max(1, current - 1))}
+          onNext={() =>
+            setPage((current) =>
+              Math.min(totalPages || current, current + 1)
+            )
+          }
+        />
+      }
+    >
       <div
-        className="max-h-[155px] overflow-auto overscroll-contain"
+        className="max-h-[185px] overflow-auto overscroll-contain"
         aria-busy={loading}
       >
         <table className="w-full min-w-[960px] table-fixed text-left text-xs">
@@ -337,35 +364,12 @@ export function TicketListTable({
         </table>
       </div>
 
-      <div className="border-t border-slate-200/80 px-3 py-1.5">
-        {isServerPagination && error && data && (
-          <p className="mb-1 text-[11px] text-red-600">{error}</p>
-        )}
-
-        <TablePagination
-          fromRecord={fromRecord}
-          toRecord={toRecord}
-          count={count}
-          page={currentPage}
-          totalPages={totalPages}
-          loading={loading}
-          pageSize={pageSize}
-          pageSizeOptions={CCC_PENDING_TICKET_PAGE_SIZES}
-          onPageSizeChange={changePageSize}
-          onPrevious={() => setPage((current) => Math.max(1, current - 1))}
-          onNext={() =>
-            setPage((current) =>
-              Math.min(totalPages || current, current + 1)
-            )
-          }
-        />
-
-        {isServerPagination && loading && data && (
-          <p className="mt-1 text-[10px] text-[#059669]">
-            Đang cập nhật trang dữ liệu...
-          </p>
-        )}
-      </div>
+      {(isServerPagination && (error || loading) && data) && (
+        <div className="px-3 py-1 text-[10px]">
+          {error && <p className="text-red-600">{error}</p>}
+          {loading && <p className="text-[#059669]">Đang cập nhật dữ liệu...</p>}
+        </div>
+      )}
     </TableCard>
   );
 }

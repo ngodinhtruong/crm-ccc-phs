@@ -211,7 +211,7 @@ export type SurveySeriesItem = {
 };
 
 export type SurveyDashboard = {
-  granularity: SurveyGranularity;
+  granularity: SurveyGranularity | "custom";
   period: { code: string; label: string; start: string; end: string };
   previous_period: { code: string; label: string };
   metrics: SurveyMetrics;

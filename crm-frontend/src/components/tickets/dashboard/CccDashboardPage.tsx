@@ -34,9 +34,11 @@ import {
   formatNumber,
 } from "./CccDashboardUtils";
 import { userService } from "@/apis/user.api";
+import { ekycApi } from "@/apis/ekyc.api";
 import { chatbotDashboardService } from "@/services/chatbot-dashboard.service";
 import { externalErrorService } from "@/services/external-error.service";
 import { surveyApi } from "@/apis/survey.api";
+import { defaultSurveyFilters } from "@/utils/survey-period.util";
 import { useExternalErrorDashboard } from "@/hooks/useExternalErrorDashboard";
 import { ExecutiveOverviewGrid } from "@/components/external-errors/ExternalErrorDashboardPage";
 
@@ -208,12 +210,22 @@ function SurveyDashboardWrapper({
   onlyTrendChart?: boolean;
 }) {
   const surveyGranularity = granularity === "QUARTER" ? "quarter" : granularity === "YEAR" ? "year" : "month";
-  const filters = {
-    granularity: surveyGranularity as "month" | "quarter" | "year",
-    period: "",
-    startDate: dateFrom || "",
-    endDate: dateTo || "",
-  };
+
+  const isCustomRange = Boolean(
+    dateFrom &&
+      dateTo &&
+      typeof window !== "undefined" &&
+      (sessionStorage.getItem("ccc_dashboard_date_from") || sessionStorage.getItem("survey_dashboard_start_date"))
+  );
+
+  const filters = isCustomRange
+    ? {
+        granularity: surveyGranularity as "month" | "quarter" | "year",
+        period: "",
+        startDate: dateFrom || "",
+        endDate: dateTo || "",
+      }
+    : defaultSurveyFilters(surveyGranularity as "month" | "quarter" | "year");
 
   return <SurveyDashboardSection filters={filters} onlyTrendChart={onlyTrendChart} />;
 }
@@ -960,92 +972,129 @@ export function CccDashboardPage() {
     loading: true,
   });
 
-  useEffect(() => {
-    if (activeDashboardTab !== "ccc" && activeDashboardTab !== "tickets") return;
+  const [tabRefreshKeys, setTabRefreshKeys] = useState({
+    ccc: 0,
+    tickets: 0,
+    chatbot: 0,
+    ekyc: 0,
+    errors: 0,
+    surveys: 0,
+  });
 
-    let isMounted = true;
-    const fetchMetrics = async () => {
-      try {
-        const surveyGranularity = granularity === "QUARTER" ? "quarter" : granularity === "YEAR" ? "year" : "month";
-        const surveyParams = dashboard.dateFrom && dashboard.dateTo
-          ? { granularity: surveyGranularity as any, period: "", start_date: dashboard.dateFrom, end_date: dashboard.dateTo }
-          : { granularity: surveyGranularity as any, period: "" };
+  const fetchMetrics = useCallback(async () => {
+    try {
+      const surveyGranularity = granularity === "QUARTER" ? "quarter" : granularity === "YEAR" ? "year" : "month";
+      const isCustomSurveyRange = Boolean(
+        dashboard.dateFrom &&
+          dashboard.dateTo &&
+          typeof window !== "undefined" &&
+          (sessionStorage.getItem("ccc_dashboard_date_from") || sessionStorage.getItem("survey_dashboard_start_date"))
+      );
+      const surveyParams = isCustomSurveyRange
+        ? { granularity: surveyGranularity as any, period: "", start_date: dashboard.dateFrom, end_date: dashboard.dateTo }
+        : { granularity: surveyGranularity as any, period: "" };
 
-        const [usersRes, chatbotRes, errorRes, surveyRes] = await Promise.allSettled([
-          userService.getUsers({ page: "1" }),
-          chatbotDashboardService.getOverview({
-            start_date: dashboard.dateFrom || undefined,
-            end_date: dashboard.dateTo || undefined,
-            granularity: (granularity === "QUARTER" ? "quarter" : granularity === "YEAR" ? "year" : "month") as any,
-          }),
-          externalErrorService.getDashboardOverview({
-            date_from: dashboard.dateFrom || undefined,
-            date_to: dashboard.dateTo || undefined,
-          }),
-          surveyApi.dashboard(surveyParams),
-        ]);
+      const [ekycRes, chatbotRes, errorRes, surveyRes] = await Promise.allSettled([
+        ekycApi.getDashboard({
+          call_date_from: dashboard.dateFrom || undefined,
+          call_date_to: dashboard.dateTo || undefined,
+          granularity,
+          compare_mode: compareMode,
+        }),
+        chatbotDashboardService.getOverview({
+          start_date: dashboard.dateFrom || undefined,
+          end_date: dashboard.dateTo || undefined,
+          granularity: (granularity === "QUARTER" ? "quarter" : granularity === "YEAR" ? "year" : "month") as any,
+        }),
+        externalErrorService.getDashboardOverview({
+          date_from: dashboard.dateFrom || undefined,
+          date_to: dashboard.dateTo || undefined,
+        }),
+        surveyApi.dashboard(surveyParams),
+      ]);
 
-        if (!isMounted) return;
+      const ekycTotal = ekycRes.status === "fulfilled" ? ekycRes.value?.total_records || 0 : 0;
 
-        const usersCount = usersRes.status === "fulfilled" ? usersRes.value.count || 0 : 0;
+      const chatbotSummary = chatbotRes.status === "fulfilled" ? chatbotRes.value.summary : null;
+      const chatbotReceived = chatbotSummary?.total_received?.value ?? 0;
+      const chatbotBotDone = chatbotSummary?.bot_done?.value ?? 0;
+      const chatbotCcc = chatbotSummary?.ccc?.value ?? 0;
 
-        const chatbotSummary = chatbotRes.status === "fulfilled" ? chatbotRes.value.summary : null;
-        const chatbotReceived = chatbotSummary?.total_received?.value ?? 0;
-        const chatbotBotDone = chatbotSummary?.bot_done?.value ?? 0;
-        const chatbotCcc = chatbotSummary?.ccc?.value ?? 0;
+      const errorOverview = errorRes.status === "fulfilled" ? errorRes.value : null;
+      const errorSummary = errorOverview?.summary;
+      const externalTotalErrors = errorSummary?.total_errors ?? 0;
+      const externalNeedReview = errorSummary?.need_review_errors ?? 0;
+      const externalClassificationRate = errorSummary?.classification_rate ?? 0;
 
-        const errorOverview = errorRes.status === "fulfilled" ? errorRes.value : null;
-        const errorSummary = errorOverview?.summary;
-        const externalTotalErrors = errorSummary?.total_errors ?? 0;
-        const externalNeedReview = errorSummary?.need_review_errors ?? 0;
-        const externalClassificationRate = errorSummary?.classification_rate ?? 0;
-
-        let externalGrowth: number | null = null;
-        const trendData = errorOverview?.charts?.trend?.data || [];
-        if (trendData.length >= 2) {
-          const curr = trendData[trendData.length - 1]?.value ?? 0;
-          const prev = trendData[trendData.length - 2]?.value ?? 0;
-          if (prev > 0) {
-            externalGrowth = Math.round(((curr - prev) / prev) * 100);
-          } else if (curr > 0) {
-            externalGrowth = 100;
-          } else {
-            externalGrowth = 0;
-          }
-        }
-
-        const surveyDashboard = surveyRes.status === "fulfilled" ? surveyRes.value : null;
-        const surveyMetrics = surveyDashboard?.metrics;
-        const surveyAvgScore = surveyMetrics?.average_score ?? null;
-        const surveyCsatRate = surveyMetrics?.csat_percent ?? null;
-        const surveyRatedCount = surveyMetrics?.rated ?? null;
-
-        setSystemMetrics({
-          totalUsers: usersCount,
-          chatbotReceived,
-          chatbotBotDone,
-          chatbotCcc,
-          externalTotalErrors,
-          externalNeedReview,
-          externalClassificationRate,
-          externalGrowth,
-          surveyAvgScore,
-          surveyCsatRate,
-          surveyRatedCount,
-          loading: false,
-        });
-      } catch {
-        if (isMounted) {
-          setSystemMetrics((prev) => ({ ...prev, loading: false }));
+      let externalGrowth: number | null = null;
+      const trendData = errorOverview?.charts?.trend?.data || [];
+      if (trendData.length >= 2) {
+        const curr = trendData[trendData.length - 1]?.value ?? 0;
+        const prev = trendData[trendData.length - 2]?.value ?? 0;
+        if (prev > 0) {
+          externalGrowth = Math.round(((curr - prev) / prev) * 100);
+        } else if (curr > 0) {
+          externalGrowth = 100;
+        } else {
+          externalGrowth = 0;
         }
       }
-    };
 
+      const surveyDashboard = surveyRes.status === "fulfilled" ? surveyRes.value : null;
+      const surveyMetrics = surveyDashboard?.metrics;
+      const surveyAvgScore = surveyMetrics?.average_score ?? null;
+      const surveyCsatRate = surveyMetrics?.csat_percent ?? null;
+      const surveyRatedCount = surveyMetrics?.rated ?? null;
+
+      setSystemMetrics({
+        totalUsers: ekycTotal,
+        chatbotReceived,
+        chatbotBotDone,
+        chatbotCcc,
+        externalTotalErrors,
+        externalNeedReview,
+        externalClassificationRate,
+        externalGrowth,
+        surveyAvgScore,
+        surveyCsatRate,
+        surveyRatedCount,
+        loading: false,
+      });
+    } catch {
+      setSystemMetrics((prev) => ({ ...prev, loading: false }));
+    }
+  }, [compareMode, dashboard.dateFrom, dashboard.dateTo, granularity]);
+
+  useEffect(() => {
+    if (activeDashboardTab !== "ccc" && activeDashboardTab !== "tickets") return;
     void fetchMetrics();
-    return () => {
-      isMounted = false;
-    };
-  }, [activeDashboardTab, dashboard.dateFrom, dashboard.dateTo, granularity]);
+  }, [activeDashboardTab, fetchMetrics]);
+
+  const handleReload = useCallback(() => {
+    if (activeDashboardTab === "ccc") {
+      dashboard.reload();
+      void fetchMetrics();
+      setTabRefreshKeys((prev) => ({
+        ccc: prev.ccc + 1,
+        tickets: prev.tickets + 1,
+        chatbot: prev.chatbot + 1,
+        ekyc: prev.ekyc + 1,
+        errors: prev.errors + 1,
+        surveys: prev.surveys + 1,
+      }));
+    } else if (activeDashboardTab === "tickets") {
+      dashboard.reload();
+      setTabRefreshKeys((prev) => ({ ...prev, tickets: prev.tickets + 1 }));
+    } else if (activeDashboardTab === "chatbot") {
+      setTabRefreshKeys((prev) => ({ ...prev, chatbot: prev.chatbot + 1 }));
+    } else if (activeDashboardTab === "ekyc") {
+      setTabRefreshKeys((prev) => ({ ...prev, ekyc: prev.ekyc + 1 }));
+    } else if (activeDashboardTab === "errors") {
+      setTabRefreshKeys((prev) => ({ ...prev, errors: prev.errors + 1 }));
+    } else if (activeDashboardTab === "surveys") {
+      setTabRefreshKeys((prev) => ({ ...prev, surveys: prev.surveys + 1 }));
+    }
+  }, [activeDashboardTab, dashboard, fetchMetrics]);
 
   const report = dashboard.data?.report;
   const reportMonthCount = getMonthCount(report?.range_from, report?.range_to);
@@ -1158,159 +1207,108 @@ export function CccDashboardPage() {
 
           <button
             type="button"
-            onClick={dashboard.reload}
+            onClick={handleReload}
             disabled={busy}
             className="flex h-8 items-center gap-1.5 rounded-lg bg-gradient-to-r from-emerald-500 to-emerald-600 px-3.5 text-xs font-semibold text-white shadow-sm hover:from-emerald-600 hover:to-emerald-700 disabled:opacity-50"
             title="Bỏ qua cache và tải dữ liệu mới từ backend"
           >
-            <RefreshCw size={14} />
+            <RefreshCw size={14} className={busy ? "animate-spin" : ""} />
             Làm mới
           </button>
         </div>
       }
     >
       <div className="space-y-3.5">
-        {/* Executive Header Banner - Ultra-Compact Green & White theme */}
-        <div className="relative overflow-hidden rounded-xl border border-emerald-100/80 bg-gradient-to-r from-emerald-50/70 via-white to-teal-50/70 px-3 py-1.5 shadow-2xs">
-          <div className="relative flex flex-wrap items-center justify-between gap-2">
-            <div className="flex flex-wrap items-center gap-2.5">
-              <div className="flex items-center gap-1.5">
-                <span className="flex h-2 w-2 rounded-full bg-emerald-500 shadow-xs shadow-emerald-500/80" />
-                <h1 className="text-xs font-black uppercase tracking-tight text-slate-900">
-                  {activeDashboardTab === "tickets"
-                    ? "Dashboard Ticket CCC"
-                    : activeDashboardTab === "chatbot"
-                    ? "Dashboard Chatbot"
-                    : activeDashboardTab === "ekyc"
-                    ? "Dashboard eKYC & Failed eKYC"
-                    : activeDashboardTab === "errors"
-                    ? "Dashboard Lỗi Hệ Thống"
-                    : activeDashboardTab === "surveys"
-                    ? "Dashboard Khảo Sát"
-                    : "Dashboard CCC"}
-                </h1>
-              </div>
+        {/* Dashboard Switcher Nav Tabs - Sticky Header */}
+        <div className="sticky top-[100px] z-20 -mx-4 -mt-4 bg-[#eef6f2]/95 px-4 pb-2 pt-2 backdrop-blur-md border-b border-slate-200/80 shadow-2xs">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setActiveDashboardTab("ccc")}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs ${
+                activeDashboardTab === "ccc"
+                  ? "bg-[#059669] text-white shadow-2xs ring-1 ring-emerald-600 font-bold"
+                  : "border border-slate-200/80 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 shadow-2xs font-semibold"
+              }`}
+              title="Xem Tổng Quan Dashboard Executive CCC"
+            >
+              <Gauge size={13} className={activeDashboardTab === "ccc" ? "text-white" : "text-[#059669]"} />
+              <span>Dashboard CCC</span>
+            </button>
 
-              <span className="text-slate-300">•</span>
+            <button
+              type="button"
+              onClick={() => setActiveDashboardTab("tickets")}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs ${
+                activeDashboardTab === "tickets"
+                  ? "bg-emerald-600 text-white shadow-2xs ring-1 ring-emerald-600 font-bold"
+                  : "border border-slate-200/80 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 shadow-2xs font-semibold"
+              }`}
+              title="Xem Chi Tiết Dashboard Ticket CCC"
+            >
+              <Ticket size={13} className={activeDashboardTab === "tickets" ? "text-white" : "text-emerald-600"} />
+              <span>Ticket CCC</span>
+            </button>
 
-              <div className="flex flex-wrap items-center gap-2 text-[11px]">
-                {report && (
-                  <span className="inline-flex items-center gap-1 rounded-md bg-emerald-100/80 px-2 py-0.5 font-bold text-emerald-800 border border-emerald-200">
-                    Báo cáo {reportMonthCount} tháng
-                  </span>
-                )}
+            <button
+              type="button"
+              onClick={() => setActiveDashboardTab("chatbot")}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs ${
+                activeDashboardTab === "chatbot"
+                  ? "bg-teal-600 text-white shadow-2xs ring-1 ring-teal-600 font-bold"
+                  : "border border-slate-200/80 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 shadow-2xs font-semibold"
+              }`}
+              title="Xem Dashboard Chatbot"
+            >
+              <BotMessageSquare size={13} className={activeDashboardTab === "chatbot" ? "text-white" : "text-teal-600"} />
+              <span>Dashboard Chatbot</span>
+            </button>
 
-                {report && (
-                  <span className="font-semibold text-slate-600">
-                    {formatDate(report.range_from)} - {formatDate(report.range_to)}
-                  </span>
-                )}
+            <button
+              type="button"
+              onClick={() => setActiveDashboardTab("ekyc")}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs ${
+                activeDashboardTab === "ekyc"
+                  ? "bg-sky-600 text-white shadow-2xs ring-1 ring-sky-600 font-bold"
+                  : "border border-slate-200/80 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 shadow-2xs font-semibold"
+              }`}
+              title="Xem Dashboard eKYC & Failed eKYC"
+            >
+              <Users size={13} className={activeDashboardTab === "ekyc" ? "text-white" : "text-sky-600"} />
+              <span>eKYC & Failed eKYC</span>
+            </button>
 
-                <span className="text-slate-300">•</span>
+            <button
+              type="button"
+              onClick={() => setActiveDashboardTab("errors")}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs ${
+                activeDashboardTab === "errors"
+                  ? "bg-amber-600 text-white shadow-2xs ring-1 ring-amber-600 font-bold"
+                  : "border border-slate-200/80 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 shadow-2xs font-semibold"
+              }`}
+              title="Xem Dashboard Lỗi Hệ Thống & Bên Ngoài"
+            >
+              <AlertTriangle size={13} className={activeDashboardTab === "errors" ? "text-white" : "text-amber-600"} />
+              <span>Lỗi Hệ Thống</span>
+            </button>
 
-                <span className="text-slate-500">
-                  Cập nhật: {formatDateTime(dashboard.data?.generated_at)}
-                </span>
-              </div>
-            </div>
-
-            {dashboard.fetching && dashboard.data && (
-              <span className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-emerald-100 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 border border-emerald-200">
-                <RefreshCw size={12} className="text-emerald-600" />
-                Đang cập nhật...
-              </span>
-            )}
+            <button
+              type="button"
+              onClick={() => setActiveDashboardTab("surveys")}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs ${
+                activeDashboardTab === "surveys"
+                  ? "bg-purple-600 text-white shadow-2xs ring-1 ring-purple-600 font-bold"
+                  : "border border-slate-200/80 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 shadow-2xs font-semibold"
+              }`}
+              title="Xem Dashboard Khảo Sát CSAT"
+            >
+              <ClipboardCheck size={13} className={activeDashboardTab === "surveys" ? "text-white" : "text-purple-600"} />
+              <span>Khảo Sát CSAT</span>
+            </button>
           </div>
         </div>
 
-        {/* Dashboard Switcher Nav Tabs - Ultra-Compact Spacing */}
-        <div className="flex flex-wrap items-center gap-1.5 border-b border-slate-200/80 pb-1.5">
-          <button
-            type="button"
-            onClick={() => setActiveDashboardTab("ccc")}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs ${
-              activeDashboardTab === "ccc"
-                ? "bg-[#059669] text-white shadow-2xs ring-1 ring-emerald-600 font-bold"
-                : "border border-slate-200/80 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 shadow-2xs font-semibold"
-            }`}
-            title="Xem Dashboard Tổng Hợp CCC"
-          >
-            <Gauge size={13} className={activeDashboardTab === "ccc" ? "text-white" : "text-emerald-600"} />
-            <span>Dashboard CCC</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveDashboardTab("tickets")}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs ${
-              activeDashboardTab === "tickets"
-                ? "bg-[#059669] text-white shadow-2xs ring-1 ring-emerald-600 font-bold"
-                : "border border-slate-200/80 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 shadow-2xs font-semibold"
-            }`}
-            title="Xem Dashboard Ticket CCC"
-          >
-            <Ticket size={13} className={activeDashboardTab === "tickets" ? "text-white" : "text-emerald-600"} />
-            <span>Tickets CCC</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveDashboardTab("chatbot")}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs ${
-              activeDashboardTab === "chatbot"
-                ? "bg-teal-600 text-white shadow-2xs ring-1 ring-teal-600 font-bold"
-                : "border border-slate-200/80 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 shadow-2xs font-semibold"
-            }`}
-            title="Xem Dashboard Chatbot"
-          >
-            <BotMessageSquare size={13} className={activeDashboardTab === "chatbot" ? "text-white" : "text-teal-600"} />
-            <span>Dashboard Chatbot</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveDashboardTab("ekyc")}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs ${
-              activeDashboardTab === "ekyc"
-                ? "bg-sky-600 text-white shadow-2xs ring-1 ring-sky-600 font-bold"
-                : "border border-slate-200/80 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 shadow-2xs font-semibold"
-            }`}
-            title="Xem Dashboard eKYC & Failed eKYC"
-          >
-            <Users size={13} className={activeDashboardTab === "ekyc" ? "text-white" : "text-sky-600"} />
-            <span>eKYC & Failed eKYC</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveDashboardTab("errors")}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs ${
-              activeDashboardTab === "errors"
-                ? "bg-amber-600 text-white shadow-2xs ring-1 ring-amber-600 font-bold"
-                : "border border-slate-200/80 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 shadow-2xs font-semibold"
-            }`}
-            title="Xem Dashboard Lỗi Hệ Thống & Bên Ngoài"
-          >
-            <AlertTriangle size={13} className={activeDashboardTab === "errors" ? "text-white" : "text-amber-600"} />
-            <span>Lỗi Hệ Thống</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveDashboardTab("surveys")}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs ${
-              activeDashboardTab === "surveys"
-                ? "bg-purple-600 text-white shadow-2xs ring-1 ring-purple-600 font-bold"
-                : "border border-slate-200/80 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 shadow-2xs font-semibold"
-            }`}
-            title="Xem Dashboard Khảo Sát Ý Kiến Khách Hàng"
-          >
-            <ClipboardCheck size={13} className={activeDashboardTab === "surveys" ? "text-white" : "text-purple-600"} />
-            <span>Khảo Sát</span>
-          </button>
-        </div>
-
-        {/* 1A. Executive Summary Dashboard CCC (Selective Highlights) */}
+        {/* 1A. Executive Summary Dashboard CCC (Selective Highlights & 4 Pillar Trend Charts) */}
         {activeDashboardTab === "ccc" && (
           <div className="space-y-4">
             {/* Top 5 Pillar Executive Overview Cards */}
@@ -1325,6 +1323,7 @@ export function CccDashboardPage() {
               {/* Trend Chart 1: Tickets CCC */}
               {dashboard.data && (
                 <CccDashboardCharts
+                  key={`ccc-trend-${tabRefreshKeys.ccc}`}
                   charts={dashboard.data.charts}
                   globalViewMode={globalViewMode}
                   granularity={granularity}
@@ -1335,6 +1334,7 @@ export function CccDashboardPage() {
 
               {/* Trend Chart 2: Chatbot AI */}
               <ChatbotDashboardSection
+                key={`chatbot-trend-${tabRefreshKeys.chatbot}`}
                 hideToolbar
                 dateFrom={dashboard.dateFrom}
                 dateTo={dashboard.dateTo}
@@ -1344,6 +1344,7 @@ export function CccDashboardPage() {
 
               {/* Trend Chart 3: Lỗi Hệ Thống (External Errors) */}
               <ExternalErrorDashboardSection
+                key={`errors-trend-${tabRefreshKeys.errors}`}
                 dateFrom={dashboard.dateFrom}
                 dateTo={dashboard.dateTo}
                 granularity={granularity}
@@ -1353,6 +1354,7 @@ export function CccDashboardPage() {
 
               {/* Trend Chart 4: Khảo Sát Ý Kiến KH (Surveys) */}
               <SurveyDashboardWrapper
+                key={`surveys-trend-${tabRefreshKeys.surveys}`}
                 dateFrom={dashboard.dateFrom}
                 dateTo={dashboard.dateTo}
                 granularity={granularity}
@@ -1368,15 +1370,15 @@ export function CccDashboardPage() {
         {/* 1B. Focused Tickets CCC Tab */}
         {activeDashboardTab === "tickets" && (
           <>
-            <div className="grid grid-cols-12 gap-5 items-start">
-              <div className="col-span-12 xl:col-span-5">
+            <div className="grid grid-cols-12 gap-5 items-stretch">
+              <div className="col-span-12 xl:col-span-5 h-full flex flex-col">
                 <SystemOverviewGrid
                   dashboard={dashboard}
                   systemMetrics={systemMetrics}
                 />
               </div>
 
-              <div className="col-span-12 xl:col-span-7">
+              <div className="col-span-12 xl:col-span-7 h-full flex flex-col">
                 {dashboard.data && (
                   <TicketListTable
                     title="Ticket chưa xử lý"
@@ -1394,6 +1396,7 @@ export function CccDashboardPage() {
 
             {dashboard.data && (
               <CccDashboardCharts
+                key={`tickets-tab-${tabRefreshKeys.tickets}`}
                 charts={dashboard.data.charts}
                 globalViewMode={globalViewMode}
                 granularity={granularity}
@@ -1406,6 +1409,7 @@ export function CccDashboardPage() {
         {/* 2. Chatbot Dashboard Section */}
         {activeDashboardTab === "chatbot" && (
           <ChatbotDashboardSection
+            key={`chatbot-tab-${tabRefreshKeys.chatbot}`}
             hideToolbar
             dateFrom={dashboard.dateFrom}
             dateTo={dashboard.dateTo}
@@ -1416,6 +1420,7 @@ export function CccDashboardPage() {
         {/* 3. eKYC & Failed eKYC Dashboard Section */}
         {activeDashboardTab === "ekyc" && (
           <EkycAndFailedEkycDashboardSection
+            key={`ekyc-tab-${tabRefreshKeys.ekyc}`}
             granularity={granularity}
             compareMode={compareMode}
             dateFrom={dashboard.dateFrom}
@@ -1426,6 +1431,7 @@ export function CccDashboardPage() {
         {/* 4. External Error Dashboard Section */}
         {activeDashboardTab === "errors" && (
           <ExternalErrorDashboardSection
+            key={`errors-tab-${tabRefreshKeys.errors}`}
             dateFrom={dashboard.dateFrom}
             dateTo={dashboard.dateTo}
             granularity={granularity}
@@ -1436,6 +1442,7 @@ export function CccDashboardPage() {
         {/* 5. Survey Dashboard Section */}
         {activeDashboardTab === "surveys" && (
           <SurveyDashboardWrapper
+            key={`surveys-tab-${tabRefreshKeys.surveys}`}
             dateFrom={dashboard.dateFrom}
             dateTo={dashboard.dateTo}
             granularity={granularity}

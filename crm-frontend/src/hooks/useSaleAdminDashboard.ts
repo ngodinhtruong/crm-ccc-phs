@@ -151,7 +151,7 @@ export function useSaleAdminDashboard() {
 
   const loadDashboard = async (
     customParams: SaAdminDashboardParams = params,
-    options: { background?: boolean } = {}
+    options: { background?: boolean; forceRefresh?: boolean } = {}
   ) => {
     const requestId = ++requestIdRef.current;
 
@@ -169,24 +169,34 @@ export function useSaleAdminDashboard() {
       const monthOffsets = [-4, -3, -2, -1, 0];
 
       const multiMonthParams = monthOffsets.map((offset) => {
+        let baseParam: SaAdminDashboardParams;
         if (offset === 0) {
-          return {
+          baseParam = {
             ...customParams,
             year: yearFromDate(targetFrom),
             month: monthFromDate(targetFrom),
             date_from: targetFrom,
             date_to: targetTo,
           };
+        } else {
+          const range = getSingleMonthRange(targetTo, offset);
+          baseParam = {
+            ...customParams,
+            year: yearFromDate(range.dateFrom),
+            month: monthFromDate(range.dateFrom),
+            date_from: range.dateFrom,
+            date_to: range.dateTo,
+          };
         }
 
-        const range = getSingleMonthRange(targetTo, offset);
-        return {
-          ...customParams,
-          year: yearFromDate(range.dateFrom),
-          month: monthFromDate(range.dateFrom),
-          date_from: range.dateFrom,
-          date_to: range.dateTo,
-        };
+        if (options.forceRefresh) {
+          return {
+            ...baseParam,
+            refresh: true,
+            _t: Date.now(),
+          };
+        }
+        return baseParam;
       });
 
       const responses = await Promise.all(
@@ -211,11 +221,11 @@ export function useSaleAdminDashboard() {
   };
 
   const search = () => {
-    void loadDashboard(params);
+    void loadDashboard(params, { forceRefresh: true });
   };
 
   const refresh = () => {
-    void loadDashboard(params, { background: true });
+    void loadDashboard(params, { background: true, forceRefresh: true });
   };
 
   const clearFilter = () => {

@@ -39,17 +39,16 @@ crm-frontend/.next/
 crm-frontend/node_modules/
 tree.txt
 crm/db.sqlite3.backup_20260725_083501
-CR - CRM - PHS add Chatbot-nop.docx
 crm/apps/chatbots/test_dashboard_view.py
 crm/apps/chatbots/test_periods.py
 crm/apps/chatbots/CHATBOT_DASHBOARD_OPTIMIZATION.md
 workflows/
-CR - CRM - PHS add Chatbot (ban viet lai).docx
 docs/
-!docs/
-docs/*
-!docs/PHS_CRM_Activity_Diagrams_PlantUML/
-docs/PHS_CRM_Activity_Diagrams_PlantUML/*
-!docs/PHS_CRM_Activity_Diagrams_PlantUML/13_quan_ly_ekyc.puml
-!docs/PHS_CRM_Activity_Diagrams_PlantUML/14_xu_ly_failed_ekyc.puml
-!docs/PHS_CRM_Activity_Diagrams_PlantUML/15_quan_ly_khao_sat_csat.puml
+CR - CRM - PHS add Chatbot (final).docx
+CR - CRM - PHS add Chatbot (final).docx
+
+
+.codegraph
+.agents
+docs/
+out/

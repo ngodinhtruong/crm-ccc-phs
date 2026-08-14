@@ -134,7 +134,7 @@ async function getDashboardData(
       return cached.data;
     }
   } else {
-    dashboardCache.delete(cacheKey);
+    dashboardCache.clear();
   }
 
   const requestKey = `${forceRefresh ? "refresh" : "normal"}:${cacheKey}`;
@@ -401,7 +401,7 @@ export function useCccDashboard(
     setErrorType("");
     setRelatedSystem("");
 
-    void loadDashboard(params);
+    void loadDashboard(params, { forceRefresh: true });
   }, [initialStatus, loadDashboard]);
 
   const reload = useCallback(() => {
