@@ -408,7 +408,18 @@ class CustomerViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(rating__rating_name__icontains=rating_name)
 
         if membership_tier:
-            queryset = queryset.filter(membership_tier_id=membership_tier)
+            # Lọc bỏ giá trị không phải số trước khi đưa vào truy vấn: trước
+            # đây gọi thẳng filter(membership_tier_id=<chuỗi>) nên chỉ cần gõ
+            # sai một ký tự trên URL là ValueError và API trả 500. Cũng nhận
+            # dạng "2,3" cho trường hợp cần lọc nhiều hạng một lượt.
+            tier_ids = [
+                value.strip()
+                for value in str(membership_tier).split(",")
+                if value.strip().isdigit()
+            ]
+
+            if tier_ids:
+                queryset = queryset.filter(membership_tier_id__in=tier_ids)
 
         if membership_tier_name:
             queryset = queryset.filter(

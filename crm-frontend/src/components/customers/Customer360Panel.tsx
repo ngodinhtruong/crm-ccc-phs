@@ -1,13 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
+  ExternalLink,
   DollarSign,
   Clock,
   Phone,
   Star,
   Ticket as TicketIcon,
   TrendingUp,
+  UserRound,
 } from "lucide-react";
 import {
   Bar,
@@ -314,13 +317,20 @@ function TimelineList({ items }: { items: Customer360TimelineItem[] }) {
                 <p className="mt-0.5 text-xs text-slate-600">{item.description}</p>
               )}
 
-              <div className="mt-0.5 flex flex-wrap gap-3 text-[11px] text-slate-500">
+              <div className="mt-0.5 flex flex-wrap items-center gap-3 text-[11px] text-slate-500">
                 {item.value !== null && item.type === "transaction" && (
                   <span className="font-semibold tabular-nums text-slate-700">
                     {formatMoney(item.value)}đ
                   </span>
                 )}
                 {item.meta && <span>{item.meta}</span>}
+
+                {item.pic && (
+                  <span className="flex items-center gap-1 font-medium text-slate-600">
+                    <UserRound size={11} className="text-slate-400" />
+                    PIC: {item.pic}
+                  </span>
+                )}
               </div>
             </div>
           </li>
@@ -330,7 +340,20 @@ function TimelineList({ items }: { items: Customer360TimelineItem[] }) {
   );
 }
 
-export function Customer360Panel({ customerId }: { customerId: number }) {
+export function Customer360Panel({
+  customerId,
+  embedded = false,
+}: {
+  customerId: number;
+  /**
+   * Panel đang nằm trong trang chi tiết khách hàng (tab "Tổng quan").
+   *
+   * Khi đó bỏ khối tên khách và khối hồ sơ: trang kia đã có header khách ngay
+   * trên tabs và có sẵn tab "Chi tiết", lặp lại chỉ tốn màn hình. Nút "Xem chi
+   * tiết" cũng thừa vì đang đứng đúng ở trang đó rồi.
+   */
+  embedded?: boolean;
+}) {
   const authz = useCurrentUserPermissions();
   const canView = authz.hasPermission("CUSTOMER_360_VIEW");
 
@@ -406,36 +429,50 @@ export function Customer360Panel({ customerId }: { customerId: number }) {
 
   return (
     <div className="space-y-3">
-      <section className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <h2 className="text-lg font-bold text-slate-800">
-            {customer.full_name}
-          </h2>
+      {!embedded && (
+        <>
+          <section className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <h2 className="text-lg font-bold text-slate-800">
+                {customer.full_name}
+              </h2>
 
-          {customer.customer_code && (
-            <span className="font-mono text-xs font-semibold text-sky-600">
-              {customer.customer_code}
-            </span>
-          )}
+              {customer.customer_code && (
+                <span className="font-mono text-xs font-semibold text-sky-600">
+                  {customer.customer_code}
+                </span>
+              )}
 
-          {customer.branch_name && (
-            <span className="text-xs text-slate-500">{customer.branch_name}</span>
-          )}
+              {customer.branch_name && (
+                <span className="text-xs text-slate-500">
+                  {customer.branch_name}
+                </span>
+              )}
 
-          <span className="ml-auto rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-700">
-            {customer.vip_type}
-          </span>
-        </div>
+              <Link
+                href={`/customers/${customerId}`}
+                className="flex h-7 items-center gap-1 rounded border border-emerald-300 bg-white px-2.5 text-[11px] font-semibold text-[#059669] transition hover:bg-emerald-50"
+              >
+                <ExternalLink size={12} />
+                Xem chi tiết
+              </Link>
 
-        {customer.account_numbers.length > 0 && (
-          <p className="mt-1 text-[11px] text-slate-500">
-            Số TK lưu ký:{" "}
-            <span className="font-mono font-semibold text-slate-700">
-              {customer.account_numbers.join(", ")}
-            </span>
-          </p>
-        )}
-      </section>
+              <span className="ml-auto rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-700">
+                {customer.vip_type}
+              </span>
+            </div>
+
+            {customer.account_numbers.length > 0 && (
+              <p className="mt-1 text-[11px] text-slate-500">
+                Số TK lưu ký:{" "}
+                <span className="font-mono font-semibold text-slate-700">
+                  {customer.account_numbers.join(", ")}
+                </span>
+              </p>
+            )}
+          </section>
+        </>
+      )}
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
         <StatTile icon={TicketIcon} label="Tickets" tone="sky" value={formatNumber(summary.tickets)} />

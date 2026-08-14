@@ -19,13 +19,22 @@ function getBranchName(branch: ReturnType<typeof useCustomers>["branches"][numbe
 
 export function CustomerTable({
   customerState,
+  onRowClick,
 }: {
   customerState: ReturnType<typeof useCustomers>;
+  /**
+   * Thay hành vi mặc định khi bấm một dòng.
+   *
+   * Màn Customer 360 mở số liệu ngay tại chỗ; bỏ trống thì vẫn điều hướng
+   * sang /customers/{id} như cũ.
+   */
+  onRowClick?: (id: number) => void;
 }) {
   const router = useRouter();
   const customers = customerState.customers;
 
-  const openDetail = (id: number) => router.push(`/customers/${id}`);
+  const openDetail = (id: number) =>
+    onRowClick ? onRowClick(id) : router.push(`/customers/${id}`);
 
   return (
     <div className="table-scroll-container">

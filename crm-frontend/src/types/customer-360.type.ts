@@ -88,6 +88,11 @@ export type Customer360TimelineItem = {
   description: string;
   value: number | null;
   meta: string | null;
+  /**
+   * Người phụ trách. Hiện chỉ cuộc gọi có; `null` nghĩa là bản ghi chưa gắn
+   * nhân viên, không phải tên rỗng.
+   */
+  pic: string | null;
 };
 
 export type Customer360 = {

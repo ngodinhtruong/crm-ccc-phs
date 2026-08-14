@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { UsersRound } from "lucide-react";
+import { ArrowLeft, UsersRound } from "lucide-react";
 
 import { customerApi } from "@/apis/customer.api";
 import { SearchInput } from "@/components/common";
 import { Customer360Panel } from "@/components/customers/Customer360Panel";
+import { PotentialCustomerTable } from "@/components/customers/PotentialCustomerTable";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
 import type { CustomerListItem } from "@/types/customer.type";
 import { getErrorMessage } from "@/utils/error.util";
@@ -14,17 +15,19 @@ const SEARCH_DEBOUNCE_MS = 350;
 const SUGGESTION_LIMIT = 8;
 
 /**
- * Trang Customer 360 độc lập: chọn khách rồi xem số liệu tổng hợp.
+ * Trang Customer 360: chọn một khách rồi xem số liệu tổng hợp ngay tại chỗ.
  *
  * Phần hiển thị dùng chung ``Customer360Panel`` với tab "Tổng quan" của trang
  * chi tiết khách hàng — hai lối vào, một khối trình bày, sửa một chỗ là cả hai
- * cùng đổi.
+ * cùng đổi. Muốn xem hồ sơ đầy đủ thì bấm "Xem chi tiết" trên panel.
  */
 export function Customer360Page() {
   const [keyword, setKeyword] = useState("");
   const [debounced, setDebounced] = useState("");
   const [suggestions, setSuggestions] = useState<CustomerListItem[]>([]);
-  const [selected, setSelected] = useState<CustomerListItem | null>(null);
+  // Chỉ giữ id: panel 360 tự gọi API lấy đủ thông tin khách, giữ thêm cả object
+  // ở đây sẽ thành hai bản dữ liệu của cùng một khách và lệch nhau khi cập nhật.
+  const [selectedId, setSelectedId] = useState<number | null>(null);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState("");
 
@@ -70,6 +73,28 @@ export function Customer360Page() {
     []
   );
 
+  // Đã chọn khách thì chỉ còn số liệu của khách đó: ô tìm kiếm và bảng danh
+  // sách lùi ra sau một nút quay lại, để màn hình không lẫn dữ liệu của người
+  // khác vào lúc đang đọc một hồ sơ.
+  if (selectedId) {
+    return (
+      <DashboardLayout breadcrumbs={breadcrumbs}>
+        <div className="space-y-3 pr-4">
+          <button
+            type="button"
+            onClick={() => setSelectedId(null)}
+            className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+          >
+            <ArrowLeft size={14} />
+            Quay lại danh sách
+          </button>
+
+          <Customer360Panel customerId={selectedId} />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout breadcrumbs={breadcrumbs}>
       <div className="space-y-3 pr-4">
@@ -92,9 +117,7 @@ export function Customer360Page() {
             />
           </div>
 
-          {error && (
-            <p className="mt-2 text-xs text-rose-600">{error}</p>
-          )}
+          {error && <p className="mt-2 text-xs text-rose-600">{error}</p>}
 
           {searching && (
             <p className="mt-2 text-xs text-slate-400">Đang tìm...</p>
@@ -113,7 +136,7 @@ export function Customer360Page() {
                   <button
                     type="button"
                     onClick={() => {
-                      setSelected(customer);
+                      setSelectedId(customer.id);
                       setSuggestions([]);
                       setKeyword("");
                     }}
@@ -144,19 +167,7 @@ export function Customer360Page() {
           )}
         </section>
 
-        {selected ? (
-          <Customer360Panel customerId={selected.id} />
-        ) : (
-          <div className="rounded-xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
-            <p className="text-sm font-semibold text-slate-600">
-              Chọn một khách hàng để xem số liệu 360
-            </p>
-            <p className="mt-1 text-xs text-slate-400">
-              Màn hình gộp giao dịch, cuộc gọi, ticket và kết quả khảo sát của
-              cùng một khách.
-            </p>
-          </div>
-        )}
+        <PotentialCustomerTable onSelect={setSelectedId} />
       </div>
     </DashboardLayout>
   );
