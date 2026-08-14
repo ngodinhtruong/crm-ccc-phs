@@ -175,7 +175,7 @@ export function useCompanyCreate() {
         status: "ACTIVE",
       });
 
-      router.push(`/companies/${createdCompany.id}`);
+      router.push("/companies");
     } catch (err) {
       setError(getErrorMessage(err, "Lưu công ty thất bại"));
     } finally {
