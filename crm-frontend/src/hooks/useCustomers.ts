@@ -19,8 +19,18 @@ import {
 } from "@/types/customer.type";
 import { useTablePagination } from "@/hooks/useTablePagination";
 
-export function useCustomers() {
+export function useCustomers(options?: {
+    /**
+     * Hạng thành viên lọc sẵn ngay khi mở màn hình, đối chiếu theo tên hạng.
+     *
+     * Nhận tên chứ không nhận id vì id chỉ biết được sau khi tải xong master
+     * data; nơi gọi không có cách nào truyền id vào lúc mount.
+     */
+    defaultMembershipTierName?: string;
+}) {
     const router = useRouter();
+
+    const defaultMembershipTierName = options?.defaultMembershipTierName;
 
     const [customers, setCustomers] = useState<CustomerListItem[]>([]);
     const [count, setCount] = useState(0);
@@ -149,6 +159,13 @@ export function useCustomers() {
     const [error, setError] = useState("");
     const [masterError, setMasterError] = useState("");
 
+    // Chưa áp xong hạng mặc định thì chưa tải danh sách. Tải trước rồi lọc sau
+    // sẽ có hai request chạy song song, mà request cũ về muộn sẽ ghi đè kết
+    // quả đã lọc — màn hình hiện đủ toàn bộ khách dù ô lọc đang chọn một hạng.
+    const [defaultTierApplied, setDefaultTierApplied] = useState(
+        !defaultMembershipTierName
+    );
+
     const textFilters = useMemo<CustomerListParams>(
         () => ({
             full_name: filters.fullName,
@@ -269,6 +286,23 @@ export function useCustomers() {
             setSources(sourceData);
             setRatings(ratingData);
             setMembershipTiers(membershipTierData);
+
+            if (defaultMembershipTierName) {
+                const matched = membershipTierData.find(
+                    (tier) => tier.tier_name === defaultMembershipTierName
+                );
+
+                if (matched) {
+                    setFilters((prev) => ({
+                        ...prev,
+                        membershipTier: String(matched.id),
+                    }));
+                }
+
+                // Mở khoá kể cả khi không tìm thấy hạng, nếu không màn hình
+                // sẽ kẹt ở trạng thái đang tải mãi.
+                setDefaultTierApplied(true);
+            }
         } catch (err) {
             setMasterError(
                 getErrorMessage(err, "Không tải được dữ liệu lọc khách hàng")
@@ -276,7 +310,7 @@ export function useCustomers() {
         } finally {
             setMasterLoading(false);
         }
-    }, []);
+    }, [defaultMembershipTierName]);
 
     const search = useCallback(() => {
         pagination.resetPage();
@@ -347,13 +381,14 @@ export function useCustomers() {
     }, [router, loadMasterData]);
 
     useEffect(() => {
-        if (!authService.isAuthenticated()) {
+        if (!authService.isAuthenticated() || !defaultTierApplied) {
             return;
         }
 
         pagination.resetPage();
         void loadCustomers(buildParams({ page: "1" }, 1), 1);
     }, [
+        defaultTierApplied,
         debouncedTextFilters,
         filters.openedAccountFrom,
         filters.openedAccountTo,

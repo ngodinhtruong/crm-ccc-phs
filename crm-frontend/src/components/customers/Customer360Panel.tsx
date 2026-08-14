@@ -1,13 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
+  ChevronDown,
+  ExternalLink,
   DollarSign,
   Clock,
   Phone,
   Star,
   Ticket as TicketIcon,
   TrendingUp,
+  UserRound,
 } from "lucide-react";
 import {
   Bar,
@@ -23,6 +27,7 @@ import {
 
 import { customerApi } from "@/apis/customer.api";
 import { AccessDenied } from "@/components/common";
+import { CustomerDetailFields } from "@/components/customers/CustomerDetailFields";
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { formatMoney, formatNumber } from "@/components/sale-admin/dashboard/SaleAdminDashboardUtils";
 import type {
@@ -30,6 +35,7 @@ import type {
   Customer360TimelineItem,
   Customer360TimelineType,
 } from "@/types/customer-360.type";
+import type { CustomerDetail } from "@/types/customer.type";
 import { getErrorMessage } from "@/utils/error.util";
 
 /**
@@ -314,13 +320,20 @@ function TimelineList({ items }: { items: Customer360TimelineItem[] }) {
                 <p className="mt-0.5 text-xs text-slate-600">{item.description}</p>
               )}
 
-              <div className="mt-0.5 flex flex-wrap gap-3 text-[11px] text-slate-500">
+              <div className="mt-0.5 flex flex-wrap items-center gap-3 text-[11px] text-slate-500">
                 {item.value !== null && item.type === "transaction" && (
                   <span className="font-semibold tabular-nums text-slate-700">
                     {formatMoney(item.value)}đ
                   </span>
                 )}
                 {item.meta && <span>{item.meta}</span>}
+
+                {item.pic && (
+                  <span className="flex items-center gap-1 font-medium text-slate-600">
+                    <UserRound size={11} className="text-slate-400" />
+                    PIC: {item.pic}
+                  </span>
+                )}
               </div>
             </div>
           </li>
@@ -330,7 +343,101 @@ function TimelineList({ items }: { items: Customer360TimelineItem[] }) {
   );
 }
 
-export function Customer360Panel({ customerId }: { customerId: number }) {
+/**
+ * Khối hồ sơ khách, mở ra khi cần.
+ *
+ * Thu lại sẵn và chỉ gọi API lúc người dùng bấm mở: màn 360 vốn để đọc số
+ * liệu, phần lớn lượt xem không cần tới hồ sơ nên tải sẵn là thêm một request
+ * thừa cho mỗi lần mở khách.
+ */
+function CustomerProfileSection({ customerId }: { customerId: number }) {
+  const [expanded, setExpanded] = useState(false);
+  const [customer, setCustomer] = useState<CustomerDetail | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!expanded || customer) return;
+
+    let cancelled = false;
+
+    async function load() {
+      setLoading(true);
+      setError("");
+
+      try {
+        const result = await customerApi.getCustomerById(customerId);
+
+        if (!cancelled) setCustomer(result);
+      } catch (err) {
+        if (!cancelled) {
+          setError(getErrorMessage(err, "Không tải được thông tin khách hàng"));
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    void load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [expanded, customer, customerId]);
+
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
+      {/* <button
+        type="button"
+        onClick={() => setExpanded((prev) => !prev)}
+        className="flex w-full flex-wrap items-center gap-2 px-4 py-3 text-left transition hover:bg-slate-50"
+      >
+        <span className="h-3.5 w-1 rounded-full bg-[#00713d]" />
+        <h3 className="text-xs font-black tracking-wide text-[#00713d]">
+          THÔNG TIN CHI TIẾT KHÁCH HÀNG
+        </h3>
+        <span className="text-[11px] text-slate-400">
+          hồ sơ, địa chỉ, phân loại
+        </span>
+
+        <ChevronDown
+          size={16}
+          className={`ml-auto text-slate-400 transition-transform ${
+            expanded ? "rotate-180" : ""
+          }`}
+        />
+      </button> */}
+
+      {/* {expanded && (
+      //   <div className="border-t border-slate-100 bg-slate-50/50 p-4">
+      //     {error ? (
+      //       <p className="text-xs text-rose-600">{error}</p>
+      //     ) : loading || !customer ? (
+      //       <p className="py-6 text-center text-xs text-slate-400">
+      //         Đang tải thông tin khách hàng...
+      //       </p>
+      //     ) : (
+      //       <CustomerDetailFields customer={customer} />
+      //     )}
+      //   </div>
+      // )} */}
+    </section>
+  );
+}
+
+export function Customer360Panel({
+  customerId,
+  showDetailLink = false,
+}: {
+  customerId: number;
+  /**
+   * Hiện nút sang trang hồ sơ khách hàng.
+   *
+   * Mặc định tắt vì panel này cũng nằm trong tab "Tổng quan" của chính trang
+   * đó — hiện nút ở đấy là link trỏ về chỗ đang đứng.
+   */
+  showDetailLink?: boolean;
+}) {
   const authz = useCurrentUserPermissions();
   const canView = authz.hasPermission("CUSTOMER_360_VIEW");
 
@@ -406,7 +513,7 @@ export function Customer360Panel({ customerId }: { customerId: number }) {
 
   return (
     <div className="space-y-3">
-      <section className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+      {/* <section className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <h2 className="text-lg font-bold text-slate-800">
             {customer.full_name}
@@ -422,6 +529,16 @@ export function Customer360Panel({ customerId }: { customerId: number }) {
             <span className="text-xs text-slate-500">{customer.branch_name}</span>
           )}
 
+          {showDetailLink && (
+            <Link
+              href={`/customers/${customerId}`}
+              className="flex h-7 items-center gap-1 rounded border border-emerald-300 bg-white px-2.5 text-[11px] font-semibold text-[#059669] transition hover:bg-emerald-50"
+            >
+              <ExternalLink size={12} />
+              Xem chi tiết
+            </Link>
+          )}
+
           <span className="ml-auto rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-700">
             {customer.vip_type}
           </span>
@@ -435,7 +552,11 @@ export function Customer360Panel({ customerId }: { customerId: number }) {
             </span>
           </p>
         )}
-      </section>
+      </section> */}
+
+      {/* key theo khách để React dựng lại khối này khi đổi khách — nếu không,
+          hồ sơ đã mở của người trước sẽ còn nguyên trên màn hình. */}
+      <CustomerProfileSection key={customerId} customerId={customerId} />
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
         <StatTile icon={TicketIcon} label="Tickets" tone="sky" value={formatNumber(summary.tickets)} />

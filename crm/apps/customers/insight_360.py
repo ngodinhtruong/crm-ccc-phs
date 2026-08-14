@@ -311,6 +311,19 @@ def _summary(customer, matched_qs, calls_qs, tickets_qs, survey_qs, today):
     }
 
 
+def _pic_label(full_name, employee_code):
+    """
+    Tên người phụ trách, kèm mã nhân viên khi có.
+
+    Trả ``None`` nếu bản ghi chưa gắn nhân viên: giao diện cần phân biệt "chưa
+    ghi nhận PIC" với một cái tên rỗng.
+    """
+    if not full_name:
+        return None
+
+    return f"{full_name} ({employee_code})" if employee_code else full_name
+
+
 def _timeline(matched_qs, calls_qs, tickets_qs, survey_qs):
     """Dòng thời gian hợp nhất bốn nguồn, mới nhất trước."""
     items = []
@@ -329,11 +342,17 @@ def _timeline(matched_qs, calls_qs, tickets_qs, survey_qs):
                 ),
                 "value": _to_float(row["transaction_value"]),
                 "meta": row["source_system"],
+                "pic": None,
             }
         )
 
     for row in calls_qs.order_by("-call_time")[:TIMELINE_LIMIT].values(
-        "call_time", "call_direction", "duration_seconds", "note"
+        "call_time",
+        "call_direction",
+        "duration_seconds",
+        "note",
+        "employee__full_name",
+        "employee__employee_code",
     ):
         duration = row["duration_seconds"] or 0
         items.append(
@@ -347,6 +366,12 @@ def _timeline(matched_qs, calls_qs, tickets_qs, survey_qs):
                 "description": row["note"] or "",
                 "value": None,
                 "meta": f"{duration // 60} phút {duration % 60} giây" if duration else "Gọi nhỡ",
+                # Người trực tiếp gọi. Cuộc gọi cũ có thể chưa gắn nhân viên
+                # nên để None chứ không dựng chuỗi rỗng — giao diện phân biệt
+                # được "chưa ghi nhận PIC" với "PIC tên rỗng".
+                "pic": _pic_label(
+                    row["employee__full_name"], row["employee__employee_code"]
+                ),
             }
         )
 
@@ -361,6 +386,7 @@ def _timeline(matched_qs, calls_qs, tickets_qs, survey_qs):
                 "description": row["title"] or "",
                 "value": None,
                 "meta": row["current_status__status_name"],
+                "pic": None,
             }
         )
 
@@ -379,6 +405,7 @@ def _timeline(matched_qs, calls_qs, tickets_qs, survey_qs):
                 "description": row["rating_note"] or "",
                 "value": row["rating_score"],
                 "meta": None,
+                "pic": None,
             }
         )
 
