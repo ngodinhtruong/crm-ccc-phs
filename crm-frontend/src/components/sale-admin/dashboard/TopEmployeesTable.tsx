@@ -93,7 +93,6 @@ export function TopEmployeesTable({
                       >
                         {row.employee_name}
                       </button>
-                      <div className="mt-0.5 truncate text-[11px] text-slate-400">{row.username || row.email || "-"}</div>
                     </td>
                     <td className="px-4 text-slate-600">{row.branch_name || "-"}</td>
                     <td className="px-4 text-right font-semibold text-emerald-600">{formatNumber(row.reactivated_accounts)}</td>

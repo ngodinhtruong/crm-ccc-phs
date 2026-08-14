@@ -64,7 +64,7 @@ let catalogRequest:
   | undefined;
 
 function createDefaultFilters(): DashboardFilterState {
-  const currentYearRange = getYearToCurrentDateRange();
+  const currentMonthRange = getGranularityDateRange("MONTH");
   if (typeof window !== "undefined") {
     sessionStorage.removeItem("ext_err_dashboard_dateFrom");
     sessionStorage.removeItem("ext_err_dashboard_dateTo");
@@ -72,8 +72,8 @@ function createDefaultFilters(): DashboardFilterState {
 
   return {
     dateField: "received_date",
-    dateFrom: currentYearRange.dateFrom,
-    dateTo: currentYearRange.dateTo,
+    dateFrom: currentMonthRange.dateFrom,
+    dateTo: currentMonthRange.dateTo,
     source: "",
     device: "",
     errorType: "",
@@ -84,7 +84,11 @@ function createDefaultFilters(): DashboardFilterState {
   };
 }
 
-function toApiParams(filters: DashboardFilterState): ExternalErrorListParams {
+function toApiParams(
+  filters: DashboardFilterState,
+  granularity?: GranularityMode,
+  compareMode?: CompareMode
+): ExternalErrorListParams {
   return {
     date_field: filters.dateField,
     date_from: filters.dateFrom,
@@ -96,6 +100,8 @@ function toApiParams(filters: DashboardFilterState): ExternalErrorListParams {
     status: filters.status,
     need_review: filters.needReview,
     q: filters.q.trim(),
+    granularity: granularity ? granularity.toLowerCase() : undefined,
+    compare_mode: compareMode,
   };
 }
 
@@ -111,6 +117,8 @@ function buildOverviewCacheKey(params: ExternalErrorListParams): string {
     params.status ?? "",
     params.need_review ?? "",
     params.q ?? "",
+    params.granularity ?? "",
+    params.compare_mode ?? "",
   ]);
 }
 
@@ -163,7 +171,11 @@ function getGranularityDateRange(g: GranularityMode) {
   };
 
   if (g === "MONTH") {
-    return getYearToCurrentDateRange();
+    const firstDay = new Date(year, month, 1);
+    return {
+      dateFrom: formatDate(firstDay),
+      dateTo: formatDate(now),
+    };
   }
   if (g === "QUARTER") {
     const qStartMonth = Math.floor(month / 3) * 3;
@@ -186,7 +198,7 @@ export function useExternalErrorDashboard() {
     createDefaultFilters
   );
 
-  const [granularity, setGranularityState] = useState<GranularityMode>("YEAR");
+  const [granularity, setGranularityState] = useState<GranularityMode>("MONTH");
   const [compareMode, setCompareModeState] = useState<CompareMode>("NONE");
 
   const [overview, setOverview] =
@@ -206,19 +218,8 @@ export function useExternalErrorDashboard() {
   }, [overview]);
 
   const params = useMemo<ExternalErrorListParams>(
-    () => toApiParams(appliedFilters),
-    [
-      appliedFilters.causeGroup,
-      appliedFilters.dateField,
-      appliedFilters.dateFrom,
-      appliedFilters.dateTo,
-      appliedFilters.device,
-      appliedFilters.errorType,
-      appliedFilters.needReview,
-      appliedFilters.q,
-      appliedFilters.source,
-      appliedFilters.status,
-    ]
+    () => toApiParams(appliedFilters, granularity, compareMode),
+    [appliedFilters, granularity, compareMode]
   );
 
   const cacheKey = useMemo(() => buildOverviewCacheKey(params), [params]);
@@ -337,11 +338,11 @@ export function useExternalErrorDashboard() {
       sessionStorage.removeItem("ext_err_dashboard_dateFrom");
       sessionStorage.removeItem("ext_err_dashboard_dateTo");
     }
-    const currentYearRange = getYearToCurrentDateRange();
+    const currentMonthRange = getGranularityDateRange("MONTH");
     const defaults: DashboardFilterState = {
       dateField: "received_date",
-      dateFrom: currentYearRange.dateFrom,
-      dateTo: currentYearRange.dateTo,
+      dateFrom: currentMonthRange.dateFrom,
+      dateTo: currentMonthRange.dateTo,
       source: "",
       device: "",
       errorType: "",
@@ -350,7 +351,7 @@ export function useExternalErrorDashboard() {
       needReview: "",
       q: "",
     };
-    setGranularityState("YEAR");
+    setGranularityState("MONTH");
     setDraftFilters(defaults);
     setAppliedFilters(defaults);
   }, []);
@@ -450,8 +451,27 @@ export function useExternalErrorDashboard() {
     [appliedFilters, draftFilters]
   );
 
+  const syncDraftFilters = useCallback(() => {
+    setDraftFilters(appliedFilters);
+  }, [appliedFilters]);
+
   const setGranularity = useCallback((g: GranularityMode) => {
     setGranularityState(g);
+    const dateRange = getGranularityDateRange(g);
+    setDraftFilters((current) => ({
+      ...current,
+      dateFrom: dateRange.dateFrom,
+      dateTo: dateRange.dateTo,
+    }));
+    setAppliedFilters((current) => ({
+      ...current,
+      dateFrom: dateRange.dateFrom,
+      dateTo: dateRange.dateTo,
+    }));
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("ext_err_dashboard_dateFrom", dateRange.dateFrom);
+      sessionStorage.setItem("ext_err_dashboard_dateTo", dateRange.dateTo);
+    }
   }, []);
 
   const setCompareMode = useCallback((c: CompareMode) => {
@@ -501,6 +521,7 @@ export function useExternalErrorDashboard() {
     reload: () => loadDashboard(true),
     ensureCatalogs,
     applyFilters,
+    syncDraftFilters,
     resetDraftDateRange,
     clearFilter,
     appliedFilterCount,

@@ -100,44 +100,12 @@ const accountTabs = [
   { label: "Chưa có TK liên kết", value: "UNLINKED" },
 ];
 
-export function TicketListPage() {
+export function TicketListPage({ embedded = false }: { embedded?: boolean }) {
   const router = useRouter();
   const tickets = useTickets();
 
-  return (
-    <DashboardLayout
-      breadcrumbs={[
-        {
-          label: "TRANG CHỦ",
-          href: "/",
-        },
-        {
-          label: "Tickets",
-        },
-      ]}
-      rightAction={
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={tickets.goErrorCatalogs}
-            className="flex h-8 items-center gap-1 rounded border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-          >
-            <FolderTree size={15} />
-            Danh mục lỗi
-          </button>
-
-          <button
-            type="button"
-            onClick={tickets.goCreate}
-            className="flex h-8 items-center gap-1 rounded bg-[#10b981] px-3 text-xs font-semibold text-white hover:bg-[#059669]"
-          >
-            <Plus size={15} />
-            Thêm ticket
-          </button>
-        </div>
-      }
-    >
-      <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+  const content = (
+    <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
         {tickets.masterError && (
           <div className="border-b border-red-200 bg-red-50 px-4 py-2 text-xs text-red-600">
             {tickets.masterError}
@@ -405,6 +373,46 @@ export function TicketListPage() {
           </table>
         </div>
       </div>
+  );
+
+  if (embedded) {
+    return content;
+  }
+
+  return (
+    <DashboardLayout
+      breadcrumbs={[
+        {
+          label: "TRANG CHỦ",
+          href: "/",
+        },
+        {
+          label: "Tickets",
+        },
+      ]}
+      rightAction={
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={tickets.goErrorCatalogs}
+            className="flex h-8 items-center gap-1 rounded border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+          >
+            <FolderTree size={15} />
+            Danh mục lỗi
+          </button>
+
+          <button
+            type="button"
+            onClick={tickets.goCreate}
+            className="flex h-8 items-center gap-1 rounded bg-[#10b981] px-3 text-xs font-semibold text-white hover:bg-[#059669]"
+          >
+            <Plus size={15} />
+            Thêm ticket
+          </button>
+        </div>
+      }
+    >
+      {content}
     </DashboardLayout>
   );
 }

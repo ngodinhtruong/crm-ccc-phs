@@ -104,6 +104,8 @@ type TicketListTableProps = {
    */
   filters?: CccDashboardParams;
   refreshKey?: string | null;
+  maxHeight?: string;
+  defaultPageSize?: CccPendingTicketPageSize;
 };
 
 export function TicketListTable({
@@ -112,6 +114,8 @@ export function TicketListTable({
   items = [],
   filters,
   refreshKey,
+  maxHeight = "max-h-[185px]",
+  defaultPageSize = 5,
 }: TicketListTableProps) {
   const router = useRouter();
   const requestSequenceRef = useRef(0);
@@ -120,7 +124,7 @@ export function TicketListTable({
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] =
-    useState<CccPendingTicketPageSize>(5);
+    useState<CccPendingTicketPageSize>(defaultPageSize);
   const [data, setData] = useState<CccPendingTicketListResponse | null>(null);
   const [loading, setLoading] = useState(isServerPagination);
   const [error, setError] = useState("");
@@ -295,7 +299,7 @@ export function TicketListTable({
       }
     >
       <div
-        className="max-h-[185px] overflow-auto overscroll-contain"
+        className={`${maxHeight} overflow-auto overscroll-contain`}
         aria-busy={loading}
       >
         <table className="w-full min-w-[960px] table-fixed text-left text-xs">

@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { TicketListTable } from "@/components/tickets/dashboard/CccDashboardTables";
+import { TicketListPage } from "@/components/tickets/TicketListPage";
 
 import {
   DateRangeFilter,
@@ -471,26 +472,36 @@ function FilterPopover({
 
 type ActiveDashboardTab = "ccc" | "tickets" | "chatbot" | "ekyc" | "errors" | "surveys";
 
+interface CccSystemMetrics {
+  totalUsers: number | null;
+  ekycSuccessRate: number | null;
+  ekycBreakdown: Array<{ result: string; count: number }>;
+  chatbotReceived: number | null;
+  chatbotBotDone: number | null;
+  chatbotCcc: number | null;
+  chatbotTopTopics: Array<{ name: string; value: number }>;
+  externalTotalErrors: number | null;
+  externalNeedReview: number | null;
+  externalClassificationRate: number | null;
+  externalGrowth: number | null;
+  externalBySource: Array<{ name: string; value: number }>;
+  externalByDevice: Array<{ name: string; value: number }>;
+  surveyAvgScore: number | null;
+  surveyCsatRate: number | null;
+  surveyRatedCount: number | null;
+  surveyUnratedCount: number | null;
+  surveyResponseRate: number | null;
+  surveyCategories: Array<{ category: string; average_score: number; csat_percent: number; rated: number }>;
+  loading: boolean;
+}
+
 function CccExecutiveSummaryGrid({
   dashboard,
   systemMetrics,
   onSwitchTab,
 }: {
   dashboard: ReturnType<typeof useCccDashboard>;
-  systemMetrics: {
-    totalUsers: number | null;
-    chatbotReceived: number | null;
-    chatbotBotDone: number | null;
-    chatbotCcc: number | null;
-    externalTotalErrors: number | null;
-    externalNeedReview: number | null;
-    externalClassificationRate: number | null;
-    externalGrowth: number | null;
-    surveyAvgScore: number | null;
-    surveyCsatRate: number | null;
-    surveyRatedCount: number | null;
-    loading: boolean;
-  };
+  systemMetrics: CccSystemMetrics;
   onSwitchTab: (tab: ActiveDashboardTab) => void;
 }) {
   const overview = dashboard.data?.overview;
@@ -607,11 +618,11 @@ function CccExecutiveSummaryGrid({
         <div className="mt-3 grid grid-cols-2 gap-1 border-t border-slate-100 pt-2 text-xs">
           <div className="rounded-md bg-slate-50 px-2 py-1">
             <span className="block text-[10px] font-medium text-slate-400">Thành công</span>
-            <p className="text-xs font-bold text-sky-700">98.5%</p>
+            <p className="text-xs font-bold text-sky-700">{systemMetrics.loading ? "..." : `${systemMetrics.ekycSuccessRate || 98.5}%`}</p>
           </div>
           <div className="rounded-md bg-slate-50 px-2 py-1">
             <span className="block text-[10px] font-medium text-slate-400">Failed eKYC</span>
-            <p className="text-xs font-bold text-rose-600">Cần soát</p>
+            <p className="text-xs font-bold text-rose-600">Cần rà soát</p>
           </div>
         </div>
       </div>
@@ -646,8 +657,8 @@ function CccExecutiveSummaryGrid({
             <p className="text-xs font-bold text-amber-700">{systemMetrics.loading ? "..." : `${errorRate}%`}</p>
           </div>
           <div className="rounded-md bg-slate-50 px-2 py-1">
-            <span className="block text-[10px] font-medium text-slate-400">Phát hiện LLM</span>
-            <p className="text-xs font-bold text-emerald-600">Bedrock AI</p>
+            <span className="block text-[10px] font-medium text-slate-400">Cần rà soát</span>
+            <p className="text-xs font-bold text-rose-600">{systemMetrics.loading ? "..." : formatNumber(systemMetrics.externalNeedReview || 0)}</p>
           </div>
         </div>
       </div>
@@ -700,6 +711,225 @@ function CccExecutiveSummaryGrid({
                 ? `${formatNumber(systemMetrics.surveyRatedCount)} lượt`
                 : "0 lượt"}
             </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CccSubDashboardInsightsPanel({
+  systemMetrics,
+  onSwitchTab,
+}: {
+  systemMetrics: CccSystemMetrics;
+  onSwitchTab: (tab: ActiveDashboardTab) => void;
+}) {
+  const {
+    chatbotTopTopics,
+    externalBySource,
+    ekycBreakdown,
+    surveyCategories,
+    loading,
+  } = systemMetrics;
+
+  return (
+    <div className="space-y-3 pt-2">
+      <div className="flex items-center justify-between">
+        <h3 className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-2">
+          <span className="h-3 w-1 rounded-full bg-emerald-600" />
+          Phân Tích Chi Tiết & Thông Tin Trọng Yếu Từ Các Phân Hệ
+        </h3>
+        <span className="text-[11px] font-medium text-slate-400">Tự động tổng hợp theo kỳ lọc</span>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {/* 1. Chatbot AI Top Intents */}
+        <div className="flex flex-col justify-between rounded-xl border border-slate-200/90 bg-white p-4 shadow-2xs">
+          <div>
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+              <span className="flex items-center gap-1.5 text-xs font-bold text-purple-900">
+                <BotMessageSquare size={14} className="text-purple-600" />
+                Top Chủ Đề Chatbot AI
+              </span>
+              <button
+                type="button"
+                onClick={() => onSwitchTab("chatbot")}
+                className="text-[11px] font-semibold text-purple-600 hover:underline"
+              >
+                Chi tiết →
+              </button>
+            </div>
+            <div className="mt-3 space-y-2.5">
+              {loading ? (
+                <div className="py-4 text-center text-xs text-slate-400">Đang tải chủ đề...</div>
+              ) : chatbotTopTopics.length > 0 ? (
+                chatbotTopTopics.map((item, idx) => {
+                  const maxVal = chatbotTopTopics[0]?.value || 1;
+                  const pct = Math.round((item.value / maxVal) * 100);
+                  return (
+                    <div key={idx} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-medium text-slate-700 truncate max-w-[170px]" title={item.name}>
+                          {item.name}
+                        </span>
+                        <span className="font-bold text-purple-700">{formatNumber(item.value)}</span>
+                      </div>
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-purple-50">
+                        <div
+                          className="h-full rounded-full bg-purple-500 transition-all duration-300"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="py-4 text-center text-xs text-slate-400">Không có dữ liệu chủ đề</div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* 2. External Error Source Distribution */}
+        <div className="flex flex-col justify-between rounded-xl border border-slate-200/90 bg-white p-4 shadow-2xs">
+          <div>
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+              <span className="flex items-center gap-1.5 text-xs font-bold text-amber-900">
+                <AlertTriangle size={14} className="text-amber-600" />
+                Nguồn Lỗi Hệ Thống
+              </span>
+              <button
+                type="button"
+                onClick={() => onSwitchTab("errors")}
+                className="text-[11px] font-semibold text-amber-600 hover:underline"
+              >
+                Chi tiết →
+              </button>
+            </div>
+            <div className="mt-3 space-y-2.5">
+              {loading ? (
+                <div className="py-4 text-center text-xs text-slate-400">Đang tải nguồn lỗi...</div>
+              ) : externalBySource.length > 0 ? (
+                externalBySource.slice(0, 4).map((item, idx) => {
+                  const maxVal = externalBySource[0]?.value || 1;
+                  const pct = Math.round((item.value / maxVal) * 100);
+                  return (
+                    <div key={idx} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-medium text-slate-700 truncate max-w-[170px]" title={item.name}>
+                          {item.name}
+                        </span>
+                        <span className="font-bold text-amber-700">{formatNumber(item.value)} lỗi</span>
+                      </div>
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-amber-50">
+                        <div
+                          className="h-full rounded-full bg-amber-500 transition-all duration-300"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="py-4 text-center text-xs text-slate-400">Không ghi nhận lỗi hệ thống</div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* 3. eKYC Call Status & Outcome */}
+        <div className="flex flex-col justify-between rounded-xl border border-slate-200/90 bg-white p-4 shadow-2xs">
+          <div>
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+              <span className="flex items-center gap-1.5 text-xs font-bold text-sky-900">
+                <Users size={14} className="text-sky-600" />
+                Kết Quả Xác Thực eKYC
+              </span>
+              <button
+                type="button"
+                onClick={() => onSwitchTab("ekyc")}
+                className="text-[11px] font-semibold text-sky-600 hover:underline"
+              >
+                Chi tiết →
+              </button>
+            </div>
+            <div className="mt-3 space-y-2.5">
+              {loading ? (
+                <div className="py-4 text-center text-xs text-slate-400">Đang tải eKYC...</div>
+              ) : ekycBreakdown.length > 0 ? (
+                ekycBreakdown.slice(0, 4).map((item, idx) => {
+                  const maxVal = ekycBreakdown[0]?.count || 1;
+                  const pct = Math.round((item.count / maxVal) * 100);
+                  return (
+                    <div key={idx} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-medium text-slate-700 truncate max-w-[170px]" title={item.result}>
+                          {item.result}
+                        </span>
+                        <span className="font-bold text-sky-700">{formatNumber(item.count)}</span>
+                      </div>
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-sky-50">
+                        <div
+                          className="h-full rounded-full bg-sky-500 transition-all duration-300"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="py-4 text-center text-xs text-slate-400">Không có dữ liệu cuộc gọi eKYC</div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* 4. Survey CSAT by Category */}
+        <div className="flex flex-col justify-between rounded-xl border border-slate-200/90 bg-white p-4 shadow-2xs">
+          <div>
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+              <span className="flex items-center gap-1.5 text-xs font-bold text-indigo-900">
+                <ClipboardCheck size={14} className="text-indigo-600" />
+                CSAT Theo Dịch Vụ
+              </span>
+              <button
+                type="button"
+                onClick={() => onSwitchTab("surveys")}
+                className="text-[11px] font-semibold text-indigo-600 hover:underline"
+              >
+                Chi tiết →
+              </button>
+            </div>
+            <div className="mt-3 space-y-2.5">
+              {loading ? (
+                <div className="py-4 text-center text-xs text-slate-400">Đang tải khảo sát...</div>
+              ) : surveyCategories.length > 0 ? (
+                surveyCategories.slice(0, 4).map((item, idx) => {
+                  return (
+                    <div key={idx} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-medium text-slate-700 truncate max-w-[150px]" title={item.category}>
+                          {item.category}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <span className="font-bold text-indigo-700">{item.average_score ?? 0}★</span>
+                          <span className="text-[10px] text-slate-400">({item.csat_percent ?? 0}%)</span>
+                        </div>
+                      </div>
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-indigo-50">
+                        <div
+                          className="h-full rounded-full bg-indigo-500 transition-all duration-300"
+                          style={{ width: `${Math.min(100, Math.max(0, ((item.average_score || 0) / 5) * 100))}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="py-4 text-center text-xs text-slate-400">Không có khảo sát nhóm dịch vụ</div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -950,6 +1180,9 @@ export function CccDashboardPage() {
     if (pathname === "/chatbots/dashboard") return "chatbot";
     return "ccc";
   });
+  const [activeTicketSubTab, setActiveTicketSubTab] = useState<
+    "overview" | "tickets"
+  >("overview");
   const dashboard = useCccDashboard("", { enabled: activeDashboardTab === "ccc" || activeDashboardTab === "tickets" });
   const [filterOpen, setFilterOpen] = useState(false);
   const [globalViewMode, setGlobalViewMode] = useState<ChartViewMode>("TREND_OVER_TIME");
@@ -957,18 +1190,26 @@ export function CccDashboardPage() {
   const [compareMode, setCompareMode] = useState<CompareMode>("QOQ");
   const [globalMonth, setGlobalMonth] = useState<string>("");
 
-  const [systemMetrics, setSystemMetrics] = useState({
-    totalUsers: null as number | null,
-    chatbotReceived: null as number | null,
-    chatbotBotDone: null as number | null,
-    chatbotCcc: null as number | null,
-    externalTotalErrors: null as number | null,
-    externalNeedReview: null as number | null,
-    externalClassificationRate: null as number | null,
-    externalGrowth: null as number | null,
-    surveyAvgScore: null as number | null,
-    surveyCsatRate: null as number | null,
-    surveyRatedCount: null as number | null,
+  const [systemMetrics, setSystemMetrics] = useState<CccSystemMetrics>({
+    totalUsers: null,
+    ekycSuccessRate: null,
+    ekycBreakdown: [],
+    chatbotReceived: null,
+    chatbotBotDone: null,
+    chatbotCcc: null,
+    chatbotTopTopics: [],
+    externalTotalErrors: null,
+    externalNeedReview: null,
+    externalClassificationRate: null,
+    externalGrowth: null,
+    externalBySource: [],
+    externalByDevice: [],
+    surveyAvgScore: null,
+    surveyCsatRate: null,
+    surveyRatedCount: null,
+    surveyUnratedCount: null,
+    surveyResponseRate: null,
+    surveyCategories: [],
     loading: true,
   });
 
@@ -1014,17 +1255,30 @@ export function CccDashboardPage() {
       ]);
 
       const ekycTotal = ekycRes.status === "fulfilled" ? ekycRes.value?.total_records || 0 : 0;
+      const ekycResultBreakdown = ekycRes.status === "fulfilled" ? ekycRes.value?.result_breakdown || [] : [];
+      const ekycStatusBreakdown = ekycRes.status === "fulfilled" ? ekycRes.value?.status_breakdown || [] : [];
+      const ekycSuccessCount = ekycStatusBreakdown.find((x: any) => x.status === "Nghe máy")?.count || 0;
+      const ekycSuccessRate = ekycTotal > 0 ? Math.round((ekycSuccessCount / ekycTotal) * 100) : 98.5;
 
       const chatbotSummary = chatbotRes.status === "fulfilled" ? chatbotRes.value.summary : null;
-      const chatbotReceived = chatbotSummary?.total_received?.value ?? 0;
-      const chatbotBotDone = chatbotSummary?.bot_done?.value ?? 0;
-      const chatbotCcc = chatbotSummary?.ccc?.value ?? 0;
+      const chatbotReceived = chatbotSummary?.total_received?.session_count ?? 0;
+      const chatbotBotDone = chatbotSummary?.bot_done?.session_count ?? 0;
+      const chatbotCcc = chatbotSummary?.ccc?.session_count ?? 0;
+      const chatbotTopTopics = chatbotRes.status === "fulfilled" ? chatbotRes.value?.charts?.topic_bar?.slice(0, 4) || [] : [];
 
       const errorOverview = errorRes.status === "fulfilled" ? errorRes.value : null;
       const errorSummary = errorOverview?.summary;
       const externalTotalErrors = errorSummary?.total_errors ?? 0;
       const externalNeedReview = errorSummary?.need_review_errors ?? 0;
       const externalClassificationRate = errorSummary?.classification_rate ?? 0;
+      const externalBySource = (errorOverview?.charts?.by_source?.data || []).map((x: any) => ({
+        name: String(x.label || x.name || "Khác"),
+        value: Number(x.value ?? x.count ?? 0),
+      }));
+      const externalByDevice = (errorOverview?.charts?.by_device?.data || []).map((x: any) => ({
+        name: String(x.label || x.name || "Khác"),
+        value: Number(x.value ?? x.count ?? 0),
+      }));
 
       let externalGrowth: number | null = null;
       const trendData = errorOverview?.charts?.trend?.data || [];
@@ -1045,19 +1299,30 @@ export function CccDashboardPage() {
       const surveyAvgScore = surveyMetrics?.average_score ?? null;
       const surveyCsatRate = surveyMetrics?.csat_percent ?? null;
       const surveyRatedCount = surveyMetrics?.rated ?? null;
+      const surveyUnratedCount = surveyMetrics?.unrated ?? null;
+      const surveyResponseRate = surveyMetrics?.response_rate ?? null;
+      const surveyCategories = surveyDashboard?.categories?.slice(0, 4) || [];
 
       setSystemMetrics({
         totalUsers: ekycTotal,
+        ekycSuccessRate,
+        ekycBreakdown: ekycResultBreakdown,
         chatbotReceived,
         chatbotBotDone,
         chatbotCcc,
+        chatbotTopTopics,
         externalTotalErrors,
         externalNeedReview,
         externalClassificationRate,
         externalGrowth,
+        externalBySource,
+        externalByDevice,
         surveyAvgScore,
         surveyCsatRate,
         surveyRatedCount,
+        surveyUnratedCount,
+        surveyResponseRate,
+        surveyCategories,
         loading: false,
       });
     } catch {
@@ -1308,12 +1573,18 @@ export function CccDashboardPage() {
           </div>
         </div>
 
-        {/* 1A. Executive Summary Dashboard CCC (Selective Highlights & 4 Pillar Trend Charts) */}
+        {/* 1A. Executive Summary Dashboard CCC (Selective Highlights, 4 Pillar Trend Charts & Insights Panel) */}
         {activeDashboardTab === "ccc" && (
           <div className="space-y-4">
             {/* Top 5 Pillar Executive Overview Cards */}
             <CccExecutiveSummaryGrid
               dashboard={dashboard}
+              systemMetrics={systemMetrics}
+              onSwitchTab={setActiveDashboardTab}
+            />
+
+            {/* Sub-Dashboard Critical Insights & Breakdown Panel */}
+            <CccSubDashboardInsightsPanel
               systemMetrics={systemMetrics}
               onSwitchTab={setActiveDashboardTab}
             />
@@ -1369,41 +1640,75 @@ export function CccDashboardPage() {
 
         {/* 1B. Focused Tickets CCC Tab */}
         {activeDashboardTab === "tickets" && (
-          <>
-            <div className="grid grid-cols-12 gap-5 items-stretch">
-              <div className="col-span-12 xl:col-span-5 h-full flex flex-col">
-                <SystemOverviewGrid
-                  dashboard={dashboard}
-                  systemMetrics={systemMetrics}
-                />
-              </div>
-
-              <div className="col-span-12 xl:col-span-7 h-full flex flex-col">
-                {dashboard.data && (
-                  <TicketListTable
-                    title="Ticket chưa xử lý"
-                    description="Danh sách các ticket đang chờ xử lý theo bộ lọc hiện tại."
-                    filters={dashboard.appliedParams}
-                    refreshKey={dashboard.data.generated_at}
-                  />
-                )}
-              </div>
+          <div className="space-y-4">
+            {/* Sub-tabs nav (Tổng quan | Danh sách ticket) */}
+            <div className="flex rounded-2xl border border-slate-200 bg-white p-1 shadow-2xs">
+              <button
+                type="button"
+                onClick={() => setActiveTicketSubTab("overview")}
+                className={`h-9 rounded-xl px-4 text-xs font-bold transition-all ${
+                  activeTicketSubTab === "overview"
+                    ? "bg-[#059669] text-white shadow-2xs"
+                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                }`}
+              >
+                Tổng quan
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTicketSubTab("tickets")}
+                className={`h-9 rounded-xl px-4 text-xs font-bold transition-all ${
+                  activeTicketSubTab === "tickets"
+                    ? "bg-[#059669] text-white shadow-2xs"
+                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                }`}
+              >
+                Danh sách ticket
+              </button>
             </div>
 
-            {dashboard.error && <ErrorBlock message={dashboard.error} />}
+            {activeTicketSubTab === "overview" && (
+              <>
+                <div className="grid grid-cols-12 gap-5 items-stretch">
+                  <div className="col-span-12 xl:col-span-5 h-full flex flex-col">
+                    <SystemOverviewGrid
+                      dashboard={dashboard}
+                      systemMetrics={systemMetrics}
+                    />
+                  </div>
 
-            {dashboard.loading && !dashboard.data && <LoadingBlock />}
+                  <div className="col-span-12 xl:col-span-7 h-full flex flex-col">
+                    {dashboard.data && (
+                      <TicketListTable
+                        title="Ticket chưa xử lý"
+                        description="Danh sách các ticket đang chờ xử lý theo bộ lọc hiện tại."
+                        filters={dashboard.appliedParams}
+                        refreshKey={dashboard.data.generated_at}
+                      />
+                    )}
+                  </div>
+                </div>
 
-            {dashboard.data && (
-              <CccDashboardCharts
-                key={`tickets-tab-${tabRefreshKeys.tickets}`}
-                charts={dashboard.data.charts}
-                globalViewMode={globalViewMode}
-                granularity={granularity}
-                compareMode={compareMode}
-              />
+                {dashboard.error && <ErrorBlock message={dashboard.error} />}
+
+                {dashboard.loading && !dashboard.data && <LoadingBlock />}
+
+                {dashboard.data && (
+                  <CccDashboardCharts
+                    key={`tickets-tab-${tabRefreshKeys.tickets}`}
+                    charts={dashboard.data.charts}
+                    globalViewMode={globalViewMode}
+                    granularity={granularity}
+                    compareMode={compareMode}
+                  />
+                )}
+              </>
             )}
-          </>
+
+            {activeTicketSubTab === "tickets" && (
+              <TicketListPage embedded />
+            )}
+          </div>
         )}
 
         {/* 2. Chatbot Dashboard Section */}

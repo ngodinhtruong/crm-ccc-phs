@@ -473,7 +473,10 @@ export function ExternalErrorDashboardPage() {
             onClick={() => {
               const nextOpen = !filterOpen;
               setFilterOpen(nextOpen);
-              if (nextOpen) void dashboard.ensureCatalogs();
+              if (nextOpen) {
+                dashboard.syncDraftFilters();
+                void dashboard.ensureCatalogs();
+              }
             }}
             className={`relative flex h-8 items-center gap-1 rounded border px-3 text-xs font-semibold ${filterOpen || activeFilterCount > 0
               ? "border-[#10b981] bg-emerald-50 text-[#059669]"

@@ -192,8 +192,11 @@ def _user_display_name(user=None, employee=None, fallback: str | None = None) ->
         return employee.full_name or employee.employee_code or fallback or "-"
 
     if user:
-        full_name = f"{getattr(user, 'first_name', '') or ''} {getattr(user, 'last_name', '') or ''}".strip()
-        return full_name or getattr(user, "username", None) or getattr(user, "email", None) or fallback or "-"
+        user_emp = getattr(user, "employee", None)
+        if user_emp and getattr(user_emp, "full_name", None):
+            return user_emp.full_name
+        full_name = getattr(user, "get_full_name", lambda: "")() or f"{getattr(user, 'first_name', '') or ''} {getattr(user, 'last_name', '') or ''}".strip()
+        return full_name or fallback or getattr(user, "username", None) or getattr(user, "email", None) or "-"
 
     return fallback or "-"
 
@@ -494,7 +497,7 @@ def _build_overview(period: PeriodRange, previous_period: PeriodRange, current_r
     ]
 
 
-def _build_branch_ranking(branch_options, current_records, previous_records, current_account_map, previous_account_map, current_active_accounts: set[str]):
+def _build_branch_ranking(branch_options, current_records, previous_records, current_account_map, previous_account_map, current_active_accounts: set[str], period: PeriodRange | None = None):
     ranking: list[dict[str, Any]] = []
 
     records_by_branch: dict[int, list[SaRecord]] = defaultdict(list)
@@ -978,6 +981,7 @@ def get_sale_admin_report_payload(request) -> dict[str, Any]:
         current_account_map,
         previous_account_map,
         current_active_accounts,
+        period,
     )
 
     top_accounts = _build_top_accounts(current_records, current_account_map)
