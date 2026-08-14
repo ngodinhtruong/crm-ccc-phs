@@ -471,7 +471,7 @@ function TicketResultChartCard({
               ) : isAggregatedOrCompared ? (
                 <BarChart data={chartData} margin={{ top: 20, right: 20, left: 10, bottom: 10 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <XAxis dataKey="label" tick={{ fontSize: 11, fontWeight: 600 }} />
+                  <XAxis dataKey="label" interval="preserveStartEnd" minTickGap={12} tick={{ fontSize: 11, fontWeight: 600 }} />
                   <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
                   <Tooltip content={<ValueTooltip />} />
                   <Legend wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
@@ -501,7 +501,7 @@ function TicketResultChartCard({
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <XAxis dataKey="label" tick={{ fontSize: 11, fontWeight: 600 }} />
+                  <XAxis dataKey="label" interval="preserveStartEnd" minTickGap={12} tick={{ fontSize: 11, fontWeight: 600 }} />
                   <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
                   <Tooltip content={<ValueTooltip />} />
                   <Legend wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
@@ -685,8 +685,6 @@ function SourceTrendChartCard({
   granularity?: GranularityMode;
   compareMode?: CompareMode;
 }) {
-  const [selectedMonth, setSelectedMonth] = useState<string>("ALL");
-
   const pivotData = useMemo(() => {
     const periodMap = new Map<string, string>();
     for (const item of items) {
@@ -717,16 +715,13 @@ function SourceTrendChartCard({
     };
   }, [items, granularity]);
 
-  const displayedMonths = useMemo(() => {
-    if (selectedMonth === "ALL") return pivotData.monthDimensions;
-    return pivotData.monthDimensions.filter((m) => m === selectedMonth);
-  }, [selectedMonth, pivotData.monthDimensions]);
+  const displayedMonths = pivotData.monthDimensions;
 
   if (isEmpty(pivotData.rows)) {
     return (
       <ChartCard
         title="Phân bổ Ticket đã xử lý theo Nguồn"
-        description="Trục hoành: Nguồn tiếp nhận | Trục tung: Số lượng ticket (5 cột tháng nhóm cho mỗi nguồn)"
+        description="Trục hoành: Nguồn tiếp nhận | Trục tung: Số lượng ticket"
         className="xl:col-span-7"
       >
         <EmptyChartAxisPlaceholder message="Không có dữ liệu phân bổ theo nguồn" type="bar" categories={["Web", "App", "Hotline", "Email"]} />
@@ -737,24 +732,7 @@ function SourceTrendChartCard({
   return (
     <ChartCard
       title="Phân bổ Ticket đã xử lý theo Nguồn"
-      description="Trục hoành: Nguồn tiếp nhận | Trục tung: Số lượng ticket (5 cột tháng nhóm cho mỗi nguồn)"
-      headerRight={
-        <div className="flex items-center gap-2">
-          <label className="text-xs font-semibold text-slate-500">Xem tháng:</label>
-          <select
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-2xs focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 transition-all"
-          >
-            <option value="ALL">5 tháng gần nhất (5 cột / nguồn)</option>
-            {pivotData.monthDimensions.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
-        </div>
-      }
+      description="Trục hoành: Nguồn tiếp nhận | Trục tung: Số lượng ticket"
     >
       {(isExpanded) => (
         <div className={isExpanded ? "h-[480px]" : "h-[220px]"}>
@@ -2052,12 +2030,25 @@ export const CccDashboardCharts = memo(function CccDashboardCharts({
   globalViewMode = "TREND_OVER_TIME",
   granularity = "MONTH",
   compareMode = "NONE",
+  onlyKeyCharts = false,
 }: {
   charts: CccCharts;
   globalViewMode?: ChartViewMode;
   granularity?: GranularityMode;
   compareMode?: CompareMode;
+  onlyKeyCharts?: boolean;
 }) {
+  if (onlyKeyCharts) {
+    return (
+      <TicketResultChartCard
+        charts={charts}
+        globalViewMode={globalViewMode}
+        granularity={granularity}
+        compareMode={compareMode}
+      />
+    );
+  }
+
   return (
     <div className="space-y-4">
       {/* Row 1 */}

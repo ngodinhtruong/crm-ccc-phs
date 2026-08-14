@@ -166,7 +166,7 @@ function LineTrendChart({ chart }: { chart?: ExternalErrorChartResponse }) {
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data} margin={{ left: 4, right: 16, top: 10, bottom: 10 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+              <XAxis dataKey="label" interval="preserveStartEnd" minTickGap={12} tick={{ fontSize: 11 }} />
               <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
               <Tooltip content={<SimpleTooltip />} />
               <Line
@@ -357,6 +357,7 @@ function RecurringIssuesTable({ items }: { items: ExternalErrorRecurringIssue[] 
 export const ExternalErrorDashboardCharts = memo(function ExternalErrorDashboardCharts({
   charts,
   recurringIssues,
+  onlyTrendChart = false,
 }: {
   charts: {
     byDevice?: ExternalErrorChartResponse;
@@ -369,7 +370,12 @@ export const ExternalErrorDashboardCharts = memo(function ExternalErrorDashboard
     stackedDeviceCause?: ExternalErrorChartResponse;
   };
   recurringIssues: ExternalErrorRecurringIssue[];
+  onlyTrendChart?: boolean;
 }) {
+  if (onlyTrendChart) {
+    return <LineTrendChart chart={charts.trend} />;
+  }
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       <RecurringIssuesTable items={recurringIssues} />

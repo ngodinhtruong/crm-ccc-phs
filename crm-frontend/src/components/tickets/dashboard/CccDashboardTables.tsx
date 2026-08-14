@@ -27,16 +27,16 @@ function TableCard({
   children: ReactNode;
 }) {
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-xs">
-      <div className="flex items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/60 px-4.5 py-3">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-amber-500 text-white font-black text-xs shadow-xs">
+    <div className="overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-xs">
+      <div className="flex items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/60 px-3 py-1.5">
+        <div className="flex items-center gap-2">
+          <div className="flex h-5 w-5 items-center justify-center rounded-md bg-amber-500 text-white font-black text-[10px] shadow-xs">
             !
           </div>
           <div>
-            <h3 className="text-sm font-bold text-slate-900">{title}</h3>
+            <h3 className="text-xs font-bold text-slate-900">{title}</h3>
             {description && (
-              <p className="mt-0.5 text-[11px] text-slate-500">{description}</p>
+              <p className="text-[10px] text-slate-500">{description}</p>
             )}
           </div>
         </div>
@@ -60,7 +60,7 @@ function MessageRow({
     <tr>
       <td
         colSpan={colSpan}
-        className={`h-24 text-center text-xs ${
+        className={`h-20 text-center text-xs ${
           tone === "error" ? "text-red-600" : "text-slate-500"
         }`}
       >
@@ -116,7 +116,7 @@ export function TicketListTable({
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] =
-    useState<CccPendingTicketPageSize>(10);
+    useState<CccPendingTicketPageSize>(5);
   const [data, setData] = useState<CccPendingTicketListResponse | null>(null);
   const [loading, setLoading] = useState(isServerPagination);
   const [error, setError] = useState("");
@@ -268,20 +268,20 @@ export function TicketListTable({
   return (
     <TableCard title={title} description={description}>
       <div
-        className="max-h-[310px] overflow-auto overscroll-contain"
+        className="max-h-[155px] overflow-auto overscroll-contain"
         aria-busy={loading}
       >
         <table className="w-full min-w-[960px] table-fixed text-left text-xs">
-          <thead className="sticky top-0 z-10 border-b bg-[#f8fafc] text-slate-600 shadow-sm">
-            <tr className="h-9">
-              <th className="w-[110px] px-3 py-2 font-semibold">Mã Ticket</th>
-              <th className="w-[140px] px-3 py-2 font-semibold">Chi nhánh xử lý</th>
-              <th className="w-[130px] px-3 py-2 font-semibold">Phân loại</th>
-              <th className="w-[140px] px-3 py-2 font-semibold">Công ty</th>
-              <th className="w-[110px] px-3 py-2 font-semibold">Tình trạng</th>
-              <th className="w-[180px] px-3 py-2 font-semibold">Mô tả</th>
-              <th className="w-[120px] px-3 py-2 font-semibold">Nguồn Ticket</th>
-              <th className="w-[110px] px-3 py-2 font-semibold">Ngày tạo</th>
+          <thead className="sticky top-0 z-10 border-b bg-[#f8fafc] text-slate-600 shadow-sm text-[11px]">
+            <tr className="h-7">
+              <th className="w-[110px] px-3 py-1 font-semibold">Mã Ticket</th>
+              <th className="w-[140px] px-3 py-1 font-semibold">Chi nhánh xử lý</th>
+              <th className="w-[130px] px-3 py-1 font-semibold">Phân loại</th>
+              <th className="w-[140px] px-3 py-1 font-semibold">Công ty</th>
+              <th className="w-[110px] px-3 py-1 font-semibold">Tình trạng</th>
+              <th className="w-[180px] px-3 py-1 font-semibold">Mô tả</th>
+              <th className="w-[120px] px-3 py-1 font-semibold">Nguồn Ticket</th>
+              <th className="w-[110px] px-3 py-1 font-semibold">Ngày tạo</th>
             </tr>
           </thead>
 
@@ -302,33 +302,33 @@ export function TicketListTable({
               <tr
                 key={item.id}
                 onClick={() => router.push(`/tickets/${item.id}`)}
-                className="h-11 cursor-pointer border-b border-slate-100 transition-colors hover:bg-emerald-50"
+                className="h-7.5 cursor-pointer border-b border-slate-100/80 transition-colors hover:bg-emerald-50/70 text-xs"
               >
-                <td className="px-3 py-3 font-semibold text-[#059669]">
+                <td className="px-3 py-1 font-semibold text-[#059669]">
                   {item.ticket_code || `#${item.id}`}
                 </td>
-                <td className="px-3 py-3 text-slate-600">
+                <td className="px-3 py-1 text-slate-600">
                   {item.handling_branch_name || "-"}
                 </td>
-                <td className="px-3 py-3 text-slate-600">
+                <td className="px-3 py-1 text-slate-600">
                   {item.category_name || "-"}
                 </td>
-                <td className="px-3 py-3 font-semibold text-slate-700">
+                <td className="px-3 py-1 font-semibold text-slate-700">
                   {item.company_name || item.customer_name || "-"}
                 </td>
-                <td className="px-3 py-3 text-slate-600">
+                <td className="px-3 py-1 text-slate-600">
                   {item.status_name || "-"}
                 </td>
                 <td
-                  className="max-w-[200px] truncate px-3 py-3 text-slate-600"
+                  className="max-w-[200px] truncate px-3 py-1 text-slate-600"
                   title={item.title || ""}
                 >
                   {item.title || "-"}
                 </td>
-                <td className="px-3 py-3 text-slate-600">
+                <td className="px-3 py-1 text-slate-600">
                   {item.source_name || "-"}
                 </td>
-                <td className="px-3 py-3 text-slate-600">
+                <td className="px-3 py-1 text-slate-600">
                   {formatDate(item.created_at)}
                 </td>
               </tr>
@@ -337,9 +337,9 @@ export function TicketListTable({
         </table>
       </div>
 
-      <div className="border-t border-slate-200 px-4 py-3">
+      <div className="border-t border-slate-200/80 px-3 py-1.5">
         {isServerPagination && error && data && (
-          <p className="mb-2 text-xs text-red-600">{error}</p>
+          <p className="mb-1 text-[11px] text-red-600">{error}</p>
         )}
 
         <TablePagination
@@ -361,7 +361,7 @@ export function TicketListTable({
         />
 
         {isServerPagination && loading && data && (
-          <p className="mt-2 text-[11px] text-[#059669]">
+          <p className="mt-1 text-[10px] text-[#059669]">
             Đang cập nhật trang dữ liệu...
           </p>
         )}

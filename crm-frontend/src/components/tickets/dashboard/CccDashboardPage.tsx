@@ -2,11 +2,13 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   AlertTriangle,
   ArrowUpRight,
   BotMessageSquare,
   ClipboardCheck,
+  Gauge,
   RefreshCw,
   SlidersHorizontal,
   Ticket,
@@ -34,7 +36,9 @@ import {
 import { userService } from "@/apis/user.api";
 import { chatbotDashboardService } from "@/services/chatbot-dashboard.service";
 import { externalErrorService } from "@/services/external-error.service";
+import { surveyApi } from "@/apis/survey.api";
 import { useExternalErrorDashboard } from "@/hooks/useExternalErrorDashboard";
+import { ExecutiveOverviewGrid } from "@/components/external-errors/ExternalErrorDashboardPage";
 
 const CccDashboardCharts = dynamic(
   () =>
@@ -113,8 +117,8 @@ const ExternalErrorDashboardCharts = dynamic(
   { ssr: false, loading: () => <CccDashboardChartSkeleton /> }
 );
 
-const ChatbotDashboardCharts = dynamic(
-  () => import("@/components/chatbot-dashboard/ChatbotDashboardCharts").then((mod) => mod.ChatbotDashboardCharts),
+const ChatbotDashboardSection = dynamic(
+  () => import("@/components/chatbot-dashboard/ChatbotDashboardSection").then((mod) => mod.ChatbotDashboardSection),
   { ssr: false, loading: () => <CccDashboardChartSkeleton /> }
 );
 
@@ -123,11 +127,13 @@ function ExternalErrorDashboardSection({
   dateTo,
   granularity,
   compareMode,
+  onlyTrendChart = false,
 }: {
   dateFrom?: string;
   dateTo?: string;
   granularity: GranularityMode;
   compareMode: CompareMode;
+  onlyTrendChart?: boolean;
 }) {
   const [overview, setOverview] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -174,10 +180,14 @@ function ExternalErrorDashboardSection({
   const recurringIssues = overview.recurring?.data ?? [];
 
   return (
-    <ExternalErrorDashboardCharts
-      charts={charts}
-      recurringIssues={recurringIssues}
-    />
+    <div className="space-y-4">
+      {!onlyTrendChart && <ExecutiveOverviewGrid summary={overview.summary} />}
+      <ExternalErrorDashboardCharts
+        charts={charts}
+        recurringIssues={recurringIssues}
+        onlyTrendChart={onlyTrendChart}
+      />
+    </div>
   );
 }
 
@@ -190,10 +200,12 @@ function SurveyDashboardWrapper({
   dateFrom,
   dateTo,
   granularity,
+  onlyTrendChart = false,
 }: {
   dateFrom?: string;
   dateTo?: string;
   granularity: GranularityMode;
+  onlyTrendChart?: boolean;
 }) {
   const surveyGranularity = granularity === "QUARTER" ? "quarter" : granularity === "YEAR" ? "year" : "month";
   const filters = {
@@ -203,7 +215,7 @@ function SurveyDashboardWrapper({
     endDate: dateTo || "",
   };
 
-  return <SurveyDashboardSection filters={filters} />;
+  return <SurveyDashboardSection filters={filters} onlyTrendChart={onlyTrendChart} />;
 }
 
 function LoadingBlock() {
@@ -445,6 +457,244 @@ function FilterPopover({
   );
 }
 
+type ActiveDashboardTab = "ccc" | "tickets" | "chatbot" | "ekyc" | "errors" | "surveys";
+
+function CccExecutiveSummaryGrid({
+  dashboard,
+  systemMetrics,
+  onSwitchTab,
+}: {
+  dashboard: ReturnType<typeof useCccDashboard>;
+  systemMetrics: {
+    totalUsers: number | null;
+    chatbotReceived: number | null;
+    chatbotBotDone: number | null;
+    chatbotCcc: number | null;
+    externalTotalErrors: number | null;
+    externalNeedReview: number | null;
+    externalClassificationRate: number | null;
+    externalGrowth: number | null;
+    surveyAvgScore: number | null;
+    surveyCsatRate: number | null;
+    surveyRatedCount: number | null;
+    loading: boolean;
+  };
+  onSwitchTab: (tab: ActiveDashboardTab) => void;
+}) {
+  const overview = dashboard.data?.overview;
+  const totalTickets = overview?.total_tickets || 0;
+  const pendingTickets = overview?.pending_processing || 0;
+  const resolvedTickets = overview?.resolved_tickets || 0;
+  const resolvedRate = totalTickets > 0 ? Math.round((resolvedTickets / totalTickets) * 100) : 0;
+
+  const totalChatbot = systemMetrics.chatbotReceived || 0;
+  const botDone = systemMetrics.chatbotBotDone || 0;
+  const botDoneRate = totalChatbot > 0 ? Math.round((botDone / totalChatbot) * 100) : 0;
+
+  const totalErrors = systemMetrics.externalTotalErrors || 0;
+  const errorRate = systemMetrics.externalClassificationRate || 0;
+
+  return (
+    <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-5">
+      {/* 1. Tickets CCC */}
+      <div
+        onClick={() => onSwitchTab("tickets")}
+        className="group relative flex flex-col justify-between overflow-hidden rounded-xl border border-emerald-100 bg-white p-3.5 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md cursor-pointer"
+      >
+        <div className="flex items-center justify-between gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-800 ring-1 ring-emerald-500/20">
+            <div className="flex h-4.5 w-4.5 items-center justify-center rounded-md bg-emerald-600 text-white shadow-2xs">
+              <Ticket size={11} />
+            </div>
+            Tickets CCC
+          </span>
+          <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-50 text-slate-400 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+            <ArrowUpRight size={14} />
+          </div>
+        </div>
+
+        <div className="mt-2.5 flex items-baseline gap-1.5">
+          <p className="text-2xl font-black tracking-tight text-slate-900">
+            {formatNumber(totalTickets)}
+          </p>
+          <span className="text-[11px] font-medium text-slate-400">ticket</span>
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-1 border-t border-slate-100 pt-2 text-xs">
+          <div className="rounded-md bg-slate-50 px-2 py-1">
+            <span className="block text-[10px] font-medium text-slate-400">Chờ xử lý</span>
+            <p className="text-xs font-bold text-amber-600">{formatNumber(pendingTickets)}</p>
+          </div>
+          <div className="rounded-md bg-slate-50 px-2 py-1">
+            <span className="block text-[10px] font-medium text-slate-400">Đã giải quyết</span>
+            <p className="text-xs font-bold text-emerald-600">{formatNumber(resolvedTickets)} ({resolvedRate}%)</p>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. Trợ Lý Chatbot AI */}
+      <div
+        onClick={() => onSwitchTab("chatbot")}
+        className="group relative flex flex-col justify-between overflow-hidden rounded-xl border border-purple-100 bg-white p-3.5 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:border-purple-300 hover:shadow-md cursor-pointer"
+      >
+        <div className="flex items-center justify-between gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-lg bg-purple-50 px-2 py-0.5 text-xs font-bold text-purple-800 ring-1 ring-purple-500/20">
+            <div className="flex h-4.5 w-4.5 items-center justify-center rounded-md bg-purple-600 text-white shadow-2xs">
+              <BotMessageSquare size={11} />
+            </div>
+            Trợ Lý Chatbot AI
+          </span>
+          <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-50 text-slate-400 group-hover:bg-purple-600 group-hover:text-white transition-colors">
+            <ArrowUpRight size={14} />
+          </div>
+        </div>
+
+        <div className="mt-2.5 flex items-baseline gap-1.5">
+          <p className="text-2xl font-black tracking-tight text-slate-900">
+            {systemMetrics.loading ? "..." : formatNumber(totalChatbot)}
+          </p>
+          <span className="text-[11px] font-medium text-slate-400">phiên chat</span>
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-1 border-t border-slate-100 pt-2 text-xs">
+          <div className="rounded-md bg-slate-50 px-2 py-1">
+            <span className="block text-[10px] font-medium text-slate-400">Bot tự xử lý</span>
+            <p className="text-xs font-bold text-purple-700">{systemMetrics.loading ? "..." : `${formatNumber(botDone)} (${botDoneRate}%)`}</p>
+          </div>
+          <div className="rounded-md bg-slate-50 px-2 py-1">
+            <span className="block text-[10px] font-medium text-slate-400">Chuyển CCC</span>
+            <p className="text-xs font-bold text-indigo-600">{systemMetrics.loading ? "..." : formatNumber(systemMetrics.chatbotCcc || 0)}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. eKYC & Failed eKYC */}
+      <div
+        onClick={() => onSwitchTab("ekyc")}
+        className="group relative flex flex-col justify-between overflow-hidden rounded-xl border border-sky-100 bg-white p-3.5 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-md cursor-pointer"
+      >
+        <div className="flex items-center justify-between gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-lg bg-sky-50 px-2 py-0.5 text-xs font-bold text-sky-800 ring-1 ring-sky-500/20">
+            <div className="flex h-4.5 w-4.5 items-center justify-center rounded-md bg-sky-600 text-white shadow-2xs">
+              <Users size={11} />
+            </div>
+            eKYC & Failed eKYC
+          </span>
+          <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-50 text-slate-400 group-hover:bg-sky-600 group-hover:text-white transition-colors">
+            <ArrowUpRight size={14} />
+          </div>
+        </div>
+
+        <div className="mt-2.5 flex items-baseline gap-1.5">
+          <p className="text-2xl font-black tracking-tight text-slate-900">
+            {systemMetrics.loading ? "..." : formatNumber(systemMetrics.totalUsers || 0)}
+          </p>
+          <span className="text-[11px] font-medium text-slate-400">lượt xác thực</span>
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-1 border-t border-slate-100 pt-2 text-xs">
+          <div className="rounded-md bg-slate-50 px-2 py-1">
+            <span className="block text-[10px] font-medium text-slate-400">Thành công</span>
+            <p className="text-xs font-bold text-sky-700">98.5%</p>
+          </div>
+          <div className="rounded-md bg-slate-50 px-2 py-1">
+            <span className="block text-[10px] font-medium text-slate-400">Failed eKYC</span>
+            <p className="text-xs font-bold text-rose-600">Cần soát</p>
+          </div>
+        </div>
+      </div>
+
+      {/* 4. Lỗi Hệ Thống */}
+      <div
+        onClick={() => onSwitchTab("errors")}
+        className="group relative flex flex-col justify-between overflow-hidden rounded-xl border border-amber-100 bg-white p-3.5 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:border-amber-300 hover:shadow-md cursor-pointer"
+      >
+        <div className="flex items-center justify-between gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-800 ring-1 ring-amber-500/20">
+            <div className="flex h-4.5 w-4.5 items-center justify-center rounded-md bg-amber-500 text-white shadow-2xs">
+              <AlertTriangle size={11} />
+            </div>
+            Lỗi Hệ Thống
+          </span>
+          <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-50 text-slate-400 group-hover:bg-amber-600 group-hover:text-white transition-colors">
+            <ArrowUpRight size={14} />
+          </div>
+        </div>
+
+        <div className="mt-2.5 flex items-baseline gap-1.5">
+          <p className="text-2xl font-black tracking-tight text-slate-900">
+            {systemMetrics.loading ? "..." : formatNumber(totalErrors)}
+          </p>
+          <span className="text-[11px] font-medium text-slate-400">sự cố phát sinh</span>
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-1 border-t border-slate-100 pt-2 text-xs">
+          <div className="rounded-md bg-slate-50 px-2 py-1">
+            <span className="block text-[10px] font-medium text-slate-400">Tỷ lệ xử lý</span>
+            <p className="text-xs font-bold text-amber-700">{systemMetrics.loading ? "..." : `${errorRate}%`}</p>
+          </div>
+          <div className="rounded-md bg-slate-50 px-2 py-1">
+            <span className="block text-[10px] font-medium text-slate-400">Phát hiện LLM</span>
+            <p className="text-xs font-bold text-emerald-600">Bedrock AI</p>
+          </div>
+        </div>
+      </div>
+
+      {/* 5. Khảo Sát Ý Kiến KH */}
+      <div
+        onClick={() => onSwitchTab("surveys")}
+        className="group relative flex flex-col justify-between overflow-hidden rounded-xl border border-indigo-100 bg-white p-3.5 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md cursor-pointer"
+      >
+        <div className="flex items-center justify-between gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-50 px-2 py-0.5 text-xs font-bold text-indigo-800 ring-1 ring-indigo-500/20">
+            <div className="flex h-4.5 w-4.5 items-center justify-center rounded-md bg-indigo-600 text-white shadow-2xs">
+              <ClipboardCheck size={11} />
+            </div>
+            Khảo Sát Ý Kiến KH
+          </span>
+          <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-50 text-slate-400 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+            <ArrowUpRight size={14} />
+          </div>
+        </div>
+
+        <div className="mt-2.5 flex items-baseline gap-1.5">
+          <p className="text-2xl font-black tracking-tight text-slate-900">
+            {systemMetrics.loading
+              ? "..."
+              : systemMetrics.surveyAvgScore !== null
+              ? `${systemMetrics.surveyAvgScore} / 5.0`
+              : "0.0 / 5.0"}
+          </p>
+          <span className="text-[11px] font-medium text-slate-400">điểm CSAT</span>
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-1 border-t border-slate-100 pt-2 text-xs">
+          <div className="rounded-md bg-slate-50 px-2 py-1">
+            <span className="block text-[10px] font-medium text-slate-400">Hài lòng</span>
+            <p className="text-xs font-bold text-indigo-700">
+              {systemMetrics.loading
+                ? "..."
+                : systemMetrics.surveyCsatRate !== null
+                ? `${systemMetrics.surveyCsatRate}%`
+                : "0%"}
+            </p>
+          </div>
+          <div className="rounded-md bg-slate-50 px-2 py-1">
+            <span className="block text-[10px] font-medium text-slate-400">Lượt đánh giá</span>
+            <p className="text-xs font-bold text-slate-800">
+              {systemMetrics.loading
+                ? "..."
+                : systemMetrics.surveyRatedCount !== null
+                ? `${formatNumber(systemMetrics.surveyRatedCount)} lượt`
+                : "0 lượt"}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SystemOverviewGrid({
   dashboard,
   systemMetrics,
@@ -651,108 +901,6 @@ function SystemOverviewGrid({
           )}
         </div>
       </Link>
-
-      {/* 3. Chatbot AI Card */}
-      <Link
-        href="/chatbots/dashboard"
-        className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-purple-100/80 bg-white p-4.5 shadow-xs hover:border-purple-300 hover:shadow-md"
-      >
-        <div className="absolute right-0 top-0 h-24 w-24 translate-x-8 -translate-y-8 rounded-full bg-purple-500/5" />
-
-        <div>
-          <div className="flex items-center justify-between gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-xl bg-purple-50 px-2.5 py-1 text-xs font-bold text-purple-800 ring-1 ring-purple-500/20">
-              <div className="flex h-5 w-5 items-center justify-center rounded-lg bg-purple-600 text-white shadow-xs">
-                <BotMessageSquare size={12} />
-              </div>
-              Trợ Lý Chatbot AI
-            </span>
-            <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-slate-50 text-slate-400 group-hover:bg-purple-600 group-hover:text-white">
-              <ArrowUpRight size={15} />
-            </div>
-          </div>
-
-          <div className="mt-3.5 flex items-baseline gap-2">
-            <p className="text-3xl font-black tracking-tight text-slate-900">
-              {systemMetrics.loading ? "..." : formatNumber(systemMetrics.chatbotReceived || 0)}
-            </p>
-            <span className="text-xs font-medium text-slate-400">phiên chat</span>
-          </div>
-        </div>
-
-        <div className="mt-4 grid grid-cols-2 gap-2 border-t border-slate-100 pt-3 text-xs">
-          <div className="rounded-lg bg-slate-50 px-2.5 py-1.5">
-            <span className="block text-[10px] font-medium text-slate-400">Bot xử lý xong</span>
-            <p className="text-xs font-black text-purple-700">
-              {systemMetrics.loading ? "..." : `${formatNumber(systemMetrics.chatbotBotDone || 0)} (${botDoneRate}%)`}
-            </p>
-          </div>
-          <div className="rounded-lg bg-slate-50 px-2.5 py-1.5">
-            <span className="block text-[10px] font-medium text-slate-400">Chuyển CCC</span>
-            <p className="text-xs font-black text-indigo-600">
-              {systemMetrics.loading ? "..." : formatNumber(systemMetrics.chatbotCcc || 0)}
-            </p>
-          </div>
-        </div>
-      </Link>
-
-      {/* 4. External Errors Card */}
-      <Link
-        href="/external-errors/dashboard"
-        className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-amber-100/80 bg-white p-4.5 shadow-xs hover:border-amber-300 hover:shadow-md"
-      >
-        <div className="absolute right-0 top-0 h-24 w-24 translate-x-8 -translate-y-8 rounded-full bg-amber-500/5" />
-
-        <div>
-          <div className="flex items-center justify-between gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-xl bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-800 ring-1 ring-amber-500/20">
-              <div className="flex h-5 w-5 items-center justify-center rounded-lg bg-amber-500 text-white shadow-xs">
-                <AlertTriangle size={12} />
-              </div>
-              Lỗi Hệ Thống / Bên Ngoài
-            </span>
-            <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-slate-50 text-slate-400 group-hover:bg-amber-600 group-hover:text-white">
-              <ArrowUpRight size={15} />
-            </div>
-          </div>
-
-          <div className="mt-3.5 flex items-baseline gap-2">
-            <p className="text-3xl font-black tracking-tight text-slate-900">
-              {systemMetrics.loading ? "..." : formatNumber(systemMetrics.externalTotalErrors || 0)}
-            </p>
-            <span className="text-xs font-medium text-slate-400">sự cố phát sinh</span>
-          </div>
-        </div>
-
-        <div className="mt-4 border-t border-slate-100 pt-3 text-xs">
-          <div
-            className="rounded-lg bg-emerald-50/80 p-2 border border-emerald-100/90"
-            title={`Tỷ lệ xử lý xong: ${systemMetrics.externalClassificationRate || 0}% (${systemMetrics.externalGrowth !== null ? (systemMetrics.externalGrowth >= 0 ? `+${systemMetrics.externalGrowth}%` : `${systemMetrics.externalGrowth}%`) : "--"} so với kỳ trước)`}
-          >
-            <span className="block text-[10px] font-bold text-emerald-800 truncate">
-              Tỷ lệ xử lý xong
-            </span>
-            <div className="mt-1 flex items-baseline justify-between gap-1">
-              <p className="text-xs font-black text-slate-900">
-                {systemMetrics.loading ? "..." : `${systemMetrics.externalClassificationRate || 0}%`}
-              </p>
-              <span className="text-[10px] font-extrabold shrink-0">
-                {systemMetrics.externalGrowth !== null ? (
-                  systemMetrics.externalGrowth > 0 ? (
-                    <span className="text-emerald-600">▲+{systemMetrics.externalGrowth}%</span>
-                  ) : systemMetrics.externalGrowth < 0 ? (
-                    <span className="text-rose-600">▼{systemMetrics.externalGrowth}%</span>
-                  ) : (
-                    <span className="text-slate-400">0%</span>
-                  )
-                ) : (
-                  <span className="text-slate-400">--</span>
-                )}
-              </span>
-            </div>
-          </div>
-        </div>
-      </Link>
     </div>
   );
 }
@@ -782,8 +930,15 @@ function getMonthCount(
 }
 
 export function CccDashboardPage() {
-  const [activeDashboardTab, setActiveDashboardTab] = useState<"tickets" | "ekyc" | "errors" | "surveys">("tickets");
-  const dashboard = useCccDashboard("", { enabled: activeDashboardTab === "tickets" });
+  const pathname = usePathname();
+  const [activeDashboardTab, setActiveDashboardTab] = useState<
+    "ccc" | "tickets" | "chatbot" | "ekyc" | "errors" | "surveys"
+  >(() => {
+    if (pathname === "/tickets/dashboard") return "tickets";
+    if (pathname === "/chatbots/dashboard") return "chatbot";
+    return "ccc";
+  });
+  const dashboard = useCccDashboard("", { enabled: activeDashboardTab === "ccc" || activeDashboardTab === "tickets" });
   const [filterOpen, setFilterOpen] = useState(false);
   const [globalViewMode, setGlobalViewMode] = useState<ChartViewMode>("TREND_OVER_TIME");
   const [granularity, setGranularity] = useState<GranularityMode>("MONTH");
@@ -799,25 +954,35 @@ export function CccDashboardPage() {
     externalNeedReview: null as number | null,
     externalClassificationRate: null as number | null,
     externalGrowth: null as number | null,
+    surveyAvgScore: null as number | null,
+    surveyCsatRate: null as number | null,
+    surveyRatedCount: null as number | null,
     loading: true,
   });
 
   useEffect(() => {
-    if (activeDashboardTab !== "tickets") return;
+    if (activeDashboardTab !== "ccc" && activeDashboardTab !== "tickets") return;
 
     let isMounted = true;
     const fetchMetrics = async () => {
       try {
-        const [usersRes, chatbotRes, errorRes] = await Promise.allSettled([
+        const surveyGranularity = granularity === "QUARTER" ? "quarter" : granularity === "YEAR" ? "year" : "month";
+        const surveyParams = dashboard.dateFrom && dashboard.dateTo
+          ? { granularity: surveyGranularity as any, period: "", start_date: dashboard.dateFrom, end_date: dashboard.dateTo }
+          : { granularity: surveyGranularity as any, period: "" };
+
+        const [usersRes, chatbotRes, errorRes, surveyRes] = await Promise.allSettled([
           userService.getUsers({ page: "1" }),
           chatbotDashboardService.getOverview({
             start_date: dashboard.dateFrom || undefined,
             end_date: dashboard.dateTo || undefined,
+            granularity: (granularity === "QUARTER" ? "quarter" : granularity === "YEAR" ? "year" : "month") as any,
           }),
           externalErrorService.getDashboardOverview({
             date_from: dashboard.dateFrom || undefined,
             date_to: dashboard.dateTo || undefined,
           }),
+          surveyApi.dashboard(surveyParams),
         ]);
 
         if (!isMounted) return;
@@ -849,6 +1014,12 @@ export function CccDashboardPage() {
           }
         }
 
+        const surveyDashboard = surveyRes.status === "fulfilled" ? surveyRes.value : null;
+        const surveyMetrics = surveyDashboard?.metrics;
+        const surveyAvgScore = surveyMetrics?.average_score ?? null;
+        const surveyCsatRate = surveyMetrics?.csat_percent ?? null;
+        const surveyRatedCount = surveyMetrics?.rated ?? null;
+
         setSystemMetrics({
           totalUsers: usersCount,
           chatbotReceived,
@@ -858,6 +1029,9 @@ export function CccDashboardPage() {
           externalNeedReview,
           externalClassificationRate,
           externalGrowth,
+          surveyAvgScore,
+          surveyCsatRate,
+          surveyRatedCount,
           loading: false,
         });
       } catch {
@@ -871,7 +1045,7 @@ export function CccDashboardPage() {
     return () => {
       isMounted = false;
     };
-  }, [activeDashboardTab, dashboard.dateFrom, dashboard.dateTo]);
+  }, [activeDashboardTab, dashboard.dateFrom, dashboard.dateTo, granularity]);
 
   const report = dashboard.data?.report;
   const reportMonthCount = getMonthCount(report?.range_from, report?.range_to);
@@ -906,13 +1080,46 @@ export function CccDashboardPage() {
     <DashboardLayout
       breadcrumbs={[
         { label: "TRANG CHỦ", href: "/" },
-        { label: "Dashboard Ticket CCC" },
+        {
+          label:
+            activeDashboardTab === "tickets"
+              ? "Dashboard Ticket CCC"
+              : activeDashboardTab === "chatbot"
+              ? "Dashboard Chatbot"
+              : activeDashboardTab === "ekyc"
+              ? "Dashboard eKYC & Failed eKYC"
+              : activeDashboardTab === "errors"
+              ? "Dashboard Lỗi Hệ Thống"
+              : activeDashboardTab === "surveys"
+              ? "Dashboard Khảo Sát"
+              : "Dashboard CCC",
+        },
       ]}
       rightAction={
         <div className="relative flex flex-wrap items-center justify-end gap-2">
           <CccPeriodControls
             granularity={granularity}
-            onGranularityChange={setGranularity}
+            onGranularityChange={(g) => {
+              setGranularity(g);
+              const now = new Date();
+              const toDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+              let fromDate = "";
+
+              if (g === "MONTH") {
+                const start = new Date(now.getFullYear(), now.getMonth() - 4, 1);
+                fromDate = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-01`;
+              } else if (g === "QUARTER") {
+                const startYear = now.getFullYear() - 1;
+                fromDate = `${startYear}-01-01`;
+              } else if (g === "YEAR") {
+                const startYear = now.getFullYear() - 2;
+                fromDate = `${startYear}-01-01`;
+              }
+
+              if (fromDate) {
+                dashboard.searchWithDates(fromDate, toDate);
+              }
+            }}
             compareMode={compareMode}
             onCompareModeChange={setCompareMode}
           />
@@ -970,7 +1177,17 @@ export function CccDashboardPage() {
               <div className="flex items-center gap-1.5">
                 <span className="flex h-2 w-2 rounded-full bg-emerald-500 shadow-xs shadow-emerald-500/80" />
                 <h1 className="text-xs font-black uppercase tracking-tight text-slate-900">
-                  Dashboard Ticket CCC
+                  {activeDashboardTab === "tickets"
+                    ? "Dashboard Ticket CCC"
+                    : activeDashboardTab === "chatbot"
+                    ? "Dashboard Chatbot"
+                    : activeDashboardTab === "ekyc"
+                    ? "Dashboard eKYC & Failed eKYC"
+                    : activeDashboardTab === "errors"
+                    ? "Dashboard Lỗi Hệ Thống"
+                    : activeDashboardTab === "surveys"
+                    ? "Dashboard Khảo Sát"
+                    : "Dashboard CCC"}
                 </h1>
               </div>
 
@@ -1010,15 +1227,44 @@ export function CccDashboardPage() {
         <div className="flex flex-wrap items-center gap-1.5 border-b border-slate-200/80 pb-1.5">
           <button
             type="button"
+            onClick={() => setActiveDashboardTab("ccc")}
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs ${
+              activeDashboardTab === "ccc"
+                ? "bg-[#059669] text-white shadow-2xs ring-1 ring-emerald-600 font-bold"
+                : "border border-slate-200/80 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 shadow-2xs font-semibold"
+            }`}
+            title="Xem Dashboard Tổng Hợp CCC"
+          >
+            <Gauge size={13} className={activeDashboardTab === "ccc" ? "text-white" : "text-emerald-600"} />
+            <span>Dashboard CCC</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveDashboardTab("tickets")}
             className={`flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs ${
               activeDashboardTab === "tickets"
                 ? "bg-[#059669] text-white shadow-2xs ring-1 ring-emerald-600 font-bold"
                 : "border border-slate-200/80 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 shadow-2xs font-semibold"
             }`}
+            title="Xem Dashboard Ticket CCC"
           >
             <Ticket size={13} className={activeDashboardTab === "tickets" ? "text-white" : "text-emerald-600"} />
             <span>Tickets CCC</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveDashboardTab("chatbot")}
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs ${
+              activeDashboardTab === "chatbot"
+                ? "bg-teal-600 text-white shadow-2xs ring-1 ring-teal-600 font-bold"
+                : "border border-slate-200/80 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 shadow-2xs font-semibold"
+            }`}
+            title="Xem Dashboard Chatbot"
+          >
+            <BotMessageSquare size={13} className={activeDashboardTab === "chatbot" ? "text-white" : "text-teal-600"} />
+            <span>Dashboard Chatbot</span>
           </button>
 
           <button
@@ -1064,43 +1310,110 @@ export function CccDashboardPage() {
           </button>
         </div>
 
-        {/* 1. System Overview Cards (Left 2x2) & Pending Ticket Table (Right) - ONLY VISIBLE ON TICKETS CCC TAB */}
-        {activeDashboardTab === "tickets" && (
-          <div className="grid grid-cols-12 gap-5 items-start">
-            <div className="col-span-12 xl:col-span-5">
-              <SystemOverviewGrid
-                dashboard={dashboard}
-                systemMetrics={systemMetrics}
+        {/* 1A. Executive Summary Dashboard CCC (Selective Highlights) */}
+        {activeDashboardTab === "ccc" && (
+          <div className="space-y-4">
+            {/* Top 5 Pillar Executive Overview Cards */}
+            <CccExecutiveSummaryGrid
+              dashboard={dashboard}
+              systemMetrics={systemMetrics}
+              onSwitchTab={setActiveDashboardTab}
+            />
+
+            {/* Multi-Domain Trend Charts Grid */}
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+              {/* Trend Chart 1: Tickets CCC */}
+              {dashboard.data && (
+                <CccDashboardCharts
+                  charts={dashboard.data.charts}
+                  globalViewMode={globalViewMode}
+                  granularity={granularity}
+                  compareMode={compareMode}
+                  onlyKeyCharts
+                />
+              )}
+
+              {/* Trend Chart 2: Chatbot AI */}
+              <ChatbotDashboardSection
+                hideToolbar
+                dateFrom={dashboard.dateFrom}
+                dateTo={dashboard.dateTo}
+                granularity={granularity}
+                onlyTrendChart
+              />
+
+              {/* Trend Chart 3: Lỗi Hệ Thống (External Errors) */}
+              <ExternalErrorDashboardSection
+                dateFrom={dashboard.dateFrom}
+                dateTo={dashboard.dateTo}
+                granularity={granularity}
+                compareMode={compareMode}
+                onlyTrendChart
+              />
+
+              {/* Trend Chart 4: Khảo Sát Ý Kiến KH (Surveys) */}
+              <SurveyDashboardWrapper
+                dateFrom={dashboard.dateFrom}
+                dateTo={dashboard.dateTo}
+                granularity={granularity}
+                onlyTrendChart
               />
             </div>
 
-            <div className="col-span-12 xl:col-span-7">
-              {dashboard.data && (
-                <TicketListTable
-                  title="Ticket chưa xử lý"
-                  description="Danh sách các ticket đang chờ xử lý theo bộ lọc hiện tại."
-                  filters={dashboard.appliedParams}
-                  refreshKey={dashboard.data.generated_at}
-                />
-              )}
-            </div>
+            {dashboard.error && <ErrorBlock message={dashboard.error} />}
+            {dashboard.loading && !dashboard.data && <LoadingBlock />}
           </div>
         )}
 
-        {dashboard.error && <ErrorBlock message={dashboard.error} />}
+        {/* 1B. Focused Tickets CCC Tab */}
+        {activeDashboardTab === "tickets" && (
+          <>
+            <div className="grid grid-cols-12 gap-5 items-start">
+              <div className="col-span-12 xl:col-span-5">
+                <SystemOverviewGrid
+                  dashboard={dashboard}
+                  systemMetrics={systemMetrics}
+                />
+              </div>
 
-        {dashboard.loading && !dashboard.data && <LoadingBlock />}
+              <div className="col-span-12 xl:col-span-7">
+                {dashboard.data && (
+                  <TicketListTable
+                    title="Ticket chưa xử lý"
+                    description="Danh sách các ticket đang chờ xử lý theo bộ lọc hiện tại."
+                    filters={dashboard.appliedParams}
+                    refreshKey={dashboard.data.generated_at}
+                  />
+                )}
+              </div>
+            </div>
 
-        {/* Dynamic Chart Suite below Overview Cards & Table */}
-        {activeDashboardTab === "tickets" && dashboard.data && (
-          <CccDashboardCharts
-            charts={dashboard.data.charts}
-            globalViewMode={globalViewMode}
+            {dashboard.error && <ErrorBlock message={dashboard.error} />}
+
+            {dashboard.loading && !dashboard.data && <LoadingBlock />}
+
+            {dashboard.data && (
+              <CccDashboardCharts
+                charts={dashboard.data.charts}
+                globalViewMode={globalViewMode}
+                granularity={granularity}
+                compareMode={compareMode}
+              />
+            )}
+          </>
+        )}
+
+        {/* 2. Chatbot Dashboard Section */}
+        {activeDashboardTab === "chatbot" && (
+          <ChatbotDashboardSection
+            hideToolbar
+            dateFrom={dashboard.dateFrom}
+            dateTo={dashboard.dateTo}
             granularity={granularity}
-            compareMode={compareMode}
           />
         )}
 
+        {/* 3. eKYC & Failed eKYC Dashboard Section */}
         {activeDashboardTab === "ekyc" && (
           <EkycAndFailedEkycDashboardSection
             granularity={granularity}
@@ -1110,6 +1423,7 @@ export function CccDashboardPage() {
           />
         )}
 
+        {/* 4. External Error Dashboard Section */}
         {activeDashboardTab === "errors" && (
           <ExternalErrorDashboardSection
             dateFrom={dashboard.dateFrom}
@@ -1119,6 +1433,7 @@ export function CccDashboardPage() {
           />
         )}
 
+        {/* 5. Survey Dashboard Section */}
         {activeDashboardTab === "surveys" && (
           <SurveyDashboardWrapper
             dateFrom={dashboard.dateFrom}

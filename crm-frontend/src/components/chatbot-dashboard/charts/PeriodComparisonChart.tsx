@@ -105,7 +105,6 @@ export function PeriodComparisonChart({
     <ChartCard
       title={`So sánh theo ${unit.toLowerCase()}`}
       description={`Mỗi ${unit.toLowerCase()} đặt cạnh ${unit.toLowerCase()} liền trước để thấy mức tăng/giảm.`}
-      className="xl:col-span-12"
     >
       {items.length === 0 ? (
         <EmptyState message="Chưa đủ dữ liệu để so sánh kỳ." />

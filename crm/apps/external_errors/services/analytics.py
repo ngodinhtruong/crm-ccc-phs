@@ -4,7 +4,13 @@ from typing import Any
 
 from django.conf import settings
 from django.db.models import Count, F, Q, QuerySet
-from django.db.models.functions import TruncDay, TruncMonth, TruncWeek
+from django.db.models.functions import (
+    TruncDay,
+    TruncMonth,
+    TruncQuarter,
+    TruncWeek,
+    TruncYear,
+)
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 
@@ -403,20 +409,27 @@ def _trend_queryset(
     queryset: QuerySet,
     params: Mapping[str, Any],
 ):
-    interval = str(params.get("interval") or "month")
+    granularity = str(params.get("granularity") or "").lower().strip()
+    interval = str(params.get("interval") or "").lower().strip()
+
+    mode = granularity if granularity in {"month", "quarter", "year", "day", "week"} else interval
+    if mode not in {"month", "quarter", "year", "day", "week"}:
+        mode = "month"
+
     date_field = str(params.get("date_field") or "received_date")
     date_field_name = DATE_FIELD_MAP.get(date_field, "received_date")
 
-    if interval == "day":
+    if mode == "quarter":
+        trunc = TruncQuarter(date_field_name)
+    elif mode == "year":
+        trunc = TruncYear(date_field_name)
+    elif mode == "day":
         trunc = TruncDay(date_field_name)
-        label_format = "%d/%m/%Y"
-    elif interval == "week":
+    elif mode == "week":
         trunc = TruncWeek(date_field_name)
-        label_format = "Tuần %W/%Y"
     else:
-        interval = "month"
+        mode = "month"
         trunc = TruncMonth(date_field_name)
-        label_format = "T%m/%Y"
 
     rows = (
         queryset.exclude(**{f"{date_field_name}__isnull": True})
@@ -426,25 +439,100 @@ def _trend_queryset(
         .order_by("period")
     )
 
-    data = []
+    counts_by_period = {}
     for row in rows:
-        period_value = row["period"]
-        label = (
-            period_value.strftime(label_format)
-            if period_value
-            else "Không xác định"
-        )
-        data.append(
-            {
-                "label": label,
-                "value": row["count"],
-                "count": row["count"],
-            }
-        )
+        p = row["period"]
+        if p:
+            counts_by_period[p] = row["count"]
+
+    date_from = get_date_param(params, "date_from")
+    date_to = get_date_param(params, "date_to") or timezone.localdate()
+
+    if not date_from:
+        if counts_by_period:
+            min_p = min(counts_by_period.keys())
+            start_date = min_p.date() if isinstance(min_p, datetime) else min_p
+        else:
+            start_date = date_to
+    else:
+        start_date = date_from
+
+    end_date = date_to
+
+    def format_label(d, m):
+        if m == "quarter":
+            q = (d.month - 1) // 3 + 1
+            return f"Quý {q}/{d.year}"
+        elif m == "year":
+            return f"{d.year}"
+        elif m == "day":
+            return d.strftime("%d/%m/%Y")
+        elif m == "week":
+            return f"Tuần {d.strftime('%W')}/{d.year}"
+        else:
+            return f"T{d.month:02d}/{d.year}"
+
+    def period_key(d, m):
+        if m == "quarter":
+            q_start_month = ((d.month - 1) // 3) * 3 + 1
+            return (d.year, q_start_month)
+        elif m == "year":
+            return (d.year, 1)
+        elif m == "month":
+            return (d.year, d.month)
+        elif m == "day":
+            return (d.year, d.month, d.day)
+        else:
+            return (d.year, d.month, d.day)
+
+    mapped_counts = {}
+    for p, cnt in counts_by_period.items():
+        dt = p if isinstance(p, datetime) else datetime.combine(p, time.min)
+        key = period_key(dt.date(), mode)
+        mapped_counts[key] = mapped_counts.get(key, 0) + cnt
+
+    data = []
+    visited_keys = set()
+    current = start_date
+
+    while current <= end_date or not visited_keys:
+        key = period_key(current, mode)
+        if key not in visited_keys:
+            visited_keys.add(key)
+            label = format_label(current, mode)
+            cnt = mapped_counts.get(key, 0)
+            data.append(
+                {
+                    "label": label,
+                    "value": cnt,
+                    "count": cnt,
+                }
+            )
+
+        if mode == "quarter":
+            next_month = current.month + 3
+            year = current.year + (next_month - 1) // 12
+            month = (next_month - 1) % 12 + 1
+            current = current.replace(year=year, month=month, day=1)
+        elif mode == "year":
+            current = current.replace(year=current.year + 1, month=1, day=1)
+        elif mode == "month":
+            next_month = current.month + 1
+            year = current.year + (next_month - 1) // 12
+            month = (next_month - 1) % 12 + 1
+            current = current.replace(year=year, month=month, day=1)
+        elif mode == "week":
+            current += timedelta(days=7)
+        else:
+            current += timedelta(days=1)
+
+        if current > end_date and len(visited_keys) > 0:
+            break
 
     return {
         "chart_type": "LINE",
-        "interval": interval,
+        "interval": mode,
+        "granularity": mode,
         "date_field": date_field,
         "data": data,
     }
@@ -469,21 +557,22 @@ def _stacked_queryset(
             f"Giá trị hợp lệ: {valid_values}."
         )
 
-    if group_key in {"month", "week", "day"}:
+    if group_key in {"month", "quarter", "year", "week", "day"}:
         date_field_name = DATE_FIELD_MAP.get(
             str(params.get("date_field") or "received_date"),
             "received_date",
         )
 
-        if group_key == "day":
+        if group_key == "quarter":
+            trunc = TruncQuarter(date_field_name)
+        elif group_key == "year":
+            trunc = TruncYear(date_field_name)
+        elif group_key == "day":
             trunc = TruncDay(date_field_name)
-            label_format = "%d/%m/%Y"
         elif group_key == "week":
             trunc = TruncWeek(date_field_name)
-            label_format = "Tuần %W/%Y"
         else:
             trunc = TruncMonth(date_field_name)
-            label_format = "T%m/%Y"
 
         rows = (
             queryset.exclude(**{f"{date_field_name}__isnull": True})
@@ -494,11 +583,19 @@ def _stacked_queryset(
         )
 
         def label_getter(value):
-            return (
-                value.strftime(label_format)
-                if value
-                else "Không xác định"
-            )
+            if not value:
+                return "Không xác định"
+            if group_key == "quarter":
+                q = (value.month - 1) // 3 + 1
+                return f"Quý {q}/{value.year}"
+            elif group_key == "year":
+                return f"{value.year}"
+            elif group_key == "day":
+                return value.strftime("%d/%m/%Y")
+            elif group_key == "week":
+                return f"Tuần {value.strftime('%W')}/{value.year}"
+            else:
+                return value.strftime("T%m/%Y")
 
     else:
         group_field = GROUP_BY_FIELD_MAP.get(group_key)
@@ -724,16 +821,23 @@ def build_overview(params: Mapping[str, Any]):
     queryset = base_queryset(params)
     summary = _build_summary_from_queryset(queryset)
 
+    granularity = str(params.get("granularity") or "").lower().strip()
+    trend_mode = (
+        granularity
+        if granularity in {"month", "quarter", "year", "day", "week"}
+        else str(params.get("interval") or "month").lower().strip()
+    )
+
     trend_data = _trend_queryset(
         queryset,
-        _params_with(params, interval="month"),
+        _params_with(params, interval=trend_mode, granularity=trend_mode),
     )
     stacked_month_device = _stacked_queryset(
         queryset,
         _params_with(
             params,
             chart_type="STACKED_BAR",
-            group_by="month",
+            group_by=trend_mode,
             breakdown_by="device",
         ),
     )

@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import {
   Bar,
   BarChart,
@@ -20,26 +21,11 @@ import {
 } from "@/components/common";
 import type { SurveySeriesItem } from "@/types/survey.type";
 
-/**
- * Bảng màu đã chạy qua bộ kiểm của skill dataviz trên nền trắng.
- *
- * Cặp đã/không đánh giá: ΔE 24.7 (protan) — người mù màu đỏ-lục vẫn phân
- * biệt được. Cặp tỷ lệ phản hồi/CSAT: ΔE 27.9 (deutan). Cả hai đạt ngưỡng
- * tương phản với nền.
- * Đổi màu thì phải chạy lại bộ kiểm, đừng chọn bằng mắt.
- */
 const RATED = "#2a78d6";
 const UNRATED = "#eb6834";
 const RESPONSE_RATE = "#008300";
 const CSAT = "#4a3aa7";
 
-/**
- * Biểu đồ gửi thành công / thất bại dùng dạng "nhấn mạnh": thứ đáng chú ý là
- * các lần gửi hỏng, còn phần gửi được chỉ là nền.
- *
- * Cố ý không dùng cặp lục-đỏ quen thuộc: cặp đó chỉ đạt ΔE 4.1 với người mù
- * màu đỏ-lục, hai lát chồng nhau thành một khối. Cặp xám-đỏ này đạt ΔE 12.4.
- */
 const SENT_OK = "#64748b";
 const SENT_FAILED = "#d03b3b";
 
@@ -47,13 +33,6 @@ const SURFACE = "#ffffff";
 const GRID = "#e2e8f0";
 const INK = "#475569";
 
-/**
- * Độ đậm của các kỳ chỉ đóng vai trò nền so sánh.
- *
- * Để 0.45 như dashboard chatbot thì cột bạc màu, nhìn như dữ liệu mờ chứ
- * không ra ý "kỳ này không phải kỳ bạn chọn". 0.85 vẫn tách được với kỳ đang
- * xem — kỳ đó còn được in đậm nhãn trục — mà màu vẫn rõ.
- */
 const CONTEXT_OPACITY = 0.85;
 
 const AXIS = {
@@ -93,7 +72,6 @@ function ChartCard({
   );
 }
 
-/** Nhãn trục hoành: kỳ đang xem in đậm để tách khỏi các kỳ làm nền. */
 function PeriodTick({
   x,
   y,
@@ -166,7 +144,6 @@ function findItem(series: SurveySeriesItem[], shortLabel?: string) {
   return series.find((item) => item.short_label === shortLabel);
 }
 
-/** null nghĩa là kỳ đó không có số liệu — hiện gạch ngang, không hiện 0%. */
 function percent(value?: number | null) {
   return value === null || value === undefined ? "—" : `${value}%`;
 }
@@ -175,12 +152,6 @@ function score(value?: number | null) {
   return value === null || value === undefined ? "—" : `${value}/5`;
 }
 
-/**
- * Lát của donut khi bấm vào một cột.
- *
- * Bỏ lát bằng 0 thay vì vẽ lát rỗng: donut có một lát 0 sẽ hiện nhãn đè lên
- * nhau ở cùng một góc, đọc không ra gì.
- */
 function nonEmpty(slices: DrilldownSlice[]): DrilldownSlice[] {
   return slices.filter((slice) => slice.value > 0);
 }
@@ -199,38 +170,33 @@ function ratingSlices(item: SurveySeriesItem): DrilldownSlice[] {
   ]);
 }
 
-/**
- * So sánh các kỳ với nhau — tháng trong năm, quý trong năm, hoặc năm nay với
- * năm ngoái, giống biểu đồ so sánh kỳ của dashboard chatbot.
- *
- * Tách làm nhiều khung chứ không gộp số lượt với phần trăm lên một khung:
- * hai đại lượng khác thang đo, vẽ chung phải dùng hai trục tung và người đọc
- * sẽ so nhầm độ cao giữa chúng.
- */
 export function SurveyPeriodCharts({
   series,
   granularityLabel,
+  onlyTrendChart = false,
 }: {
   series: SurveySeriesItem[];
   granularityLabel: string;
+  onlyTrendChart?: boolean;
 }) {
-  // Hook phải chạy trước mọi nhánh thoát sớm.
   const delivery = usePeriodDrilldown();
   const rating = usePeriodDrilldown();
 
-  if (series.length === 0) return null;
+  const displaySeries = series;
+
+  if (displaySeries.length === 0) return null;
 
   const currentLabel =
-    series.find((item) => item.is_current)?.short_label ?? "";
+    displaySeries.find((item) => item.is_current)?.short_label ?? "";
   const tick = (props: object) => (
     <PeriodTick {...props} currentLabel={currentLabel} />
   );
 
-  const deliveryItem = findItem(series, delivery.selectedPeriod ?? undefined);
-  const ratingItem = findItem(series, rating.selectedPeriod ?? undefined);
+  const deliveryItem = findItem(displaySeries, delivery.selectedPeriod ?? undefined);
+  const ratingItem = findItem(displaySeries, rating.selectedPeriod ?? undefined);
 
   return (
-    <div className="grid gap-3 xl:grid-cols-2">
+    <div className={`grid gap-3 ${onlyTrendChart ? "grid-cols-1" : "xl:grid-cols-2"}`}>
       <ChartCard
         title={
           deliveryItem
@@ -261,20 +227,20 @@ export function SurveyPeriodCharts({
         ) : (
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
-            data={series}
+            data={displaySeries}
             onClick={delivery.openPeriod}
             margin={{ top: 8, right: 32, bottom: 4, left: -12 }}
             maxBarSize={24}
             className="cursor-pointer"
           >
             <CartesianGrid stroke={GRID} vertical={false} />
-            <XAxis dataKey="short_label" {...AXIS} tick={tick} interval={0} />
+            <XAxis dataKey="short_label" {...AXIS} tick={tick} interval="preserveStartEnd" minTickGap={12} />
             <YAxis {...AXIS} allowDecimals={false} />
 
             <Tooltip
               cursor={{ fill: "rgba(148,163,184,0.12)" }}
               content={({ active, label }) => {
-                const item = findItem(series, label as string);
+                const item = findItem(displaySeries, label as string);
                 const total = item?.total ?? 0;
 
                 return (
@@ -320,7 +286,7 @@ export function SurveyPeriodCharts({
               strokeWidth={2}
               isAnimationActive={false}
             >
-              {series.map((item) => (
+              {displaySeries.map((item) => (
                 <Cell key={item.code} fillOpacity={item.is_current ? 1 : CONTEXT_OPACITY} />
               ))}
             </Bar>
@@ -334,7 +300,7 @@ export function SurveyPeriodCharts({
               radius={[4, 4, 0, 0]}
               isAnimationActive={false}
             >
-              {series.map((item) => (
+              {displaySeries.map((item) => (
                 <Cell key={item.code} fillOpacity={item.is_current ? 1 : CONTEXT_OPACITY} />
               ))}
             </Bar>
@@ -344,219 +310,213 @@ export function SurveyPeriodCharts({
         </div>
       </ChartCard>
 
-      <ChartCard
-        title={
-          ratingItem
-            ? `LƯỢT GỬI THÀNH CÔNG — ${ratingItem.label.toUpperCase()}`
-            : `LƯỢT GỬI THÀNH CÔNG THEO ${granularityLabel.toUpperCase()}`
-        }
-        hint={
-          ratingItem
-            ? "nháy đúp hoặc bấm Quay lại để xem tất cả các kỳ"
-            : "bấm vào cột để xem chi tiết kỳ đó"
-        }
-        action={
-          ratingItem && (
-            <PeriodDrilldownBackButton onClick={rating.closePeriod} />
-          )
-        }
-      >
-        <div className="h-[260px]">
-        {ratingItem ? (
-          <PeriodDrilldownDonut
-            data={ratingSlices(ratingItem)}
-            colorOf={(name) =>
-              name === "Khách đã đánh giá" ? RATED : UNRATED
-            }
-            onExit={rating.closePeriod}
-            emptyMessage={`${ratingItem.label} chưa có lượt gửi thành công nào.`}
-          />
-        ) : (
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart
-            data={series}
-            onClick={rating.openPeriod}
-            margin={{ top: 8, right: 32, bottom: 4, left: -12 }}
-            maxBarSize={24}
-            className="cursor-pointer"
-          >
-            <CartesianGrid stroke={GRID} vertical={false} />
-            <XAxis dataKey="short_label" {...AXIS} tick={tick} interval={0} />
-            <YAxis {...AXIS} allowDecimals={false} />
-
-            <Tooltip
-              cursor={{ fill: "rgba(148,163,184,0.12)" }}
-              content={({ active, label }) => {
-                const item = findItem(series, label as string);
-
-                return (
-                  <SeriesTooltip
-                    active={active}
-                    label={item?.label ?? (label as string)}
-                    rows={[
-                      {
-                        label: "Khách đã đánh giá",
-                        value: String(item?.rated ?? 0),
-                        color: RATED,
-                      },
-                      {
-                        label: "Khách không đánh giá",
-                        value: String(item?.unrated ?? 0),
-                        color: UNRATED,
-                      },
-                      {
-                        label: "Tổng gửi thành công",
-                        value: String(item?.success ?? 0),
-                      },
-                      {
-                        label: "Gửi thất bại",
-                        value: String(
-                          (item?.total ?? 0) - (item?.success ?? 0)
-                        ),
-                      },
-                    ]}
-                  />
-                );
-              }}
+      {!onlyTrendChart && (
+        <ChartCard
+          title={
+            ratingItem
+              ? `LƯỢT GỬI THÀNH CÔNG — ${ratingItem.label.toUpperCase()}`
+              : `LƯỢT GỬI THÀNH CÔNG THEO ${granularityLabel.toUpperCase()}`
+          }
+          hint={
+            ratingItem
+              ? "nháy đúp hoặc bấm Quay lại để xem tất cả các kỳ"
+              : "bấm vào cột để xem chi tiết kỳ đó"
+          }
+          action={
+            ratingItem && (
+              <PeriodDrilldownBackButton onClick={rating.closePeriod} />
+            )
+          }
+        >
+          <div className="h-[260px]">
+          {ratingItem ? (
+            <PeriodDrilldownDonut
+              data={ratingSlices(ratingItem)}
+              colorOf={(name) =>
+                name === "Khách đã đánh giá" ? RATED : UNRATED
+              }
+              onExit={rating.closePeriod}
+              emptyMessage={`${ratingItem.label} chưa có lượt gửi thành công nào.`}
             />
-
-            <Legend
-              iconType="square"
-              iconSize={9}
-              wrapperStyle={{ fontSize: 11, color: INK, paddingTop: 8 }}
-            />
-
-            {/* Viền màu nền tạo khe 2px giữa hai lát chồng nhau. */}
-            <Bar
-              dataKey="rated"
-              name="Khách đã đánh giá"
-              stackId="sent"
-              fill={RATED}
-              stroke={SURFACE}
-              strokeWidth={2}
-              isAnimationActive={false}
+          ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              data={displaySeries}
+              onClick={rating.openPeriod}
+              margin={{ top: 8, right: 32, bottom: 4, left: -12 }}
+              maxBarSize={24}
+              className="cursor-pointer"
             >
-              {series.map((item) => (
-                <Cell key={item.code} fillOpacity={item.is_current ? 1 : CONTEXT_OPACITY} />
-              ))}
-            </Bar>
-            <Bar
-              dataKey="unrated"
-              name="Khách không đánh giá"
-              stackId="sent"
-              fill={UNRATED}
-              stroke={SURFACE}
-              strokeWidth={2}
-              radius={[4, 4, 0, 0]}
-              isAnimationActive={false}
-            >
-              {series.map((item) => (
-                <Cell key={item.code} fillOpacity={item.is_current ? 1 : CONTEXT_OPACITY} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-        )}
-        </div>
-      </ChartCard>
+              <CartesianGrid stroke={GRID} vertical={false} />
+              <XAxis dataKey="short_label" {...AXIS} tick={tick} interval="preserveStartEnd" minTickGap={12} />
+              <YAxis {...AXIS} allowDecimals={false} />
 
-      {/*
-        Vẽ cột chứ không vẽ đường: phần lớn kỳ chưa có khảo sát nên chuỗi rất
-        thưa, mà một điểm đo đơn lẻ thì không nối thành đoạn nào — biểu đồ
-        đường sẽ trắng trơn dù kỳ đó có số liệu hẳn hoi. Cột thì một kỳ cũng
-        hiện rõ, và kỳ không có số liệu thì đơn giản là không có cột.
+              <Tooltip
+                cursor={{ fill: "rgba(148,163,184,0.12)" }}
+                content={({ active, label }) => {
+                  const item = findItem(displaySeries, label as string);
 
-        Hai cột đặt cạnh nhau chứ không chồng lên: đây là hai tỷ lệ độc lập,
-        cộng chúng lại không ra ý nghĩa gì.
-      */}
-      <ChartCard
-        title={`CHẤT LƯỢNG THEO ${granularityLabel.toUpperCase()}`}
-        hint="cùng thang 0–100%; kỳ không có khảo sát thì không có cột"
-        className="xl:col-span-2"
-      >
-        <div className="h-[260px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart
-            data={series}
-            margin={{ top: 8, right: 32, bottom: 4, left: -12 }}
-            maxBarSize={24}
-          >
-            <CartesianGrid stroke={GRID} vertical={false} />
-            <XAxis dataKey="short_label" {...AXIS} tick={tick} interval={0} />
-            <YAxis {...AXIS} domain={[0, 100]} unit="%" />
+                  return (
+                    <SeriesTooltip
+                      active={active}
+                      label={item?.label ?? (label as string)}
+                      rows={[
+                        {
+                          label: "Khách đã đánh giá",
+                          value: String(item?.rated ?? 0),
+                          color: RATED,
+                        },
+                        {
+                          label: "Khách không đánh giá",
+                          value: String(item?.unrated ?? 0),
+                          color: UNRATED,
+                        },
+                        {
+                          label: "Tổng gửi thành công",
+                          value: String(item?.success ?? 0),
+                        },
+                        {
+                          label: "Gửi thất bại",
+                          value: String(
+                            (item?.total ?? 0) - (item?.success ?? 0)
+                          ),
+                        },
+                      ]}
+                    />
+                  );
+                }}
+              />
 
-            <Tooltip
-              cursor={{ fill: "rgba(148,163,184,0.12)" }}
-              content={({ active, label }) => {
-                const item = findItem(series, label as string);
+              <Legend
+                iconType="square"
+                iconSize={9}
+                wrapperStyle={{ fontSize: 11, color: INK, paddingTop: 8 }}
+              />
 
-                return (
-                  <SeriesTooltip
-                    active={active}
-                    label={item?.label ?? (label as string)}
-                    rows={[
-                      {
-                        label: "Tỷ lệ phản hồi",
-                        value: percent(item?.response_rate),
-                        color: RESPONSE_RATE,
-                      },
-                      {
-                        label: "CSAT",
-                        value: percent(item?.csat_percent),
-                        color: CSAT,
-                      },
-                      {
-                        label: "Điểm trung bình",
-                        value: score(item?.average_score),
-                      },
-                      {
-                        label: "Gửi thành công",
-                        value: String(item?.success ?? 0),
-                      },
-                    ]}
-                  />
-                );
-              }}
-            />
+              <Bar
+                dataKey="rated"
+                name="Khách đã đánh giá"
+                stackId="sent"
+                fill={RATED}
+                stroke={SURFACE}
+                strokeWidth={2}
+                isAnimationActive={false}
+              >
+                {displaySeries.map((item) => (
+                  <Cell key={item.code} fillOpacity={item.is_current ? 1 : CONTEXT_OPACITY} />
+                ))}
+              </Bar>
+              <Bar
+                dataKey="unrated"
+                name="Khách không đánh giá"
+                stackId="sent"
+                fill={UNRATED}
+                stroke={SURFACE}
+                strokeWidth={2}
+                radius={[4, 4, 0, 0]}
+                isAnimationActive={false}
+              >
+                {displaySeries.map((item) => (
+                  <Cell key={item.code} fillOpacity={item.is_current ? 1 : CONTEXT_OPACITY} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+          )}
+          </div>
+        </ChartCard>
+      )}
 
-            <Legend
-              iconType="square"
-              iconSize={9}
-              wrapperStyle={{ fontSize: 11, color: INK, paddingTop: 8 }}
-            />
+      {!onlyTrendChart && (
+        <ChartCard
+          title={`CHẤT LƯỢNG THEO ${granularityLabel.toUpperCase()}`}
+          hint="cùng thang 0–100%; kỳ không có khảo sát thì không có cột"
+          className="xl:col-span-2"
+        >
+          <div className="h-[260px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={series}
+                margin={{ top: 8, right: 32, bottom: 4, left: -12 }}
+                maxBarSize={24}
+              >
+                <CartesianGrid stroke={GRID} vertical={false} />
+                <XAxis dataKey="short_label" {...AXIS} tick={tick} interval="preserveStartEnd" minTickGap={12} />
+                <YAxis {...AXIS} domain={[0, 100]} unit="%" />
 
-            <Bar
-              dataKey="response_rate"
-              name="Tỷ lệ phản hồi"
-              fill={RESPONSE_RATE}
-              radius={[4, 4, 0, 0]}
-              isAnimationActive={false}
-            >
-              {series.map((item) => (
-                <Cell
-                  key={item.code}
-                  fillOpacity={item.is_current ? 1 : CONTEXT_OPACITY}
+                <Tooltip
+                  cursor={{ fill: "rgba(148,163,184,0.12)" }}
+                  content={({ active, label }) => {
+                    const item = findItem(series, label as string);
+
+                    return (
+                      <SeriesTooltip
+                        active={active}
+                        label={item?.label ?? (label as string)}
+                        rows={[
+                          {
+                            label: "Tỷ lệ phản hồi",
+                            value: percent(item?.response_rate),
+                            color: RESPONSE_RATE,
+                          },
+                          {
+                            label: "CSAT",
+                            value: percent(item?.csat_percent),
+                            color: CSAT,
+                          },
+                          {
+                            label: "Điểm trung bình",
+                            value: score(item?.average_score),
+                          },
+                          {
+                            label: "Gửi thành công",
+                            value: String(item?.success ?? 0),
+                          },
+                        ]}
+                      />
+                    );
+                  }}
                 />
-              ))}
-            </Bar>
-            <Bar
-              dataKey="csat_percent"
-              name="CSAT"
-              fill={CSAT}
-              radius={[4, 4, 0, 0]}
-              isAnimationActive={false}
-            >
-              {series.map((item) => (
-                <Cell
-                  key={item.code}
-                  fillOpacity={item.is_current ? 1 : CONTEXT_OPACITY}
+
+                <Legend
+                  iconType="square"
+                  iconSize={9}
+                  wrapperStyle={{ fontSize: 11, color: INK, paddingTop: 8 }}
                 />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-        </div>
-      </ChartCard>
+
+                <Bar
+                  dataKey="response_rate"
+                  name="Tỷ lệ phản hồi"
+                  fill={RESPONSE_RATE}
+                  radius={[4, 4, 0, 0]}
+                  isAnimationActive={false}
+                >
+                  {series.map((item) => (
+                    <Cell
+                      key={item.code}
+                      fillOpacity={item.is_current ? 1 : CONTEXT_OPACITY}
+                    />
+                  ))}
+                </Bar>
+                <Bar
+                  dataKey="csat_percent"
+                  name="CSAT"
+                  fill={CSAT}
+                  radius={[4, 4, 0, 0]}
+                  isAnimationActive={false}
+                >
+                  {series.map((item) => (
+                    <Cell
+                      key={item.code}
+                      fillOpacity={item.is_current ? 1 : CONTEXT_OPACITY}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </ChartCard>
+      )}
     </div>
   );
 }

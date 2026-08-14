@@ -54,6 +54,7 @@ function isExternalErrorPath(pathname: string) {
 
 function isCccPath(pathname: string) {
   return (
+    pathname.startsWith("/ccc") ||
     pathname.startsWith("/workspace") ||
     pathname.startsWith("/tickets") ||
     pathname.startsWith("/customers") ||

@@ -267,7 +267,7 @@ function FilterPopover({
   );
 }
 
-const ExecutiveOverviewGrid = memo(function ExecutiveOverviewGrid({
+export const ExecutiveOverviewGrid = memo(function ExecutiveOverviewGrid({
   summary,
 }: {
   summary: any;
@@ -275,13 +275,40 @@ const ExecutiveOverviewGrid = memo(function ExecutiveOverviewGrid({
   const total = summary?.total_errors || 0;
   const classified = summary?.classified_errors || 0;
   const classifiedRate = formatPercent(summary?.classification_rate || 0);
-  const unclassified = summary?.unclassified_errors || 0;
+  const unclassified = Math.max(0, total - classified);
 
   const causeClassified = summary?.cause_classified_errors || 0;
   const causeClassifiedRate = formatPercent(summary?.cause_classification_rate || 0);
 
-  const needReview = summary?.need_review_errors || 0;
-  const causeNeedReview = summary?.cause_need_review_errors || 0;
+  // Calculate Internal vs Customer detected errors based on exact source fields (clean_source / raw_source)
+  const bySource = summary?.by_source || [];
+  let internalCount = 0;
+  let customerCount = 0;
+
+  for (const item of bySource) {
+    const sourceName = String(item.label || item.name || "").trim().toLowerCase();
+    const val = Number(item.value ?? item.count ?? 0);
+
+    if (
+      sourceName === "nội bộ" ||
+      sourceName === "noi bo" ||
+      sourceName === "internal" ||
+      sourceName.includes("tự phát hiện") ||
+      sourceName.includes("tu phat hien") ||
+      sourceName.includes("monitoring") ||
+      sourceName.includes("hệ thống") ||
+      sourceName.includes("he thong") ||
+      sourceName.includes("nhân viên") ||
+      sourceName.includes("staff")
+    ) {
+      internalCount += val;
+    } else {
+      customerCount += val;
+    }
+  }
+
+  const internalRate = total > 0 ? formatPercent((internalCount / total) * 100) : "0%";
+  const customerRate = total > 0 ? formatPercent((customerCount / total) * 100) : "0%";
 
   const errorTypesCount = summary?.by_error_type?.length || 0;
   const recurringCount = summary?.recurring_issue_count || 0;
@@ -315,14 +342,14 @@ const ExecutiveOverviewGrid = memo(function ExecutiveOverviewGrid({
         </div>
       </div>
 
-      {/* Card 2: Phân Loại LLM & Nguyên Nhân */}
+      {/* Card 2: Trạng Thái Xử Lý */}
       <div className="relative overflow-hidden rounded-2xl border border-sky-100 bg-gradient-to-br from-sky-50/70 via-white to-white p-4 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
         <div className="flex items-start justify-between">
           <div>
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Phân Loại LLM Bedrock</span>
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Trạng Thái Xử Lý</span>
             <div className="mt-1 flex items-baseline gap-2">
-              <span className="text-2xl font-black tracking-tight text-sky-900">{formatNumber(causeClassified)}</span>
-              <span className="text-xs font-medium text-slate-500">nguyên nhân</span>
+              <span className="text-2xl font-black tracking-tight text-sky-900">{classifiedRate}</span>
+              <span className="text-xs font-medium text-slate-500">đã xử lý xong</span>
             </div>
           </div>
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-500/10 text-sky-600 shadow-2xs">
@@ -332,24 +359,24 @@ const ExecutiveOverviewGrid = memo(function ExecutiveOverviewGrid({
 
         <div className="mt-3.5 grid grid-cols-2 gap-2 border-t border-sky-100/60 pt-3">
           <div className="rounded-lg bg-sky-100/40 p-2">
-            <span className="block text-[11px] font-medium text-slate-500">Tỷ lệ hoàn tất</span>
-            <span className="text-xs font-bold text-sky-800">{causeClassifiedRate}</span>
+            <span className="block text-[11px] font-medium text-slate-500">Đã xử lý xong</span>
+            <span className="text-xs font-bold text-sky-800">{formatNumber(classified)}</span>
           </div>
-          <div className="rounded-lg bg-purple-100/40 p-2">
-            <span className="block text-[11px] font-medium text-slate-500">Nhóm lỗi</span>
-            <span className="text-xs font-bold text-purple-800">{formatNumber(errorTypesCount)} nhóm</span>
+          <div className="rounded-lg bg-amber-100/40 p-2">
+            <span className="block text-[11px] font-medium text-slate-500">Chưa xử lý xong</span>
+            <span className="text-xs font-bold text-amber-800">{formatNumber(unclassified)}</span>
           </div>
         </div>
       </div>
 
-      {/* Card 3: Cần Kiểm Tra & Xác Nhận */}
+      {/* Card 3: Nguồn Phát Hiện Lỗi */}
       <div className="relative overflow-hidden rounded-2xl border border-rose-100 bg-gradient-to-br from-rose-50/70 via-white to-white p-4 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
         <div className="flex items-start justify-between">
           <div>
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Dữ Liệu Cần Kiểm Tra</span>
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Nguồn Phát Hiện Lỗi</span>
             <div className="mt-1 flex items-baseline gap-2">
-              <span className="text-2xl font-black tracking-tight text-rose-900">{formatNumber(needReview)}</span>
-              <span className="text-xs font-medium text-slate-500">lỗi cần soát</span>
+              <span className="text-2xl font-black tracking-tight text-rose-900">{formatNumber(internalCount)}</span>
+              <span className="text-xs font-medium text-slate-500">tự phát hiện ({internalRate})</span>
             </div>
           </div>
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-500/10 text-rose-600 shadow-2xs">
@@ -359,12 +386,12 @@ const ExecutiveOverviewGrid = memo(function ExecutiveOverviewGrid({
 
         <div className="mt-3.5 grid grid-cols-2 gap-2 border-t border-rose-100/60 pt-3">
           <div className="rounded-lg bg-rose-100/40 p-2">
-            <span className="block text-[11px] font-medium text-slate-500">LLM chưa chắc</span>
-            <span className="text-xs font-bold text-rose-800">{formatNumber(needReview)}</span>
+            <span className="block text-[11px] font-medium text-slate-500">Tự phát hiện (Nội bộ)</span>
+            <span className="text-xs font-bold text-rose-800">{formatNumber(internalCount)} ({internalRate})</span>
           </div>
           <div className="rounded-lg bg-amber-100/40 p-2">
-            <span className="block text-[11px] font-medium text-slate-500">Kiểm tra nguyên nhân</span>
-            <span className="text-xs font-bold text-amber-800">{formatNumber(causeNeedReview)}</span>
+            <span className="block text-[11px] font-medium text-slate-500">Khách hàng phát hiện</span>
+            <span className="text-xs font-bold text-amber-800">{formatNumber(customerCount)} ({customerRate})</span>
           </div>
         </div>
       </div>

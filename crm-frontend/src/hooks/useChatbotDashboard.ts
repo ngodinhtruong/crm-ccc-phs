@@ -99,8 +99,8 @@ function getDefaultFilters(): ChatbotDashboardFilters {
   let savedStart = "";
   let savedEnd = "";
   if (typeof window !== "undefined") {
-    savedStart = sessionStorage.getItem("chatbot_dashboard_start_date") || "";
-    savedEnd = sessionStorage.getItem("chatbot_dashboard_end_date") || "";
+    savedStart = sessionStorage.getItem("ccc_dashboard_date_from") || sessionStorage.getItem("chatbot_dashboard_start_date") || "";
+    savedEnd = sessionStorage.getItem("ccc_dashboard_date_to") || sessionStorage.getItem("chatbot_dashboard_end_date") || "";
   }
 
   return {
@@ -112,14 +112,15 @@ function getDefaultFilters(): ChatbotDashboardFilters {
   };
 }
 
-export function useChatbotDashboard() {
+export function useChatbotDashboard(initialFilters?: Partial<ChatbotDashboardFilters>) {
   const router = useRouter();
 
   const [activeTab, setActiveTab] = useState<ActiveTab>("overview");
 
-  const [filters, setFilters] = useState<ChatbotDashboardFilters>(
-    getDefaultFilters()
-  );
+  const [filters, setFilters] = useState<ChatbotDashboardFilters>(() => ({
+    ...getDefaultFilters(),
+    ...initialFilters,
+  }));
 
   const [overview, setOverview] = useState<ChatbotOverviewResponse | null>(null);
 
@@ -150,6 +151,25 @@ export function useChatbotDashboard() {
   const updateFilter = (key: keyof ChatbotDashboardFilters, value: string) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
   };
+
+  const initialStartDate = initialFilters?.start_date;
+  const initialEndDate = initialFilters?.end_date;
+  const initialGranularity = initialFilters?.granularity;
+
+  useEffect(() => {
+    if (initialStartDate !== undefined || initialEndDate !== undefined || initialGranularity !== undefined) {
+      setFilters((prev) => {
+        const nextFilters: ChatbotDashboardFilters = {
+          ...prev,
+          start_date: initialStartDate ?? prev.start_date,
+          end_date: initialEndDate ?? prev.end_date,
+          granularity: initialGranularity ?? prev.granularity,
+        };
+        void loadData(nextFilters);
+        return nextFilters;
+      });
+    }
+  }, [initialStartDate, initialEndDate, initialGranularity]);
 
   /**
    * Số thứ tự của request mới nhất.
@@ -253,9 +273,11 @@ export function useChatbotDashboard() {
   const changeTab = (nextTab: ActiveTab) => {
     setActiveTab(nextTab);
 
-    router.replace(`/chatbots/dashboard?tab=${nextTab}`, {
-      scroll: false,
-    });
+    if (typeof window !== "undefined" && window.location.pathname.startsWith("/chatbots")) {
+      router.replace(`/chatbots/dashboard?tab=${nextTab}`, {
+        scroll: false,
+      });
+    }
 
     void loadData(undefined, nextTab);
   };

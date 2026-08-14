@@ -367,6 +367,20 @@ export function useCccDashboard(
     void loadDashboard(params);
   }, [buildParams, loadDashboard]);
 
+  const searchWithDates = useCallback(
+    (from: string, to: string, override: Partial<CccDashboardParams> = {}) => {
+      setDateFrom(from);
+      setDateTo(to);
+      const params = buildParams({ date_from: from, date_to: to, ...override });
+      if (typeof window !== "undefined" && params.date_from && params.date_to) {
+        sessionStorage.setItem("ccc_dashboard_date_from", params.date_from);
+        sessionStorage.setItem("ccc_dashboard_date_to", params.date_to);
+      }
+      void loadDashboard(params);
+    },
+    [buildParams, loadDashboard]
+  );
+
   const clearFilter = useCallback(() => {
     if (typeof window !== "undefined") {
       sessionStorage.removeItem("ccc_dashboard_date_from");
@@ -517,6 +531,7 @@ export function useCccDashboard(
     masterError,
     ensureMasterData,
     search,
+    searchWithDates,
     clearFilter,
     reload,
     setThisMonth,

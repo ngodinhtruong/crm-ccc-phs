@@ -106,7 +106,7 @@ const mainMenuItemsByWorkspace: Record<WorkspaceCode, MainMenuItem[]> = {
     // },
     {
       title: "DASHBOARD CCC",
-      href: "/tickets/dashboard",
+      href: "/ccc/dashboard",
       icon: Gauge,
     },
     {
@@ -257,11 +257,11 @@ const panelGroupsByWorkspace: Record<
       {
         title: "CSKH",
         items: [
-          // {
-          //   title: "Dashboard CCC",
-          //   href: "/tickets/dashboard",
-          //   icon: Gauge,
-          // },
+          {
+            title: "Dashboard CCC",
+            href: "/ccc/dashboard",
+            icon: Gauge,
+          },
           {
             title: "Ticket",
             href: "/tickets",

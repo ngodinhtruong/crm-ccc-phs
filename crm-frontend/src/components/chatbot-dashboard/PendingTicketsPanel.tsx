@@ -60,67 +60,65 @@ export function PendingTicketsPanel({
 
   return (
     <div
-      className={`overflow-hidden rounded-2xl border bg-white shadow-sm ${
+      className={`overflow-hidden rounded-xl border bg-white shadow-xs ${
         hasPending ? "border-rose-200" : "border-slate-200"
       }`}
     >
       <div
-        className={`flex flex-wrap items-center justify-between gap-3 border-b px-4 py-4 ${
-          hasPending ? "border-rose-100 bg-rose-50" : "border-slate-100 bg-white"
+        className={`flex items-center justify-between gap-2 border-b px-3 py-1.5 ${
+          hasPending ? "border-rose-100 bg-rose-50/70" : "border-slate-100 bg-slate-50/60"
         }`}
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <span
-            className={`flex h-9 w-9 items-center justify-center rounded-xl ${
+            className={`flex h-5 w-5 items-center justify-center rounded-md ${
               hasPending
-                ? "bg-rose-100 text-rose-600"
-                : "bg-slate-100 text-slate-500"
+                ? "bg-rose-500 text-white shadow-xs"
+                : "bg-slate-200 text-slate-600"
             }`}
           >
-            <Inbox size={17} />
+            <Inbox size={12} />
           </span>
 
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-sm font-bold text-slate-800">
-                Vấn đề cần CCC xử lý
-              </h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-xs font-bold text-slate-800">
+              Vấn đề cần CCC xử lý
+            </h3>
 
-              <span
-                className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
-                  hasPending
-                    ? "bg-rose-500 text-white"
-                    : "bg-slate-200 text-slate-600"
-                }`}
-              >
-                {total}
-              </span>
-            </div>
+            <span
+              className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+                hasPending
+                  ? "bg-rose-500 text-white"
+                  : "bg-slate-200 text-slate-600"
+              }`}
+            >
+              {total}
+            </span>
 
-            <p className="mt-0.5 text-xs text-slate-500">
-              Ticket đang ở trạng thái Mở, chưa có người tiếp nhận.
-            </p>
+            <span className="text-[10px] text-slate-500 hidden sm:inline">
+              (Ticket đang ở trạng thái Mở, chưa tiếp nhận)
+            </span>
           </div>
         </div>
 
         {total > rows.length && (
-          <span className="text-xs text-slate-500">
-            Đang tải {rows.length} mới nhất trên tổng {total}
+          <span className="text-[10px] text-slate-500">
+            Đang tải {rows.length}/{total}
           </span>
         )}
       </div>
 
-      <div className="max-h-[256px] overflow-auto overscroll-contain">
-        <table className="w-full min-w-[720px] text-left text-sm">
-          <thead className="sticky top-0 z-10 border-b bg-slate-50 text-slate-600 shadow-sm">
-            <tr className="h-10">
-              <th className="w-12 px-4 font-semibold" />
-              <th className="px-4 font-semibold">Mã ticket</th>
-              <th className="px-4 font-semibold">Session</th>
-              <th className="px-4 font-semibold">Chủ đề</th>
-              <th className="px-4 font-semibold">Nội dung</th>
-              <th className="px-4 font-semibold">Trạng thái</th>
-              <th className="px-4 font-semibold">Ngày</th>
+      <div className="max-h-[155px] overflow-auto overscroll-contain">
+        <table className="w-full min-w-[720px] text-left text-xs">
+          <thead className="sticky top-0 z-10 border-b bg-slate-50 text-slate-600 shadow-sm text-[11px]">
+            <tr className="h-7">
+              <th className="w-10 px-3 py-1 font-semibold" />
+              <th className="px-3 py-1 font-semibold">Mã ticket</th>
+              <th className="px-3 py-1 font-semibold">Session</th>
+              <th className="px-3 py-1 font-semibold">Chủ đề</th>
+              <th className="px-3 py-1 font-semibold">Nội dung</th>
+              <th className="px-3 py-1 font-semibold">Trạng thái</th>
+              <th className="px-3 py-1 font-semibold">Ngày</th>
             </tr>
           </thead>
 
@@ -129,7 +127,7 @@ export function PendingTicketsPanel({
               <tr>
                 <td
                   colSpan={COLUMN_COUNT}
-                  className="h-20 text-center text-slate-500"
+                  className="h-16 text-center text-slate-500 text-xs"
                 >
                   Không có ticket nào đang chờ tiếp nhận.
                 </td>
@@ -139,43 +137,43 @@ export function PendingTicketsPanel({
             {visibleRows.map((item) => (
               <tr
                 key={item.id}
-                className="h-[46px] border-b border-slate-200 hover:bg-slate-50"
+                className="h-7.5 border-b border-slate-100/80 hover:bg-slate-50 text-xs"
               >
-                <td className="px-4 text-slate-700">
+                <td className="px-3 py-1 text-slate-700">
                   {item.ticket_chatbot_id && (
                     <button
                       type="button"
                       onClick={() =>
                         router.push(`/tickets/${item.ticket_chatbot_id}`)
                       }
-                      className="flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-600 transition hover:bg-white"
+                      className="flex items-center gap-1 rounded-md border border-slate-200 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 transition hover:bg-white"
                       aria-label="Xem chi tiết ticket"
                       title="Xem chi tiết ticket"
                     >
-                      <Eye size={12} />
+                      <Eye size={11} />
                     </button>
                   )}
                 </td>
-                <td className="px-4 font-semibold text-sky-600">
+                <td className="px-3 py-1 font-semibold text-sky-600">
                   {item.ticket_chatbot_code || item.ticket_code || "-"}
                 </td>
-                <td className="px-4 font-mono text-[11px] text-slate-600">
+                <td className="px-3 py-1 font-mono text-[10px] text-slate-600">
                   {shortText(item.session_id, 12)}
                 </td>
-                <td className="px-4 text-slate-700">{item.category_label || "-"}</td>
-                <td className="px-4 text-slate-600">
+                <td className="px-3 py-1 text-slate-700">{item.category_label || "-"}</td>
+                <td className="px-3 py-1 text-slate-600">
                   {shortText(item.reason || item.last_question, 60)}
                 </td>
-                <td className="px-4 text-slate-700">
+                <td className="px-3 py-1 text-slate-700">
                   <span
-                    className={`rounded-full px-2 py-1 text-[11px] font-semibold ${ticketStatusPillClass(
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${ticketStatusPillClass(
                       item.ticket_chatbot_status || "Mở"
                     )}`}
                   >
                     {item.ticket_chatbot_status || "Mở"}
                   </span>
                 </td>
-                <td className="px-4 whitespace-nowrap">
+                <td className="px-3 py-1 whitespace-nowrap text-slate-600 text-xs">
                   {formatDateTime(item.started_at)}
                 </td>
               </tr>
@@ -184,7 +182,7 @@ export function PendingTicketsPanel({
         </table>
       </div>
 
-      <div className="border-t border-slate-200 px-4 py-3">
+      <div className="border-t border-slate-200/80 px-3 py-1.5">
         <TablePagination
           fromRecord={fromRecord}
           toRecord={toRecord}

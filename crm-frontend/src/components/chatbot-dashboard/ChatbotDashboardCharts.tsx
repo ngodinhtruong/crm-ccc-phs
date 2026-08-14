@@ -6,6 +6,7 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  ComposedChart,
   Legend,
   Line,
   LineChart,
@@ -162,7 +163,6 @@ function AutomationTrendChartCard({
           <PeriodDrilldownBackButton onClick={closePeriod} />
         ) : undefined
       }
-      className="xl:col-span-12"
     >
       <div className="h-[320px]">
         {selectedPeriod ? (
@@ -173,7 +173,7 @@ function AutomationTrendChartCard({
           />
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart
+            <ComposedChart
               data={chartData}
               margin={{ top: 15, right: 25, left: 0, bottom: 15 }}
               onClick={openPeriod}
@@ -183,6 +183,8 @@ function AutomationTrendChartCard({
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
               <XAxis
                 dataKey="label"
+                interval="preserveStartEnd"
+                minTickGap={12}
                 tick={{ fontSize: 11, fontWeight: 600, fill: "#334155" }}
               />
               <YAxis
@@ -191,9 +193,6 @@ function AutomationTrendChartCard({
               />
               <Tooltip content={<ValueTooltip />} cursor={{ fill: "#f8fafc" }} />
               <Legend wrapperStyle={{ fontSize: 11, paddingTop: 6 }} />
-              {/* Hai cột cạnh nhau cho mỗi kỳ: đọc trực tiếp được phần bot gánh
-                so với phần phải đẩy sang CCC, không phải ước lượng bằng mắt
-                giữa một vùng nền và một cột như trước. */}
               <Bar
                 dataKey="bot_done"
                 name="Bot tự xử lý (BOT_DONE)"
@@ -203,8 +202,6 @@ function AutomationTrendChartCard({
                 strokeWidth={2.5}
                 isAnimationActive={false}
               >
-                {/* Khi backend nới dữ liệu ra kỳ cha (vd lọc "hôm nay" -> vẽ cả
-                  tuần), các kỳ nền được làm mờ để kỳ đang xem nổi lên. */}
                 {hasContextPeriods &&
                   chartData.map((row) => (
                     <Cell
@@ -241,7 +238,23 @@ function AutomationTrendChartCard({
                   formatter={hideZeroLabel}
                 />
               </Bar>
-            </BarChart>
+              <Line
+                type="monotone"
+                dataKey="total"
+                name="Tổng session"
+                stroke="#2563eb"
+                strokeWidth={2.5}
+                dot={{ r: 4, fill: "#2563eb" }}
+                isAnimationActive={false}
+              >
+                <LabelList
+                  dataKey="total"
+                  position="top"
+                  style={{ fontSize: 10, fill: "#1d4ed8", fontWeight: 800 }}
+                  formatter={hideZeroLabel}
+                />
+              </Line>
+            </ComposedChart>
           </ResponsiveContainer>
         )}
       </div>
@@ -305,7 +318,6 @@ function SessionTrendLineChartCard({
           <PeriodDrilldownBackButton onClick={closePeriod} />
         ) : undefined
       }
-      className="xl:col-span-6"
     >
       <div className="h-[320px]">
         {selectedPeriod ? (
@@ -492,7 +504,6 @@ function OutcomeByPeriodChartCard({ data }: { data?: OutcomeByPeriod | null }) {
           <PeriodDrilldownBackButton onClick={closePeriod} />
         ) : undefined
       }
-      className="xl:col-span-6"
     >
       {rows.length === 0 ? (
         <EmptyState message="Chưa có dữ liệu kết quả xử lý." />
@@ -649,7 +660,6 @@ function TopCategoryHorizontalBarCard({
           onBack={selectedPeriod ? closePeriod : undefined}
         />
       }
-      className="xl:col-span-6"
     >
       <div className="h-[330px]">
         {selectedPeriod ? (
@@ -819,7 +829,6 @@ function CategoryCccRateHorizontalBarCard({
           onBack={selectedPeriod ? closePeriod : undefined}
         />
       }
-      className="xl:col-span-6"
     >
       <div className="h-[330px]">
         {selectedPeriod ? (
@@ -1095,7 +1104,6 @@ function CategoryBotVsCccBarCard({
           <PeriodDrilldownBackButton onClick={closeTopic} />
         ) : undefined
       }
-      className="xl:col-span-6"
     >
       {/* Nhường chiều cao cho phần chú thích mã chủ đề ở dưới, để thẻ không
           cao hơn biểu đồ Top Lý do đứng cạnh. */}
@@ -1282,7 +1290,6 @@ function ChatbotFunnelChartCard({ data }: { data?: FunnelStepItem[] | null }) {
     <ChartCard
       title="🔻 5. Funnel Chuyển đổi Chatbot → Ticket → CCC"
       description="Theo dõi tỷ lệ rơi rớt (drop-off) qua 6 bước nghiệp vụ từ tiếp nhận tới xử lý xong"
-      className="xl:col-span-6"
     >
       <div className="min-h-[320px] flex items-center justify-center">
         <FunnelChartComponent data={data} />
@@ -1350,7 +1357,6 @@ function HourlyPeakChartCard({
           onBack={selectedPeriod ? closePeriod : undefined}
         />
       }
-      className="xl:col-span-6"
     >
       <div className="h-[320px]">
         {selectedPeriod ? (
@@ -1520,7 +1526,6 @@ function TopReasonHorizontalBarCard({
           onBack={selectedPeriod ? closePeriod : undefined}
         />
       }
-      className="xl:col-span-6"
     >
       <div className="h-[330px]">
         {selectedPeriod ? (
@@ -1684,9 +1689,6 @@ function ChannelPerformanceBarCard({
           onBack={selectedPeriod ? closePeriod : undefined}
         />
       }
-      // Đứng một mình trên hàng sau khi biểu đồ chủ đề chiếm chỗ cạnh Top Lý
-      // do, nên trải hết chiều ngang thay vì bỏ trống nửa hàng.
-      className="xl:col-span-12"
     >
       <div className="h-[330px]">
         {selectedPeriod ? (
@@ -1810,7 +1812,6 @@ function TopFaqTableCard({ faqs }: { faqs?: ChatbotFaqItem[] | null }) {
     <ChartCard
       title="📋 8. Top Câu hỏi Phổ biến (Knowledge Base)"
       description="Danh sách các câu hỏi thường gặp nhất làm cơ sở xây dựng bộ tri thức Chatbot"
-      className="xl:col-span-12"
     >
       <div className="overflow-x-auto">
         <table className="w-full text-left text-xs border-collapse">
@@ -1866,28 +1867,27 @@ function TopFaqTableCard({ faqs }: { faqs?: ChatbotFaqItem[] | null }) {
 export function ChatbotDashboardCharts({
   charts,
   faqs,
+  onlyTrendChart = false,
 }: {
   charts: ChatbotOverviewCharts;
   faqs?: ChatbotFaqItem[];
+  onlyTrendChart?: boolean;
 }) {
-  return (
-    <div className="space-y-6">
-      {/* SECTION 1: XU HƯỚNG TỰ ĐỘNG HÓA (BOT TỰ XỬ LÝ VS CHUYỂN CCC) */}
-      <AutomationTrendChartCard data={charts.time_series_outcomes} />
+  if (onlyTrendChart) {
+    return <AutomationTrendChartCard data={charts.time_series_outcomes} />;
+  }
 
-      {/* SECTION 1B: SO SÁNH KỲ (kỳ này với kỳ liền trước) */}
-      <div className="grid gap-4 xl:grid-cols-12">
+  return (
+    <div className="space-y-4">
+      {/* ROW 1: 3 CHARTS */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <AutomationTrendChartCard data={charts.time_series_outcomes} />
+        <OutcomeByPeriodChartCard data={charts.outcome_by_period} />
         <PeriodComparisonChart data={charts.period_comparison} />
       </div>
 
-      {/* SECTION 2: XU HƯỚNG SESSION & KẾT QUẢ XỬ LÝ */}
-      <div className="grid gap-4 xl:grid-cols-12">
-        <SessionTrendLineChartCard data={charts.time_series_outcomes} />
-        <OutcomeByPeriodChartCard data={charts.outcome_by_period} />
-      </div>
-
-      {/* SECTION 3: PHÂN TÍCH CATEGORY & TỶ LỆ CHUYỂN CCC */}
-      <div className="grid gap-4 xl:grid-cols-12">
+      {/* ROW 2: 3 CHARTS */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <TopCategoryHorizontalBarCard
           data={charts.topic_bar}
           multiMonthData={charts.all_topic_multi_month}
@@ -1896,19 +1896,15 @@ export function ChatbotDashboardCharts({
           data={charts.category_ccc_rate}
           multiMonthData={charts.ccc_multi_month_topics}
         />
+        <ChatbotFunnelChartCard data={charts.chat_funnel} />
       </div>
 
-      {/* SECTION 4: FUNNEL CHUYỂN ĐỔI & HOURLY PEAK */}
-      <div className="grid gap-4 xl:grid-cols-12">
-        <ChatbotFunnelChartCard data={charts.chat_funnel} />
+      {/* ROW 3: 3 CHARTS */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <HourlyPeakChartCard
           data={charts.hourly_peak}
           multiPeriodData={charts.hourly_peak_multi_period}
         />
-      </div>
-
-      {/* SECTION 5: LÝ DO CHUYỂN CCC & NĂNG LỰC BOT TRÊN CÙNG CHỦ ĐỀ */}
-      <div className="grid gap-4 xl:grid-cols-12">
         <TopReasonHorizontalBarCard
           data={charts.top_reasons}
           multiPeriodData={charts.top_reasons_multi_period}
@@ -1919,16 +1915,12 @@ export function ChatbotDashboardCharts({
         />
       </div>
 
-      {/* SECTION 5B: HIỆU QUẢ THEO CHANNEL */}
-      <div className="grid gap-4 xl:grid-cols-12">
+      {/* ROW 4: 2 CHARTS / TABLES */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <ChannelPerformanceBarCard
           data={charts.channel_performance}
           multiPeriodData={charts.channel_performance_multi_period}
         />
-      </div>
-
-      {/* SECTION 6: TOP CÂU HỎI PHỔ BIẾN (TABLE) */}
-      <div className="grid gap-4 xl:grid-cols-12">
         <TopFaqTableCard faqs={faqs} />
       </div>
     </div>

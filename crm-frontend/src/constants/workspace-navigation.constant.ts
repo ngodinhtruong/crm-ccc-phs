@@ -54,7 +54,7 @@ export const WORKSPACE_NAVIGATION: Record<
         {
           key: "ccc-dashboard",
           label: "Dashboard CCC",
-          href: "/tickets/dashboard",
+          href: "/ccc/dashboard",
           icon: Gauge,
         },
         {

@@ -159,8 +159,10 @@ function ChangeCell({ value }: { value: number | null }) {
  */
 export function SurveyDashboardSection({
   filters,
+  onlyTrendChart = false,
 }: {
   filters: SurveyFilters;
+  onlyTrendChart?: boolean;
 }) {
   const [data, setData] = useState<SurveyDashboard | null>(null);
   const [loading, setLoading] = useState(true);
@@ -217,8 +219,18 @@ export function SurveyDashboardSection({
   if (!data) {
     return (
       <div className="rounded-xl border border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500">
-        Đang tải số liệu khảo sát...
+        Đang tải biểu đồ xu hướng khảo sát...
       </div>
+    );
+  }
+
+  if (onlyTrendChart) {
+    return (
+      <SurveyPeriodCharts
+        series={data.series}
+        granularityLabel={GRANULARITY_LABELS[data.granularity] || "kỳ"}
+        onlyTrendChart={true}
+      />
     );
   }
 
@@ -491,6 +503,7 @@ export function SurveyDashboardSection({
       <SurveyPeriodCharts
         series={data.series}
         granularityLabel={GRANULARITY_LABELS[data.granularity] || "kỳ"}
+        onlyTrendChart={onlyTrendChart}
       />
     </div>
   );

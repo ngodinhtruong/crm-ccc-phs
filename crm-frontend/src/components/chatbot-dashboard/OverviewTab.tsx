@@ -9,14 +9,17 @@ import { ChatbotOverviewResponse } from "@/types/chatbot-dashboard.type";
 // dùng — mở danh sách phiên đang do KpiCards ở trang cha đảm nhận.
 export function OverviewTab({
   overview,
+  onlyTrendChart = false,
 }: {
   overview: ChatbotOverviewResponse;
+  onlyTrendChart?: boolean;
 }) {
   return (
     <div className="space-y-6">
       <ChatbotDashboardCharts
         charts={overview.charts}
         faqs={overview.quick_lists?.top_faqs}
+        onlyTrendChart={onlyTrendChart}
       />
     </div>
   );
