@@ -89,7 +89,7 @@ export function Customer360Page() {
             Quay lại danh sách
           </button>
 
-          <Customer360Panel customerId={selectedId} showDetailLink />
+          <Customer360Panel customerId={selectedId} />
         </div>
       </DashboardLayout>
     );

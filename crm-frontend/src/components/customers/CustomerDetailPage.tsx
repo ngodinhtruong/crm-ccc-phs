@@ -201,7 +201,7 @@ export function CustomerDetailPage({ id }: { id: number }) {
 
           {tab === "tickets" && <CustomerTicketsTab customerId={id} />}
 
-          {tab === "overview" && <Customer360Panel customerId={id} />}
+          {tab === "overview" && <Customer360Panel customerId={id} embedded />}
 
           {tab !== "detail" && tab !== "tickets" && tab !== "overview" && (
             <ComingSoon label={TABS.find((t) => t.key === tab)?.label || ""} />
