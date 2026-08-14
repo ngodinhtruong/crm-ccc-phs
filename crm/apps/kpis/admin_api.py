@@ -709,14 +709,7 @@ def calculate_per_call(value, call_count):
     return (value / call_count).quantize(Decimal("0.01"))
 
 
-MATCHED_ORDER_STATUSES = (
-    "MATCHED",
-    "PARTIALLY_MATCHED",
-    "COMPLETED",
-    "FILLED",
-    "PARTIALLY_FILLED",
-    "EXECUTED",
-)
+from apps.common.constants import MATCHED_ORDER_STATUSES
 
 
 def get_sa_records_for_operational_report(period, users):

@@ -7,6 +7,7 @@ import { ArrowLeft, MapPin, Phone, Tag, User } from "lucide-react";
 import { chatbotTicketApi } from "@/apis/chatbot-ticket.api";
 import { customerApi } from "@/apis/customer.api";
 import { ticketApi } from "@/apis/ticket.api";
+import { Customer360Panel } from "@/components/customers/Customer360Panel";
 import { CustomerTicketsTab } from "@/components/customers/CustomerTicketsTab";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
 import { CustomerDetail } from "@/types/customer.type";
@@ -22,7 +23,7 @@ type TabKey =
   | "calls";
 
 const TABS: { key: TabKey; label: string; ready: boolean }[] = [
-  { key: "overview", label: "Tổng quan", ready: false },
+  { key: "overview", label: "Tổng quan", ready: true },
   { key: "detail", label: "Chi tiết", ready: true },
   { key: "activity_log", label: "Nhật ký", ready: false },
   { key: "activities", label: "Hoạt động", ready: false },
@@ -338,7 +339,9 @@ export function CustomerDetailPage({ id }: { id: number }) {
 
           {tab === "tickets" && <CustomerTicketsTab customerId={id} />}
 
-          {tab !== "detail" && tab !== "tickets" && (
+          {tab === "overview" && <Customer360Panel customerId={id} />}
+
+          {tab !== "detail" && tab !== "tickets" && tab !== "overview" && (
             <ComingSoon label={TABS.find((t) => t.key === tab)?.label || ""} />
           )}
         </div>

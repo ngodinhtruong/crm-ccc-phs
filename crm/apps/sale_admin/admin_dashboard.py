@@ -18,14 +18,7 @@ from apps.kpis.models import TransactionLog
 
 ZERO = Decimal("0.00")
 
-MATCHED_ORDER_STATUSES = (
-    "MATCHED",
-    "PARTIALLY_MATCHED",
-    "COMPLETED",
-    "FILLED",
-    "PARTIALLY_FILLED",
-    "EXECUTED",
-)
+from apps.common.constants import MATCHED_ORDER_STATUSES
 
 
 @dataclass(frozen=True)

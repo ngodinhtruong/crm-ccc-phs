@@ -1,6 +1,5 @@
 "use client";
 
-import { useMemo } from "react";
 import {
   Bar,
   BarChart,
@@ -21,11 +20,26 @@ import {
 } from "@/components/common";
 import type { SurveySeriesItem } from "@/types/survey.type";
 
+/**
+ * Bảng màu đã chạy qua bộ kiểm của skill dataviz trên nền trắng.
+ *
+ * Cặp đã/không đánh giá: ΔE 24.7 (protan) — người mù màu đỏ-lục vẫn phân
+ * biệt được. Cặp tỷ lệ phản hồi/CSAT: ΔE 27.9 (deutan). Cả hai đạt ngưỡng
+ * tương phản với nền.
+ * Đổi màu thì phải chạy lại bộ kiểm, đừng chọn bằng mắt.
+ */
 const RATED = "#2a78d6";
 const UNRATED = "#eb6834";
 const RESPONSE_RATE = "#008300";
 const CSAT = "#4a3aa7";
 
+/**
+ * Biểu đồ gửi thành công / thất bại dùng dạng "nhấn mạnh": thứ đáng chú ý là
+ * các lần gửi hỏng, còn phần gửi được chỉ là nền.
+ *
+ * Cố ý không dùng cặp lục-đỏ quen thuộc: cặp đó chỉ đạt ΔE 4.1 với người mù
+ * màu đỏ-lục, hai cột cạnh nhau nhìn như cùng một màu. Cặp xám-đỏ đạt ΔE 12.4.
+ */
 const SENT_OK = "#64748b";
 const SENT_FAILED = "#d03b3b";
 
@@ -33,6 +47,13 @@ const SURFACE = "#ffffff";
 const GRID = "#e2e8f0";
 const INK = "#475569";
 
+/**
+ * Độ đậm của các kỳ chỉ đóng vai trò nền so sánh.
+ *
+ * Để 0.45 như dashboard chatbot thì cột bạc màu, nhìn như dữ liệu mờ chứ
+ * không ra ý "kỳ này không phải kỳ bạn chọn". 0.85 vẫn tách được với kỳ đang
+ * xem — kỳ đó còn được in đậm nhãn trục — mà màu vẫn rõ.
+ */
 const CONTEXT_OPACITY = 0.85;
 
 const AXIS = {
@@ -72,6 +93,7 @@ function ChartCard({
   );
 }
 
+/** Nhãn trục hoành: kỳ đang xem in đậm để tách khỏi các kỳ làm nền. */
 function PeriodTick({
   x,
   y,
@@ -144,6 +166,7 @@ function findItem(series: SurveySeriesItem[], shortLabel?: string) {
   return series.find((item) => item.short_label === shortLabel);
 }
 
+/** null nghĩa là kỳ đó không có số liệu — hiện gạch ngang, không hiện 0%. */
 function percent(value?: number | null) {
   return value === null || value === undefined ? "—" : `${value}%`;
 }
@@ -152,6 +175,12 @@ function score(value?: number | null) {
   return value === null || value === undefined ? "—" : `${value}/5`;
 }
 
+/**
+ * Lát của donut khi bấm vào một cột.
+ *
+ * Bỏ lát bằng 0 thay vì vẽ lát rỗng: donut có một lát 0 sẽ hiện nhãn đè lên
+ * nhau ở cùng một góc, đọc không ra gì.
+ */
 function nonEmpty(slices: DrilldownSlice[]): DrilldownSlice[] {
   return slices.filter((slice) => slice.value > 0);
 }
@@ -170,6 +199,14 @@ function ratingSlices(item: SurveySeriesItem): DrilldownSlice[] {
   ]);
 }
 
+/**
+ * So sánh các kỳ với nhau — tháng trong năm, quý trong năm, hoặc năm nay với
+ * năm ngoái, giống biểu đồ so sánh kỳ của dashboard chatbot.
+ *
+ * Tách làm nhiều khung chứ không gộp số lượt với phần trăm lên một khung:
+ * hai đại lượng khác thang đo, vẽ chung phải dùng hai trục tung và người đọc
+ * sẽ so nhầm độ cao giữa chúng.
+ */
 export function SurveyPeriodCharts({
   series,
   granularityLabel,
@@ -179,6 +216,7 @@ export function SurveyPeriodCharts({
   granularityLabel: string;
   onlyTrendChart?: boolean;
 }) {
+  // Hook phải chạy trước mọi nhánh thoát sớm.
   const delivery = usePeriodDrilldown();
   const rating = usePeriodDrilldown();
 

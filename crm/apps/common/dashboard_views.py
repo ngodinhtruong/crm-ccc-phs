@@ -27,14 +27,7 @@ from apps.tickets.models import (
 )
 
 
-MATCHED_ORDER_STATUSES = (
-    "MATCHED",
-    "PARTIALLY_MATCHED",
-    "COMPLETED",
-    "FILLED",
-    "PARTIALLY_FILLED",
-    "EXECUTED",
-)
+from apps.common.constants import MATCHED_ORDER_STATUSES
 
 User = get_user_model()
 
