@@ -129,8 +129,8 @@ const mainMenuItemsByWorkspace: Record<WorkspaceCode, MainMenuItem[]> = {
     },
     {
       title: "KHẢO SÁT",
-      href: "/surveys",
-      icon: ClipboardList,
+      href: "/surveys/dashboard",
+      icon: Gauge,
       panel: "surveys",
     },
     {
@@ -239,14 +239,14 @@ const panelGroupsByWorkspace: Record<
         title: "KHẢO SÁT",
         items: [
           {
-            title: "Kết quả khảo sát",
-            href: "/surveys",
-            icon: ClipboardList,
-          },
-          {
             title: "Dashboard CSAT",
             href: "/surveys/dashboard",
             icon: Gauge,
+          },
+          {
+            title: "Kết quả khảo sát",
+            href: "/surveys",
+            icon: ClipboardList,
           },
         ],
       },

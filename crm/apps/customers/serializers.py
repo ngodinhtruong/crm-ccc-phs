@@ -1,5 +1,6 @@
 import re
 
+from django.db import transaction
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework import serializers
@@ -101,20 +102,8 @@ class CompanySerializer(serializers.ModelSerializer):
             getattr(self.instance, "primary_contact", None),
         )
 
-        if primary_contact:
-            # Khi thêm mới công ty thì công ty chưa có id,
-            # nên chưa thể kiểm tra người liên hệ có thuộc công ty đó chưa.
-            if not self.instance:
-                raise serializers.ValidationError(
-                    {
-                        "primary_contact": (
-                            "Cần tạo công ty trước, sau đó mới chọn Người liên hệ chính "
-                            "thuộc công ty này."
-                        )
-                    }
-                )
-
-            if primary_contact.company_id != self.instance.id:
+        if primary_contact and self.instance:
+            if primary_contact.company_id and primary_contact.company_id != self.instance.id:
                 raise serializers.ValidationError(
                     {
                         "primary_contact": (
@@ -125,6 +114,17 @@ class CompanySerializer(serializers.ModelSerializer):
                 )
 
         return attrs
+
+    @transaction.atomic
+    def create(self, validated_data):
+        primary_contact = validated_data.get("primary_contact")
+        company = super().create(validated_data)
+
+        if primary_contact and primary_contact.company_id != company.id:
+            primary_contact.company = company
+            primary_contact.save(update_fields=["company"])
+
+        return company
 
 
 class CustomerSourceSerializer(serializers.ModelSerializer):

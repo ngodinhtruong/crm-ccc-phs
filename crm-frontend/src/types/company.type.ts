@@ -157,6 +157,8 @@ export type CompanyListParams = {
 
 export type CompanyCreateFormState = {
   companyName: string;
+  primaryContact: string;
+  contactSearch: string;
   phone: string;
   email: string;
   website: string;

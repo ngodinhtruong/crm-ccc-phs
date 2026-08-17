@@ -451,31 +451,31 @@ export function KpiMetricsTab({ config }: { config: KpiConfigController }) {
   return (
     <div className="mx-auto max-w-6xl space-y-4 p-4">
       <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-100 p-1 text-xs font-bold">
           <button
             type="button"
             onClick={() => setActiveSectionTab("A")}
             className={[
-              "rounded-md px-4 py-2 text-xs font-bold transition-all",
+              "rounded-md px-3.5 py-1.5 text-xs font-bold transition-all",
               activeSectionTab === "A"
-                ? "bg-[#10b981] text-white shadow-sm"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200",
+                ? "bg-white text-[#059669] shadow-xs ring-1 ring-emerald-500/20"
+                : "text-slate-600 hover:text-slate-900 hover:bg-white/50",
             ].join(" ")}
           >
-            Bảng A - Chỉ tiêu Định tính / Tự đánh giá
+            Bảng A - Định tính / Tự đánh giá
           </button>
 
           <button
             type="button"
             onClick={() => setActiveSectionTab("B")}
             className={[
-              "rounded-md px-4 py-2 text-xs font-bold transition-all",
+              "rounded-md px-3.5 py-1.5 text-xs font-bold transition-all",
               activeSectionTab === "B"
-                ? "bg-[#10b981] text-white shadow-sm"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200",
+                ? "bg-white text-[#059669] shadow-xs ring-1 ring-emerald-500/20"
+                : "text-slate-600 hover:text-slate-900 hover:bg-white/50",
             ].join(" ")}
           >
-            Bảng B - Chỉ tiêu Định lượng / Tự động
+            Bảng B - Định lượng / Tự động
           </button>
         </div>
 
@@ -483,29 +483,28 @@ export function KpiMetricsTab({ config }: { config: KpiConfigController }) {
           <button
             type="button"
             onClick={() => openAddModal()}
-            className="flex h-8 items-center gap-1 rounded bg-[#10b981] px-3 text-xs font-semibold text-white shadow-sm hover:bg-[#059669]"
+            className="flex h-8 items-center gap-1 rounded bg-[#10b981] px-3 text-xs font-bold text-white shadow-sm hover:bg-[#059669]"
           >
-            <Plus size={15} />
+            <Plus size={14} />
             Thêm KPI
           </button>
         )}
       </div>
 
-      <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
-        <table className="w-full border-collapse text-left text-sm">
+      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xs">
+        <table className="w-full border-collapse text-left text-xs">
           <thead>
-            <tr className="h-10 border-b bg-slate-100 text-slate-700 font-bold">
-              <th className="w-[110px] px-3">Mã KPI</th>
-              <th className="px-4 text-slate-700">Tên chỉ tiêu KPI</th>
+            <tr className="h-9 border-b border-slate-200 bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-600">
+              <th className="w-[100px] px-3">Mã KPI</th>
+              <th className="px-3">Tên chỉ tiêu</th>
               <th className="w-[140px] px-3">Chỉ tiêu</th>
-              <th className="w-[100px] px-3">Tần suất</th>
-              <th className="w-[110px] px-3">Trọng số (%)</th>
-              <th className="w-[110px] px-3">Trạng thái</th>
-              <th className="w-[90px] px-3 text-center">Thao tác</th>
+              <th className="w-[100px] px-3 text-center">Trọng số (%)</th>
+              <th className="w-[100px] px-3 text-center">Trạng thái</th>
+              <th className="w-[85px] px-3 text-center">Thao tác</th>
             </tr>
           </thead>
 
-          <tbody>
+          <tbody className="divide-y divide-slate-100">
             {filteredGroupedMetrics.map(({ section, groups }) =>
               groups.map(({ group, metrics }) => {
                 const activeTotal = getGroupMetricTotal(metrics);
@@ -514,27 +513,31 @@ export function KpiMetricsTab({ config }: { config: KpiConfigController }) {
 
                 return (
                   <Fragment key={group.id}>
-                    <tr className="h-9 border-b border-t border-slate-200 bg-[#f1f5f9] text-xs font-bold text-slate-800">
-                      <td colSpan={7} className="px-4 text-slate-700">
+                    <tr className="h-9 border-t border-b border-slate-200 bg-slate-100/70 text-xs font-bold text-slate-800">
+                      <td colSpan={6} className="px-3">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <span className="text-[#059669] font-extrabold">{group.group_code}</span>
-                            <span>- {group.group_name}</span>
-                            <span className="text-[11px] font-normal text-slate-500">
+                            <span className="inline-flex items-center rounded bg-[#059669] px-2 py-0.5 text-[11px] font-extrabold text-white">
+                              {group.group_code}
+                            </span>
+                            <span className="text-slate-800 font-bold">{group.group_name}</span>
+                            <span className="text-[11px] font-medium text-slate-500">
                               ({metrics.length} chỉ tiêu)
                             </span>
                           </div>
 
-                          <div className="flex items-center gap-3 font-semibold text-[11px]">
-                            <span className="text-slate-600">Trọng số nhóm: {group.weight_percent}%</span>
-                            <span className={isValid ? "text-emerald-700 font-bold" : "text-red-600 font-bold"}>
+                          <div className="flex items-center gap-3 text-[11px]">
+                            <span className="font-semibold text-slate-600">
+                              Trọng số: <strong className="text-slate-800">{group.weight_percent}%</strong>
+                            </span>
+                            <span className={isValid ? "font-bold text-emerald-700" : "font-bold text-red-600"}>
                               Active: {activeTotal.toFixed(2)}%
                             </span>
                             {config.canManage && (
                               <button
                                 type="button"
                                 onClick={() => openAddModal(group)}
-                                className="flex items-center gap-1 rounded bg-emerald-600 px-2 py-0.5 text-[11px] text-white hover:bg-emerald-700"
+                                className="flex items-center gap-1 rounded bg-emerald-600 px-2 py-0.5 text-[11px] font-semibold text-white hover:bg-emerald-700"
                               >
                                 <Plus size={12} />
                                 Thêm KPI
@@ -547,37 +550,32 @@ export function KpiMetricsTab({ config }: { config: KpiConfigController }) {
 
                     {metrics.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="h-10 text-center text-slate-400 text-xs italic">
-                          Nhóm này chưa có chỉ tiêu KPI.
+                        <td colSpan={6} className="h-9 text-center text-xs italic text-slate-400">
+                          Nhóm chưa có chỉ tiêu KPI.
                         </td>
                       </tr>
                     ) : (
                       metrics.map((metric, index) => {
-                        const rowBg = index % 2 === 0 ? "bg-white" : "bg-slate-50/60";
+                        const rowBg = index % 2 === 0 ? "bg-white" : "bg-slate-50/40";
 
                         return (
                           <tr
                             key={metric.id}
                             onDoubleClick={() => openDetailModal(metric)}
-                            className={`h-11 cursor-pointer border-b border-slate-100 ${rowBg} hover:bg-emerald-50 transition-colors`}
+                            className={`h-10 cursor-pointer ${rowBg} hover:bg-emerald-50/50 transition-colors`}
                           >
-                            <td className="px-4 font-semibold text-[#059669]">
+                            <td className="px-3 font-bold text-[#059669]">
                               {metric.metric_code}
                             </td>
-                            <td className="px-4 text-slate-700">
-                              <span className="font-semibold text-slate-800">
-                                {metric.metric_name || "-"}
-                              </span>
+                            <td className="px-3 font-medium text-slate-800">
+                              {metric.metric_name || "-"}
                             </td>
-                            <td className="px-4 text-slate-700 font-medium">
+                            <td className="px-3 font-semibold text-slate-700">
                               {formatTargetValue(metric.target_value, metric.target_unit) ||
                                 metric.target_text ||
                                 "-"}
                             </td>
-                            <td className="px-4 text-slate-600">
-                              {getFrequencyLabel(metric.frequency)}
-                            </td>
-                            <td className="px-4 text-slate-700">
+                            <td className="px-3 text-center">
                               <input
                                 value={metric.weight_percent}
                                 disabled={!config.canManage}
@@ -588,11 +586,11 @@ export function KpiMetricsTab({ config }: { config: KpiConfigController }) {
                                     event.target.value
                                   )
                                 }
-                                className="h-7 w-20 rounded border border-slate-300 px-2 text-center text-xs font-semibold outline-none focus:border-sky-400 disabled:bg-slate-50"
+                                className="h-7 w-16 rounded border border-slate-200 bg-white text-center text-xs font-bold text-slate-800 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 disabled:bg-slate-50"
                               />
                             </td>
-                            <td className="px-4 text-slate-700">
-                              <div className="flex items-center gap-2">
+                            <td className="px-3 text-center">
+                              <div className="flex items-center justify-center gap-1.5">
                                 <input
                                   type="checkbox"
                                   checked={metric.is_active}
@@ -604,13 +602,13 @@ export function KpiMetricsTab({ config }: { config: KpiConfigController }) {
                                       event.target.checked
                                     )
                                   }
-                                  className="h-4 w-4 rounded border-slate-300 text-[#10b981] focus:ring-[#10b981]"
+                                  className="h-3.5 w-3.5 rounded border-slate-300 text-[#10b981] focus:ring-[#10b981]"
                                 />
                                 <MetricStatusBadge active={metric.is_active} />
                               </div>
                             </td>
-                            <td className="px-4 text-center">
-                              <div className="flex items-center justify-center gap-2.5 text-slate-400">
+                            <td className="px-3 text-center">
+                              <div className="flex items-center justify-center gap-2 text-slate-400">
                                 <button
                                   type="button"
                                   title="Xem"
@@ -618,9 +616,9 @@ export function KpiMetricsTab({ config }: { config: KpiConfigController }) {
                                     e.stopPropagation();
                                     openDetailModal(metric);
                                   }}
-                                  className="hover:text-sky-600"
+                                  className="hover:text-emerald-600"
                                 >
-                                  <Eye size={15} />
+                                  <Eye size={14} />
                                 </button>
                                 <button
                                   type="button"
@@ -630,9 +628,9 @@ export function KpiMetricsTab({ config }: { config: KpiConfigController }) {
                                     e.stopPropagation();
                                     openEditModal(metric);
                                   }}
-                                  className="hover:text-sky-600 disabled:opacity-40"
+                                  className="hover:text-emerald-600 disabled:opacity-40"
                                 >
-                                  <Edit size={15} />
+                                  <Edit size={14} />
                                 </button>
                                 <button
                                   type="button"
@@ -644,7 +642,7 @@ export function KpiMetricsTab({ config }: { config: KpiConfigController }) {
                                   }}
                                   className="hover:text-red-600 disabled:opacity-40"
                                 >
-                                  <Trash2 size={15} />
+                                  <Trash2 size={14} />
                                 </button>
                               </div>
                             </td>
@@ -659,7 +657,7 @@ export function KpiMetricsTab({ config }: { config: KpiConfigController }) {
 
             {filteredGroupedMetrics.length === 0 && (
               <tr>
-                <td colSpan={7} className="h-20 text-center text-slate-500">
+                <td colSpan={6} className="h-16 text-center text-slate-400 text-xs italic">
                   Chưa có dữ liệu KPI trong {activeSectionTab === "A" ? "Bảng A" : "Bảng B"}.
                 </td>
               </tr>

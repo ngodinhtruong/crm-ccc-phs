@@ -81,7 +81,7 @@ export function KpiMetricDetailModal({
               {metric.metric_name}
             </h2>
             <div className="mt-1 text-xs text-slate-500">
-              Trọng số: {metric.weight_percent}% · Tần suất: {getFrequencyLabel(metric.frequency)}
+              Trọng số: {metric.weight_percent}%
             </div>
           </div>
 

@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 
 import { authService } from "@/services/auth.service";
 import { companyService } from "@/services/company.service";
+import { customerApi } from "@/apis/customer.api";
+import { CustomerListItem } from "@/types/customer.type";
 import {
   CompanyCreateFormState,
   SelectOption,
@@ -16,6 +18,8 @@ import {
 
 const initialForm: CompanyCreateFormState = {
   companyName: "",
+  primaryContact: "",
+  contactSearch: "",
   phone: "",
   email: "",
   website: "",
@@ -47,10 +51,12 @@ export function useCompanyCreate() {
   const [ratings, setRatings] = useState<SelectOption[]>([]);
   const [membershipTiers, setMembershipTiers] = useState<SelectOption[]>([]);
   const [employees, setEmployees] = useState<SelectOption[]>([]);
+  const [customers, setCustomers] = useState<CustomerListItem[]>([]);
 
   const [form, setForm] = useState<CompanyCreateFormState>(initialForm);
 
   const [employeeDropdownOpen, setEmployeeDropdownOpen] = useState(false);
+  const [contactDropdownOpen, setContactDropdownOpen] = useState(false);
 
   const [loadingDropdowns, setLoadingDropdowns] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -90,28 +96,113 @@ export function useCompanyCreate() {
       .slice(0, 20);
   }, [form.employeeSearch, employees]);
 
+  const filteredContacts = useMemo(() => {
+    const keyword = form.contactSearch.trim().toLowerCase();
+
+    if (!keyword) {
+      return customers.slice(0, 20);
+    }
+
+    return customers
+      .filter((item) => {
+        const name = (item.full_name || "").toLowerCase();
+        const phone = (item.phone || "").toLowerCase();
+        const code = (item.customer_code || "").toLowerCase();
+        const email = (item.email || "").toLowerCase();
+        const acc = (item.account_number || "").toLowerCase();
+
+        return (
+          name.includes(keyword) ||
+          phone.includes(keyword) ||
+          code.includes(keyword) ||
+          email.includes(keyword) ||
+          acc.includes(keyword)
+        );
+      })
+      .slice(0, 20);
+  }, [form.contactSearch, customers]);
+
   const loadDropdowns = async () => {
     try {
       setLoadingDropdowns(true);
       setError("");
 
-      const [sourceData, ratingData, tierData, employeeData] =
+      const [sourceData, ratingData, tierData, employeeData, customerData] =
         await Promise.all([
           companyService.getSources(),
           companyService.getRatings(),
           companyService.getMembershipTiers(),
           companyService.getEmployees(),
+          customerApi.getCustomers({ page_size: "100" }).catch(() => ({ results: [] })),
         ]);
 
       setSources(sourceData);
       setRatings(ratingData);
       setMembershipTiers(tierData);
       setEmployees(employeeData);
+      setCustomers(customerData.results || []);
     } catch (err) {
       setError(getErrorMessage(err, "Không tải được dropdown"));
     } finally {
       setLoadingDropdowns(false);
     }
+  };
+
+  const selectContact = async (contact: CustomerListItem) => {
+    setField("primaryContact", String(contact.id));
+    setField(
+      "contactSearch",
+      `${contact.full_name}${contact.phone ? ` - ${contact.phone}` : ""}`
+    );
+    setContactDropdownOpen(false);
+
+    let fullCustomer = contact;
+    try {
+      fullCustomer = await customerApi.getCustomerById(contact.id);
+    } catch {
+      // Fall back to list item
+    }
+
+    if (fullCustomer.phone) setField("phone", fullCustomer.phone);
+    if (fullCustomer.email) setField("email", fullCustomer.email);
+    if (fullCustomer.address) setField("address", fullCustomer.address);
+    if (fullCustomer.country) setField("country", fullCustomer.country);
+    if (fullCustomer.province) setField("province", fullCustomer.province);
+    if (fullCustomer.district) setField("district", fullCustomer.district);
+
+    if (fullCustomer.membership_tier) {
+      setField("membershipTier", String(fullCustomer.membership_tier));
+    }
+    if (fullCustomer.rating) {
+      setField("rating", String(fullCustomer.rating));
+    }
+    if (fullCustomer.source) {
+      setField("source", String(fullCustomer.source));
+    }
+
+    if (fullCustomer.assigned_employee_name || (fullCustomer as any).assigned_employee) {
+      const empId = (fullCustomer as any).assigned_employee;
+      const empName = fullCustomer.assigned_employee_name || "";
+
+      const matchedEmp = employees.find(
+        (e) =>
+          (empId && e.id === Number(empId)) ||
+          (empName &&
+            (getEmployeeLabel(e).toLowerCase().includes(empName.toLowerCase()) ||
+              String(e["full_name"] || "").toLowerCase() === empName.toLowerCase()))
+      );
+
+      if (matchedEmp) {
+        setField("assignedEmployee", String(matchedEmp.id));
+        setField("employeeSearch", getEmployeeLabel(matchedEmp));
+      }
+    }
+  };
+
+  const clearContact = () => {
+    setField("primaryContact", "");
+    setField("contactSearch", "");
+    setContactDropdownOpen(true);
   };
 
   const validateForm = () => {
@@ -157,6 +248,7 @@ export function useCompanyCreate() {
         opened_at: form.openedAt || undefined,
         tax_code: form.taxCode.trim() || undefined,
 
+        primary_contact: form.primaryContact ? Number(form.primaryContact) : null,
         source: form.source ? Number(form.source) : null,
         rating: form.rating ? Number(form.rating) : null,
         membership_tier: form.membershipTier
@@ -223,6 +315,12 @@ export function useCompanyCreate() {
     setEmployeeDropdownOpen,
     selectEmployee,
     clearEmployee,
+
+    filteredContacts,
+    contactDropdownOpen,
+    setContactDropdownOpen,
+    selectContact,
+    clearContact,
 
     loadingDropdowns,
     saving,

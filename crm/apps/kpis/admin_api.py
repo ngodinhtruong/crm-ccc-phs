@@ -789,6 +789,29 @@ def get_operational_user_rows(period, users):
         if r.pic_user_id:
             records_by_user[r.pic_user_id].append(r)
 
+    handover_tx_map = {}
+    handover_records = [
+        r for r in records if r.customer_account_id and getattr(r, "handover_to_broker", False)
+    ]
+    for hr in handover_records:
+        h_date = hr.broker_handover_at.date() if hr.broker_handover_at else hr.call_date
+        if h_date:
+            key = (hr.customer_account_id, h_date)
+            if key not in handover_tx_map:
+                tx_before = TransactionLog.objects.filter(
+                    customer_account_id=hr.customer_account_id,
+                    transaction_date__gte=period.start_date,
+                    transaction_date__lt=h_date,
+                    order_status__in=MATCHED_ORDER_STATUSES,
+                ).aggregate(
+                    f=Sum("transaction_fee"),
+                    v=Sum("transaction_value"),
+                )
+                handover_tx_map[key] = {
+                    "fee": tx_before.get("f") or Decimal("0"),
+                    "value": tx_before.get("v") or Decimal("0"),
+                }
+
     rows = []
     for user in users:
         employee = getattr(user, "employee", None)
@@ -808,18 +831,10 @@ def get_operational_user_rows(period, users):
                     user_account_nos.add(acc_no)
                     if r.handover_to_broker:
                         handover_date = r.broker_handover_at.date() if r.broker_handover_at else r.call_date
-                        if r.customer_account_id:
-                            tx_before = TransactionLog.objects.filter(
-                                customer_account_id=r.customer_account_id,
-                                transaction_date__gte=period.start_date,
-                                transaction_date__lt=handover_date,
-                                order_status__in=MATCHED_ORDER_STATUSES,
-                            ).aggregate(
-                                f=Sum("transaction_fee"),
-                                v=Sum("transaction_value"),
-                            )
-                            fee += tx_before.get("f") or Decimal("0")
-                            value += tx_before.get("v") or Decimal("0")
+                        if r.customer_account_id and handover_date:
+                            tx_data = handover_tx_map.get((r.customer_account_id, handover_date), {})
+                            fee += tx_data.get("fee", Decimal("0"))
+                            value += tx_data.get("value", Decimal("0"))
                     else:
                         fee += account_tx_map.get(acc_no, {}).get("fee", Decimal("0"))
                         value += account_tx_map.get(acc_no, {}).get("value", Decimal("0"))

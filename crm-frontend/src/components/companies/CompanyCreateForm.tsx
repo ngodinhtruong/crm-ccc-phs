@@ -1,7 +1,6 @@
 "use client";
 
-import { Search } from "lucide-react";
-
+import { ContactCombobox } from "@/components/companies/ContactCombobox";
 import { EmployeeCombobox } from "@/components/companies/EmployeeCombobox";
 import {
   CompanyDateInput,
@@ -27,6 +26,11 @@ export function CompanyCreateForm({
     setEmployeeDropdownOpen,
     selectEmployee,
     clearEmployee,
+    filteredContacts,
+    contactDropdownOpen,
+    setContactDropdownOpen,
+    selectContact,
+    clearContact,
     saving,
     submit,
     cancel,
@@ -45,21 +49,19 @@ export function CompanyCreateForm({
           </CompanyFormField>
 
           <CompanyFormField label="Người liên hệ chính">
-            <div className="flex">
-              <input
-                disabled
-                placeholder="Lưu công ty trước, sau đó chọn người liên hệ"
-                className="h-9 flex-1 rounded-l border bg-slate-50 px-3 text-xs text-slate-500"
-              />
-
-              <button
-                type="button"
-                disabled
-                className="flex h-9 w-9 items-center justify-center rounded-r border-y border-r bg-slate-100 text-slate-400"
-              >
-                <Search size={14} />
-              </button>
-            </div>
+            <ContactCombobox
+              value={form.contactSearch}
+              selectedContact={form.primaryContact}
+              open={contactDropdownOpen}
+              contacts={filteredContacts}
+              onOpenChange={setContactDropdownOpen}
+              onSearchChange={(value) => {
+                setField("contactSearch", value);
+                setField("primaryContact", "");
+              }}
+              onSelect={selectContact}
+              onClear={clearContact}
+            />
           </CompanyFormField>
 
           <CompanyFormField label="Điện thoại">

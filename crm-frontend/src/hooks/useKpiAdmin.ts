@@ -473,28 +473,23 @@ export function useKpiAdmin() {
       let data: KpiAdminDashboardResponse;
 
       if (roleType === "ALL") {
-        const saData = await kpiService.getKpiAdminDashboard(buildQueryParams("SA", "SA"));
-        const dashboards: KpiAdminDashboardResponse[] = [saData];
+        const [saRes, supRes] = await Promise.allSettled([
+          kpiService.getKpiAdminDashboard(buildQueryParams("SA", "SA")),
+          kpiService.getKpiAdminDashboard(buildQueryParams("SA_SUP", "SUP")),
+        ]);
 
-        const canLoadSup = saData.meta?.profiles?.some(
-          (profile) => profile.profile_code === "SA_SUP"
-        );
+        const dashboards: KpiAdminDashboardResponse[] = [];
+        if (saRes.status === "fulfilled") dashboards.push(saRes.value);
+        if (supRes.status === "fulfilled") dashboards.push(supRes.value);
 
-        if (canLoadSup) {
-          try {
-            const supData = await kpiService.getKpiAdminDashboard(
-              buildQueryParams("SA_SUP", "SUP")
-            );
-            dashboards.push(supData);
-          } catch {
-            // Tài khoản SUP thường không có quyền đọc bộ KPI SUP của người khác.
-            // Khi đó tab "Tất cả" vẫn hiển thị phần SA trong phạm vi được cấp quyền.
-          }
+        if (dashboards.length === 0 && saRes.status === "rejected") {
+          throw saRes.reason;
         }
 
         data = mergeKpiAdminDashboards(dashboards);
       } else {
-        data = await kpiService.getKpiAdminDashboard(queryParams);
+        const targetProfileCode = roleType === "SUP" ? "SA_SUP" : "SA";
+        data = await kpiService.getKpiAdminDashboard(buildQueryParams(targetProfileCode, roleType));
       }
 
       setDashboard(data);

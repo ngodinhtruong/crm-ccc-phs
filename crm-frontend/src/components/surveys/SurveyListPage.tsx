@@ -9,7 +9,6 @@ import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { useDebounce } from "@/hooks/useDebounce";
 import { SurveyImportModal } from "@/components/surveys/SurveyImportModal";
 import { SurveyLogsPanel } from "@/components/surveys/SurveyLogsPanel";
-import { SurveyToolbar } from "@/components/surveys/SurveyToolbar";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
 import {
   EMPTY_SURVEY_COLUMN_FILTERS,
@@ -21,7 +20,6 @@ import {
 } from "@/types/survey.type";
 import { getErrorMessage } from "@/utils/error.util";
 import { hasPermission } from "@/utils/permission.util";
-import { ALL_TIME_FILTERS } from "@/utils/survey-period.util";
 
 // Bảng đổ hết ra trang, không phân trang. 200 là trần backend cho một lượt;
 // vượt qua thì panel nói rõ đang cắt bớt chứ không im lặng.
@@ -143,58 +141,48 @@ export function SurveyListPage() {
   return (
     <DashboardLayout
       breadcrumbs={[{ label: "TRANG CHỦ", href: "/" }, { label: "Khảo sát" }]}
+      rightAction={
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/surveys/dashboard"
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-colors shadow-2xs"
+          >
+            <Gauge size={13} className="text-emerald-600" />
+            Dashboard CSAT
+          </Link>
+
+          <button
+            type="button"
+            onClick={reload}
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-colors shadow-2xs"
+          >
+            <RefreshCw size={13} />
+            Tải lại
+          </button>
+
+          {canEnterSurvey && (
+            <>
+              <button
+                type="button"
+                onClick={() => setShowImport(true)}
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-colors shadow-2xs"
+              >
+                <FileSpreadsheet size={13} className="text-emerald-600" />
+                Import Excel
+              </button>
+
+              <Link
+                href="/surveys/create"
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#00713d] px-3 text-xs font-bold text-white hover:bg-[#005c32] shadow-2xs transition-colors"
+              >
+                <Plus size={13} />
+                Nhập khảo sát
+              </Link>
+            </>
+          )}
+        </div>
+      }
     >
-      {/* Lọc nằm hết trên hàng lọc của bảng, giống màn ticket — thanh này chỉ
-          còn tiêu đề và các nút thao tác. */}
-      <SurveyToolbar
-        filters={ALL_TIME_FILTERS}
-        onChange={() => {}}
-        showPeriodPicker={false}
-        showFilterButtons={false}
-        subtitle="Lịch sử gửi khảo sát. Lọc ngay trên từng cột của bảng."
-        rightSlot={
-          <>
-            <Link
-              href="/surveys/dashboard"
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-            >
-              <Gauge size={13} className="text-emerald-600" />
-              Dashboard CSAT
-            </Link>
-
-            <button
-              type="button"
-              onClick={reload}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-            >
-              <RefreshCw size={13} />
-              Tải lại
-            </button>
-
-            {canEnterSurvey && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setShowImport(true)}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                >
-                  <FileSpreadsheet size={13} className="text-emerald-600" />
-                  Import Excel
-                </button>
-
-                <Link
-                  href="/surveys/create"
-                  className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#00713d] px-3 text-xs font-bold text-white hover:bg-[#005c32]"
-                >
-                  <Plus size={13} />
-                  Nhập khảo sát
-                </Link>
-              </>
-            )}
-          </>
-        }
-      />
-
       {error && (
         <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-600">
           {error}

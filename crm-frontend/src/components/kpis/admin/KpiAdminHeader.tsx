@@ -56,7 +56,7 @@ function findPeriodByOffset(
 }
 
 function getActiveFilterCount(admin: KpiAdminController) {
-  let count = admin.roleType === "ALL" ? 0 : 1;
+  let count = 0;
 
   if (admin.selectedBranch && admin.selectedBranch !== "all") count += 1;
   if (admin.selectedPeriodId) count += 1;
@@ -86,6 +86,7 @@ export function KpiAdminHeader({ admin }: { admin: KpiAdminController }) {
       : [
           { value: "ALL" as const, label: "Tất cả" },
           { value: "SA" as const, label: "SA" },
+          { value: "SUP" as const, label: "SUP" },
         ];
   }, [profiles]);
 
@@ -100,6 +101,29 @@ export function KpiAdminHeader({ admin }: { admin: KpiAdminController }) {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {/* SA / SUP Role Switcher Tabs */}
+          <div className="flex rounded-md border border-slate-200 bg-[#f8fafc] p-0.5">
+            {roleOptions.map((option) => {
+              const active = admin.roleType === option.value;
+
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => admin.setRoleType(option.value)}
+                  className={[
+                    "flex h-8 items-center gap-1.5 rounded px-3 text-xs font-bold transition",
+                    active
+                      ? "bg-white text-[#059669] shadow-sm"
+                      : "text-slate-500 hover:text-slate-800",
+                  ].join(" ")}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+
           <div className="flex rounded-md border border-slate-200 bg-[#f8fafc] p-0.5">
             {tabs.map((tab) => {
               const Icon = tab.icon;
@@ -151,34 +175,6 @@ export function KpiAdminHeader({ admin }: { admin: KpiAdminController }) {
                 </div>
 
                 <div className="space-y-3">
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold text-slate-600">Loại nhân viên</label>
-                    <div
-                      className={[
-                        "grid gap-2",
-                        roleOptions.length >= 3 ? "grid-cols-3" : "grid-cols-2",
-                      ].join(" ")}
-                    >
-                      {roleOptions.map((option) => {
-                        const active = admin.roleType === option.value;
-                        return (
-                          <button
-                            key={option.value}
-                            type="button"
-                            onClick={() => admin.setRoleType(option.value)}
-                            className={[
-                              "h-9 rounded border text-sm font-bold transition",
-                              active
-                                ? "border-[#10b981] bg-emerald-50 text-[#059669]"
-                                : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
-                            ].join(" ")}
-                          >
-                            {option.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
 
                   <div>
                     <label className="mb-1 block text-xs font-semibold text-slate-600">Kỳ KPI</label>

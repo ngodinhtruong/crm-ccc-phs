@@ -19,9 +19,9 @@ export function KpiConfigTabs({
   onChange: (tab: KpiConfigTab) => void;
 }) {
   return (
-    <div className="flex h-12 items-center justify-center border-b bg-white px-4">
-      <div className="inline-flex overflow-hidden rounded border border-sky-300 text-xs font-semibold">
-        {tabs.map((tab, index) => {
+    <div className="flex h-12 items-center justify-center border-b border-slate-200 bg-slate-50/50 px-4">
+      <div className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-100 p-1 text-xs font-bold">
+        {tabs.map((tab) => {
           const active = activeTab === tab.key;
 
           return (
@@ -30,11 +30,10 @@ export function KpiConfigTabs({
               type="button"
               onClick={() => onChange(tab.key)}
               className={[
-                "h-8 px-5",
-                index > 0 ? "border-l border-emerald-300" : "",
+                "h-8 px-4 rounded-md transition-all font-bold",
                 active
-                  ? "bg-[#10b981] text-white"
-                  : "bg-white text-[#059669] hover:bg-emerald-50",
+                  ? "bg-white text-[#059669] shadow-sm ring-1 ring-emerald-500/20"
+                  : "text-slate-500 hover:text-slate-800 hover:bg-white/50",
               ].join(" ")}
             >
               {tab.label}

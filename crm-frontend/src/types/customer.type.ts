@@ -37,6 +37,10 @@ export type CustomerListItem = {
     date_of_birth?: string | null;
     description?: string | null;
     address?: string | null;
+    province?: string | null;
+    district?: string | null;
+    ward?: string | null;
+    country?: string | null;
 };
 export type CustomerTypeOption = {
   id: number;
@@ -76,6 +80,7 @@ export type PaginatedResponse<T> = {
 
 export type CustomerListParams = {
   page?: string;
+  page_size?: string;
 
   q?: string;
 

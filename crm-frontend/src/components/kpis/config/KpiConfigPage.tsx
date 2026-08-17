@@ -138,7 +138,7 @@ export function KpiConfigPage() {
             </div>
           ) : (
             <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
-              <div className="flex h-12 items-center justify-between border-b bg-white px-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b bg-white p-4">
                 <div>
                   <div className="flex items-center gap-2">
                     <h2 className="text-sm font-semibold text-slate-800">
@@ -148,17 +148,50 @@ export function KpiConfigPage() {
                   </div>
                   <p className="mt-0.5 text-xs text-slate-500">
                     {config.periodDetail.start_date} → {config.periodDetail.end_date}
+                    {config.selectedProfile && (
+                      <span className="ml-2 border-l border-slate-200 pl-2">
+                        Tổng trọng số: <span className="font-bold text-slate-700">{config.selectedProfile.total_weight}%</span>
+                      </span>
+                    )}
                   </p>
                 </div>
 
-                {config.selectedProfile && (
-                  <div className="text-right text-xs text-slate-500">
-                    <div>
-                      Bộ KPI: <span className="font-semibold text-slate-800">{config.selectedProfile.profile_code}</span>
-                    </div>
-                    <div>
-                      Role áp dụng: <span className="font-semibold text-slate-800">{config.selectedProfile.target_role_code}</span> · Tổng trọng số: <span className="font-semibold text-slate-800">{config.selectedProfile.total_weight}%</span>
-                    </div>
+                {/* SA / SUP Profile Switcher Tabs */}
+                {config.profileRows.length > 0 && (
+                  <div className="flex items-center rounded-md border border-slate-200 bg-[#f8fafc] p-0.5">
+                    {config.profileRows.map((profile) => {
+                      const active = String(profile.id) === String(config.selectedProfileId);
+                      const isSup =
+                        profile.profile_code?.toUpperCase().includes("SUP") ||
+                        profile.target_role_code?.toUpperCase().includes("SUP");
+                      const tag = isSup ? "SUP" : "SA";
+
+                      return (
+                        <button
+                          key={profile.id}
+                          type="button"
+                          onClick={() => config.setSelectedProfileId(String(profile.id))}
+                          className={[
+                            "flex h-8 items-center gap-1.5 rounded px-3 text-xs font-bold transition",
+                            active
+                              ? "bg-white text-[#059669] shadow-sm"
+                              : "text-slate-500 hover:text-slate-800",
+                          ].join(" ")}
+                        >
+                          <span
+                            className={[
+                              "rounded px-1.5 py-0.5 text-[10px] font-black uppercase",
+                              active
+                                ? "bg-emerald-100 text-[#059669]"
+                                : "bg-slate-200 text-slate-600",
+                            ].join(" ")}
+                          >
+                            {tag}
+                          </span>
+                          <span>{profile.profile_name || (isSup ? "KPI SUP" : "KPI SA")}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </div>
