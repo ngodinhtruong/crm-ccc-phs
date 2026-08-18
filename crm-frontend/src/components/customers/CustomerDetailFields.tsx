@@ -3,6 +3,11 @@
 import { Phone } from "lucide-react";
 
 import type { CustomerDetail } from "@/types/customer.type";
+import {
+  isLinkedCustomer,
+  maskEmail,
+  maskPhone,
+} from "@/utils/mask-data.util";
 
 /** Một dòng thông tin: nhãn bên trái, giá trị bên phải (giống ảnh CRM) */
 function Field({
@@ -12,7 +17,11 @@ function Field({
   label: string;
   children?: React.ReactNode;
 }) {
-  const empty = children === null || children === undefined || children === "";
+  const empty =
+    children === null ||
+    children === undefined ||
+    children === "" ||
+    children === "-";
 
   return (
     <div className="flex gap-4 px-4 py-2.5">
@@ -56,6 +65,10 @@ export function CustomerDetailFields({
   customer: CustomerDetail;
 }) {
   const isVip = (customer.vip_type || "").toUpperCase() === "VIP";
+  const isLinked = isLinkedCustomer(customer.account_number);
+
+  const phoneVal = maskPhone(customer.phone, isLinked);
+  const emailVal = maskEmail(customer.email, isLinked);
 
   return (
     <div className="flex flex-col gap-3">
@@ -64,34 +77,28 @@ export function CustomerDetailFields({
           <Field label="Họ và tên đệm">{customer.full_name}</Field>
           <Field label="Tên">{customer.full_name}</Field>
 
-          <Field label="CMND/CCCD">{customer.identity_number}</Field>
-          <Field label="Loại">{customer.customer_type_name}</Field>
-
-          <Field label="Ngày sinh">
-            {customer.birth_date_display || customer.date_of_birth}
-          </Field>
           <Field label="Giới tính">{customer.gender}</Field>
-
           <Field label="Số tài khoản">{customer.account_number}</Field>
           <Field label="Chi nhánh">{customer.branch_name}</Field>
 
-          <Field label="Di động">
-            {customer.phone && (
+          {phoneVal !== "-" && (
+            <Field label="Di động">
               <span className="inline-flex items-center gap-1">
-                {customer.phone}
+                {phoneVal}
                 <Phone size={11} className="text-emerald-500" />
               </span>
-            )}
-          </Field>
+            </Field>
+          )}
+
           <Field label="Ngày mở tài khoản">{customer.opened_account_date}</Field>
 
-          <Field label="Email">
-            {customer.email && (
-              <span className="text-[#059669]">{customer.email}</span>
-            )}
-          </Field>
-          <Field label="Môi giới">{customer.assigned_employee_name}</Field>
+          {emailVal !== "-" && (
+            <Field label="Email">
+              <span className="text-[#059669]">{emailVal}</span>
+            </Field>
+          )}
 
+          <Field label="Môi giới">{customer.assigned_employee_name}</Field>
           <Field label="Công ty">{customer.company_name}</Field>
           <Field label="Khảo sát" />
 
@@ -106,6 +113,7 @@ export function CustomerDetailFields({
               </span>
             )}
           </Field>
+
           <Field label="Tình trạng">
             {customer.status_label && (
               <span className="rounded bg-emerald-500 px-2 py-0.5 text-[11px] font-semibold text-white">
@@ -124,24 +132,8 @@ export function CustomerDetailFields({
         </div>
       </Section>
 
-      <Section title="Thông tin địa chỉ">
-        <div className="grid grid-cols-1 lg:grid-cols-2">
-          <Field label="Địa chỉ">{customer.address}</Field>
-          <Field label="Quận/Huyện">{customer.district}</Field>
-
-          <Field label="Tỉnh/ TP">{customer.province}</Field>
-          <Field label="Quốc gia">{customer.country}</Field>
-
-          <Field label="Phường/Xã">{customer.ward}</Field>
-          <Field label="Nguồn khách">{customer.source_name}</Field>
-        </div>
-      </Section>
-
       <Section title="Thông tin khác">
         <div className="grid grid-cols-1 lg:grid-cols-2">
-          <Field label="Mã khách hàng">{customer.customer_code}</Field>
-          <Field label="Mã hệ thống core">{customer.external_customer_id}</Field>
-
           <Field label="Xếp hạng">{customer.rating_name}</Field>
           <Field label="Hạng thành viên">{customer.membership_tier_name}</Field>
         </div>
@@ -150,3 +142,4 @@ export function CustomerDetailFields({
     </div>
   );
 }
+

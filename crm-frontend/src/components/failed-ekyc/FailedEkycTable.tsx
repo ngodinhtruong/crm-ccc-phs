@@ -18,6 +18,7 @@ import {
   FailedEkycListParams,
   FailedEkycRecord,
 } from "@/types/failed-ekyc.type";
+import { isLinkedCustomer, maskEmail, maskPhone } from "@/utils/mask-data.util";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
@@ -174,8 +175,8 @@ export function FailedEkycTable() {
                 <td className="px-4"><span className="inline-flex rounded-md bg-emerald-100 px-2 py-1 text-[11px] font-semibold text-emerald-700">{row.step}</span></td>
                 <td className="px-4 text-slate-600">{row.branch_name || "-"}</td>
                 <td className="px-4 font-semibold text-slate-700">{row.account_number || "-"}</td>
-                <td className="px-4 text-slate-600">{row.email || "-"}</td>
-                <td className="px-4 text-slate-600">{row.phone || "-"}</td>
+                <td className="px-4 text-slate-600">{maskEmail(row.email, isLinkedCustomer(row.account_number)) || "-"}</td>
+                <td className="px-4 text-slate-600">{maskPhone(row.phone, isLinkedCustomer(row.account_number)) || "-"}</td>
                 <td className="px-4 text-slate-600">{formatDate(row.failed_at)}</td>
                 <td className="px-4"><div className="line-clamp-2 max-w-[320px] text-xs leading-5 text-slate-700" title={row.error_message}>{row.error_message || "-"}</div></td>
                 <td className="px-4 font-medium text-slate-700">{row.pic || "-"}</td>

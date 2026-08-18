@@ -69,24 +69,66 @@ export function KpiDashboardPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs px-5 py-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-base font-bold text-slate-800">
-                  Dashboard KPI Sale Admin
-                </h1>
-                <span className="inline-flex items-center rounded-full bg-emerald-50 border border-emerald-200/80 px-2.5 py-0.5 text-xs font-semibold text-[#059669]">
-                  {dashboard.selectedProfileCode === "SA_SUP" ? "KPI SUP" : "KPI SA"}
-                </span>
+          {/* Employee / User Info Card */}
+          {dashboard.displayUserCard && (
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
+              <div className="flex flex-wrap items-center gap-4 px-5 py-3.5">
+                {/* Avatar / Initial */}
+                <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-teal-600 text-base font-bold text-white shadow-sm">
+                  {(dashboard.displayUserCard.employee_name || dashboard.displayUserCard.user_username || "?")
+                    .charAt(0)
+                    .toUpperCase()}
+                </div>
+
+                {/* Main Info */}
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-base font-bold text-slate-800 truncate">
+                      {dashboard.displayUserCard.employee_name || dashboard.displayUserCard.user_username || "—"}
+                    </span>
+                    {(dashboard.displayUserCard.role_names || []).map((role) => (
+                      <span
+                        key={role}
+                        className="inline-flex items-center rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[11px] font-semibold text-[#059669]"
+                      >
+                        {role}
+                      </span>
+                    ))}
+                    <span className="inline-flex items-center rounded-full bg-slate-100 border border-slate-200 px-2.5 py-0.5 text-xs font-semibold text-slate-600">
+                      {dashboard.selectedProfileCode === "SA_SUP" ? "KPI SUP" : "KPI SA"}
+                    </span>
+                  </div>
+
+                  <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
+                    {dashboard.displayUserCard.user_username && (
+                      <span className="flex items-center gap-1">
+                        <User size={12} className="text-slate-400 flex-shrink-0" />
+                        @{dashboard.displayUserCard.user_username}
+                      </span>
+                    )}
+                    {dashboard.displayUserCard.employee_position && (
+                      <span className="flex items-center gap-1">
+                        <Briefcase size={12} className="text-slate-400 flex-shrink-0" />
+                        {dashboard.displayUserCard.employee_position}
+                      </span>
+                    )}
+                    {dashboard.displayUserCard.branch_name && (
+                      <span className="flex items-center gap-1">
+                        <Building2 size={12} className="text-slate-400 flex-shrink-0" />
+                        {dashboard.displayUserCard.branch_name}
+                      </span>
+                    )}
+                    {dashboard.displayUserCard.user_email && (
+                      <span className="flex items-center gap-1">
+                        <Mail size={12} className="text-slate-400 flex-shrink-0" />
+                        {dashboard.displayUserCard.user_email}
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
-              <p className="mt-0.5 text-xs text-slate-500">
-                Kỳ KPI mặc định theo tháng hiện tại. SA xem KPI cá nhân, SUP xem KPI cá nhân; xem KPI nhân viên qua Bảng xếp hạng.
-              </p>
             </div>
-            <div className="hidden text-xs text-slate-400 font-medium md:block">
-              Tự động cập nhật nền mỗi 60 giây
-            </div>
-          </div>
+          )}
 
           {dashboard.error && (
             <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-600">
@@ -111,64 +153,6 @@ export function KpiDashboardPage() {
           ) : (
             <>
               <KpiSummaryCards dashboard={dashboard} />
-
-              {/* Employee Info Card */}
-              {dashboard.activeSummary && (
-                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
-                  <div className="flex flex-wrap items-center gap-4 px-5 py-4">
-                    {/* Avatar / Initial */}
-                    <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-teal-600 text-base font-bold text-white shadow-sm">
-                      {(dashboard.activeSummary.employee_name || dashboard.activeSummary.user_username || "?")
-                        .charAt(0)
-                        .toUpperCase()}
-                    </div>
-
-                    {/* Main Info */}
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-base font-bold text-slate-800 truncate">
-                          {dashboard.activeSummary.employee_name || dashboard.activeSummary.user_username || "—"}
-                        </span>
-                        {(dashboard.activeSummary.role_names || []).map((role) => (
-                          <span
-                            key={role}
-                            className="inline-flex items-center rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[11px] font-semibold text-[#059669]"
-                          >
-                            {role}
-                          </span>
-                        ))}
-                      </div>
-
-                      <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
-                        {dashboard.activeSummary.user_username && (
-                          <span className="flex items-center gap-1">
-                            <User size={12} className="text-slate-400 flex-shrink-0" />
-                            @{dashboard.activeSummary.user_username}
-                          </span>
-                        )}
-                        {dashboard.activeSummary.employee_position && (
-                          <span className="flex items-center gap-1">
-                            <Briefcase size={12} className="text-slate-400 flex-shrink-0" />
-                            {dashboard.activeSummary.employee_position}
-                          </span>
-                        )}
-                        {dashboard.activeSummary.branch_name && (
-                          <span className="flex items-center gap-1">
-                            <Building2 size={12} className="text-slate-400 flex-shrink-0" />
-                            {dashboard.activeSummary.branch_name}
-                          </span>
-                        )}
-                        {dashboard.activeSummary.user_email && (
-                          <span className="flex items-center gap-1">
-                            <Mail size={12} className="text-slate-400 flex-shrink-0" />
-                            {dashboard.activeSummary.user_email}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
                 {/* Unified Card Header with Attached Tabs */}

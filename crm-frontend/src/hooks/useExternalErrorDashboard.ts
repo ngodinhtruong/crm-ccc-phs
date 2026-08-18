@@ -63,8 +63,24 @@ let catalogRequest:
     }>
   | undefined;
 
+function getLast5MonthsDateRange() {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth() - 4, 1);
+  const formatDate = (date: Date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  };
+
+  return {
+    dateFrom: formatDate(start),
+    dateTo: formatDate(now),
+  };
+}
+
 function createDefaultFilters(): DashboardFilterState {
-  const currentMonthRange = getGranularityDateRange("MONTH");
+  const fiveMonthRange = getLast5MonthsDateRange();
   if (typeof window !== "undefined") {
     sessionStorage.removeItem("ext_err_dashboard_dateFrom");
     sessionStorage.removeItem("ext_err_dashboard_dateTo");
@@ -72,8 +88,8 @@ function createDefaultFilters(): DashboardFilterState {
 
   return {
     dateField: "received_date",
-    dateFrom: currentMonthRange.dateFrom,
-    dateTo: currentMonthRange.dateTo,
+    dateFrom: fiveMonthRange.dateFrom,
+    dateTo: fiveMonthRange.dateTo,
     source: "",
     device: "",
     errorType: "",

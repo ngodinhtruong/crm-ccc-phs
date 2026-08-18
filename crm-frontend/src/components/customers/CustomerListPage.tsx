@@ -16,14 +16,14 @@ export function CustomerListPage() {
       breadcrumbs={[
         {
           label: "TRANG CHỦ",
-          href: "/",
+          href: "/workspace",
         },
         {
           label: "Khách hàng",
           href: "/customers",
         },
         {
-          label: "Customers",
+          label: "Danh sách khách hàng",
         },
       ]}
       rightAction={

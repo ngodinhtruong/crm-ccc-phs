@@ -95,13 +95,14 @@ def _customer_header(customer):
         for account in customer.accounts.all()
         if account.account_number
     ]
+    is_linked = len(accounts) > 0
 
     return {
         "id": customer.id,
-        "customer_code": customer.customer_code,
+        "customer_code": "",
         "full_name": customer.full_name,
-        "phone": customer.phone,
-        "email": customer.email,
+        "phone": None if is_linked else customer.phone,
+        "email": None if is_linked else customer.email,
         "branch_name": customer.branch.branch_name if customer.branch else None,
         "status": customer.status,
         "vip_type": (
@@ -123,7 +124,7 @@ def _transaction_series(matched_qs, months):
         orders=lambda: 0,
     )
 
-    rows = matched_qs.values("transaction_date", "side", "transaction_value")
+    rows = matched_qs.values("transaction_date", "side")
 
     for row in rows:
         code = _month_code(row["transaction_date"])
@@ -132,14 +133,7 @@ def _transaction_series(matched_qs, months):
         if bucket is None:
             continue
 
-        value = float(row["transaction_value"] or 0)
         bucket["orders"] += 1
-        bucket["total_value"] += value
-
-        if (row["side"] or "").upper() == "SELL":
-            bucket["sell_value"] += value
-        else:
-            bucket["buy_value"] += value
 
     return list(series.values())
 
@@ -243,7 +237,6 @@ def _behaviour(transaction_series, matched_qs, today):
         pattern = "OCCASIONAL"
 
     aggregate = matched_qs.aggregate(
-        avg_value=Avg("transaction_value"),
         last_date=Max("transaction_date"),
     )
 
@@ -260,7 +253,7 @@ def _behaviour(transaction_series, matched_qs, today):
         "pattern_label": BEHAVIOUR_LABELS[pattern],
         "active_months_6m": active_6m,
         "active_months_12m": active_12m,
-        "avg_transaction_value": _to_float(aggregate["avg_value"]),
+        "avg_transaction_value": 0.0,
         "product_diversity": (
             matched_qs.exclude(product_code__isnull=True)
             .values("product_code")
@@ -281,7 +274,6 @@ def _summary(customer, matched_qs, calls_qs, tickets_qs, survey_qs, today):
 
     totals = matched_qs.aggregate(
         orders=Count("id"),
-        value_ytd=Sum("transaction_value", filter=Q(transaction_date__gte=year_start)),
         orders_30d=Count(
             "id", filter=Q(transaction_date__gte=today - timedelta(days=30))
         ),
@@ -301,7 +293,7 @@ def _summary(customer, matched_qs, calls_qs, tickets_qs, survey_qs, today):
         "tickets": tickets_qs.count(),
         "calls": calls_qs.count(),
         "transactions": totals["orders"],
-        "total_value_ytd": _to_float(totals["value_ytd"]) or 0.0,
+        "total_value_ytd": 0.0,
         "orders_30d": totals["orders_30d"],
         "rated": rated,
         "avg_rating": round(ratings["avg_score"], 2) if rated else None,
@@ -329,18 +321,15 @@ def _timeline(matched_qs, calls_qs, tickets_qs, survey_qs):
     items = []
 
     for row in matched_qs.order_by("-transaction_date")[:TIMELINE_LIMIT].values(
-        "transaction_date", "side", "stock_code", "quantity", "price",
-        "transaction_value", "order_status", "source_system",
+        "transaction_date", "side", "stock_code", "order_status", "source_system",
     ):
         items.append(
             {
                 "type": "transaction",
                 "date": row["transaction_date"].isoformat(),
                 "title": f"{'Bán' if (row['side'] or '').upper() == 'SELL' else 'Mua'} {row['stock_code'] or ''}".strip(),
-                "description": (
-                    f"{int(row['quantity'] or 0)} × {int(row['price'] or 0):,}đ"
-                ),
-                "value": _to_float(row["transaction_value"]),
+                "description": "",
+                "value": None,
                 "meta": row["source_system"],
                 "pic": None,
             }

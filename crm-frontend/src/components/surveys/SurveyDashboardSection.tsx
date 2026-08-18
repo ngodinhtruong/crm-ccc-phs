@@ -263,7 +263,7 @@ export function SurveyDashboardSection({
       <div className="grid gap-3 xl:grid-cols-12">
         <Panel
           title="TỔNG SỐ LƯỢNG KH RATING"
-          className="xl:col-span-7"
+          className="xl:col-span-12"
           subtitle={`${metrics.total} lượt gửi`}
         >
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
@@ -328,9 +328,96 @@ export function SurveyDashboardSection({
             </div>
           </div>
         </Panel>
+      </div>
 
-        <Panel title="CSAT SCORE" className="xl:col-span-5">
-          <div className="flex h-full flex-col justify-center gap-3">
+      {/* DỰNG 2 BẢNG KẾT QUẢ KHẢO SÁT & KEY COMPARISON NẰM CÙNG 1 HÀNG */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Panel title="KẾT QUẢ KHẢO SÁT THEO DANH MỤC">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[540px] text-xs">
+              <thead>
+                <tr className="bg-[#1f5fa8] text-white">
+                  <th className="rounded-l px-3 py-2 text-left font-bold">
+                    DANH MỤC HỖ TRỢ
+                  </th>
+                  <th className="px-3 py-2 text-right font-bold">SL GỬI ĐI</th>
+                  <th className="px-3 py-2 text-right font-bold">SL ĐÁNH GIÁ</th>
+                  <th className="px-3 py-2 text-right font-bold">
+                    TỶ LỆ PHẢN HỒI
+                  </th>
+                  <th className="px-3 py-2 text-right font-bold">ĐIỂM TB (★)</th>
+                  <th className="rounded-r px-3 py-2 text-right font-bold">
+                    CSAT (%)
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {data.categories.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="h-16 text-center text-slate-400">
+                      Chưa có khảo sát nào trong kỳ này.
+                    </td>
+                  </tr>
+                )}
+
+                {data.categories.map((row) => (
+                  <tr
+                    key={row.category}
+                    className="border-b border-slate-100 last:border-0 hover:bg-slate-50"
+                  >
+                    <td className="px-3 py-2 font-semibold text-slate-700">
+                      {row.category}
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums text-slate-700">
+                      {row.sent}
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums text-slate-700">
+                      {row.rated}
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums text-slate-700">
+                      {row.response_rate}%
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums text-slate-700">
+                      {row.average_score}
+                    </td>
+                    <td className="px-3 py-2 text-right font-bold tabular-nums text-slate-800">
+                      {row.csat_percent}%
+                    </td>
+                  </tr>
+                ))}
+
+                {data.categories.length > 0 && (
+                  <tr className="bg-[#e8f1fb] font-black text-slate-800">
+                    <td className="px-3 py-2.5">Tổng cộng</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums">
+                      {metrics.success}
+                    </td>
+                    <td className="px-3 py-2.5 text-right tabular-nums">
+                      {metrics.rated}
+                    </td>
+                    <td className="px-3 py-2.5 text-right tabular-nums">
+                      {metrics.response_rate}%
+                    </td>
+                    <td className="px-3 py-2.5 text-right tabular-nums">
+                      {metrics.average_score}★
+                    </td>
+                    <td className="px-3 py-2.5 text-right tabular-nums">
+                      {metrics.csat_percent}%
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Panel>
+
+        <Panel
+          title="KEY COMPARISON & CSAT SCORE"
+          subtitle={`so với ${data.previous_period.label}`}
+        >
+          {/* GIỮ NGUYÊN THIẾT KẾ BAN ĐẦU CỦA KHỐI CSAT SCORE */}
+          <div className="mb-4 space-y-3 pb-3 border-b border-slate-100">
             <div className="flex items-end gap-3">
               <span className="text-5xl font-black leading-none text-[#00713d]">
                 {metrics.csat_percent}
@@ -343,7 +430,7 @@ export function SurveyDashboardSection({
               </span>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3 border-t border-slate-100 pt-3">
+            <div className="flex flex-wrap items-center gap-3 pt-1">
               <div>
                 <p className="text-[11px] text-slate-500">Điểm trung bình</p>
                 <p className="text-2xl font-black text-slate-800">
@@ -355,149 +442,64 @@ export function SurveyDashboardSection({
               <Stars value={metrics.average_score} />
             </div>
           </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[540px] text-xs">
+              <thead>
+                <tr className="border-b-2 border-slate-200 text-orange-600">
+                  <th className="px-3 py-2 text-left font-bold">CHỈ TIÊU</th>
+                  <th className="px-3 py-2 text-right font-bold">
+                    {data.period.label.toUpperCase()}
+                  </th>
+                  <th className="px-3 py-2 text-right font-bold">
+                    {data.previous_period.label.toUpperCase()}
+                  </th>
+                  <th className="px-3 py-2 text-right font-bold">+/- (%)</th>
+                  <th className="px-3 py-2 text-right font-bold">MỤC TIÊU</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {data.comparison.map((row) => {
+                  const met = row.current >= row.target;
+
+                  return (
+                    <tr
+                      key={row.key}
+                      className="border-b border-slate-100 last:border-0 hover:bg-slate-50"
+                    >
+                      <td className="px-3 py-2.5 font-bold text-slate-700">
+                        {row.label}
+                      </td>
+                      <td
+                        className={`px-3 py-2.5 text-right text-sm font-black tabular-nums ${
+                          met ? "text-emerald-600" : "text-rose-500"
+                        }`}
+                        title={met ? "Đạt mục tiêu" : "Chưa đạt mục tiêu"}
+                      >
+                        {formatValue(row, row.current)}
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-bold tabular-nums text-slate-500">
+                        {formatValue(row, row.previous)}
+                      </td>
+                      <td className="px-3 py-2.5 text-right tabular-nums">
+                        <ChangeCell value={row.change_percent} />
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-bold text-orange-600">
+                        {formatTarget(row)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <p className="mt-2 text-[11px] text-slate-400">
+            Cột kỳ này xanh khi đạt mục tiêu, đỏ khi chưa đạt.
+          </p>
         </Panel>
       </div>
-
-      <Panel title="KẾT QUẢ KHẢO SÁT THEO DANH MỤC">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] text-xs">
-            <thead>
-              <tr className="bg-[#1f5fa8] text-white">
-                <th className="rounded-l px-3 py-2 text-left font-bold">
-                  DANH MỤC HỖ TRỢ
-                </th>
-                <th className="px-3 py-2 text-right font-bold">SL GỬI ĐI</th>
-                <th className="px-3 py-2 text-right font-bold">SL ĐÁNH GIÁ</th>
-                <th className="px-3 py-2 text-right font-bold">
-                  TỶ LỆ PHẢN HỒI
-                </th>
-                <th className="px-3 py-2 text-right font-bold">ĐIỂM TB (★)</th>
-                <th className="rounded-r px-3 py-2 text-right font-bold">
-                  CSAT (%)
-                </th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {data.categories.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="h-16 text-center text-slate-400">
-                    Chưa có khảo sát nào trong kỳ này.
-                  </td>
-                </tr>
-              )}
-
-              {data.categories.map((row) => (
-                <tr
-                  key={row.category}
-                  className="border-b border-slate-100 last:border-0 hover:bg-slate-50"
-                >
-                  <td className="px-3 py-2 font-semibold text-slate-700">
-                    {row.category}
-                  </td>
-                  <td className="px-3 py-2 text-right tabular-nums text-slate-700">
-                    {row.sent}
-                  </td>
-                  <td className="px-3 py-2 text-right tabular-nums text-slate-700">
-                    {row.rated}
-                  </td>
-                  <td className="px-3 py-2 text-right tabular-nums text-slate-700">
-                    {row.response_rate}%
-                  </td>
-                  <td className="px-3 py-2 text-right tabular-nums text-slate-700">
-                    {row.average_score}
-                  </td>
-                  <td className="px-3 py-2 text-right font-bold tabular-nums text-slate-800">
-                    {row.csat_percent}%
-                  </td>
-                </tr>
-              ))}
-
-              {data.categories.length > 0 && (
-                <tr className="bg-[#e8f1fb] font-black text-slate-800">
-                  <td className="px-3 py-2.5">Tổng cộng</td>
-                  <td className="px-3 py-2.5 text-right tabular-nums">
-                    {metrics.success}
-                  </td>
-                  <td className="px-3 py-2.5 text-right tabular-nums">
-                    {metrics.rated}
-                  </td>
-                  <td className="px-3 py-2.5 text-right tabular-nums">
-                    {metrics.response_rate}%
-                  </td>
-                  <td className="px-3 py-2.5 text-right tabular-nums">
-                    {metrics.average_score}★
-                  </td>
-                  <td className="px-3 py-2.5 text-right tabular-nums">
-                    {metrics.csat_percent}%
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Panel>
-
-      <Panel
-        title="KEY COMPARISON"
-        subtitle={`so với ${data.previous_period.label}`}
-      >
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[620px] text-xs">
-            <thead>
-              <tr className="border-b-2 border-slate-200 text-orange-600">
-                <th className="px-3 py-2 text-left font-bold">CHỈ TIÊU</th>
-                <th className="px-3 py-2 text-right font-bold">
-                  {data.period.label.toUpperCase()}
-                </th>
-                <th className="px-3 py-2 text-right font-bold">
-                  {data.previous_period.label.toUpperCase()}
-                </th>
-                <th className="px-3 py-2 text-right font-bold">+/- (%)</th>
-                <th className="px-3 py-2 text-right font-bold">MỤC TIÊU</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {data.comparison.map((row) => {
-                const met = row.current >= row.target;
-
-                return (
-                  <tr
-                    key={row.key}
-                    className="border-b border-slate-100 last:border-0 hover:bg-slate-50"
-                  >
-                    <td className="px-3 py-2.5 font-bold text-slate-700">
-                      {row.label}
-                    </td>
-                    <td
-                      className={`px-3 py-2.5 text-right text-sm font-black tabular-nums ${
-                        met ? "text-emerald-600" : "text-rose-500"
-                      }`}
-                      title={met ? "Đạt mục tiêu" : "Chưa đạt mục tiêu"}
-                    >
-                      {formatValue(row, row.current)}
-                    </td>
-                    <td className="px-3 py-2.5 text-right font-bold tabular-nums text-slate-500">
-                      {formatValue(row, row.previous)}
-                    </td>
-                    <td className="px-3 py-2.5 text-right tabular-nums">
-                      <ChangeCell value={row.change_percent} />
-                    </td>
-                    <td className="px-3 py-2.5 text-right font-bold text-orange-600">
-                      {formatTarget(row)}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        <p className="mt-2 text-[11px] text-slate-400">
-          Cột kỳ này xanh khi đạt mục tiêu, đỏ khi chưa đạt.
-        </p>
-      </Panel>
 
       {/* Biểu đồ so sánh kỳ đặt cuối: hai bảng phía trên trả lời "kỳ này ra
           sao", còn phần này mới là "so với các kỳ khác thì thế nào". */}

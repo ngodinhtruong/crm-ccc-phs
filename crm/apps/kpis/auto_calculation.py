@@ -43,6 +43,9 @@ AUTO_FORMULA_BY_PROFILE_AND_METRIC = {
         # B1_01/B1_02 nên toàn bộ KPI tự động của SA_SUP im lặng trả 0.
         "B1_17": "team_call_target_completion_rate",
         "B1_18": "team_data_quality_rate",
+        "B4_26": "support_success_customers",
+        "B4_27": "introduced_product_count",
+        "B4_28": "group_conversion_rate",
     },
 }
 

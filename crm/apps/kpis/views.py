@@ -63,10 +63,25 @@ from apps.kpis.serializers import (
     KpiUserTargetWriteSerializer,
     KpiWeightConfigSaveSerializer,
 )
-from apps.kpis.services import create_kpi_audit_log, serialize_model_basic
+from apps.kpis.services import (
+    create_kpi_audit_log,
+    ensure_default_kpi_structures_for_period,
+    serialize_model_basic,
+)
 from apps.kpis.summary_calculation import calculate_kpi_summaries
 from apps.kpis.dashboard_contributions import get_metric_contribution_payload
 from apps.kpis.ranking import get_kpi_ranking_payload
+
+
+def ensure_period_defaults_by_id(period_id):
+    if not period_id:
+        return
+    try:
+        period_obj = KpiPeriod.objects.filter(id=period_id).first()
+        if period_obj and period_obj.status != KpiPeriod.STATUS_CLOSED:
+            ensure_default_kpi_structures_for_period(period_obj)
+    except Exception:
+        pass
 
 
 def normalize_config_compare_value(value):
@@ -711,10 +726,13 @@ class KpiSectionViewSet(KpiPeriodConfigCrudMixin, viewsets.ModelViewSet):
     permission_classes = [KpiConfigPermission]
     config_object_type = "KpiSection"
     validate_weights_on_save = True
+    pagination_class = None
 
     def get_queryset(self):
-        queryset = KpiSection.objects.select_related("period", "profile").all()
         period = self.request.query_params.get("period")
+        ensure_period_defaults_by_id(period)
+
+        queryset = KpiSection.objects.select_related("period", "profile").all()
         period_code = self.request.query_params.get("period_code")
         profile = self.request.query_params.get("profile")
         profile_code = self.request.query_params.get("profile_code")
@@ -741,10 +759,13 @@ class KpiGroupViewSet(KpiPeriodConfigCrudMixin, viewsets.ModelViewSet):
     permission_classes = [KpiConfigPermission]
     config_object_type = "KpiGroup"
     validate_weights_on_save = True
+    pagination_class = None
 
     def get_queryset(self):
-        queryset = KpiGroup.objects.select_related("period", "profile", "section").all()
         period = self.request.query_params.get("period")
+        ensure_period_defaults_by_id(period)
+
+        queryset = KpiGroup.objects.select_related("period", "profile", "section").all()
         period_code = self.request.query_params.get("period_code")
         profile = self.request.query_params.get("profile")
         profile_code = self.request.query_params.get("profile_code")
@@ -777,10 +798,14 @@ class KpiPeriodMetricViewSet(KpiPeriodConfigCrudMixin, viewsets.ModelViewSet):
     permission_classes = [KpiConfigPermission]
     config_object_type = "KpiPeriodMetric"
     validate_weights_on_save = True
+    pagination_class = None
 
     def get_queryset(self):
-        queryset = KpiPeriodMetric.objects.select_related("period", "profile", "group", "group__section").all()
         period = self.request.query_params.get("period")
+        ensure_period_defaults_by_id(period)
+
+        queryset = KpiPeriodMetric.objects.select_related("period", "profile", "group", "group__section").all()
+        period_code = self.request.query_params.get("period_code")
         period_code = self.request.query_params.get("period_code")
         profile = self.request.query_params.get("profile")
         profile_code = self.request.query_params.get("profile_code")
@@ -948,6 +973,7 @@ def get_target_user_or_403(request, user_id):
 
 class KpiUserMetricResultViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = KpiUserMetricResultSerializer
+    pagination_class = None
 
     def get_permissions(self):
         if self.action == "calculate_auto":
@@ -998,6 +1024,10 @@ class KpiUserMetricResultViewSet(viewsets.ReadOnlyModelViewSet):
         if period:
             period_obj = KpiPeriod.objects.filter(id=period).first()
             if period_obj and period_obj.status != KpiPeriod.STATUS_CLOSED:
+                try:
+                    ensure_default_kpi_structures_for_period(period_obj)
+                except Exception:
+                    pass
                 target_user = get_user_model().objects.filter(id=user_id).first()
                 if target_user:
                     try:

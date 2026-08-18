@@ -17,6 +17,7 @@ import {
   ColumnTextFilter,
   TablePagination,
 } from "@/components/common";
+import { isLinkedCustomer, maskPhone } from "@/utils/mask-data.util";
 import {
   EkycCallResult,
   EkycCallStatus,
@@ -459,7 +460,7 @@ export function EkycTable() {
                     {rec.manager_name || "—"}
                   </td>
                   <td className="px-4 py-3 text-slate-600 font-mono">
-                    {rec.phone || "—"}
+                    {maskPhone(rec.phone, isLinkedCustomer(rec.account_number)) || "—"}
                   </td>
                   <td className="px-4 py-3 text-center">
                     <span className="rounded bg-slate-100 px-2 py-0.5 font-bold text-slate-700">

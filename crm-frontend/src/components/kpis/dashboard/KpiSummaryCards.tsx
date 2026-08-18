@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { CheckCircle2, CircleDollarSign, Trophy, XCircle } from "lucide-react";
+import { Award, CheckCircle2, CircleDollarSign, Trophy } from "lucide-react";
 
 import { KpiDashboardController } from "@/hooks/useKpiDashboard";
 import { formatNumber } from "./KpiDashboardUtils";
@@ -48,6 +48,27 @@ export function KpiSummaryCards({
   const summary = dashboard.activeSummary;
   const scores = dashboard.computedScores;
 
+  const branchRank = summary?.rank_branch;
+  const overallRank = summary?.rank_overall;
+
+  const rankDisplay =
+    branchRank != null
+      ? `Hạng #${branchRank}`
+      : overallRank != null
+        ? `Hạng #${overallRank}`
+        : summary?.total_score != null
+          ? "Hạng #" + (summary.rank_branch || 1)
+          : "—";
+
+  const rankDesc =
+    branchRank != null && overallRank != null
+      ? `Hạng #${branchRank} Chi nhánh • Hạng #${overallRank} Toàn công ty`
+      : branchRank != null
+        ? `Thứ hạng #${branchRank} trong chi nhánh kỳ này.`
+        : overallRank != null
+          ? `Thứ hạng #${overallRank} toàn công ty kỳ này.`
+          : "Thứ hạng thi đua được cập nhật theo tổng điểm.";
+
   return (
     <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-4">
       <SummaryCard
@@ -78,20 +99,12 @@ export function KpiSummaryCards({
       </SummaryCard>
 
       <SummaryCard
-        label="Điều kiện cổng"
-        value={summary?.all_gates_passed ? "Đạt" : "Theo dõi"}
-        description={
-          summary?.all_gates_passed
-            ? "Tất cả điều kiện cổng đang đạt."
-            : "Có điều kiện cổng chưa đạt hoặc nguy cơ."
-        }
-        accentColor={summary?.all_gates_passed ? "emerald" : "amber"}
+        label="Thứ hạng thi đua"
+        value={rankDisplay}
+        description={rankDesc}
+        accentColor="amber"
       >
-        {summary?.all_gates_passed ? (
-          <CheckCircle2 size={20} />
-        ) : (
-          <XCircle size={20} />
-        )}
+        <Award size={20} />
       </SummaryCard>
     </div>
   );

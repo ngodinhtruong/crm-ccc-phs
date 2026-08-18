@@ -372,37 +372,13 @@ export function SaRecordTransactionSection({
             Giao dịch & Bàn giao Môi giới
           </h2>
           <p className="text-[11px] text-slate-500">
-            Ghi nhận số liệu giao dịch và thông tin chuyển giao chăm sóc cho môi giới
+            Ghi nhận thông tin chuyển giao chăm sóc cho môi giới và ghi chú cuộc gọi
           </p>
         </div>
       </div>
 
       <div className="grid grid-cols-12 gap-3">
-        <div className="col-span-12 md:col-span-4">
-          <FieldLabel>Giá trị giao dịch dự kiến (VNĐ)</FieldLabel>
-          <TextInput
-            type="number"
-            value={create.form.transactionValueSnapshot}
-            onChange={(value) =>
-              create.setField("transactionValueSnapshot", value)
-            }
-            placeholder="0"
-          />
-        </div>
-
-        <div className="col-span-12 md:col-span-4">
-          <FieldLabel>Phí giao dịch dự kiến (VNĐ)</FieldLabel>
-          <TextInput
-            type="number"
-            value={create.form.transactionFeeSnapshot}
-            onChange={(value) =>
-              create.setField("transactionFeeSnapshot", value)
-            }
-            placeholder="0"
-          />
-        </div>
-
-        <div className="col-span-12 md:col-span-4">
+        <div className="col-span-12 md:col-span-6">
           <FieldLabel>Thực hiện bàn giao</FieldLabel>
           <ToggleChip
             checked={create.form.handoverToBroker}
@@ -446,7 +422,7 @@ export function SaRecordTransactionSection({
           </div>
 
           <p className="text-[11px] font-medium text-slate-600">
-            * Lưu ý: Phí và giá trị giao dịch phát sinh kể từ thời điểm bàn giao sẽ được tính cho Môi giới đã chọn, không tính cho SA.
+            * Lưu ý: Tài khoản sau khi bàn giao sẽ được tính cho Môi giới đã chọn, không tính cho SA.
           </p>
         </div>
       )}

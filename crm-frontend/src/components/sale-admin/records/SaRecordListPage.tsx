@@ -14,19 +14,11 @@ import { SaRecordItem } from "@/types/sale-admin.type";
 import {
     ColumnBooleanFilter,
     ColumnDateRangeFilter,
-    ColumnNumberRangeFilter,
     ColumnSelectFilter,
     ColumnTextFilter,
     TablePagination,
     TableState,
 } from "@/components/common";
-
-function formatMoney(value?: string | number | null) {
-    const numberValue = Number(value || 0);
-    if (!numberValue) return "-";
-
-    return new Intl.NumberFormat("vi-VN").format(numberValue);
-}
 
 function formatDate(value?: string | null) {
     if (!value) return "-";
@@ -305,24 +297,6 @@ export function SaRecordListPage() {
                                 </th>
 
                                 <th className="px-4 py-2.5">
-                                    <ColumnNumberRangeFilter
-                                        minValue={records.transactionValueMin}
-                                        maxValue={records.transactionValueMax}
-                                        onMinChange={records.setTransactionValueMin}
-                                        onMaxChange={records.setTransactionValueMax}
-                                    />
-                                </th>
-
-                                <th className="px-4 py-2.5">
-                                    <ColumnNumberRangeFilter
-                                        minValue={records.transactionFeeMin}
-                                        maxValue={records.transactionFeeMax}
-                                        onMinChange={records.setTransactionFeeMin}
-                                        onMaxChange={records.setTransactionFeeMax}
-                                    />
-                                </th>
-
-                                <th className="px-4 py-2.5">
                                     <ColumnTextFilter
                                         value={records.note}
                                         onChange={records.setNote}
@@ -345,7 +319,7 @@ export function SaRecordListPage() {
                                 loading={records.loading}
                                 error={records.error}
                                 empty={!records.loading && !records.error && records.items.length === 0}
-                                colSpan={20}
+                                colSpan={18}
                                 emptyText="Không có dữ liệu SA Record."
                             />
                             {!records.loading &&
@@ -422,12 +396,6 @@ export function SaRecordListPage() {
                                             </td>
                                             <td className="px-4 text-slate-700">
                                                 <BooleanBadge value={item.support_info} />
-                                            </td>
-                                            <td className="px-4 text-right font-semibold">
-                                                {formatMoney(item.transaction_value_snapshot)}
-                                            </td>
-                                            <td className="px-4 text-right font-semibold">
-                                                {formatMoney(item.transaction_fee_snapshot)}
                                             </td>
                                             <td className="max-w-[250px] truncate px-3">
                                                 {item.note || "-"}

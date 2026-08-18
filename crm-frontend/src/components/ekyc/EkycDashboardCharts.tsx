@@ -218,7 +218,7 @@ function ChartXuHuongKetNoiLine({ trends }: { trends: EkycDailyTrend[] }) {
           activeDot={{ r: 7 }}
           isAnimationActive={false}
         >
-          <LabelList dataKey="rateSuccess" position="top" formatter={(v: any) => `${v}%`} style={{ fontSize: 10, fontWeight: 700, fill: C_GREEN }} />
+          <LabelList dataKey="rateSuccess" position="top" dy={-4} formatter={(v: any) => `${v}%`} style={{ fontSize: 10, fontWeight: 700, fill: C_GREEN }} />
         </Line>
         <Line
           type="monotone"
@@ -230,7 +230,7 @@ function ChartXuHuongKetNoiLine({ trends }: { trends: EkycDailyTrend[] }) {
           activeDot={{ r: 7 }}
           isAnimationActive={false}
         >
-          <LabelList dataKey="rateFail" position="bottom" formatter={(v: any) => `${v}%`} style={{ fontSize: 10, fontWeight: 700, fill: C_ORANGE }} />
+          <LabelList dataKey="rateFail" position="top" dy={-4} formatter={(v: any) => `${v}%`} style={{ fontSize: 10, fontWeight: 700, fill: C_ORANGE }} />
         </Line>
       </ComposedChart>
     </ResponsiveContainer>

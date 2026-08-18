@@ -20,8 +20,59 @@ function normalizePathname(value: string) {
   return path.replace(/\/+$/, "");
 }
 
+function getSectionRootPath(path: string): string {
+  const normalized = normalizePathname(path);
+  const segments = normalized.split("/").filter(Boolean);
+  if (segments.length === 0) return "/";
+  return `/${segments[0]}`;
+}
+
 function getStorageKey(homeHref: string) {
   return `${STORAGE_PREFIX}:${normalizePathname(homeHref)}`;
+}
+
+function isChildPath(parentPath: string, candidatePath: string): boolean {
+  if (parentPath === candidatePath) return false;
+
+  // 1. Nếu trang candidate nằm trong đường dẫn con của parentPath
+  if (candidatePath.startsWith(`${parentPath}/`)) return true;
+
+  // 2. Nếu cùng thuộc một nhóm route (vd: parent = /customers, candidate = /customers/360)
+  const parentSeg = parentPath.split("/").filter(Boolean)[0];
+  const candidateSeg = candidatePath.split("/").filter(Boolean)[0];
+  if (parentSeg && candidateSeg && parentSeg === candidateSeg) {
+    return candidatePath.length > parentPath.length;
+  }
+
+  return false;
+}
+
+const MAIN_SECTION_LIST_ROUTES = new Set([
+  "/tickets",
+  "/customers",
+  "/chatbots/dashboard",
+  "/external-errors",
+  "/external-errors/dashboard",
+  "/surveys",
+  "/accounts/users",
+  "/sale-admin/records",
+  "/sale-admin/dashboard",
+  "/sale-admin/inactive-customers",
+  "/sale-admin/kpis/personal",
+  "/sale-admin/kpis/admin",
+  "/sla",
+  "/ekyc",
+  "/failed-ekyc",
+  "/ccc/dashboard",
+  "/dashboard",
+  "/workspace",
+]);
+
+function isMainSectionListPage(pathname: string): boolean {
+  const normalized = normalizePathname(pathname);
+  if (MAIN_SECTION_LIST_ROUTES.has(normalized)) return true;
+  const segments = normalized.split("/").filter(Boolean);
+  return segments.length <= 1;
 }
 
 function readStoredHistory(storageKey: string): StoredBreadcrumbItem[] {
@@ -162,15 +213,51 @@ export function useNavigationBreadcrumbs({
       (item) => item.pathname === pathname
     );
 
+    // Kiểm tra nếu trang mới là trang danh mục cha của các trang con trước đó trong lịch sử
+    // (ví dụ: đang ở trang con như /customers/360, /tickets/123 mà bấm về trang cha như /customers, /tickets)
+    // thì lập tức cắt bỏ toàn bộ các nhánh con ra khỏi lịch sử.
+    const childIndex = validStoredHistory.findIndex(
+      (item) =>
+        item.pathname !== normalizedHomePath &&
+        isChildPath(pathname, item.pathname)
+    );
+
+    const currentSectionRoot = getSectionRootPath(pathname);
+    const lastItemPath =
+      validStoredHistory.length > 1
+        ? validStoredHistory[validStoredHistory.length - 1].pathname
+        : null;
+    const lastSectionRoot = lastItemPath
+      ? getSectionRootPath(lastItemPath)
+      : currentSectionRoot;
+    const isDifferentSection = lastSectionRoot !== currentSectionRoot;
+    const isMainList = isMainSectionListPage(pathname);
+
     let nextHistory: StoredBreadcrumbItem[];
 
-    if (existingIndex >= 0) {
+    if (isMainList || isDifferentSection) {
+      // Khi truy cập bất kỳ trang danh sách cha chính nào (vd: /tickets, /customers, /surveys, /external-errors,...):
+      // XÓA SẠCH hoàn toàn lịch sử cũ và khởi tạo lại từ Trang chủ + Trang mới.
+      if (declaredItems && declaredItems.length > 1) {
+        nextHistory = declaredItems.map((item, idx) => ({
+          label: item.label,
+          href: item.href || (idx === 0 ? homeHref : currentHref),
+          pathname: idx === 0 ? normalizedHomePath : pathname,
+        }));
+      } else {
+        nextHistory = [homeItem, currentItem];
+      }
+    } else if (existingIndex >= 0) {
       // Quay lại một breadcrumb cũ hoặc dùng nút Back của trình duyệt:
       // cắt bỏ các trang nằm sau vị trí vừa quay về.
       nextHistory = validStoredHistory.slice(0, existingIndex + 1);
       nextHistory[existingIndex] = currentItem;
+    } else if (childIndex >= 0) {
+      // Quay lại trang danh sách cha từ trang con: cắt bỏ các trang con đứng sau.
+      nextHistory = validStoredHistory.slice(0, childIndex);
+      nextHistory.push(currentItem);
     } else {
-      // Route mới luôn được nối sau trang người dùng vừa đứng trước đó.
+      // Route mới trong cùng phân hệ: nối sau trang người dùng vừa đứng trước đó.
       nextHistory = [...validStoredHistory, currentItem];
     }
 

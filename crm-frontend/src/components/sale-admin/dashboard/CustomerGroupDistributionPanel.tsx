@@ -116,7 +116,7 @@ function AccountModal({
               {groupLabel(looseGroup)}
             </h2>
             <p className="mt-1 text-xs text-slate-500">
-              {formatNumber(group.count)} tài khoản · Phí GD {formatCompactMoney(group.transaction_fee)}
+              {formatNumber(group.count)} tài khoản
             </p>
           </div>
           <button
@@ -129,21 +129,19 @@ function AccountModal({
         </div>
 
         <div className="max-h-[62vh] overflow-auto">
-          <table className="w-full min-w-[820px] border-collapse text-left text-sm">
+          <table className="w-full min-w-[600px] border-collapse text-left text-sm">
             <thead>
               <tr className="h-[46px] border-b border-slate-200 bg-white text-[11px] text-slate-500">
                 <th className="px-4 font-semibold">Số TK</th>
                 <th className="px-4 font-semibold">Khách hàng</th>
                 <th className="px-4 font-semibold">Chi nhánh</th>
                 <th className="px-4 font-semibold">PIC</th>
-                <th className="px-4 text-right font-semibold">Phí GD</th>
-                <th className="px-4 text-right font-semibold">GT GD</th>
               </tr>
             </thead>
             <tbody>
               {accounts.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-xs text-slate-400">
+                  <td colSpan={4} className="px-4 py-8 text-center text-xs text-slate-400">
                     Chưa có danh sách tài khoản cho nhóm này.
                   </td>
                 </tr>
@@ -160,18 +158,6 @@ function AccountModal({
                     <td className="px-4 text-slate-700">{account.customer_name || "-"}</td>
                     <td className="px-4 text-slate-600">{account.branch_name || "-"}</td>
                     <td className="px-4 text-slate-600">{account.pic_name || "-"}</td>
-                    <td
-                      className="px-4 text-right font-semibold text-amber-600"
-                      title={formatMoney(account.transaction_fee)}
-                    >
-                      {formatCompactMoney(account.transaction_fee)}
-                    </td>
-                    <td
-                      className="px-4 text-right text-slate-600"
-                      title={formatMoney(account.transaction_value)}
-                    >
-                      {formatCompactMoney(account.transaction_value)}
-                    </td>
                   </tr>
                 ))
               )}

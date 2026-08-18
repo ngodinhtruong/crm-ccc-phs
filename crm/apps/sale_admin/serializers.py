@@ -113,6 +113,12 @@ class SaRecordReadSerializer(serializers.ModelSerializer):
         model = SaRecord
         fields = "__all__"
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["transaction_value_snapshot"] = "0.00"
+        data["transaction_fee_snapshot"] = "0.00"
+        return data
+
     def get_customer_name(self, obj):
         return obj.customer.full_name if obj.customer else None
 

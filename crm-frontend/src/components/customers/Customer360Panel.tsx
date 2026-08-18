@@ -3,10 +3,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
-  ExternalLink,
-  DollarSign,
   Clock,
+  ExternalLink,
+  MessageSquare,
   Phone,
+  PhoneCall,
   Star,
   Ticket as TicketIcon,
   TrendingUp,
@@ -233,10 +234,6 @@ function BehaviourPanel({ data }: { data: Customer360 }) {
     },
     { label: "Tháng có GD (6 tháng)", value: `${behaviour.active_months_6m}/6` },
     { label: "Tháng có GD (12 tháng)", value: `${behaviour.active_months_12m}/12` },
-    {
-      label: "Giá trị lệnh trung bình",
-      value: compactVnd(behaviour.avg_transaction_value),
-    },
     { label: "Số loại sản phẩm", value: `${behaviour.product_diversity} loại` },
     { label: "Kênh hay dùng", value: behaviour.preferred_channel || "—" },
     { label: "Điểm khảo sát TB", value: orDash(summary.avg_rating, "/5") },
@@ -474,11 +471,10 @@ export function Customer360Panel({
         </>
       )}
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
         <StatTile icon={TicketIcon} label="Tickets" tone="sky" value={formatNumber(summary.tickets)} />
         <StatTile icon={Phone} label="Cuộc gọi" tone="teal" value={formatNumber(summary.calls)} />
         <StatTile icon={TrendingUp} label="Giao dịch" tone="violet" value={formatNumber(summary.transactions)} />
-        <StatTile icon={DollarSign} label="GTGD YTD" tone="amber" value={compactVnd(summary.total_value_ytd)} />
         <StatTile
           icon={Clock}
           label="Không GD"
@@ -495,68 +491,7 @@ export function Customer360Panel({
 
       <BehaviourPanel data={data} />
 
-      <div className="grid gap-3 xl:grid-cols-2">
-        <ChartCard
-          title="GIÁ TRỊ GIAO DỊCH THEO THÁNG"
-          hint="12 tháng gần nhất, tách mua/bán"
-        >
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={series.transactions}
-              margin={{ top: 8, right: 16, bottom: 4, left: -8 }}
-              maxBarSize={24}
-            >
-              <CartesianGrid stroke={GRID} vertical={false} />
-              <XAxis dataKey="short_label" {...AXIS} interval={0} />
-              <YAxis {...AXIS} tickFormatter={(value) => compactVnd(Number(value))} />
-
-              <Tooltip
-                cursor={TOOLTIP_CURSOR}
-                content={({ active, label, payload }) => {
-                  const item = payload?.[0]?.payload as
-                    | (typeof series.transactions)[number]
-                    | undefined;
-
-                  return (
-                    <SeriesTooltip
-                      active={active}
-                      label={item?.label ?? (label as string)}
-                      rows={[
-                        { label: "Mua", value: `${compactVnd(item?.buy_value)}đ`, color: BUY },
-                        { label: "Bán", value: `${compactVnd(item?.sell_value)}đ`, color: SELL },
-                        { label: "Tổng", value: `${compactVnd(item?.total_value)}đ` },
-                        { label: "Số lệnh", value: formatNumber(item?.orders) },
-                      ]}
-                    />
-                  );
-                }}
-              />
-
-              <Legend iconType="square" iconSize={9} wrapperStyle={LEGEND_STYLE} />
-
-              <Bar
-                dataKey="buy_value"
-                name="Mua"
-                stackId="value"
-                fill={BUY}
-                stroke={SURFACE}
-                strokeWidth={2}
-                isAnimationActive={false}
-              />
-              <Bar
-                dataKey="sell_value"
-                name="Bán"
-                stackId="value"
-                fill={SELL}
-                stroke={SURFACE}
-                strokeWidth={2}
-                radius={[4, 4, 0, 0]}
-                isAnimationActive={false}
-              />
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartCard>
-
+      <div className="grid gap-3 xl:grid-cols-1">
         <ChartCard
           title="SỐ LỆNH KHỚP THEO THÁNG"
           hint="tháng không có lệnh thì không có cột"

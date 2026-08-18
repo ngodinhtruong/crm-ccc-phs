@@ -23,6 +23,7 @@ import {
   TicketTabComingSoon,
   type TicketDetailTabKey,
 } from "@/components/tickets/detail/TicketDetailTabs";
+import { isLinkedCustomer, maskEmail, maskPhone } from "@/utils/mask-data.util";
 import { TicketHistoryModal } from "@/components/tickets/detail/TicketHistoryModal";
 import { TicketHistoryTimeline } from "@/components/tickets/detail/TicketHistoryTimeline";
 import { TicketStatusFlow } from "@/components/tickets/detail/TicketStatusFlow";
@@ -330,8 +331,11 @@ function TicketDetailInner({
   return (
     <DashboardLayout
       breadcrumbs={[
-        { label: "TRANG CHỦ", href: "/" },
-        { label: "Tickets", href: ticketListHref },
+        { label: "TRANG CHỦ", href: "/workspace" },
+        {
+          label: isChatbotTicket ? "Dashboard Chatbot" : "Tickets",
+          href: ticketListHref,
+        },
         { label: ticket.ticket_code || "Chi tiết" },
       ]}
       rightAction={
@@ -569,6 +573,32 @@ function TicketDetailInner({
                     )
                   }
                 />
+                {ticket.customer_phone && (
+                  <Field
+                    label="Số điện thoại"
+                    editing={false}
+                    view={maskPhone(
+                      ticket.customer_phone,
+                      isLinkedCustomer(
+                        ticket.display_account_number || ticket.customer_account_number,
+                        ticket.account_link_status === "LINKED"
+                      )
+                    )}
+                  />
+                )}
+                {ticket.customer_email && (
+                  <Field
+                    label="Email"
+                    editing={false}
+                    view={maskEmail(
+                      ticket.customer_email,
+                      isLinkedCustomer(
+                        ticket.display_account_number || ticket.customer_account_number,
+                        ticket.account_link_status === "LINKED"
+                      )
+                    )}
+                  />
+                )}
               </div>
             </Section>
 

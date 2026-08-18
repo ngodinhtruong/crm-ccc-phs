@@ -672,8 +672,8 @@ def _build_top_accounts(current_records, current_account_map):
                 "account_no": account_no,
                 "customer_name": _record_customer_name(record),
                 "branch_name": totals.get("branch_name") or _record_branch_name(record),
-                "transaction_fee": _money(totals["transaction_fee"]),
-                "transaction_value": _money(totals["transaction_value"]),
+                "transaction_fee": "0.00",
+                "transaction_value": "0.00",
                 "order_count": _number(totals["order_count"]),
                 "call_date": record.call_date.isoformat() if record.call_date else None,
                 "pic_name": _record_pic_name(record),
@@ -745,8 +745,8 @@ def _build_top_employees(current_records, current_account_map, current_active_ac
             "account_no": account_no,
             "customer_name": _record_customer_name(record),
             "branch_name": totals.get("branch_name") or _record_branch_name(record),
-            "transaction_fee": _money(totals["transaction_fee"]),
-            "transaction_value": _money(totals["transaction_value"]),
+            "transaction_fee": "0.00",
+            "transaction_value": "0.00",
             "order_count": _number(totals["order_count"]),
             "call_date": record.call_date.isoformat() if record.call_date else None,
         }
@@ -766,8 +766,8 @@ def _build_top_employees(current_records, current_account_map, current_active_ac
                 "rank": 0,
                 "total_calls": row["total_calls"],
                 "reactivated_accounts": len(row["reactivated_accounts"]),
-                "transaction_fee": _money(row["transaction_fee"]),
-                "transaction_value": _money(row["transaction_value"]),
+                "transaction_fee": "0.00",
+                "transaction_value": "0.00",
                 "accounts": accounts,
             }
         )
@@ -858,8 +858,8 @@ def _build_customer_group_distribution(current_records, current_account_map):
                 "description": description,
                 "count": 0,
                 "percent": 0,
-                "transaction_fee": ZERO,
-                "transaction_value": ZERO,
+                "transaction_fee": "0.00",
+                "transaction_value": "0.00",
                 "accounts": [],
             }
 
@@ -867,8 +867,6 @@ def _build_customer_group_distribution(current_records, current_account_map):
 
         account_no = _record_account_no(record)
         totals = current_account_map.get(account_no, {})
-        groups[key]["transaction_fee"] += _decimal(totals.get("transaction_fee", 0))
-        groups[key]["transaction_value"] += _decimal(totals.get("transaction_value", 0))
         groups[key]["accounts"].append(
             {
                 "account_no": account_no,
@@ -877,8 +875,8 @@ def _build_customer_group_distribution(current_records, current_account_map):
                 "pic_name": _record_pic_name(record),
                 "call_date": record.call_date.isoformat() if record.call_date else None,
                 "reactivation": bool(record.reactivation),
-                "transaction_fee": _money(totals.get("transaction_fee", 0)),
-                "transaction_value": _money(totals.get("transaction_value", 0)),
+                "transaction_fee": "0.00",
+                "transaction_value": "0.00",
                 "order_count": _number(totals.get("order_count", 0)),
             }
         )
@@ -886,8 +884,8 @@ def _build_customer_group_distribution(current_records, current_account_map):
     rows = list(groups.values())
     for row in rows:
         row["percent"] = float(_safe_percent(row["count"], total))
-        row["transaction_fee"] = _money(row["transaction_fee"])
-        row["transaction_value"] = _money(row["transaction_value"])
+        row["transaction_fee"] = "0.00"
+        row["transaction_value"] = "0.00"
         row["accounts"].sort(key=lambda item: _decimal(item["transaction_fee"]), reverse=True)
         row["accounts"] = row["accounts"][:50]
 

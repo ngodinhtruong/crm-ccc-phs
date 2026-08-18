@@ -122,7 +122,10 @@ export function UserAssigneeCombobox({
                             onChange("", "");
                         }
                     }}
-                    onFocus={() => setOpen(true)}
+                    onFocus={(event) => {
+                        setOpen(true);
+                        event.target.select();
+                    }}
                     placeholder={placeholder}
                     className="h-full flex-1 rounded-l px-3 text-xs outline-none"
                 />

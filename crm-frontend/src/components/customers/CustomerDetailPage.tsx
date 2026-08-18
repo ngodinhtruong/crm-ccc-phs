@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, MapPin, Phone, Tag, User } from "lucide-react";
-
+import { ArrowLeft, Mail, MapPin, Phone, Tag, User } from "lucide-react";
 import { chatbotTicketApi } from "@/apis/chatbot-ticket.api";
 import { customerApi } from "@/apis/customer.api";
 import { ticketApi } from "@/apis/ticket.api";
@@ -12,6 +11,7 @@ import { CustomerDetailFields } from "@/components/customers/CustomerDetailField
 import { CustomerTicketsTab } from "@/components/customers/CustomerTicketsTab";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
 import { CustomerDetail } from "@/types/customer.type";
+import { isLinkedCustomer } from "@/utils/mask-data.util";
 
 type TabKey =
   | "overview"
@@ -98,9 +98,9 @@ export function CustomerDetailPage({ id }: { id: number }) {
   return (
     <DashboardLayout
       breadcrumbs={[
-        { label: "KHÁCH HÀNG", href: "/customers" },
-        { label: "Tất cả", href: "/customers" },
-        { label: customer?.full_name || "Chi tiết" },
+        { label: "TRANG CHỦ", href: "/workspace" },
+        { label: "Khách hàng", href: "/customers" },
+        { label: customer?.full_name || "Chi tiết khách hàng" },
       ]}
       rightAction={
         <button
@@ -140,12 +140,37 @@ export function CustomerDetailPage({ id }: { id: number }) {
                   {customer.full_name}
                 </h1>
 
-                {customer.phone && (
-                  <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-600">
-                    {customer.phone}
-                    <Phone size={12} className="text-emerald-500" />
-                  </div>
-                )}
+                {(() => {
+                  const isLinked = isLinkedCustomer(customer.account_number);
+                  if (isLinked) {
+                    return (
+                      <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-600">
+                        <span className="font-medium text-slate-500">STK:</span>
+                        <span className="font-semibold text-slate-800">{customer.account_number}</span>
+                      </div>
+                    );
+                  }
+
+                  if (customer.phone && customer.phone.trim() !== "" && customer.phone.trim() !== "-") {
+                    return (
+                      <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-600">
+                        <span>{customer.phone.trim()}</span>
+                        <Phone size={12} className="text-emerald-500" />
+                      </div>
+                    );
+                  }
+
+                  if (customer.email && customer.email.trim() !== "" && customer.email.trim() !== "-") {
+                    return (
+                      <div className="mt-1 flex items-center gap-1.5 text-xs text-emerald-600">
+                        <span>{customer.email.trim()}</span>
+                        <Mail size={12} className="text-emerald-500" />
+                      </div>
+                    );
+                  }
+
+                  return null;
+                })()}
 
                 <div className="mt-1 flex items-center gap-1.5 text-xs text-[#059669]">
                   <MapPin size={12} />

@@ -56,9 +56,8 @@ export function SurveyDashboardPage() {
   return (
     <DashboardLayout
       breadcrumbs={[
-        { label: "TRANG CHỦ", href: "/" },
-        { label: "Khảo sát", href: "/surveys" },
-        { label: "Dashboard CSAT" },
+        { label: "TRANG CHỦ", href: "/workspace" },
+        { label: "Dashboard Khảo sát" },
       ]}
       rightAction={
         <div className="relative flex flex-wrap items-center justify-end gap-2">

@@ -16,6 +16,7 @@ import { TicketStatusFlow } from "@/components/chatbot-tickets/TicketStatusFlow"
 import { CHATBOT_TICKET_STATUS_PILL } from "@/constants/chatbot-ticket.constant";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
 import { ChatbotTicketItem } from "@/types/chatbot-dashboard.type";
+import { isLinkedCustomer, maskEmail, maskPhone } from "@/utils/mask-data.util";
 import {
   ChatbotTicket,
   ChatbotTicketOptions,
@@ -469,21 +470,27 @@ export function ChatbotTicketDetailPage({ id }: { id: number }) {
             <Field
               label="Di động"
               editing={false}
-              view={
-                ticket.phone ? (
+              view={(() => {
+                const phoneVal = maskPhone(ticket.phone, isLinkedCustomer(ticket.account_number));
+                if (phoneVal === "-") return "-";
+                return (
                   <span className="inline-flex items-center gap-1 text-sky-600">
-                    {ticket.phone}
+                    {phoneVal}
                     <Phone size={12} />
                   </span>
-                ) : null
-              }
+                );
+              })()}
             />
             <Field
               label="Số tài khoản"
               editing={false}
               view={ticket.account_number}
             />
-            <Field label="Email" editing={false} view={ticket.email} />
+            <Field
+              label="Email"
+              editing={false}
+              view={maskEmail(ticket.email, isLinkedCustomer(ticket.account_number))}
+            />
           </div>
         </Section>
 

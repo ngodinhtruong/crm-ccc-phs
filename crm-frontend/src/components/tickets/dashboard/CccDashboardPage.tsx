@@ -82,11 +82,20 @@ function EkycAndFailedEkycDashboardSection({
     <div className="space-y-8">
       {/* 1. eKYC Dashboard Section */}
       <div className="space-y-3">
-        <div className="flex items-center gap-2 border-b border-sky-200/80 pb-2">
-          <span className="h-3.5 w-1 rounded-full bg-sky-600" />
-          <h2 className="text-xs font-black uppercase tracking-wider text-sky-900">
-            1. Thống Kê Xác Thực Cuộc Gọi eKYC
-          </h2>
+        <div className="flex items-center justify-between border-b border-sky-200/80 pb-2">
+          <div className="flex items-center gap-2">
+            <span className="h-3.5 w-1 rounded-full bg-sky-600" />
+            <h2 className="text-xs font-black uppercase tracking-wider text-sky-900">
+              1. Thống Kê Xác Thực Cuộc Gọi eKYC
+            </h2>
+          </div>
+          <Link
+            href="/ekyc"
+            className="flex items-center gap-1 text-xs font-bold text-sky-700 hover:text-sky-900 hover:underline"
+          >
+            <Users size={13} />
+            Danh sách cuộc gọi eKYC &rarr;
+          </Link>
         </div>
         <EkycDashboardView
           granularity={granularity}
@@ -98,11 +107,20 @@ function EkycAndFailedEkycDashboardSection({
 
       {/* 2. Failed eKYC Dashboard Section */}
       <div className="space-y-3">
-        <div className="flex items-center gap-2 border-b border-amber-200/80 pb-2">
-          <span className="h-3.5 w-1 rounded-full bg-amber-600" />
-          <h2 className="text-xs font-black uppercase tracking-wider text-amber-900">
-            2. Thống Kê Sự Cố Failed eKYC & Kết Quả Chăm Sóc KH
-          </h2>
+        <div className="flex items-center justify-between border-b border-amber-200/80 pb-2">
+          <div className="flex items-center gap-2">
+            <span className="h-3.5 w-1 rounded-full bg-amber-600" />
+            <h2 className="text-xs font-black uppercase tracking-wider text-amber-900">
+              2. Thống Kê Sự Cố Failed eKYC & Kết Quả Chăm Sóc KH
+            </h2>
+          </div>
+          <Link
+            href="/failed-ekyc"
+            className="flex items-center gap-1 text-xs font-bold text-amber-700 hover:text-amber-900 hover:underline"
+          >
+            <AlertTriangle size={13} />
+            Danh sách Failed eKYC &rarr;
+          </Link>
         </div>
         <FailedEkycDashboard
           granularity={granularity}
@@ -200,9 +218,6 @@ const SurveyDashboardSection = dynamic(
 );
 
 function SurveyDashboardWrapper({
-  dateFrom,
-  dateTo,
-  granularity,
   onlyTrendChart = false,
 }: {
   dateFrom?: string;
@@ -210,23 +225,7 @@ function SurveyDashboardWrapper({
   granularity: GranularityMode;
   onlyTrendChart?: boolean;
 }) {
-  const surveyGranularity = granularity === "QUARTER" ? "quarter" : granularity === "YEAR" ? "year" : "month";
-
-  const isCustomRange = Boolean(
-    dateFrom &&
-      dateTo &&
-      typeof window !== "undefined" &&
-      (sessionStorage.getItem("ccc_dashboard_date_from") || sessionStorage.getItem("survey_dashboard_start_date"))
-  );
-
-  const filters = isCustomRange
-    ? {
-        granularity: surveyGranularity as "month" | "quarter" | "year",
-        period: "",
-        startDate: dateFrom || "",
-        endDate: dateTo || "",
-      }
-    : defaultSurveyFilters(surveyGranularity as "month" | "quarter" | "year");
+  const filters = defaultSurveyFilters("month");
 
   return <SurveyDashboardSection filters={filters} onlyTrendChart={onlyTrendChart} />;
 }
@@ -1224,16 +1223,7 @@ export function CccDashboardPage() {
 
   const fetchMetrics = useCallback(async () => {
     try {
-      const surveyGranularity = granularity === "QUARTER" ? "quarter" : granularity === "YEAR" ? "year" : "month";
-      const isCustomSurveyRange = Boolean(
-        dashboard.dateFrom &&
-          dashboard.dateTo &&
-          typeof window !== "undefined" &&
-          (sessionStorage.getItem("ccc_dashboard_date_from") || sessionStorage.getItem("survey_dashboard_start_date"))
-      );
-      const surveyParams = isCustomSurveyRange
-        ? { granularity: surveyGranularity as any, period: "", start_date: dashboard.dateFrom, end_date: dashboard.dateTo }
-        : { granularity: surveyGranularity as any, period: "" };
+      const surveyParams = { granularity: "month" as const, period: "" };
 
       const [ekycRes, chatbotRes, errorRes, surveyRes] = await Promise.allSettled([
         ekycApi.getDashboard({
@@ -1390,6 +1380,43 @@ export function CccDashboardPage() {
     });
   }, [dashboard.ensureMasterData]);
 
+  const listActionConfig = useMemo(() => {
+    switch (activeDashboardTab) {
+      case "chatbot":
+        return {
+          href: "/tickets",
+          label: "Danh sách ticket Chatbot",
+          icon: <BotMessageSquare size={14} className="text-teal-600" />,
+        };
+      case "ekyc":
+        return {
+          href: "/failed-ekyc",
+          label: "Danh sách Failed eKYC",
+          icon: <Users size={14} className="text-sky-600" />,
+        };
+      case "errors":
+        return {
+          href: "/external-errors",
+          label: "Danh sách lỗi",
+          icon: <AlertTriangle size={14} className="text-amber-600" />,
+        };
+      case "surveys":
+        return {
+          href: "/surveys",
+          label: "Kết quả khảo sát",
+          icon: <ClipboardCheck size={14} className="text-indigo-600" />,
+        };
+      case "tickets":
+      case "ccc":
+      default:
+        return {
+          href: "/tickets",
+          label: "Danh sách ticket",
+          icon: <Ticket size={14} className="text-emerald-600" />,
+        };
+    }
+  }, [activeDashboardTab]);
+
   return (
     <DashboardLayout
       breadcrumbs={[
@@ -1438,13 +1465,32 @@ export function CccDashboardPage() {
             onCompareModeChange={setCompareMode}
           />
 
-          <Link
-            href="/tickets"
-            className="flex h-8 items-center gap-1.5 rounded-lg border border-slate-300/80 bg-white px-3 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 hover:border-slate-400"
-          >
-            <Ticket size={14} className="text-emerald-600" />
-            Danh sách ticket
-          </Link>
+          {activeDashboardTab === "ekyc" ? (
+            <>
+              <Link
+                href="/ekyc"
+                className="flex h-8 items-center gap-1.5 rounded-lg border border-slate-300/80 bg-white px-3 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 hover:border-slate-400 transition-colors"
+              >
+                <Users size={14} className="text-sky-600" />
+                Danh sách cuộc gọi eKYC
+              </Link>
+              <Link
+                href="/failed-ekyc"
+                className="flex h-8 items-center gap-1.5 rounded-lg border border-slate-300/80 bg-white px-3 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 hover:border-slate-400 transition-colors"
+              >
+                <AlertTriangle size={14} className="text-amber-600" />
+                Danh sách Failed eKYC
+              </Link>
+            </>
+          ) : (
+            <Link
+              href={listActionConfig.href}
+              className="flex h-8 items-center gap-1.5 rounded-lg border border-slate-300/80 bg-white px-3 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 hover:border-slate-400 transition-colors"
+            >
+              {listActionConfig.icon}
+              {listActionConfig.label}
+            </Link>
+          )}
 
           <button
             type="button"

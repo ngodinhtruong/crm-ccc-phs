@@ -47,7 +47,7 @@ export const kpiDashboardApi = {
     const response = await api.get<KpiProfileItem[] | PaginatedResponse<KpiProfileItem>>(
       KPI_PROFILE_ENDPOINT,
       {
-        params: cleanParams({ period: periodId, is_active: "true" }),
+        params: cleanParams({ period: periodId, is_active: "true", page_size: 1000 }),
       }
     );
 
@@ -58,7 +58,7 @@ export const kpiDashboardApi = {
     const response = await api.get<KpiSectionItem[] | PaginatedResponse<KpiSectionItem>>(
       KPI_SECTION_ENDPOINT,
       {
-        params: cleanParams(params),
+        params: cleanParams({ page_size: 1000, ...params }),
       }
     );
 
@@ -69,7 +69,7 @@ export const kpiDashboardApi = {
     const response = await api.get<KpiGroupItem[] | PaginatedResponse<KpiGroupItem>>(
       KPI_GROUP_ENDPOINT,
       {
-        params: cleanParams(params),
+        params: cleanParams({ page_size: 1000, ...params }),
       }
     );
 
@@ -80,7 +80,7 @@ export const kpiDashboardApi = {
     const response = await api.get<
       KpiPeriodMetricItem[] | PaginatedResponse<KpiPeriodMetricItem>
     >(KPI_METRIC_ENDPOINT, {
-      params: cleanParams({ ...params, is_active: "true" }),
+      params: cleanParams({ page_size: 1000, ...params, is_active: "true" }),
     });
 
     return toList(response.data);
@@ -92,7 +92,7 @@ export const kpiDashboardApi = {
     const response = await api.get<
       KpiUserMetricResultItem[] | PaginatedResponse<KpiUserMetricResultItem>
     >(KPI_RESULT_ENDPOINT, {
-      params: cleanParams(params),
+      params: cleanParams({ page_size: 1000, ...params }),
     });
 
     return toList(response.data);
@@ -104,7 +104,7 @@ export const kpiDashboardApi = {
     const response = await api.get<
       KpiUserGateResultItem[] | PaginatedResponse<KpiUserGateResultItem>
     >(KPI_GATE_RESULT_ENDPOINT, {
-      params: cleanParams(params),
+      params: cleanParams({ page_size: 1000, ...params }),
     });
 
     return toList(response.data);
@@ -114,7 +114,7 @@ export const kpiDashboardApi = {
     const response = await api.get<
       KpiUserSummaryItem[] | PaginatedResponse<KpiUserSummaryItem>
     >(KPI_SUMMARY_ENDPOINT, {
-      params: cleanParams(params),
+      params: cleanParams({ page_size: 1000, ...params }),
     });
 
     return toList(response.data);

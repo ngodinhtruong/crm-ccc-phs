@@ -73,7 +73,7 @@ export function BranchRankingTable({
   year?: string | number;
   periodLabel?: string;
 }) {
-  const visibleRows = rows.slice(0, 6);
+  const visibleRows = rows;
 
   return (
     <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
@@ -88,11 +88,6 @@ export function BranchRankingTable({
           <span className="rounded-full bg-white px-2.5 py-0.5 font-semibold ring-1 ring-slate-200">
             {formatNumber(rows.length)} chi nhánh
           </span>
-          {rows.length > visibleRows.length && (
-            <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 font-semibold text-[#059669] ring-1 ring-emerald-100">
-              Top {visibleRows.length}
-            </span>
-          )}
         </div>
       </div>
 

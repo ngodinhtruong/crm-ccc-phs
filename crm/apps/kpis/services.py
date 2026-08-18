@@ -358,3 +358,164 @@ def create_default_reward_tiers(period: KpiPeriod, profiles_by_code: dict):
                 new_data=serialize_model_basic(reward_tier),
                 note="Tạo bậc thưởng KPI mặc định.",
             )
+
+
+def ensure_default_kpi_structures_for_period(period: KpiPeriod):
+    """
+    Đảm bảo kỳ KPI (kể cả các kỳ cũ đã khởi tạo trước đó) có đầy đủ các profile, section, group (đặc biệt là B4)
+    và metrics (B4_26, B4_27, B4_28) theo định nghĩa mới nhất trong defaults.py.
+    """
+    from apps.kpis.models import (
+        KpiProfile,
+        KpiSection,
+        KpiGroup,
+        KpiPeriodMetric,
+    )
+    from apps.kpis.defaults import (
+        DEFAULT_KPI_PROFILES,
+        DEFAULT_KPI_SECTIONS,
+        DEFAULT_KPI_GROUPS,
+        DEFAULT_KPI_PERIOD_METRICS,
+    )
+
+    # 1. Profiles
+    profiles_by_code = {}
+    for item in DEFAULT_KPI_PROFILES:
+        prof = KpiProfile.objects.filter(
+            period=period,
+            profile_code=item["profile_code"],
+        ).first()
+
+        if not prof:
+            prof = KpiProfile.objects.create(
+                period=period,
+                profile_code=item["profile_code"],
+                profile_name=item["profile_name"],
+                target_role_code=item["target_role_code"],
+                total_weight=item.get("total_weight", "100.00"),
+                sort_order=item.get("sort_order", 0),
+                is_active=True,
+            )
+        elif not prof.is_active:
+            prof.is_active = True
+            prof.save(update_fields=["is_active"])
+
+        profiles_by_code[prof.profile_code] = prof
+
+    # 2. Sections
+    sections_by_key = {}
+    for item in DEFAULT_KPI_SECTIONS:
+        prof = profiles_by_code.get(item["profile_code"])
+        if not prof:
+            continue
+
+        sec = KpiSection.objects.filter(
+            period=period,
+            section_code=item["section_code"],
+        ).first()
+
+        if not sec:
+            sec = KpiSection.objects.create(
+                period=period,
+                profile=prof,
+                section_code=item["section_code"],
+                section_name=item["section_name"],
+                weight_percent=item["weight_percent"],
+                sort_order=item.get("sort_order", 0),
+                is_active=True,
+            )
+        else:
+            sec_fields = []
+            if not sec.is_active:
+                sec.is_active = True
+                sec_fields.append("is_active")
+            if sec.profile_id != prof.id:
+                sec.profile = prof
+                sec_fields.append("profile")
+            if sec_fields:
+                sec.save(update_fields=sec_fields)
+
+        sections_by_key[(prof.profile_code, sec.section_code)] = sec
+
+    # 3. Groups
+    groups_by_key = {}
+    for item in DEFAULT_KPI_GROUPS:
+        prof = profiles_by_code.get(item["profile_code"])
+        sec = sections_by_key.get((item["profile_code"], item["section_code"]))
+        if not prof or not sec:
+            continue
+
+        grp = KpiGroup.objects.filter(
+            period=period,
+            group_code=item["group_code"],
+        ).first()
+
+        if not grp:
+            grp = KpiGroup.objects.create(
+                period=period,
+                profile=prof,
+                section=sec,
+                group_code=item["group_code"],
+                group_name=item["group_name"],
+                group_type=item["group_type"],
+                weight_percent=item["weight_percent"],
+                sort_order=item.get("sort_order", 0),
+                is_active=True,
+            )
+        else:
+            group_updated_fields = []
+            if not grp.is_active:
+                grp.is_active = True
+                group_updated_fields.append("is_active")
+            if grp.section_id != sec.id:
+                grp.section = sec
+                group_updated_fields.append("section")
+            if grp.profile_id != prof.id:
+                grp.profile = prof
+                group_updated_fields.append("profile")
+            if group_updated_fields:
+                grp.save(update_fields=group_updated_fields)
+
+        groups_by_key[(prof.profile_code, grp.group_code)] = grp
+
+    # 4. Metrics
+    for item in DEFAULT_KPI_PERIOD_METRICS:
+        prof = profiles_by_code.get(item["profile_code"])
+        grp = groups_by_key.get((item["profile_code"], item["group_code"]))
+        if not prof or not grp:
+            continue
+
+        m = KpiPeriodMetric.objects.filter(
+            period=period,
+            metric_code=item["metric_code"],
+        ).first()
+
+        if not m:
+            formula = item.get("measurement_formula") or "Tự động đo lường từ dữ liệu CRM"
+            m = KpiPeriodMetric.objects.create(
+                period=period,
+                profile=prof,
+                group=grp,
+                metric_code=item["metric_code"],
+                metric_name=item["metric_name"],
+                weight_percent=item["weight_percent"],
+                measurement_formula=formula,
+                target_text=item.get("target_text", ""),
+                target_value=item.get("target_value"),
+                target_unit=item.get("target_unit", "COUNT"),
+                frequency=item.get("frequency", "MONTHLY"),
+                is_active=True,
+            )
+        else:
+            metric_updated_fields = []
+            if not m.is_active:
+                m.is_active = True
+                metric_updated_fields.append("is_active")
+            if m.group_id != grp.id:
+                m.group = grp
+                metric_updated_fields.append("group")
+            if m.profile_id != prof.id:
+                m.profile = prof
+                metric_updated_fields.append("profile")
+            if metric_updated_fields:
+                m.save(update_fields=metric_updated_fields)

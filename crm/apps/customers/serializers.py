@@ -172,6 +172,36 @@ class CustomerSerializer(serializers.ModelSerializer):
         model = Customer
         fields = "__all__"
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+
+        account_number = data.get("account_number")
+        is_linked = bool(
+            account_number
+            and str(account_number).strip().upper()
+            not in ["", "-", "N/A", "KHÔNG CÓ", "NULL", "UNDEFINED"]
+        )
+
+        if is_linked:
+            data["phone"] = None
+            data["email"] = None
+
+        # Mask sensitive PII and remove hidden fields from API responses
+        data["identity_number"] = None
+        data["date_of_birth"] = None
+        data["birth_date_display"] = ""
+        data["customer_type_name"] = ""
+        data["address"] = None
+        data["ward"] = None
+        data["district"] = None
+        data["province"] = None
+        data["country"] = None
+        data["source_name"] = ""
+        data["customer_code"] = ""
+        data["external_customer_id"] = ""
+
+        return data
+
     def create(self, validated_data):
         assigned_user_id = validated_data.pop("assigned_employee", None)
         customer = super().create(validated_data)

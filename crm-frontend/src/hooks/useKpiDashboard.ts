@@ -1,4 +1,4 @@
-"use client";
+import { useSearchParams } from "next/navigation";
 import { getErrorMessage } from "@/utils/error.util";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -168,30 +168,51 @@ function ensureProfileCode(
 }
 
 function getResultMap(results: KpiUserMetricResultItem[]) {
-  const map = new Map<number, KpiUserMetricResultItem>();
+  const map = new Map<string | number, KpiUserMetricResultItem>();
 
   results.forEach((item) => {
-    map.set(item.metric, item);
+    if (item.metric != null) {
+      map.set(item.metric, item);
+      map.set(String(item.metric), item);
+      map.set(Number(item.metric), item);
+    }
+    if (item.metric_code) {
+      map.set(item.metric_code, item);
+    }
   });
 
   return map;
 }
 
 function getSectionMap(sections: KpiSectionItem[]) {
-  const map = new Map<number, KpiSectionItem>();
+  const map = new Map<string | number, KpiSectionItem>();
 
   sections.forEach((item) => {
-    map.set(item.id, item);
+    if (item.id != null) {
+      map.set(item.id, item);
+      map.set(String(item.id), item);
+      map.set(Number(item.id), item);
+    }
+    if (item.section_code) {
+      map.set(item.section_code, item);
+    }
   });
 
   return map;
 }
 
 function getGroupMap(groups: KpiGroupItem[]) {
-  const map = new Map<number, KpiGroupItem>();
+  const map = new Map<string | number, KpiGroupItem>();
 
   groups.forEach((item) => {
-    map.set(item.id, item);
+    if (item.id != null) {
+      map.set(item.id, item);
+      map.set(String(item.id), item);
+      map.set(Number(item.id), item);
+    }
+    if (item.group_code) {
+      map.set(item.group_code, item);
+    }
   });
 
   return map;
@@ -274,24 +295,34 @@ function buildMetricSections({
   const resultMap = getResultMap(results);
 
   return sections
-    .filter((section) => section.is_active)
+    .filter((section) => section.is_active !== false)
     .slice()
     .sort((a, b) => a.sort_order - b.sort_order)
     .map((section) => {
       const sectionGroups = groups
-        .filter((group) => group.section === section.id && group.is_active)
+        .filter(
+          (group) =>
+            (String(group.section) === String(section.id) ||
+              (group.section_code && group.section_code === section.section_code)) &&
+            group.is_active !== false
+        )
         .slice()
         .sort((a, b) => a.sort_order - b.sort_order)
         .map((group): KpiMetricGroup => {
           const groupMetrics = metrics
-            .filter((metric) => metric.group === group.id && metric.is_active)
+            .filter(
+              (metric) =>
+                (String(metric.group) === String(group.id) ||
+                  (metric.group_code && metric.group_code === group.group_code)) &&
+                metric.is_active !== false
+            )
             .slice()
-            .sort((a, b) => a.metric_code.localeCompare(b.metric_code))
+            .sort((a, b) => (a.metric_code || "").localeCompare(b.metric_code || ""))
             .map((metric) =>
               buildProgressMetric(
                 metric,
-                resultMap.get(metric.id) || null,
-                groupMap.get(metric.group)
+                resultMap.get(metric.id) || (metric.metric_code ? resultMap.get(metric.metric_code) : null) || null,
+                groupMap.get(metric.group) || group
               )
             );
 
@@ -304,12 +335,17 @@ function buildMetricSections({
 
       const looseMetrics = metrics
         .filter((metric) => {
-          const group = groupMap.get(metric.group);
+          const group = groupMap.get(metric.group) || (metric.group_code ? groupMap.get(metric.group_code) : null);
           const metricSection = group?.section ? sectionMap.get(group.section) : null;
 
           return !group && metricSection?.id === section.id;
         })
-        .map((metric) => buildProgressMetric(metric, resultMap.get(metric.id) || null));
+        .map((metric) =>
+          buildProgressMetric(
+            metric,
+            resultMap.get(metric.id) || (metric.metric_code ? resultMap.get(metric.metric_code) : null) || null
+          )
+        );
 
       const looseGroup: KpiMetricGroup[] = looseMetrics.length
         ? [
@@ -376,7 +412,10 @@ function buildGateItems(gates: KpiUserGateResultItem[]): KpiGateStatusItem[] {
 
 export function useKpiDashboard() {
   const authz = useCurrentUserPermissions();
-  const [initialQuery] = useState(() => getDashboardQueryParams());
+  const searchParams = useSearchParams();
+  const urlUserId = searchParams.get("user") || searchParams.get("user_id") || "";
+  const urlPeriodId = searchParams.get("period") || "";
+  const urlEmployeeName = searchParams.get("employeeName") || searchParams.get("employee_name") || "";
   const [initializedFromQuery, setInitializedFromQuery] = useState(false);
 
   const canViewSelf =
@@ -455,6 +494,101 @@ export function useKpiDashboard() {
     return summaries[0] || null;
   }, [effectiveUserId, summaries]);
 
+  const filteredResults = useMemo(() => {
+    if (!effectiveUserId) return results;
+
+    return results.filter((item) => String(item.user) === effectiveUserId);
+  }, [effectiveUserId, results]);
+
+  const filteredGateResults = useMemo(() => {
+    if (!effectiveUserId) return gateResults;
+
+    return gateResults.filter((item) => String(item.user) === effectiveUserId);
+  }, [effectiveUserId, gateResults]);
+
+  const displayUserCard = useMemo(() => {
+    if (activeSummary) {
+      return {
+        employee_name: activeSummary.employee_name || activeSummary.user_username || "—",
+        user_username: activeSummary.user_username || "",
+        user_email: activeSummary.user_email || "",
+        employee_position: activeSummary.employee_position || null,
+        branch_name: activeSummary.branch_name || null,
+        role_names: activeSummary.role_names || [],
+      };
+    }
+
+    const firstResult = filteredResults.find((r) => String(r.user) === effectiveUserId) || filteredResults[0];
+
+    if (scope === "BRANCH" && selectedUserId) {
+      const selectedMember = teamMembers.find(
+        (item) => String(item.user) === selectedUserId
+      );
+      if (selectedMember) {
+        return {
+          employee_name:
+            selectedMember.employee_name ||
+            selectedMember.user_username ||
+            firstResult?.employee_name ||
+            firstResult?.user_username ||
+            selectedEmployeeNameOverride ||
+            `User ${selectedUserId}`,
+          user_username: selectedMember.user_username || firstResult?.user_username || "",
+          user_email: selectedMember.user_email || firstResult?.user_email || "",
+          employee_position: selectedMember.employee_position || null,
+          branch_name: selectedMember.branch_name || firstResult?.branch_name || null,
+          role_names: selectedMember.role_names || [],
+        };
+      }
+
+      if (firstResult && String(firstResult.user) === selectedUserId) {
+        return {
+          employee_name:
+            firstResult.employee_name ||
+            firstResult.user_username ||
+            selectedEmployeeNameOverride ||
+            `User ${selectedUserId}`,
+          user_username: firstResult.user_username || "",
+          user_email: firstResult.user_email || "",
+          employee_position: null,
+          branch_name: firstResult.branch_name || null,
+          role_names: [],
+        };
+      }
+
+      if (selectedEmployeeNameOverride) {
+        return {
+          employee_name: selectedEmployeeNameOverride,
+          user_username: firstResult?.user_username || "",
+          user_email: firstResult?.user_email || "",
+          employee_position: null,
+          branch_name: firstResult?.branch_name || null,
+          role_names: [],
+        };
+      }
+    }
+
+    // Fallback to currently logged-in user (e.g. Admin)
+    const cur = authz.currentUser;
+    if (cur) {
+      const emp = cur.employee;
+      const roleNames = cur.roles?.map((r) => r.role_name).filter(Boolean) || [];
+      if (cur.is_superuser || cur.is_global_admin) {
+        roleNames.unshift("Quản trị hệ thống");
+      }
+      return {
+        employee_name: emp?.full_name || cur.full_name || cur.username || "Admin",
+        user_username: cur.username || "",
+        user_email: cur.email || "",
+        employee_position: emp?.position || (cur.is_superuser ? "Administrator" : null),
+        branch_name: emp?.branch?.branch_name || null,
+        role_names: Array.from(new Set(roleNames)),
+      };
+    }
+
+    return null;
+  }, [activeSummary, scope, selectedUserId, teamMembers, selectedEmployeeNameOverride, authz.currentUser, filteredResults, effectiveUserId]);
+
   const selectedEmployeeName = useMemo(() => {
     if (scope !== "BRANCH" || !selectedUserId) return "";
 
@@ -471,18 +605,6 @@ export function useKpiDashboard() {
       `User ${selectedUserId}`
     );
   }, [scope, selectedEmployeeNameOverride, selectedUserId, teamMembers]);
-
-  const filteredResults = useMemo(() => {
-    if (!effectiveUserId) return results;
-
-    return results.filter((item) => String(item.user) === effectiveUserId);
-  }, [effectiveUserId, results]);
-
-  const filteredGateResults = useMemo(() => {
-    if (!effectiveUserId) return gateResults;
-
-    return gateResults.filter((item) => String(item.user) === effectiveUserId);
-  }, [effectiveUserId, gateResults]);
 
   const metricSections = useMemo(() => {
     return buildMetricSections({
@@ -607,13 +729,13 @@ export function useKpiDashboard() {
 
       if (currentStillExists) return current;
 
-      if (initialQuery.periodId && data.some((item) => String(item.id) === initialQuery.periodId)) {
-        return initialQuery.periodId;
+      if (urlPeriodId && data.some((item) => String(item.id) === urlPeriodId)) {
+        return urlPeriodId;
       }
 
       return getCurrentMonthPeriodDefault(data);
     });
-  }, [initialQuery.periodId]);
+  }, [urlPeriodId]);
 
   const loadProfiles = useCallback(
     async (periodId: string, desiredProfileCode: string) => {
@@ -712,10 +834,10 @@ export function useKpiDashboard() {
 
   useEffect(() => {
     if (!authz.loading && canView && !initializedFromQuery) {
-      if (initialQuery.userId && canViewBranch) {
+      if (urlUserId && canViewBranch) {
         setScope("BRANCH");
-        setSelectedUserId(initialQuery.userId);
-        setSelectedEmployeeNameOverride(initialQuery.employeeName);
+        setSelectedUserId(urlUserId);
+        setSelectedEmployeeNameOverride(urlEmployeeName);
       } else {
         setScope("SELF");
         setSelectedUserId("");
@@ -733,20 +855,58 @@ export function useKpiDashboard() {
     authz.loading,
     canView,
     canViewBranch,
-    initialQuery.employeeName,
-    initialQuery.userId,
+    urlEmployeeName,
+    urlUserId,
     initializedFromQuery,
     reloadAll,
   ]);
 
+  // Dynamically sync state when URL searchParams change (e.g. clicking employee row in ranking table)
+  useEffect(() => {
+    if (initializedFromQuery && canViewBranch && urlUserId && urlUserId !== selectedUserId) {
+      setScope("BRANCH");
+      setSelectedUserId(urlUserId);
+      if (urlEmployeeName) {
+        setSelectedEmployeeNameOverride(urlEmployeeName);
+      }
+    }
+  }, [initializedFromQuery, canViewBranch, urlUserId, selectedUserId, urlEmployeeName]);
+
   useEffect(() => {
     if (!selectedPeriodId) return;
 
+    const targetUserSummary =
+      scope === "BRANCH" && selectedUserId
+        ? summaries.find((item) => String(item.user) === selectedUserId) ||
+          teamSummaries.find((item) => String(item.user) === selectedUserId)
+        : null;
+
+    const targetProfileCode = targetUserSummary?.profile_code || null;
+
     const desiredProfileCode =
-      scope === "BRANCH" && selectedUserId ? SA_PROFILE_CODE : selfProfileCode;
+      scope === "BRANCH" && selectedUserId
+        ? targetProfileCode || SA_PROFILE_CODE
+        : selfProfileCode;
 
     void loadProfiles(selectedPeriodId, desiredProfileCode);
-  }, [loadProfiles, scope, selectedPeriodId, selectedUserId, selfProfileCode]);
+  }, [loadProfiles, scope, selectedPeriodId, selectedUserId, selfProfileCode, summaries, teamSummaries]);
+
+  // Automatically align selectedProfileCode with target user's actual profile (e.g. SA_SUP vs SA)
+  useEffect(() => {
+    if (scope === "BRANCH" && selectedUserId) {
+      const targetUserSummary =
+        summaries.find((item) => String(item.user) === selectedUserId) ||
+        teamSummaries.find((item) => String(item.user) === selectedUserId);
+
+      if (
+        targetUserSummary?.profile_code &&
+        targetUserSummary.profile_code !== selectedProfileCode &&
+        profiles.some((p) => p.profile_code === targetUserSummary.profile_code)
+      ) {
+        setSelectedProfileCode(targetUserSummary.profile_code);
+      }
+    }
+  }, [scope, selectedUserId, summaries, teamSummaries, selectedProfileCode, profiles]);
 
   useEffect(() => {
     if (selectedPeriodId && selectedProfileCode) {
@@ -835,6 +995,7 @@ export function useKpiDashboard() {
     selectedEmployeeName,
 
     activeSummary,
+    displayUserCard,
     computedScores,
     teamMembers,
     metricSections,

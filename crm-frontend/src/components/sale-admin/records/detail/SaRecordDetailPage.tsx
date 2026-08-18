@@ -119,14 +119,6 @@ function CurrentInfoTab({ item }: { item: SaRecordItem }) {
                     Giao dịch & ghi chú
                 </h2>
 
-                <InfoRow
-                    label="Tổng GTGD"
-                    value={formatMoney(item.transaction_value_snapshot)}
-                />
-                <InfoRow
-                    label="Phí GD"
-                    value={formatMoney(item.transaction_fee_snapshot)}
-                />
                 <InfoRow label="Nguồn dữ liệu" value={item.source_system} />
                 <InfoRow label="Trạng thái dữ liệu" value={item.data_status} />
                 <InfoRow label="Ghi chú" value={item.note} />

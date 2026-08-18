@@ -5,7 +5,9 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  ComposedChart,
   Legend,
+  Line,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -20,40 +22,19 @@ import {
 } from "@/components/common";
 import type { SurveySeriesItem } from "@/types/survey.type";
 
-/**
- * Bảng màu đã chạy qua bộ kiểm của skill dataviz trên nền trắng.
- *
- * Cặp đã/không đánh giá: ΔE 24.7 (protan) — người mù màu đỏ-lục vẫn phân
- * biệt được. Cặp tỷ lệ phản hồi/CSAT: ΔE 27.9 (deutan). Cả hai đạt ngưỡng
- * tương phản với nền.
- * Đổi màu thì phải chạy lại bộ kiểm, đừng chọn bằng mắt.
- */
 const RATED = "#2a78d6";
 const UNRATED = "#eb6834";
 const RESPONSE_RATE = "#008300";
 const CSAT = "#4a3aa7";
 
-/**
- * Biểu đồ gửi thành công / thất bại dùng dạng "nhấn mạnh": thứ đáng chú ý là
- * các lần gửi hỏng, còn phần gửi được chỉ là nền.
- *
- * Cố ý không dùng cặp lục-đỏ quen thuộc: cặp đó chỉ đạt ΔE 4.1 với người mù
- * màu đỏ-lục, hai cột cạnh nhau nhìn như cùng một màu. Cặp xám-đỏ đạt ΔE 12.4.
- */
 const SENT_OK = "#64748b";
 const SENT_FAILED = "#d03b3b";
+const TOTAL_SURVEY = "#10b981";
 
 const SURFACE = "#ffffff";
 const GRID = "#e2e8f0";
 const INK = "#475569";
 
-/**
- * Độ đậm của các kỳ chỉ đóng vai trò nền so sánh.
- *
- * Để 0.45 như dashboard chatbot thì cột bạc màu, nhìn như dữ liệu mờ chứ
- * không ra ý "kỳ này không phải kỳ bạn chọn". 0.85 vẫn tách được với kỳ đang
- * xem — kỳ đó còn được in đậm nhãn trục — mà màu vẫn rõ.
- */
 const CONTEXT_OPACITY = 0.85;
 
 const AXIS = {
@@ -93,7 +74,6 @@ function ChartCard({
   );
 }
 
-/** Nhãn trục hoành: kỳ đang xem in đậm để tách khỏi các kỳ làm nền. */
 function PeriodTick({
   x,
   y,
@@ -166,7 +146,6 @@ function findItem(series: SurveySeriesItem[], shortLabel?: string) {
   return series.find((item) => item.short_label === shortLabel);
 }
 
-/** null nghĩa là kỳ đó không có số liệu — hiện gạch ngang, không hiện 0%. */
 function percent(value?: number | null) {
   return value === null || value === undefined ? "—" : `${value}%`;
 }
@@ -175,12 +154,6 @@ function score(value?: number | null) {
   return value === null || value === undefined ? "—" : `${value}/5`;
 }
 
-/**
- * Lát của donut khi bấm vào một cột.
- *
- * Bỏ lát bằng 0 thay vì vẽ lát rỗng: donut có một lát 0 sẽ hiện nhãn đè lên
- * nhau ở cùng một góc, đọc không ra gì.
- */
 function nonEmpty(slices: DrilldownSlice[]): DrilldownSlice[] {
   return slices.filter((slice) => slice.value > 0);
 }
@@ -199,14 +172,6 @@ function ratingSlices(item: SurveySeriesItem): DrilldownSlice[] {
   ]);
 }
 
-/**
- * So sánh các kỳ với nhau — tháng trong năm, quý trong năm, hoặc năm nay với
- * năm ngoái, giống biểu đồ so sánh kỳ của dashboard chatbot.
- *
- * Tách làm nhiều khung chứ không gộp số lượt với phần trăm lên một khung:
- * hai đại lượng khác thang đo, vẽ chung phải dùng hai trục tung và người đọc
- * sẽ so nhầm độ cao giữa chúng.
- */
 export function SurveyPeriodCharts({
   series,
   granularityLabel,
@@ -216,7 +181,6 @@ export function SurveyPeriodCharts({
   granularityLabel: string;
   onlyTrendChart?: boolean;
 }) {
-  // Hook phải chạy trước mọi nhánh thoát sớm.
   const delivery = usePeriodDrilldown();
   const rating = usePeriodDrilldown();
 
@@ -234,7 +198,7 @@ export function SurveyPeriodCharts({
   const ratingItem = findItem(displaySeries, rating.selectedPeriod ?? undefined);
 
   return (
-    <div className={`grid gap-3 ${onlyTrendChart ? "grid-cols-1" : "xl:grid-cols-2"}`}>
+    <div className={`grid gap-4 ${onlyTrendChart ? "grid-cols-1" : "grid-cols-1 lg:grid-cols-2"}`}>
       <ChartCard
         title={
           deliveryItem
@@ -264,11 +228,12 @@ export function SurveyPeriodCharts({
           />
         ) : (
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart
+          <ComposedChart
             data={displaySeries}
             onClick={delivery.openPeriod}
             margin={{ top: 8, right: 32, bottom: 4, left: -12 }}
-            maxBarSize={24}
+            barGap={0}
+            barCategoryGap="15%"
             className="cursor-pointer"
           >
             <CartesianGrid stroke={GRID} vertical={false} />
@@ -296,7 +261,11 @@ export function SurveyPeriodCharts({
                         value: String(item?.failed ?? 0),
                         color: SENT_FAILED,
                       },
-                      { label: "Tổng lượt gửi", value: String(total) },
+                      {
+                        label: "Tổng survey",
+                        value: String(total),
+                        color: TOTAL_SURVEY,
+                      },
                       {
                         label: "Tỷ lệ gửi hỏng",
                         value: total
@@ -318,10 +287,11 @@ export function SurveyPeriodCharts({
             <Bar
               dataKey="success"
               name="Gửi thành công"
-              stackId="delivery"
               fill={SENT_OK}
               stroke={SURFACE}
-              strokeWidth={2}
+              strokeWidth={1}
+              barSize={14}
+              radius={[3, 3, 0, 0]}
               isAnimationActive={false}
             >
               {displaySeries.map((item) => (
@@ -331,18 +301,29 @@ export function SurveyPeriodCharts({
             <Bar
               dataKey="failed"
               name="Gửi thất bại"
-              stackId="delivery"
               fill={SENT_FAILED}
               stroke={SURFACE}
-              strokeWidth={2}
-              radius={[4, 4, 0, 0]}
+              strokeWidth={1}
+              barSize={14}
+              radius={[3, 3, 0, 0]}
               isAnimationActive={false}
             >
               {displaySeries.map((item) => (
                 <Cell key={item.code} fillOpacity={item.is_current ? 1 : CONTEXT_OPACITY} />
               ))}
             </Bar>
-          </BarChart>
+
+            <Line
+              type="monotone"
+              dataKey="total"
+              name="Tổng survey"
+              stroke={TOTAL_SURVEY}
+              strokeWidth={2}
+              dot={{ r: 3, fill: TOTAL_SURVEY }}
+              activeDot={{ r: 5 }}
+              isAnimationActive={false}
+            />
+          </ComposedChart>
         </ResponsiveContainer>
         )}
         </div>
@@ -382,7 +363,8 @@ export function SurveyPeriodCharts({
               data={displaySeries}
               onClick={rating.openPeriod}
               margin={{ top: 8, right: 32, bottom: 4, left: -12 }}
-              maxBarSize={24}
+              barGap={0}
+              barCategoryGap="15%"
               className="cursor-pointer"
             >
               <CartesianGrid stroke={GRID} vertical={false} />
@@ -432,12 +414,13 @@ export function SurveyPeriodCharts({
               />
 
               <Bar
-                dataKey="rated"
-                name="Khách đã đánh giá"
-                stackId="sent"
-                fill={RATED}
+                dataKey="unrated"
+                name="Khách không đánh giá"
+                fill={UNRATED}
                 stroke={SURFACE}
-                strokeWidth={2}
+                strokeWidth={1}
+                barSize={14}
+                radius={[3, 3, 0, 0]}
                 isAnimationActive={false}
               >
                 {displaySeries.map((item) => (
@@ -445,13 +428,13 @@ export function SurveyPeriodCharts({
                 ))}
               </Bar>
               <Bar
-                dataKey="unrated"
-                name="Khách không đánh giá"
-                stackId="sent"
-                fill={UNRATED}
+                dataKey="rated"
+                name="Khách đã đánh giá"
+                fill={RATED}
                 stroke={SURFACE}
-                strokeWidth={2}
-                radius={[4, 4, 0, 0]}
+                strokeWidth={1}
+                barSize={14}
+                radius={[3, 3, 0, 0]}
                 isAnimationActive={false}
               >
                 {displaySeries.map((item) => (
@@ -476,7 +459,8 @@ export function SurveyPeriodCharts({
               <BarChart
                 data={series}
                 margin={{ top: 8, right: 32, bottom: 4, left: -12 }}
-                maxBarSize={24}
+                barGap={0}
+                barCategoryGap="15%"
               >
                 <CartesianGrid stroke={GRID} vertical={false} />
                 <XAxis dataKey="short_label" {...AXIS} tick={tick} interval="preserveStartEnd" minTickGap={12} />
@@ -526,7 +510,10 @@ export function SurveyPeriodCharts({
                   dataKey="response_rate"
                   name="Tỷ lệ phản hồi"
                   fill={RESPONSE_RATE}
-                  radius={[4, 4, 0, 0]}
+                  stroke={SURFACE}
+                  strokeWidth={1}
+                  barSize={14}
+                  radius={[3, 3, 0, 0]}
                   isAnimationActive={false}
                 >
                   {series.map((item) => (
@@ -540,7 +527,10 @@ export function SurveyPeriodCharts({
                   dataKey="csat_percent"
                   name="CSAT"
                   fill={CSAT}
-                  radius={[4, 4, 0, 0]}
+                  stroke={SURFACE}
+                  strokeWidth={1}
+                  barSize={14}
+                  radius={[3, 3, 0, 0]}
                   isAnimationActive={false}
                 >
                   {series.map((item) => (

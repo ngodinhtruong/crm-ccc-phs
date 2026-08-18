@@ -65,7 +65,7 @@ export function PendingTicketsPanel({
       }`}
     >
       <div
-        className={`flex items-center justify-between gap-2 border-b px-3 py-1.5 ${
+        className={`flex flex-wrap items-center justify-between gap-2 border-b px-3 py-1.5 ${
           hasPending ? "border-rose-100 bg-rose-50/70" : "border-slate-100 bg-slate-50/60"
         }`}
       >
@@ -95,20 +95,40 @@ export function PendingTicketsPanel({
               {total}
             </span>
 
-            <span className="text-[10px] text-slate-500 hidden sm:inline">
+            <span className="text-[10px] text-slate-500 hidden lg:inline">
               (Ticket đang ở trạng thái Mở, chưa tiếp nhận)
             </span>
           </div>
         </div>
 
-        {total > rows.length && (
-          <span className="text-[10px] text-slate-500">
-            Đang tải {rows.length}/{total}
-          </span>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {total > rows.length && (
+            <span className="text-[10px] text-slate-500 hidden xl:inline">
+              Đang tải {rows.length}/{total}
+            </span>
+          )}
+
+          <TablePagination
+            fromRecord={fromRecord}
+            toRecord={toRecord}
+            count={rows.length}
+            page={page}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            pageSizeOptions={PAGE_SIZES}
+            onPageSizeChange={(value) => {
+              setPageSize(value);
+              setPage(1);
+            }}
+            onPrevious={() => setPage((current) => Math.max(1, current - 1))}
+            onNext={() =>
+              setPage((current) => Math.min(totalPages || current, current + 1))
+            }
+          />
+        </div>
       </div>
 
-      <div className="max-h-[155px] overflow-auto overscroll-contain">
+      <div className="max-h-[260px] overflow-auto overscroll-contain">
         <table className="w-full min-w-[720px] text-left text-xs">
           <thead className="sticky top-0 z-10 border-b bg-slate-50 text-slate-600 shadow-sm text-[11px]">
             <tr className="h-7">
@@ -180,26 +200,6 @@ export function PendingTicketsPanel({
             ))}
           </tbody>
         </table>
-      </div>
-
-      <div className="border-t border-slate-200/80 px-3 py-1.5">
-        <TablePagination
-          fromRecord={fromRecord}
-          toRecord={toRecord}
-          count={rows.length}
-          page={page}
-          totalPages={totalPages}
-          pageSize={pageSize}
-          pageSizeOptions={PAGE_SIZES}
-          onPageSizeChange={(value) => {
-            setPageSize(value);
-            setPage(1);
-          }}
-          onPrevious={() => setPage((current) => Math.max(1, current - 1))}
-          onNext={() =>
-            setPage((current) => Math.min(totalPages || current, current + 1))
-          }
-        />
       </div>
     </div>
   );

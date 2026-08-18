@@ -12,6 +12,7 @@ import {
 } from "@/components/common";
 import { useTickets } from "@/hooks/useTickets";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
+import { isLinkedCustomer, maskEmail, maskPhone } from "@/utils/mask-data.util";
 
 function TicketMethodBadge({ value }: { value?: string | null }) {
   if (value === "AUTO") {
@@ -345,9 +346,13 @@ export function TicketListPage({ embedded = false }: { embedded?: boolean }) {
                         {item.display_account_number || item.customer_account_number || item.raw_account_number || "-"}
                       </td>
 
-                      <td className="px-4 text-slate-600">{item.customer_phone || "-"}</td>
+                      <td className="px-4 text-slate-600">
+                        {maskPhone(item.customer_phone, isLinkedCustomer(item.display_account_number || item.customer_account_number || item.raw_account_number)) || "-"}
+                      </td>
 
-                      <td className="px-4 text-slate-600">{item.customer_email || "-"}</td>
+                      <td className="px-4 text-slate-600">
+                        {maskEmail(item.customer_email, isLinkedCustomer(item.display_account_number || item.customer_account_number || item.raw_account_number)) || "-"}
+                      </td>
 
                       <td className="px-4 text-slate-600">{item.source_name || "-"}</td>
 

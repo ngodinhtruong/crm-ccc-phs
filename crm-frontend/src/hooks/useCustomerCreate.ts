@@ -51,6 +51,7 @@ export function useCustomerCreate() {
 
   const {
     users: assigneeUsers,
+    defaultAssignee,
     loading: assigneeLoading,
     error: assigneeError,
   } = useUserAssignees();
@@ -233,6 +234,16 @@ export function useCustomerCreate() {
     void loadDropdowns();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
+
+  useEffect(() => {
+    if (defaultAssignee && !form.assignedTo) {
+      setForm((prev) => ({
+        ...prev,
+        assignedTo: defaultAssignee.id,
+        assignedToLabel: defaultAssignee.label,
+      }));
+    }
+  }, [defaultAssignee, form.assignedTo]);
 
   return {
     form,

@@ -11,6 +11,7 @@ import {
   CustomerStatusBadge,
   CustomerVipBadge,
 } from "@/components/customers/CustomerBadges";
+import { isLinkedCustomer, maskEmail, maskPhone } from "@/utils/mask-data.util";
 import type { useCustomers } from "@/hooks/useCustomers";
 
 function getBranchName(branch: ReturnType<typeof useCustomers>["branches"][number]) {
@@ -255,10 +256,15 @@ export function CustomerTable({
                   </td>
 
                   <td className="align-middle px-4">
-                    <div className="flex items-center gap-1.5 whitespace-nowrap text-slate-700">
-                      <span>{customer.phone || "-"}</span>
-                      {customer.phone && <Phone size={14} className="shrink-0 text-emerald-500" />}
-                    </div>
+                    {(() => {
+                      const phoneVal = maskPhone(customer.phone, isLinkedCustomer(customer.account_number));
+                      return (
+                        <div className="flex items-center gap-1.5 whitespace-nowrap text-slate-700">
+                          <span>{phoneVal}</span>
+                          {phoneVal !== "-" && <Phone size={14} className="shrink-0 text-emerald-500" />}
+                        </div>
+                      );
+                    })()}
                   </td>
 
                   <td className="align-middle whitespace-nowrap px-4 text-slate-600">
@@ -274,7 +280,9 @@ export function CustomerTable({
                   </td>
 
                   <td className="align-middle px-4">
-                    <span className="block truncate text-[#059669]">{customer.email || "-"}</span>
+                    <span className="block truncate text-[#059669]">
+                      {maskEmail(customer.email, isLinkedCustomer(customer.account_number)) || "-"}
+                    </span>
                   </td>
 
                   <td className="align-middle whitespace-nowrap px-4">
