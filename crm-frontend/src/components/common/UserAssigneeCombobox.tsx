@@ -42,12 +42,15 @@ export function UserAssigneeCombobox({
     onChange: (userId: string, label: string) => void;
 }) {
     const wrapperRef = useRef<HTMLDivElement | null>(null);
+    const isEditingKeyword = useRef(false);
 
     const [keyword, setKeyword] = useState(label || "");
     const [open, setOpen] = useState(false);
 
     useEffect(() => {
-        setKeyword(label || "");
+        if (!isEditingKeyword.current) {
+            setKeyword(label || "");
+        }
     }, [label]);
 
     useEffect(() => {
@@ -68,10 +71,11 @@ export function UserAssigneeCombobox({
     }, []);
 
     const filteredUsers = useMemo(() => {
-        const searchText = keyword.trim().toLowerCase();
+        const isDefaultLabel = keyword === label;
+        const searchText = isDefaultLabel ? "" : keyword.trim().toLowerCase();
 
         if (!searchText) {
-            return users.slice(0, 20);
+            return users.slice(0, 50);
         }
 
         return users
@@ -90,20 +94,22 @@ export function UserAssigneeCombobox({
                     fullName.includes(searchText)
                 );
             })
-            .slice(0, 20);
-    }, [keyword, users]);
+            .slice(0, 50);
+    }, [keyword, label, users]);
 
     const selectedUser = users.find((user) => String(user.id) === value);
 
     const selectUser = (user: UserListItem) => {
         const nextLabel = getAssigneeLabel(user);
 
+        isEditingKeyword.current = false;
         setKeyword(nextLabel);
         onChange(String(user.id), nextLabel);
         setOpen(false);
     };
 
     const clearValue = () => {
+        isEditingKeyword.current = false;
         setKeyword("");
         onChange("", "");
         setOpen(true);
@@ -115,6 +121,7 @@ export function UserAssigneeCombobox({
                 <input
                     value={keyword}
                     onChange={(event) => {
+                        isEditingKeyword.current = true;
                         setKeyword(event.target.value);
                         setOpen(true);
 
@@ -125,6 +132,11 @@ export function UserAssigneeCombobox({
                     onFocus={(event) => {
                         setOpen(true);
                         event.target.select();
+                    }}
+                    onBlur={() => {
+                        setTimeout(() => {
+                            isEditingKeyword.current = false;
+                        }, 200);
                     }}
                     placeholder={placeholder}
                     className="h-full flex-1 rounded-l px-3 text-xs outline-none"
@@ -161,7 +173,7 @@ export function UserAssigneeCombobox({
             )}
 
             {open && (
-                <div className="absolute left-0 right-0 top-10 z-[9999] max-h-64 overflow-auto rounded border border-slate-200 bg-white shadow-lg">
+                <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-[99999] max-h-64 overflow-auto rounded-md border border-slate-200 bg-white shadow-2xl">
                     {filteredUsers.length === 0 && (
                         <div className="px-3 py-3 text-xs text-slate-500">
                             Không tìm thấy người dùng phù hợp.

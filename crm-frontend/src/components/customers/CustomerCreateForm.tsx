@@ -276,7 +276,7 @@ export function CustomerCreateForm({
         </div>
       </section>
 
-      <section className="mb-16 overflow-hidden rounded-md border bg-white shadow-sm">
+      <section className="mb-16 relative z-30 rounded-md border bg-white shadow-sm">
         <div className="border-b px-4 py-3 text-sm font-semibold">
           Thông tin quản lý
         </div>

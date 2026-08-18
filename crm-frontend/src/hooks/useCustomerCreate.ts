@@ -1,7 +1,7 @@
 "use client";
 import { getErrorMessage } from "@/utils/error.util";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { authService } from "@/services/auth.service";
@@ -235,15 +235,18 @@ export function useCustomerCreate() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
+  const hasInitializedAssignee = useRef(false);
+
   useEffect(() => {
-    if (defaultAssignee && !form.assignedTo) {
+    if (defaultAssignee && !hasInitializedAssignee.current) {
+      hasInitializedAssignee.current = true;
       setForm((prev) => ({
         ...prev,
         assignedTo: defaultAssignee.id,
         assignedToLabel: defaultAssignee.label,
       }));
     }
-  }, [defaultAssignee, form.assignedTo]);
+  }, [defaultAssignee]);
 
   return {
     form,
