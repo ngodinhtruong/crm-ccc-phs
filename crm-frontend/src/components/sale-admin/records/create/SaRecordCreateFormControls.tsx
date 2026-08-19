@@ -122,18 +122,25 @@ export function ToggleChip({
   checked,
   onChange,
   label,
+  disabled = false,
 }: {
   checked: boolean;
   onChange: (value: boolean) => void;
   label: string;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
-      onClick={() => onChange(!checked)}
+      disabled={disabled}
+      onClick={() => {
+        if (!disabled) onChange(!checked);
+      }}
       className={[
         "flex h-9 w-full items-center justify-between gap-2 rounded-md border px-3 text-xs transition-all",
-        checked
+        disabled
+          ? "cursor-not-allowed border-slate-200 bg-slate-100 font-medium text-slate-400 opacity-60"
+          : checked
           ? "border-[#10b981] bg-[#10b981] font-semibold text-white shadow-sm"
           : "border-slate-300 bg-slate-50/70 font-medium text-slate-700 hover:border-slate-400 hover:bg-slate-100",
       ].join(" ")}
@@ -142,7 +149,11 @@ export function ToggleChip({
       <div
         className={[
           "flex h-4 w-4 items-center justify-center rounded",
-          checked ? "bg-white/20 text-white" : "border border-slate-300 bg-white text-transparent",
+          disabled
+            ? "border border-slate-200 bg-slate-100 text-transparent"
+            : checked
+            ? "bg-white/20 text-white"
+            : "border border-slate-300 bg-white text-transparent",
         ].join(" ")}
       >
         <Check size={12} strokeWidth={3} />

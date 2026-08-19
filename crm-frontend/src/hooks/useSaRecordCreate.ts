@@ -382,7 +382,7 @@ export function useSaRecordCreate() {
         reactivation: form.reactivation,
         introduced_product: form.introducedProduct,
         support_info: form.supportInfo,
-        referred_rm: form.handoverToBroker,
+        referred_rm: form.referredRm,
 
         handover_to_broker: form.handoverToBroker,
         broker_employee: form.handoverToBroker ? toId(form.brokerEmployee) : null,

@@ -359,23 +359,31 @@ function SectionBlock({
           </tbody>
 
           <tfoot className="border-t border-slate-200 bg-slate-100/70 text-xs font-bold text-slate-700">
-            <tr className="h-9">
-              <td className="px-3 text-center">
-                Tổng:
-              </td>
-              <td colSpan={2} className="px-3 text-slate-800 font-bold">
-                {groups.length} nhóm
-              </td>
-              <td className="px-3 text-center font-extrabold text-[#059669]">
-                {activeGroupTotal.toFixed(2)}% / {section.weight_percent}%
-              </td>
-              <td className="px-3 text-center text-slate-400">
-                -
-              </td>
-              <td className="px-3 text-center font-bold text-slate-800">
-                {config.metricRows.filter((m) => groups.some((g) => g.id === m.group)).length}
-              </td>
-            </tr>
+            {(() => {
+              const isGroupTotalValid = activeGroupTotal.toFixed(2) === toNumber(section.weight_percent).toFixed(2);
+              return (
+                <tr className="h-9">
+                  <td className="px-3 text-center">
+                    Tổng:
+                  </td>
+                  <td colSpan={2} className="px-3 text-slate-800 font-bold">
+                    {groups.length} nhóm
+                  </td>
+                  <td className="px-3 text-center font-extrabold">
+                    <span className={isGroupTotalValid ? "text-[#059669] font-extrabold" : "text-red-600 font-extrabold"}>
+                      {activeGroupTotal.toFixed(2)}%
+                    </span>
+                    <span className="text-[#059669] font-extrabold"> / {toNumber(section.weight_percent).toFixed(2)}%</span>
+                  </td>
+                  <td className="px-3 text-center text-slate-400">
+                    -
+                  </td>
+                  <td className="px-3 text-center font-bold text-slate-800">
+                    {config.metricRows.filter((m) => groups.some((g) => g.id === m.group)).length}
+                  </td>
+                </tr>
+              );
+            })()}
           </tfoot>
         </table>
       </div>

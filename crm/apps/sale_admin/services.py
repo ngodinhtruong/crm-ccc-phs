@@ -42,18 +42,15 @@ def serialize_sa_record(record):
         "company_name": record.company.company_name if record.company else None,
         "branch_name": record.branch.branch_name if record.branch else None,
 
-        "pic_user_id": record.pic_user_id,
-        "pic_employee_id": record.pic_employee_id,
         "pic_user_name": (
-            record.pic_user.get_full_name()
-            or record.pic_user.username
-            or record.pic_user.email
-            if record.pic_user
-            else None
+            getattr(getattr(record.pic_user, "employee", None), "full_name", None)
+            or (record.pic_user.get_full_name().strip() if record.pic_user and record.pic_user.get_full_name() else None)
+            or (record.pic_user.username if record.pic_user else None)
         ),
         "pic_employee_name": (
             getattr(record.pic_employee, "full_name", None)
-            if record.pic_employee
+            or getattr(getattr(record.pic_user, "employee", None), "full_name", None)
+            if record.pic_employee or record.pic_user
             else None
         ),
 
@@ -118,6 +115,23 @@ def serialize_sa_record(record):
     }
 
 
+def normalize_audit_value(val):
+    if val is None:
+        return ""
+    if isinstance(val, bool):
+        return val
+    if isinstance(val, (int, float)):
+        return str(val)
+    s = str(val).strip()
+    try:
+        from decimal import Decimal
+        d = Decimal(s)
+        return str(d.quantize(Decimal("0.01")))
+    except Exception:
+        pass
+    return s
+
+
 def get_changed_fields(old_data, new_data):
     if not old_data:
         return list(new_data.keys())
@@ -127,7 +141,7 @@ def get_changed_fields(old_data, new_data):
     for key, new_value in new_data.items():
         old_value = old_data.get(key)
 
-        if old_value != new_value:
+        if normalize_audit_value(old_value) != normalize_audit_value(new_value):
             changed.append(key)
 
     return changed

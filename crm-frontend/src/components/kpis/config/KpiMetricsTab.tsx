@@ -80,9 +80,11 @@ function normalizeTargetUnit(value?: string | null): KpiTargetUnit {
 
 function formatTargetValue(value?: string | null, unit?: string | null) {
   if (!value) return "";
-  if (unit === "PERCENT") return `${value}%`;
-  if (unit === "COUNT") return `${value} ${getTargetUnitLabel(unit)}`;
-  return value;
+  const parsed = Number(value);
+  const cleaned = Number.isNaN(parsed) ? value : parsed.toString();
+  if (unit === "PERCENT") return `${cleaned}%`;
+  if (unit === "COUNT") return `${cleaned} ${getTargetUnitLabel(unit)}`;
+  return cleaned;
 }
 
 function normalizeKpiCode(value: string) {
@@ -527,12 +529,6 @@ export function KpiMetricsTab({ config }: { config: KpiConfigController }) {
                           </div>
 
                           <div className="flex items-center gap-3 text-[11px]">
-                            <span className="font-semibold text-slate-600">
-                              Trọng số: <strong className="text-slate-800">{group.weight_percent}%</strong>
-                            </span>
-                            <span className={isValid ? "font-bold text-emerald-700" : "font-bold text-red-600"}>
-                              Active: {activeTotal.toFixed(2)}%
-                            </span>
                             {config.canManage && (
                               <button
                                 type="button"
@@ -650,6 +646,21 @@ export function KpiMetricsTab({ config }: { config: KpiConfigController }) {
                         );
                       })
                     )}
+
+                    <tr className="h-9 border-t border-b border-slate-200 bg-slate-100/70 text-xs font-bold text-slate-700">
+                      <td className="px-3 text-center">Tổng nhóm:</td>
+                      <td colSpan={2} className="px-3 text-slate-800 font-bold">
+                        {metrics.length} chỉ tiêu
+                      </td>
+                      <td className="px-3 text-center font-extrabold">
+                        <span className={isValid ? "text-[#059669] font-extrabold" : "text-red-600 font-extrabold"}>
+                          {activeTotal.toFixed(2)}%
+                        </span>
+                        <span className="text-[#059669] font-extrabold"> / {groupWeight.toFixed(2)}%</span>
+                      </td>
+                      <td className="px-3 text-center text-slate-400">-</td>
+                      <td className="px-3 text-center text-slate-400">-</td>
+                    </tr>
                   </Fragment>
                 );
               })
@@ -663,6 +674,41 @@ export function KpiMetricsTab({ config }: { config: KpiConfigController }) {
               </tr>
             )}
           </tbody>
+
+          <tfoot className="border-t border-slate-200 bg-slate-100/80 text-xs font-bold text-slate-700">
+            {(() => {
+              const sectionTotalActive = filteredGroupedMetrics.reduce(
+                (acc, { groups }) => acc + groups.reduce((gAcc, { metrics }) => gAcc + getGroupMetricTotal(metrics), 0),
+                0
+              );
+              const sectionTotalExpected = filteredGroupedMetrics.reduce(
+                (acc, { groups }) => acc + groups.reduce((gAcc, { group }) => gAcc + toNumber(group.weight_percent), 0),
+                0
+              );
+              const isSectionValid = sectionTotalActive.toFixed(2) === sectionTotalExpected.toFixed(2);
+              const totalMetricsCount = filteredGroupedMetrics.reduce(
+                (acc, { groups }) => acc + groups.reduce((gAcc, { metrics }) => gAcc + metrics.length, 0),
+                0
+              );
+
+              return (
+                <tr className="h-9">
+                  <td className="px-3 text-center">Tổng:</td>
+                  <td colSpan={2} className="px-3 text-slate-800 font-bold">
+                    {totalMetricsCount} chỉ tiêu
+                  </td>
+                  <td className="px-3 text-center font-extrabold">
+                    <span className={isSectionValid ? "text-[#059669] font-extrabold" : "text-red-600 font-extrabold"}>
+                      {sectionTotalActive.toFixed(2)}%
+                    </span>
+                    <span className="text-[#059669] font-extrabold"> / {sectionTotalExpected.toFixed(2)}%</span>
+                  </td>
+                  <td className="px-3 text-center text-slate-400">-</td>
+                  <td className="px-3 text-center text-slate-400">-</td>
+                </tr>
+              );
+            })()}
+          </tfoot>
         </table>
       </div>
 

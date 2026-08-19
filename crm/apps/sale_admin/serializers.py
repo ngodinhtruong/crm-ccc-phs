@@ -141,7 +141,11 @@ class SaRecordReadSerializer(serializers.ModelSerializer):
         if not obj.pic_user:
             return None
 
-        full_name = obj.pic_user.get_full_name()
+        emp = getattr(obj.pic_user, "employee", None)
+        if emp and getattr(emp, "full_name", None):
+            return emp.full_name.strip()
+
+        full_name = obj.pic_user.get_full_name().strip()
         return full_name or obj.pic_user.username or obj.pic_user.email
 
     def get_pic_employee_name(self, obj):
@@ -227,7 +231,7 @@ def get_available_vip_classification_values():
     return {value for value in tier_values | tier_code_values | existing_values if value}
 
 
-def apply_customer_account_to_sa_record_attrs(attrs, customer_account):
+def apply_customer_account_to_sa_record_attrs(attrs, customer_account, instance=None):
     """
     Khóa SA Record theo tài khoản có thật trong CRM.
     Nhân viên chỉ nhập/chọn số TK đã tồn tại trong customer_accounts;
@@ -258,6 +262,18 @@ def apply_customer_account_to_sa_record_attrs(attrs, customer_account):
         or getattr(branch, "name", None)
         or ""
     )
+    pic_user = attrs.get("pic_user") or (instance.pic_user if instance else None)
+    pic_employee = attrs.get("pic_employee") or (instance.pic_employee if instance else None)
+    existing_pic_name = getattr(instance, "pic_name_snapshot", "") if instance else ""
+    submitted_pic_name = str(attrs.get("pic_name_snapshot") or "").strip()
+    default_pic_name = (
+        (getattr(pic_employee, "full_name", None) if pic_employee else None)
+        or (pic_user.get_full_name() or pic_user.username or pic_user.email if pic_user else None)
+        or existing_pic_name
+        or ""
+    )
+    attrs["pic_name_snapshot"] = submitted_pic_name or default_pic_name
+
     attrs["account_status"] = submitted_account_status or default_account_status
     attrs["vip_classification"] = submitted_vip_classification or default_vip_classification
 
@@ -367,7 +383,7 @@ class SaRecordWriteSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
 
         customer_account = self.resolve_customer_account(attrs)
-        attrs = apply_customer_account_to_sa_record_attrs(attrs, customer_account)
+        attrs = apply_customer_account_to_sa_record_attrs(attrs, customer_account, instance=self.instance)
 
         account_status = str(attrs.get("account_status") or "").strip()
         vip_classification = str(attrs.get("vip_classification") or "").strip()
@@ -386,7 +402,38 @@ class SaRecordWriteSerializer(serializers.ModelSerializer):
         if handover_to_broker is None and self.instance:
             handover_to_broker = self.instance.handover_to_broker
 
-        attrs["referred_rm"] = bool(handover_to_broker)
+        referred_rm = attrs.get("referred_rm")
+        if referred_rm is None and self.instance:
+            referred_rm = self.instance.referred_rm
+        referred_rm = bool(referred_rm)
+        attrs["referred_rm"] = referred_rm
+
+        if referred_rm:
+            icp_group = attrs.get("icp_group")
+            if icp_group is None and self.instance:
+                icp_group = self.instance.icp_group
+
+            is_tp_rtp = False
+            if icp_group:
+                icp_code = str(getattr(icp_group, "icp_code", "") or "").strip().upper()
+                is_tp_rtp = (
+                    icp_code in ["A", "B"]
+                    or icp_code.startswith("A")
+                    or icp_code.startswith("B")
+                    or bool(getattr(icp_group, "is_potential", False))
+                )
+
+            if not is_tp_rtp:
+                import logging
+                logger = logging.getLogger(__name__)
+                acc_num = attrs.get("account_no") or (customer_account.account_number if customer_account else "N/A")
+                grp_code = getattr(icp_group, "icp_code", "Chưa chọn") if icp_group else "Chưa chọn"
+                logger.warning(
+                    f"Từ chối cờ Referral cho SA Record (TK {acc_num}): Nhóm ICP '{grp_code}' không thuộc nhóm Tiềm năng (A) hoặc Rất tiềm năng (B)."
+                )
+                raise serializers.ValidationError(
+                    {"referred_rm": "Chỉ được ghi nhận Referral cho khách hàng thuộc nhóm Tiềm năng (nhóm A) hoặc Rất tiềm năng (nhóm B)."}
+                )
 
         if handover_to_broker:
             broker_user = attrs.get("broker_user")

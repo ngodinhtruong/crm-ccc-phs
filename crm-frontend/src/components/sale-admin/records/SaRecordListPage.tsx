@@ -159,8 +159,6 @@ export function SaRecordListPage() {
                                 <th className="w-[110px] min-w-[110px] px-4 font-semibold">Giới thiệu SP</th>
                                 <th className="w-[110px] min-w-[110px] px-4 font-semibold">Tái kích hoạt</th>
                                 <th className="w-[110px] min-w-[110px] px-4 font-semibold">Hỗ trợ TT</th>
-                                <th className="w-[150px] min-w-[150px] px-4 font-semibold">Tổng GTGD</th>
-                                <th className="w-[130px] min-w-[130px] px-4 font-semibold">Phí GD</th>
                                 <th className="w-[250px] min-w-[250px] px-4 font-semibold">Ghi chú</th>
                                 <th className="w-[140px] min-w-[140px] px-4 font-semibold">Bàn giao MG</th>
                             </tr>

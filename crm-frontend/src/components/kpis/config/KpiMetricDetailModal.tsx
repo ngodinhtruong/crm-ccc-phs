@@ -35,10 +35,12 @@ function getTargetUnitLabel(value?: string | null) {
 
 function formatTargetValue(value?: string | null, unit?: string | null) {
   if (!value) return null;
-  if (unit === "PERCENT") return `${value}%`;
-  if (unit === "COUNT") return `${value} ${getTargetUnitLabel(unit)}`;
+  const parsed = Number(value);
+  const cleaned = Number.isNaN(parsed) ? value : parsed.toString();
+  if (unit === "PERCENT") return `${cleaned}%`;
+  if (unit === "COUNT") return `${cleaned} ${getTargetUnitLabel(unit)}`;
 
-  return value;
+  return cleaned;
 }
 
 function InfoBlock({
@@ -81,7 +83,7 @@ export function KpiMetricDetailModal({
               {metric.metric_name}
             </h2>
             <div className="mt-1 text-xs text-slate-500">
-              Trọng số: {metric.weight_percent}%
+              Trọng số: {Number(metric.weight_percent || 0).toFixed(2)}%
             </div>
           </div>
 

@@ -263,25 +263,45 @@ def get_reactivated_account_nos(records_queryset):
     )
 
 
-def get_matched_transactions(period, account_nos, metric=None):
+def get_matched_transactions(period, account_nos, records_queryset=None, metric=None):
     if not account_nos:
         return TransactionLog.objects.none()
 
     window = get_metric_window(period, metric)
-    return TransactionLog.objects.filter(
+    base_qs = TransactionLog.objects.filter(
         customer_account__account_number__in=account_nos,
         transaction_date__gte=window.start_date,
         transaction_date__lte=window.end_date,
         order_status__iexact=MATCHED_STATUS,
     )
 
+    if records_queryset is None:
+        return base_qs
 
-def get_active_reactivated_account_nos(period, account_nos, metric=None):
+    handover_records = records_queryset.filter(
+        handover_to_broker=True,
+        account_no__in=account_nos,
+    )
+
+    if not handover_records.exists():
+        return base_qs
+
+    exclude_q = Q(pk__in=[])
+    for record in handover_records:
+        acc_no = record.account_no
+        handover_date = record.broker_handover_at.date() if record.broker_handover_at else record.call_date
+        if acc_no and handover_date:
+            exclude_q |= Q(customer_account__account_number=acc_no, transaction_date__gte=handover_date)
+
+    return base_qs.exclude(exclude_q)
+
+
+def get_active_reactivated_account_nos(period, account_nos, records_queryset=None, metric=None):
     if not account_nos:
         return []
 
     return list(
-        get_matched_transactions(period, account_nos, metric=metric)
+        get_matched_transactions(period, account_nos, records_queryset=records_queryset, metric=metric)
         .values_list("customer_account__account_number", flat=True)
         .distinct()
     )
@@ -424,11 +444,28 @@ def calculate_rm_referral_count(records_queryset):
 
 
 def calculate_referral_intro_rate(records_queryset):
-    total_records = records_queryset.count()
-    referral_count, payload = calculate_rm_referral_count(records_queryset)
-    payload.update({"total_records": total_records})
+    tp_rtp_queryset = safe_filter(
+        records_queryset,
+        Q(icp_group__icp_code__in=["A", "B"])
+        | Q(icp_group__icp_code__startswith="A")
+        | Q(icp_group__icp_code__startswith="B")
+        | Q(icp_group__icp_type__in=["A", "B"])
+        | Q(icp_group__is_potential=True),
+    )
+    total_tp_rtp_records = tp_rtp_queryset.count()
 
-    return percent_value(referral_count, total_records), payload
+    referral_queryset = safe_filter(
+        tp_rtp_queryset,
+        referred_rm=True,
+    )
+    referral_count = referral_queryset.count()
+
+    payload = {
+        "sa_record_ids": list(referral_queryset.values_list("id", flat=True)),
+        "total_records": total_tp_rtp_records,
+    }
+
+    return percent_value(referral_count, total_tp_rtp_records), payload
 
 
 def calculate_support_success_customers(records_queryset):

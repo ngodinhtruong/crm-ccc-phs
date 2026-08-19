@@ -254,9 +254,9 @@ const auditColumns = [
     {
         label: "PIC",
         fields: [
-            "pic_name_snapshot",
-            "pic_user_name",
             "pic_employee_name",
+            "pic_user_name",
+            "pic_name_snapshot",
             "pic_user_id",
             "pic_employee_id",
         ],

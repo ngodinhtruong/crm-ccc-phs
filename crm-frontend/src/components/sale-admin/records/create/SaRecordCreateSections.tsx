@@ -240,6 +240,19 @@ export function SaRecordCallSection({
 }: {
   create: SaRecordCreateController;
 }) {
+  const selectedIcpGroup = create.icpGroups.find(
+    (g) => String(g.id) === String(create.form.icpGroup)
+  );
+  const icpCode = (selectedIcpGroup?.icp_code || "").trim().toUpperCase();
+  const isTpOrRtp = Boolean(
+    selectedIcpGroup &&
+      (icpCode === "A" ||
+        icpCode === "B" ||
+        icpCode.startsWith("A") ||
+        icpCode.startsWith("B") ||
+        selectedIcpGroup.is_potential)
+  );
+
   return (
     <section className="rounded-lg border border-slate-200 border-l-4 border-l-[#10b981] bg-white p-3.5 shadow-sm">
       <div className="mb-2.5 flex items-center gap-2 border-b border-slate-100 pb-2">
@@ -326,7 +339,7 @@ export function SaRecordCallSection({
           </SelectInput>
         </div>
 
-        <div className="col-span-12 md:col-span-4">
+        <div className="col-span-12 md:col-span-3">
           <ToggleChip
             checked={create.form.reactivation}
             onChange={(value) => create.setField("reactivation", value)}
@@ -334,7 +347,7 @@ export function SaRecordCallSection({
           />
         </div>
 
-        <div className="col-span-12 md:col-span-4">
+        <div className="col-span-12 md:col-span-3">
           <ToggleChip
             checked={create.form.introducedProduct}
             onChange={(value) => create.setField("introducedProduct", value)}
@@ -342,12 +355,28 @@ export function SaRecordCallSection({
           />
         </div>
 
-        <div className="col-span-12 md:col-span-4">
+        <div className="col-span-12 md:col-span-3">
           <ToggleChip
             checked={create.form.supportInfo}
             onChange={(value) => create.setField("supportInfo", value)}
             label="Hỗ trợ thông tin tài khoản"
           />
+        </div>
+
+        <div className="col-span-12 md:col-span-3">
+          <ToggleChip
+            checked={Boolean(create.form.referredRm)}
+            disabled={!isTpOrRtp}
+            onChange={(value) => {
+              if (isTpOrRtp) {
+                create.setField("referredRm", value);
+              }
+            }}
+            label="Giới thiệu Referral (Khách mời bạn bè)"
+          />
+          <p className="mt-0.5 text-right text-[11px] font-medium italic text-slate-600 leading-snug">
+            * Chỉ áp dụng cho KH nhóm Tiềm năng & Rất tiềm năng (A/B)
+          </p>
         </div>
       </div>
     </section>

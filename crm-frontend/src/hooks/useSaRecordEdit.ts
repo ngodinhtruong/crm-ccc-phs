@@ -274,7 +274,7 @@ export function useSaRecordEdit(recordId: string) {
       introduced_product: form.introducedProduct,
       reactivation: form.reactivation,
       support_info: form.supportInfo,
-      referred_rm: form.handoverToBroker,
+      referred_rm: form.referredRm,
 
       handover_to_broker: form.handoverToBroker,
       broker_employee: form.handoverToBroker ? (form.brokerEmployee ? Number(form.brokerEmployee) : null) : null,
