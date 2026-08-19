@@ -246,11 +246,11 @@ export function SaRecordCallSection({
   const icpCode = (selectedIcpGroup?.icp_code || "").trim().toUpperCase();
   const isTpOrRtp = Boolean(
     selectedIcpGroup &&
-      (icpCode === "A" ||
-        icpCode === "B" ||
-        icpCode.startsWith("A") ||
-        icpCode.startsWith("B") ||
-        selectedIcpGroup.is_potential)
+    (icpCode === "A" ||
+      icpCode === "B" ||
+      icpCode.startsWith("A") ||
+      icpCode.startsWith("B") ||
+      selectedIcpGroup.is_potential)
   );
 
   return (
@@ -372,7 +372,7 @@ export function SaRecordCallSection({
                 create.setField("referredRm", value);
               }
             }}
-            label="Giới thiệu Referral (Khách mời bạn bè)"
+            label="Giới thiệu Referral"
           />
           <p className="mt-0.5 text-right text-[11px] font-medium italic text-slate-600 leading-snug">
             * Chỉ áp dụng cho KH nhóm Tiềm năng & Rất tiềm năng (A/B)
