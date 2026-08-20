@@ -5,6 +5,7 @@ import {
   Clock,
   MessageSquareWarning,
   Ticket,
+  TrendingUp,
   UserRoundCheck,
 } from "lucide-react";
 
@@ -30,12 +31,12 @@ export function KpiCards({
 }) {
   return (
     /*
-      Luôn giữ 5 KPI trên cùng một hàng. Breakpoint cũ chỉ dùng 5 cột từ
+      Luôn giữ 6 KPI trên cùng một hàng. Breakpoint cũ chỉ dùng 5 cột từ
       `2xl` (>= 1536px), nên laptop 1366px bị chia thành 3 + 2 card.
-      Khi vùng nội dung hẹp hơn 840px, hàng KPI cuộn ngang thay vì wrap.
+      Khi vùng nội dung hẹp hơn 1000px, hàng KPI cuộn ngang thay vì wrap.
     */
     <div className="-mx-1 overflow-x-auto px-1 pb-1">
-      <div className="grid min-w-[840px] grid-cols-5 gap-2 xl:gap-3">
+      <div className="grid min-w-[1000px] grid-cols-6 gap-2 xl:gap-3">
         <KpiCard
           bucket={summary.total_received}
           subtitle="Toàn bộ phiên tương tác trong kỳ"
@@ -64,6 +65,19 @@ export function KpiCards({
           iconClassName="bg-amber-100 text-amber-600"
           onClick={() =>
             onOpenTickets({ title: "Chuyển CCC xử lý", status: "CCC" })
+          }
+        />
+
+        <KpiCard
+          bucket={summary.research}
+          subtitle="Bot phân tích CP, khuyến nghị thị trường"
+          icon={<TrendingUp size={18} />}
+          iconClassName="bg-violet-100 text-violet-600"
+          onClick={() =>
+            onOpenTickets({
+              title: "Phân tích / khuyến nghị",
+              status: "RESEARCH",
+            })
           }
         />
 

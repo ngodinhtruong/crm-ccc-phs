@@ -3,10 +3,19 @@ import { useRouter } from "next/navigation";
 
 import { StatusPill } from "@/components/chatbot-dashboard/StatusPill";
 import {
+  ColumnDateRangeFilter,
+  ColumnNumberRangeFilter,
+  ColumnSelectFilter,
+  ColumnTextFilter,
+} from "@/components/common/table-filters";
+import {
   CHATBOT_TICKET_STATUS_OPTIONS,
   ticketStatusPillClass,
 } from "@/constants/chatbot-dashboard.constant";
+import { CHATBOT_TICKET_STATUS_LABELS } from "@/constants/chatbot-ticket.constant";
 import {
+  ChatbotTicketColumnFilterKey,
+  ChatbotTicketColumnFilters,
   ChatbotTicketItem,
   OutcomeCode,
 } from "@/types/chatbot-dashboard.type";
@@ -25,6 +34,9 @@ export function TicketsTab({
   onSearch,
   onClearPreset,
   onOpenSession,
+  columnFilters,
+  onColumnFilterChange,
+  hasColumnFilter,
 }: {
   tickets: ChatbotTicketItem[];
   count: number;
@@ -37,13 +49,31 @@ export function TicketsTab({
   onSearch: () => void;
   onClearPreset: () => void;
   onOpenSession: (item: ChatbotTicketItem) => void;
+  columnFilters: ChatbotTicketColumnFilters;
+  onColumnFilterChange: (
+    key: ChatbotTicketColumnFilterKey,
+    value: string
+  ) => void;
+  hasColumnFilter: boolean;
 }) {
+  const set =
+    (key: ChatbotTicketColumnFilterKey) => (value: string) =>
+      onColumnFilterChange(key, value);
+
+  // Nhãn trạng thái ticket dùng chung với màn chi tiết, giá trị gửi lên là
+  // status_code để backend khỏi phải dịch ngược từ nhãn tiếng Việt.
+  const ticketStatusOptions = Object.entries(CHATBOT_TICKET_STATUS_LABELS).map(
+    ([value, label]) => ({ value, label })
+  );
   const router = useRouter();
   // "CCC" là mặc định của tab nên không tính là đang lọc.
   // Mọi giá trị khác (kể cả "ALL") đều là người dùng đã chủ động đổi,
   // nên phải cho họ đường quay về mặc định.
   const hasFilter =
-    Boolean(category) || status !== "CCC" || Boolean(keyword);
+    Boolean(category) ||
+    status !== "CCC" ||
+    Boolean(keyword) ||
+    hasColumnFilter;
 
   return (
     <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
@@ -145,6 +175,107 @@ export function TicketsTab({
               <th className="w-[160px] px-3 py-1 font-semibold">Thông tin KH</th>
               <th className="w-[250px] px-3 py-1 font-semibold">Câu hỏi cuối</th>
               <th className="w-[250px] px-3 py-1 font-semibold">Lý do chuyển CCC</th>
+            </tr>
+
+            {/* Lọc theo từng cột — gõ tới đâu lọc tới đó (chờ 400ms). */}
+            <tr className="table-filter-row border-b border-slate-200 bg-slate-50/70 align-top">
+              <th className="px-2 py-1.5">
+                <ColumnTextFilter
+                  value={columnFilters.ticket_code}
+                  onChange={set("ticket_code")}
+                  placeholder="Mã"
+                />
+              </th>
+
+              <th className="px-2 py-1.5">
+                <ColumnSelectFilter
+                  value={columnFilters.ticket_status}
+                  onChange={set("ticket_status")}
+                  options={ticketStatusOptions}
+                />
+              </th>
+
+              <th className="px-2 py-1.5">
+                <ColumnTextFilter
+                  value={columnFilters.session_id}
+                  onChange={set("session_id")}
+                  placeholder="Session"
+                />
+              </th>
+
+              <th className="px-2 py-1.5">
+                <ColumnDateRangeFilter
+                  fromValue={columnFilters.started_from}
+                  toValue={columnFilters.started_to}
+                  onFromChange={set("started_from")}
+                  onToChange={set("started_to")}
+                />
+              </th>
+
+              <th className="px-2 py-1.5">
+                <ColumnTextFilter
+                  value={columnFilters.channel}
+                  onChange={set("channel")}
+                  placeholder="Kênh"
+                />
+              </th>
+
+              <th className="px-2 py-1.5">
+                <ColumnTextFilter
+                  value={columnFilters.category}
+                  onChange={set("category")}
+                  placeholder="Chủ đề"
+                />
+              </th>
+
+              <th className="px-2 py-1.5">
+                <ColumnNumberRangeFilter
+                  minValue={columnFilters.msg_count_min}
+                  maxValue={columnFilters.msg_count_max}
+                  onMinChange={set("msg_count_min")}
+                  onMaxChange={set("msg_count_max")}
+                />
+              </th>
+
+              <th className="px-2 py-1.5">
+                <ColumnSelectFilter
+                  value={status === "CCC" ? "" : status}
+                  onChange={(value) =>
+                    onStatusChange((value || "CCC") as OutcomeCode)
+                  }
+                  options={CHATBOT_TICKET_STATUS_OPTIONS.filter(
+                    (option) => option.value !== "ALL"
+                  ).map((option) => ({
+                    value: option.value,
+                    label: option.label,
+                  }))}
+                  placeholder="Chuyển CCC xử lý"
+                />
+              </th>
+
+              <th className="px-2 py-1.5">
+                <ColumnTextFilter
+                  value={columnFilters.contact_info}
+                  onChange={set("contact_info")}
+                  placeholder="SĐT / email / STK"
+                />
+              </th>
+
+              <th className="px-2 py-1.5">
+                <ColumnTextFilter
+                  value={columnFilters.last_question}
+                  onChange={set("last_question")}
+                  placeholder="Câu hỏi"
+                />
+              </th>
+
+              <th className="px-2 py-1.5">
+                <ColumnTextFilter
+                  value={columnFilters.reason}
+                  onChange={set("reason")}
+                  placeholder="Lý do"
+                />
+              </th>
             </tr>
           </thead>
 

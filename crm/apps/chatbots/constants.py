@@ -8,8 +8,24 @@ QUESTION_TYPE_UNRELATED = "UNRELATED"
 # category, nên cũng là loại duy nhất so sánh được bot với CCC theo chủ đề.
 QUESTION_TYPE_CUSTOMER_CARE = "CUSTOMER_CARE"
 
+# Câu phân tích cổ phiếu / khuyến nghị thị trường. Chỉ nguồn xpro_chat_logs có;
+# chat_questions (Zalo) chỉ dùng CUSTOMER_CARE / GREETING / UNRELATED.
+QUESTION_TYPE_RESEARCH = "RESEARCH"
+
 # Câu hỏi rác: chào hỏi + không liên quan
 SPAM_QUESTION_TYPES = [QUESTION_TYPE_GREETING, QUESTION_TYPE_UNRELATED]
+
+# sender_type trong bảng chat_questions. xpro_chat_logs không có cột này.
+SENDER_TYPE_CUSTOMER = "customer"
+SENDER_TYPE_BOT = "bot"
+SENDER_TYPE_SA = "sa"
+
+# Nhãn người nói khi dựng lại hội thoại.
+SENDER_LABELS = {
+    SENDER_TYPE_CUSTOMER: "KH",
+    SENDER_TYPE_BOT: "Bot",
+    SENDER_TYPE_SA: "NV",
+}
 
 # step trong bảng cskh_state
 STATE_STEP_WAITING_INFO = "waiting_info"
@@ -57,3 +73,29 @@ def is_spam_question(question_type):
 def is_faq_question(question_type):
     """Câu hỏi nghiệp vụ mà chatbot trả lời bằng kho tri thức."""
     return normalize_question_type(question_type) == QUESTION_TYPE_CUSTOMER_CARE
+
+
+def is_research_question(question_type):
+    """Câu phân tích cổ phiếu / khuyến nghị thị trường."""
+    return normalize_question_type(question_type) == QUESTION_TYPE_RESEARCH
+
+
+def normalize_sender_type(value):
+    return str(value or "").strip().lower()
+
+
+def is_customer_turn(log):
+    """
+    Dòng này có phải một lượt hỏi của khách không.
+
+    Hai nguồn chat ghi khác nhau:
+      - xpro_chat_logs  : mỗi dòng là trọn một cặp hỏi - đáp, không có
+                          sender_type, nên dòng nào cũng là một lượt của khách.
+      - chat_questions  : mỗi dòng là một tin nhắn của MỘT bên (customer / bot
+                          / sa), nên chỉ dòng của khách mới tính là một lượt.
+
+    Không lọc thì msg_count_total của phiên Zalo bị đếm gấp hai, gấp ba.
+    """
+    sender = normalize_sender_type(getattr(log, "sender_type", None))
+
+    return not sender or sender == SENDER_TYPE_CUSTOMER

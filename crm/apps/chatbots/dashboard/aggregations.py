@@ -27,9 +27,12 @@ from apps.common.constants import TicketStatusCode
 
 OUTCOME_BOT_DONE = ChatbotSessionSummary.OUTCOME_BOT_DONE
 OUTCOME_CCC = ChatbotSessionSummary.OUTCOME_CCC
+OUTCOME_RESEARCH = ChatbotSessionSummary.OUTCOME_RESEARCH
 OUTCOME_SPAM = ChatbotSessionSummary.OUTCOME_SPAM
 OUTCOME_PENDING = ChatbotSessionSummary.OUTCOME_PENDING
 
+# Nhóm có chủ đề để so bot với CCC. RESEARCH đứng ngoài vì chatbot không gán
+# category cho câu phân tích, đưa vào chỉ làm phình nhóm "Chưa phân loại".
 TOPIC_OUTCOMES = (OUTCOME_BOT_DONE, OUTCOME_CCC)
 
 # Ngưỡng cho biểu đồ so sánh bot vs CCC theo chủ đề. Chủ đề chỉ 1-2 phiên mà
@@ -44,6 +47,7 @@ TOPIC_COMPARISON_LIMIT = 8
 OUTCOME_SERIES = (
     (OUTCOME_BOT_DONE, "bot_done", "Chatbot tự xử lý"),
     (OUTCOME_CCC, "ccc", "Chuyển CCC xử lý"),
+    (OUTCOME_RESEARCH, "research", "Phân tích / khuyến nghị"),
     (OUTCOME_PENDING, "pending", "Chờ thông tin khách hàng"),
     (OUTCOME_SPAM, "spam", "Câu hỏi rác"),
 )

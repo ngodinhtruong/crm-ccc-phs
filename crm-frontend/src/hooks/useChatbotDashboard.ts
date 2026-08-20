@@ -9,6 +9,8 @@ import { chatbotDashboardService } from "@/services/chatbot-dashboard.service";
 import {
   ActiveTab,
   ChatbotDashboardFilters,
+  ChatbotTicketColumnFilterKey,
+  ChatbotTicketColumnFilters,
   ChatbotFaqItem,
   ChatbotOverviewResponse,
   ChatbotTicketItem,
@@ -18,6 +20,7 @@ import {
   TicketListParams,
   TicketOpenOptions,
 } from "@/types/chatbot-dashboard.type";
+import { useDebounce } from "@/hooks/useDebounce";
 import { normalizeFilters } from "@/utils/chatbot-filter.util";
 import { formatDateInput } from "@/utils/date.util";
 import { getErrorMessage } from "@/utils/error.util";
@@ -39,6 +42,26 @@ const DEFAULT_TICKET_STATUS: OutcomeCode = "CCC";
 
 /** Chu kỳ tự làm mới dashboard: 2 phút. */
 const AUTO_REFRESH_MS = 120_000;
+
+/** Bộ lọc theo cột lúc chưa nhập gì. */
+const EMPTY_COLUMN_FILTERS: ChatbotTicketColumnFilters = {
+  ticket_code: "",
+  ticket_status: "",
+  session_id: "",
+  started_from: "",
+  started_to: "",
+  channel: "",
+  category: "",
+  msg_count_min: "",
+  msg_count_max: "",
+  contact_info: "",
+  last_question: "",
+  reason: "",
+};
+
+function hasColumnFilter(filters: ChatbotTicketColumnFilters) {
+  return Object.values(filters).some((value) => value.trim() !== "");
+}
 
 /** Khoảng của preset "5 tháng gần đây": từ đầu tháng cách đây 4 tháng tới nay. */
 function getPresetFilters(): ChatbotDashboardFilters {
@@ -133,6 +156,13 @@ export function useChatbotDashboard(initialFilters?: Partial<ChatbotDashboardFil
   const [ticketPanelTitle, setTicketPanelTitle] =
     useState(DEFAULT_CCC_PANEL_TITLE);
 
+  const [columnFilters, setColumnFilters] =
+    useState<ChatbotTicketColumnFilters>(EMPTY_COLUMN_FILTERS);
+
+  // Gõ tới đâu lọc tới đó, nhưng chờ 400ms để một lần gõ không thành một
+  // request mỗi ký tự.
+  const debouncedColumnFilters = useDebounce(columnFilters, 400);
+
   const [selectedSession, setSelectedSession] =
     useState<ChatbotTicketItem | null>(null);
 
@@ -181,6 +211,11 @@ export function useChatbotDashboard(initialFilters?: Partial<ChatbotDashboardFil
    */
   const requestIdRef = useRef(0);
 
+  // loadTickets được gọi từ nhiều nhánh async nên đọc bộ lọc cột qua ref để
+  // luôn lấy giá trị mới nhất, không phải bản đóng băng của lần render trước.
+  const columnFiltersRef = useRef(debouncedColumnFilters);
+  columnFiltersRef.current = debouncedColumnFilters;
+
   const nextRequestId = () => {
     requestIdRef.current += 1;
     return requestIdRef.current;
@@ -204,6 +239,8 @@ export function useChatbotDashboard(initialFilters?: Partial<ChatbotDashboardFil
   ) => {
     const data = await chatbotDashboardService.getTickets({
       ...activeFilters,
+      ...columnFiltersRef.current,
+      ...overrides,
       status: overrides.status ?? ticketStatus,
       q: overrides.q ?? ticketKeyword,
       dashboard_category: overrides.dashboard_category ?? ticketCategory,
@@ -409,19 +446,49 @@ export function useChatbotDashboard(initialFilters?: Partial<ChatbotDashboardFil
     await runTicketQuery({ status, dashboard_category: "" });
   };
 
+  const updateColumnFilter = (
+    key: ChatbotTicketColumnFilterKey,
+    value: string
+  ) => {
+    setColumnFilters((prev) => ({ ...prev, [key]: value }));
+  };
+
   /** Về lại trạng thái mặc định của tab Ticket, không phải "Tất cả". */
   const clearTicketFilters = async () => {
     setTicketStatus(DEFAULT_TICKET_STATUS);
     setTicketKeyword("");
     setTicketCategory("");
     setTicketPanelTitle(DEFAULT_CCC_PANEL_TITLE);
+    setColumnFilters(EMPTY_COLUMN_FILTERS);
+    columnFiltersRef.current = EMPTY_COLUMN_FILTERS;
 
     await runTicketQuery({
       status: DEFAULT_TICKET_STATUS,
       q: "",
       dashboard_category: "",
+      ...EMPTY_COLUMN_FILTERS,
     });
   };
+
+  /*
+   * Bộ lọc cột đổi -> tải lại danh sách.
+   *
+   * Bỏ qua lần chạy đầu: lúc mở trang danh sách đã được tải bởi loadData,
+   * chạy thêm ở đây chỉ tốn một request trùng.
+   */
+  const skipFirstColumnEffect = useRef(true);
+
+  useEffect(() => {
+    if (skipFirstColumnEffect.current) {
+      skipFirstColumnEffect.current = false;
+      return;
+    }
+
+    if (activeTab !== "tickets") return;
+
+    void runTicketQuery({});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedColumnFilters]);
 
   useEffect(() => {
     if (!authService.isAuthenticated()) {
@@ -499,6 +566,10 @@ export function useChatbotDashboard(initialFilters?: Partial<ChatbotDashboardFil
     changeTicketStatus,
     setTicketKeyword,
     clearTicketFilters,
+
+    columnFilters,
+    updateColumnFilter,
+    hasColumnFilter: hasColumnFilter(columnFilters),
     openTicketsFromOverview,
 
     selectedSession,

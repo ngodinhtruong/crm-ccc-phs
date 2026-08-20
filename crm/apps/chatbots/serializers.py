@@ -132,6 +132,9 @@ class ChatbotChatLogSerializer(serializers.ModelSerializer):
             "answer",
             "questionType",
             "category",
+            # Rỗng = dòng xpro (một cặp hỏi - đáp). Có giá trị = dòng Zalo,
+            # cho biết tin đó do khách, bot hay nhân viên gửi.
+            "sender_type",
             "external_created_at",
         ]
 

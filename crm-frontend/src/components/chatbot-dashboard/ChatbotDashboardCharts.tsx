@@ -121,6 +121,7 @@ function AutomationTrendChartCard({
         total: 0,
         bot_done: 0,
         ccc: 0,
+        research: 0,
         pending: 0,
         spam: 0,
         bot_done_rate: 0,
@@ -284,6 +285,7 @@ function SessionTrendLineChartCard({
         total: 0,
         bot_done: 0,
         ccc: 0,
+        research: 0,
         pending: 0,
         spam: 0,
         bot_done_rate: 0,
@@ -382,6 +384,7 @@ function SessionTrendLineChartCard({
 const OUTCOME_SERIES_COLORS: Record<string, string> = {
   "Chatbot tự xử lý": "#10b981",
   "Chuyển CCC xử lý": "#f59e0b",
+  "Phân tích / khuyến nghị": "#8b5cf6",
   "Chờ thông tin khách hàng": "#0284c7",
   "Câu hỏi rác": "#ef4444",
 };
@@ -446,6 +449,7 @@ function slicesFromRow(row: any, keys: string[]): DrilldownSlice[] {
 const OUTCOME_FIELDS = [
   { field: "bot_done", name: "Chatbot tự xử lý" },
   { field: "ccc", name: "Chuyển CCC xử lý" },
+  { field: "research", name: "Phân tích / khuyến nghị" },
   { field: "pending", name: "Chờ thông tin khách hàng" },
   { field: "spam", name: "Câu hỏi rác" },
 ] as const;

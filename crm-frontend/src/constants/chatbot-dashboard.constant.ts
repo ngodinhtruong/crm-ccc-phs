@@ -31,6 +31,7 @@ export const CHATBOT_TICKET_STATUS_OPTIONS: {
   { value: "ALL", label: "Tất cả" },
   { value: "BOT_DONE", label: "Chatbot tự xử lý" },
   { value: "CCC", label: "Chuyển CCC xử lý" },
+  { value: "RESEARCH", label: "Phân tích / khuyến nghị" },
   { value: "PENDING", label: "Chờ thông tin khách hàng" },
   { value: "SPAM", label: "Câu hỏi rác" },
   { value: "TOPIC", label: "Có chủ đề (Chatbot + CCC)" },
@@ -48,6 +49,10 @@ export const OUTCOME_STYLES: Record<
   CCC: {
     pill: "bg-amber-100 text-amber-700",
     bar: "from-amber-500 to-orange-400",
+  },
+  RESEARCH: {
+    pill: "bg-violet-100 text-violet-700",
+    bar: "from-violet-500 to-violet-400",
   },
   PENDING: {
     pill: "bg-sky-100 text-sky-700",

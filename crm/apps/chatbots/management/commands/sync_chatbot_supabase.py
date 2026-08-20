@@ -3,34 +3,24 @@ from django.core.management.base import BaseCommand
 from django.utils.dateparse import parse_datetime
 from supabase import create_client
 
-from apps.chatbots.models import (
-    ChatbotChatLog,
-    ChatbotCskhRequest,
-    ChatbotState,
-    ChatbotSyncCursor,
-)
+from apps.chatbots.models import ChatbotChatLog, ChatbotSyncCursor
 from apps.chatbots.services import (
     create_crm_tickets_from_chatbot,
     rebuild_chatbot_session_summaries,
     resolve_default_branch,
 )
+from apps.chatbots.sources import (
+    DEFAULT_SESSION_KEYS,
+    SYNC_SOURCES,
+    get_value,
+)
 
 BATCH_SIZE = 1000
 
-# Một số dòng trên Supabase có session_id rỗng (chủ yếu là câu chào/rác từ
+# Một số dòng trên Supabase có khóa phiên rỗng (chủ yếu là câu chào/rác từ
 # tài khoản test). Vẫn phải nhập để không thiếu lượt ở "tổng tiếp nhận",
 # nên gán cho mỗi dòng một session riêng thay vì bỏ qua.
 ORPHAN_SESSION_PREFIX = "no-session"
-
-
-def get_value(row, *keys):
-    for key in keys:
-        value = row.get(key)
-
-        if value is not None:
-            return value
-
-    return None
 
 
 def parse_dt(value):
@@ -43,62 +33,14 @@ def parse_dt(value):
     return parse_datetime(str(value))
 
 
-def get_session_id(row):
-    """session_id thô của một dòng; rỗng nghĩa là dòng không gắn được vào phiên."""
-    return str(get_value(row, "session_id", "sessionID", "sessionId") or "").strip()
+def get_session_id(row, keys=DEFAULT_SESSION_KEYS):
+    """
+    Khóa gom phiên của một dòng; rỗng nghĩa là dòng không gắn được vào phiên.
 
-
-# Ba bảng nguồn chỉ khác nhau ở model đích, cột thời gian và vài cột riêng —
-# phần còn lại (phân trang, mốc sync, gom session, cập nhật cursor) giống hệt
-# nhau nên mô tả bằng dữ liệu và dùng chung một vòng nhập.
-SYNC_SOURCES = (
-    {
-        "name": "xpro_chat_logs",
-        "label": "Chat logs",
-        "table_setting": "SUPABASE_XPRO_CHAT_TABLE",
-        "model": ChatbotChatLog,
-        "order_column": "created_at",
-        "time_keys": ("created_at", "create_at"),
-        # Chat log không có session_id vẫn nhập, xem như một phiên riêng.
-        "allow_orphan_session": True,
-        "extra_fields": lambda row: {
-            "question": get_value(row, "question"),
-            "answer": get_value(row, "answer"),
-            "questionType": get_value(row, "questionType", "question_type"),
-            "category": get_value(row, "category", "categories"),
-        },
-    },
-    {
-        "name": "cskh_state",
-        "label": "CSKH states",
-        "table_setting": "SUPABASE_CSKH_STATE_TABLE",
-        "model": ChatbotState,
-        "order_column": "updated_at",
-        "time_keys": ("updated_at", "updatedAt", "created_at"),
-        # State/Request không có session_id thì vô nghĩa: không biết gắn vào
-        # phiên nào để tính ra nhóm xử lý.
-        "allow_orphan_session": False,
-        "extra_fields": lambda row: {
-            "step": get_value(row, "step"),
-            "reason": get_value(row, "reason"),
-        },
-    },
-    {
-        "name": "cskh_requests",
-        "label": "CSKH requests",
-        "table_setting": "SUPABASE_CSKH_REQUESTS_TABLE",
-        "model": ChatbotCskhRequest,
-        "order_column": "created_at",
-        "time_keys": ("created_at", "create_at"),
-        "allow_orphan_session": False,
-        "extra_fields": lambda row: {
-            "contact_info": get_value(row, "contact_info"),
-            "contact_type": get_value(row, "contact_type"),
-            "reason": get_value(row, "reason"),
-            "status": get_value(row, "status"),
-        },
-    },
-)
+    Mỗi bảng nguồn để khóa này ở một cột khác nhau (``session_id`` với XPro,
+    ``sender_id`` với Zalo) nên tên cột do chính nguồn khai báo.
+    """
+    return str(get_value(row, *keys) or "").strip()
 
 
 class Command(BaseCommand):
@@ -199,15 +141,14 @@ class Command(BaseCommand):
 
     def sync_source(self, client, source, full):
         """Nhập một bảng nguồn, trả về tập session_id vừa đụng tới."""
-        cursor, _ = ChatbotSyncCursor.objects.get_or_create(source_name=source["name"])
+        cursor, _ = ChatbotSyncCursor.objects.get_or_create(source_name=source.name)
         rows = self.fetch_incremental(
             client,
-            getattr(settings, source["table_setting"]),
-            source["order_column"],
+            getattr(settings, source.table_setting),
+            source.order_column,
             since=None if full else cursor.last_synced_at,
         )
 
-        model = source["model"]
         sessions = set()
         max_dt = cursor.last_synced_at
 
@@ -217,26 +158,40 @@ class Command(BaseCommand):
             if external_id is None:
                 continue
 
+            # Dòng chat không có cả câu hỏi lẫn câu trả lời thì không phải một
+            # lượt trò chuyện — bỏ để không sinh phiên rỗng trên dashboard.
+            if source.model is ChatbotChatLog and not (
+                get_value(row, "question") or get_value(row, "answer")
+            ):
+                continue
+
             external_id = str(external_id)
-            session_id = get_session_id(row)
+            session_id = get_session_id(row, source.session_keys)
 
             if not session_id:
-                if not source["allow_orphan_session"]:
+                if not source.allow_orphan_session:
                     continue
 
-                session_id = f"{ORPHAN_SESSION_PREFIX}-{external_id}"
+                session_id = f"{ORPHAN_SESSION_PREFIX}-{source.name}-{external_id}"
 
-            dt = parse_dt(get_value(row, *source["time_keys"]))
+            dt = parse_dt(get_value(row, *source.time_keys))
 
-            model.objects.update_or_create(
-                external_id=external_id,
+            # Nguồn nào đổ chung bảng thì source_name phải nằm trong khóa tra:
+            # id của xpro_chat_logs và chat_questions trùng dải nhau.
+            lookup = {"external_id": external_id}
+
+            if source.track_source:
+                lookup["source_name"] = source.name
+
+            source.model.objects.update_or_create(
+                **lookup,
                 defaults={
                     "session_id": session_id,
-                    "user_id": get_value(row, "user_id", "user_ID", "userId"),
-                    "channel": get_value(row, "channel"),
+                    "user_id": get_value(row, *source.user_keys),
+                    "channel": get_value(row, "platform", "channel"),
                     "external_created_at": dt,
                     "raw_payload": row,
-                    **source["extra_fields"](row),
+                    **source.extra_fields(row),
                 },
             )
 
@@ -246,6 +201,6 @@ class Command(BaseCommand):
                 max_dt = dt
 
         self.save_cursor(cursor, max_dt, len(rows))
-        self.stdout.write(f"{source['label']}: {len(rows)}")
+        self.stdout.write(f"{source.label}: {len(rows)}")
 
         return sessions

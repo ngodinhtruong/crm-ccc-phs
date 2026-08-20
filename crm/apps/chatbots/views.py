@@ -1,4 +1,8 @@
+from datetime import datetime, time, timedelta
+
 from django.db.models import Count, F, Max, Q
+from django.utils import timezone
+from django.utils.dateparse import parse_date
 from rest_framework import generics
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
@@ -21,7 +25,10 @@ from apps.chatbots.dashboard.constants import (
     parse_dashboard_sections,
 )
 from apps.chatbots.dashboard.filters import ChatbotDashboardFilterMixin
-from apps.chatbots.dashboard.periods import GRANULARITY_LABELS
+from apps.chatbots.dashboard.periods import (
+    DASHBOARD_TIMEZONE,
+    GRANULARITY_LABELS,
+)
 from apps.chatbots.models import ChatbotChatLog, ChatbotSessionSummary
 from apps.chatbots.serializers import (
     ChatbotChatLogSerializer,
@@ -160,6 +167,8 @@ class ChatbotDashboardTicketsAPIView(ChatbotDashboardFilterMixin, generics.ListA
         elif status_value and status_value != "ALL":
             queryset = queryset.filter(outcome_type=status_value)
 
+        # dashboard_category khớp tuyệt đối: tham số này do biểu đồ truyền vào
+        # khi người dùng bấm một cột, phải ra đúng tập của cột đó.
         if category:
             if category == UNCATEGORIZED_LABEL:
                 queryset = queryset.filter(
@@ -167,6 +176,8 @@ class ChatbotDashboardTicketsAPIView(ChatbotDashboardFilterMixin, generics.ListA
                 )
             else:
                 queryset = queryset.filter(dashboard_category=category)
+
+        queryset = self.apply_column_filters(queryset)
 
         if keyword:
             # Không quét full_conversation trong list API. Endpoint chi tiết vẫn
@@ -181,6 +192,73 @@ class ChatbotDashboardTicketsAPIView(ChatbotDashboardFilterMixin, generics.ListA
                 | Q(contact_info__icontains=keyword)
                 | Q(ticket__ticket_code__icontains=keyword)
             )
+
+        return queryset
+
+    # Lọc theo từng cột của bảng, đặt ngay dưới dòng tiêu đề. Mỗi tham số ứng
+    # với đúng một cột người dùng nhìn thấy; khác với `q` là ô tìm chung.
+    COLUMN_TEXT_FILTERS = {
+        "ticket_code": "ticket__ticket_code__icontains",
+        "session_id": "session_id__icontains",
+        "channel": "channel__icontains",
+        # Khác `dashboard_category` (khớp tuyệt đối, do biểu đồ truyền vào):
+        # ô lọc cột là người dùng gõ tay nên tìm gần đúng.
+        "category": "dashboard_category__icontains",
+        "contact_info": "contact_info__icontains",
+        "last_question": "last_question__icontains",
+        "reason": "reason__icontains",
+    }
+
+    def apply_column_filters(self, queryset):
+        for param, lookup in self.COLUMN_TEXT_FILTERS.items():
+            value = (self.request.query_params.get(param) or "").strip()
+
+            if value:
+                queryset = queryset.filter(**{lookup: value})
+
+        ticket_status = (
+            self.request.query_params.get("ticket_status") or ""
+        ).strip()
+
+        if ticket_status:
+            queryset = queryset.filter(
+                ticket__current_status__status_code=ticket_status
+            )
+
+        # Khoảng thời gian riêng của cột, chồng lên bộ lọc chung của dashboard.
+        for param, lookup in (
+            ("started_from", "started_at__gte"),
+            ("started_to", "started_at__lt"),
+        ):
+            parsed = parse_date(self.request.query_params.get(param) or "")
+
+            if not parsed:
+                continue
+
+            moment = datetime.combine(parsed, time.min)
+
+            if timezone.is_naive(moment):
+                moment = timezone.make_aware(moment, DASHBOARD_TIMEZONE)
+
+            if param == "started_to":
+                # Người dùng chọn "đến ngày 15" là muốn gồm cả ngày 15.
+                moment += timedelta(days=1)
+
+            queryset = queryset.filter(**{lookup: moment})
+
+        for param, lookup in (
+            ("msg_count_min", "msg_count_total__gte"),
+            ("msg_count_max", "msg_count_total__lte"),
+        ):
+            raw = (self.request.query_params.get(param) or "").strip()
+
+            if not raw:
+                continue
+
+            try:
+                queryset = queryset.filter(**{lookup: int(raw)})
+            except (TypeError, ValueError):
+                continue
 
         return queryset
 
@@ -216,6 +294,7 @@ class ChatbotSessionDetailAPIView(APIView):
                 "answer",
                 "questionType",
                 "category",
+                "sender_type",
                 "external_created_at",
             )
             .order_by("external_created_at", "id")

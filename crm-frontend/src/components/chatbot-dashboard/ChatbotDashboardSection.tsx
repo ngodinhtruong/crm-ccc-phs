@@ -125,6 +125,9 @@ export function ChatbotDashboardSection({
             onSearch={dashboard.searchTickets}
             onClearPreset={dashboard.clearTicketFilters}
             onOpenSession={dashboard.setSelectedSession}
+            columnFilters={dashboard.columnFilters}
+            onColumnFilterChange={dashboard.updateColumnFilter}
+            hasColumnFilter={dashboard.hasColumnFilter}
           />
         )}
 

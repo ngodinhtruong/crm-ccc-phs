@@ -6,10 +6,15 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.chatbots.constants import (
+    SENDER_LABELS,
+    SENDER_TYPE_CUSTOMER,
     category_label,
+    is_customer_turn,
     is_faq_question,
+    is_research_question,
     is_spam_question,
     normalize_category,
+    normalize_sender_type,
     normalize_step,
 )
 from apps.chatbots.models import (
@@ -87,14 +92,44 @@ def normalize_contact_type(raw_type, value=None):
 
 
 def build_full_conversation(logs):
+    """
+    Dựng lại hội thoại, chịu được cả hai kiểu ghi log của hai nguồn.
+
+    xpro_chat_logs ghi mỗi dòng là trọn một cặp hỏi - đáp. chat_questions ghi
+    mỗi dòng là một tin nhắn của một bên, nên phải đánh số theo lượt của khách
+    và gọi đúng tên người nói — nếu không, tin của nhân viên bị gắn nhãn "Bot"
+    và số thứ tự nhảy theo từng tin thay vì theo từng lượt hỏi.
+    """
     lines = []
+    index = 0
 
-    for index, log in enumerate(logs, start=1):
-        if log.question:
-            lines.append(f"{index}. KH: {log.question}")
+    for log in logs:
+        sender = normalize_sender_type(getattr(log, "sender_type", None))
 
-        if log.answer:
-            lines.append(f"   Bot: {log.answer}")
+        # Nguồn xpro: một dòng là trọn một cặp hỏi - đáp.
+        if not sender:
+            index += 1
+
+            if log.question:
+                lines.append(f"{index}. KH: {log.question}")
+
+            if log.answer:
+                lines.append(f"   Bot: {log.answer}")
+
+            continue
+
+        # Nguồn chat_questions: một dòng là một tin nhắn của một bên.
+        raw = log.question if sender == SENDER_TYPE_CUSTOMER else log.answer
+        text = (raw or "").strip()
+
+        if not text:
+            continue
+
+        if sender == SENDER_TYPE_CUSTOMER:
+            index += 1
+            lines.append(f"{index}. KH: {text}")
+        else:
+            lines.append(f"   {SENDER_LABELS.get(sender, sender.upper())}: {text}")
 
     return "\n".join(lines)
 
@@ -109,6 +144,10 @@ def pick_session_category(logs):
     last_seen = {}
 
     for index, log in enumerate(logs):
+        # Dòng trả lời của bot/nhân viên không phải câu khách hỏi.
+        if not is_customer_turn(log):
+            continue
+
         if is_spam_question(log.questionType):
             continue
 
@@ -134,16 +173,19 @@ def detect_outcome(logs, has_state, has_request):
       1. Có cskh_request     -> CCC (đã xin được thông tin, tạo ticket)
       2. Có cskh_state       -> PENDING (chatbot bí, KH chưa/không cho thông tin)
       3. Có câu FAQ          -> BOT_DONE (chatbot tự trả lời bằng kho tri thức)
-      4. Còn lại             -> SPAM
+      4. Có câu RESEARCH     -> RESEARCH (phân tích cổ phiếu, khuyến nghị)
+      5. Còn lại             -> SPAM
 
-    Bước 3 chỉ nhận CUSTOMER_CARE, chứ không nhận mọi câu "không phải rác" như
-    trước. Lý do: chỉ CUSTOMER_CARE mới được chatbot gán category, nên nếu tính
-    cả RESEARCH (phân tích cổ phiếu, khuyến nghị thị trường) vào BOT_DONE thì
-    phía bot đầy phiên không có chủ đề và không đặt cạnh phía CCC để so được.
+    Bước 3 đứng trước bước 4 có chủ đích: phiên vừa hỏi FAQ vừa hỏi phân tích
+    được tính là BOT_DONE, vì trả được câu nghiệp vụ mới là tín hiệu chính.
 
-    Hệ quả có ý thức: phiên chỉ toàn RESEARCH rơi xuống nhánh cuối cùng chung
-    với câu rác. Nghiệp vụ hiện không theo dõi riêng nhóm RESEARCH; muốn tách
-    thì thêm một mã vào OUTCOME_CHOICES và OUTCOME_SERIES.
+    RESEARCH là nhóm riêng chứ không gộp vào SPAM như trước — đó là việc bot
+    làm được, gộp vào câu rác thì tỷ lệ tự động hóa bị báo thiếu, và khi đặt
+    hai nền tảng cạnh nhau (XPro có RESEARCH, Zalo không) thì XPro trông tệ
+    hơn một cách giả tạo.
+
+    Chỉ đếm lượt của khách: nguồn chat_questions ghi mỗi tin nhắn một dòng nên
+    dòng trả lời của bot/nhân viên không mang câu hỏi để phân loại.
     """
     if has_request:
         return ChatbotSessionSummary.OUTCOME_CCC
@@ -151,10 +193,13 @@ def detect_outcome(logs, has_state, has_request):
     if has_state:
         return ChatbotSessionSummary.OUTCOME_PENDING
 
-    has_faq_question = any(is_faq_question(log.questionType) for log in logs)
+    turns = [log for log in logs if is_customer_turn(log)]
 
-    if has_faq_question:
+    if any(is_faq_question(log.questionType) for log in turns):
         return ChatbotSessionSummary.OUTCOME_BOT_DONE
+
+    if any(is_research_question(log.questionType) for log in turns):
+        return ChatbotSessionSummary.OUTCOME_RESEARCH
 
     return ChatbotSessionSummary.OUTCOME_SPAM
 
@@ -163,25 +208,33 @@ def count_messages(logs, outcome):
     """
     Chia số lượt hỏi của phiên vào đúng nhóm.
 
-    Bất biến cần giữ: msg_count_total = bot_done + ccc + spam + pending.
+    Bất biến cần giữ:
+        msg_count_total = bot_done + ccc + spam + pending + research
+
+    Chỉ đếm lượt của KHÁCH. Nguồn chat_questions ghi mỗi tin nhắn một dòng
+    (khách / bot / nhân viên), nên đếm hết mọi dòng sẽ thổi phồng số lượt của
+    phiên Zalo lên gấp hai, gấp ba so với phiên XPro.
 
     Câu rác luôn tính vào msg_count_spam, kể cả trong phiên CCC/PENDING, để
-    "tổng tiếp nhận" không bị đếm trùng.
+    "tổng tiếp nhận" không bị đếm trùng. Phiên SPAM thì dồn toàn bộ lượt vào
+    msg_count_spam.
 
-    Phiên SPAM thì dồn toàn bộ lượt hỏi vào msg_count_spam. Từ khi BOT_DONE
-    chỉ nhận câu FAQ, phiên SPAM có thể còn lượt RESEARCH vốn không phải câu
-    rác; để nguyên nhánh mặc định cũ thì số lượt đó chảy sang msg_count_bot_done
-    của một phiên không hề là BOT_DONE.
+    Lượt không-rác đi theo nhóm của PHIÊN chứ không theo nhóm của từng lượt:
+    lượt RESEARCH nằm trong một phiên BOT_DONE vẫn được cộng vào
+    msg_count_bot_done.
     """
-    spam = sum(1 for log in logs if is_spam_question(log.questionType))
-    non_spam = len(logs) - spam
+    turns = [log for log in logs if is_customer_turn(log)]
+
+    spam = sum(1 for log in turns if is_spam_question(log.questionType))
+    non_spam = len(turns) - spam
 
     counts = {
-        "msg_count_total": len(logs),
+        "msg_count_total": len(turns),
         "msg_count_bot_done": 0,
         "msg_count_ccc": 0,
         "msg_count_spam": spam,
         "msg_count_pending": 0,
+        "msg_count_research": 0,
     }
 
     if outcome == ChatbotSessionSummary.OUTCOME_CCC:
@@ -190,8 +243,10 @@ def count_messages(logs, outcome):
         counts["msg_count_pending"] = non_spam
     elif outcome == ChatbotSessionSummary.OUTCOME_BOT_DONE:
         counts["msg_count_bot_done"] = non_spam
+    elif outcome == ChatbotSessionSummary.OUTCOME_RESEARCH:
+        counts["msg_count_research"] = non_spam
     else:
-        counts["msg_count_spam"] = len(logs)
+        counts["msg_count_spam"] = len(turns)
 
     return counts
 
@@ -233,6 +288,9 @@ def rebuild_chatbot_session_summaries(affected_session_ids=None):
         "answer",
         "questionType",
         "category",
+        # is_customer_turn() đọc cột này; thiếu ở đây là mỗi dòng log sinh
+        # thêm một query phụ khi rebuild.
+        "sender_type",
         "external_created_at",
     ).order_by("external_created_at", "id")
 
@@ -283,6 +341,14 @@ def rebuild_chatbot_session_summaries(affected_session_ids=None):
         first_log = logs[0] if logs else None
         last_log = logs[-1] if logs else None
 
+        # Mốc thời gian lấy theo mọi dòng (phiên bắt đầu / kết thúc lúc nào),
+        # nhưng câu hỏi phải lấy từ lượt của khách: dòng cuối của phiên Zalo
+        # thường là tin của bot hoặc nhân viên, lấy nhầm thì last_question
+        # rỗng và ticket mất luôn tiêu đề.
+        customer_logs = [log for log in logs if is_customer_turn(log)]
+        first_customer = customer_logs[0] if customer_logs else None
+        last_customer = customer_logs[-1] if customer_logs else None
+
         outcome = detect_outcome(logs, has_state=bool(state), has_request=bool(request))
         counts = count_messages(logs, outcome)
 
@@ -322,8 +388,8 @@ def rebuild_chatbot_session_summaries(affected_session_ids=None):
                 "contact_info": request.contact_info if request else "",
                 "contact_type": request.contact_type if request else "",
                 "reason": reason,
-                "first_question": first_log.question if first_log else "",
-                "last_question": last_log.question if last_log else "",
+                "first_question": first_customer.question if first_customer else "",
+                "last_question": last_customer.question if last_customer else "",
                 "full_conversation": build_full_conversation(logs),
                 "started_at": started_at,
                 "ended_at": ended_at,

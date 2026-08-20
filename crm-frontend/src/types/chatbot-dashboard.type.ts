@@ -5,6 +5,7 @@ export type OutcomeCode =
   | "ALL"
   | "BOT_DONE"
   | "CCC"
+  | "RESEARCH"
   | "SPAM"
   | "PENDING"
   | "TOPIC";
@@ -44,6 +45,7 @@ export type PeriodComparisonItem = {
   total: number;
   bot_done: number;
   ccc: number;
+  research: number;
   pending: number;
   spam: number;
   ccc_rate: number;
@@ -151,6 +153,7 @@ export type TimeSeriesOutcomeItem = {
   total: number;
   bot_done: number;
   ccc: number;
+  research: number;
   pending: number;
   spam: number;
   bot_done_rate: number;
@@ -247,6 +250,7 @@ export type ChatbotOverviewResponse = {
     total_received: SummaryBucket;
     bot_done: SummaryBucket;
     ccc: SummaryBucket;
+    research: SummaryBucket;
     spam: SummaryBucket;
     pending: SummaryBucket;
   };
@@ -307,13 +311,38 @@ export type PaginatedResponse<T> = {
   results: T[];
 };
 
-export type TicketListParams = ChatbotDashboardFilters & {
-  status?: OutcomeCode;
-  q?: string;
-  dashboard_category?: string;
-  page?: number;
-  page_size?: number;
+/**
+ * Bộ lọc theo từng cột của bảng phiên, đặt ngay dưới dòng tiêu đề.
+ *
+ * Khác `q` (tìm chung trên nhiều cột) và khác `dashboard_category` (khớp
+ * tuyệt đối, do biểu đồ truyền vào khi bấm một cột): đây là những ô người
+ * dùng gõ tay nên tìm gần đúng trên đúng một cột.
+ */
+export type ChatbotTicketColumnFilters = {
+  ticket_code: string;
+  ticket_status: string;
+  session_id: string;
+  started_from: string;
+  started_to: string;
+  channel: string;
+  category: string;
+  msg_count_min: string;
+  msg_count_max: string;
+  contact_info: string;
+  last_question: string;
+  reason: string;
 };
+
+export type ChatbotTicketColumnFilterKey = keyof ChatbotTicketColumnFilters;
+
+export type TicketListParams = ChatbotDashboardFilters &
+  Partial<ChatbotTicketColumnFilters> & {
+    status?: OutcomeCode;
+    q?: string;
+    dashboard_category?: string;
+    page?: number;
+    page_size?: number;
+  };
 
 export type FaqListParams = ChatbotDashboardFilters & {
   q?: string;
