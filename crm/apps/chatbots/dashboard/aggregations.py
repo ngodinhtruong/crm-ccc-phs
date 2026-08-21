@@ -451,12 +451,11 @@ class ChatbotDashboardAggregator:
     # ------------------------------------------------------------------
     # Nhãn tiếng Việt cho các giá trị questionType đã biết. Giá trị lạ (gõ sai
     # từ n8n, ví dụ "GEETING") giữ nguyên để nhìn ra ngay mà đi sửa nguồn.
-    QUESTION_TYPE_LABELS = {
-        "CUSTOMER_CARE": "CUSTOMER_CARE",
-        "RESEARCH": "Phân tích / khuyến nghị",
-        "GREETING": "GREETING",
-        "UNRELATED": "UNRELATED",
-    }
+    # Giữ nguyên mã thô. Biểu đồ này để soi chất lượng dữ liệu nguồn, nên hiện
+    # đúng chữ n8n ghi xuống thì mới nhìn ra giá trị sai (GEETING, HIHI...).
+    # Khác OUTCOME_SERIES: nhãn ở đó vừa hiển thị vừa làm khóa tra màu bên
+    # frontend nên phải giữ tiếng Việt.
+    QUESTION_TYPE_LABELS = {}
 
     UNKNOWN_QUESTION_TYPE_LABEL = "Chưa gán loại"
 
@@ -471,20 +470,23 @@ class ChatbotDashboardAggregator:
 
     def build_question_type_bar(self):
         """
-        Khách hỏi những loại gì, tách theo nguồn.
+        Khách hỏi những loại gì, tách theo NỀN TẢNG.
 
-        Tách nguồn vì hai nền tảng gán questionType không đều nhau: thiếu ở
-        nguồn nào thì nhìn cột "Chưa gán loại" là thấy ngay, thay vì tưởng
-        khách bên đó không hỏi.
+        Tách theo cột platform chứ không phải theo bảng nguồn: bảng
+        xpro_chat_logs chứa lẫn cả xpro, website, mobile và một ít zalo, nên
+        chia theo bảng thì gộp nhầm bốn nền tảng làm một.
+
+        Tách ra mới thấy nền tảng nào chatbot gán questionType không đều —
+        thiếu ở đâu là lộ ngay ở chiều dài cột.
         """
         merged = {}
         sources = set()
 
         for row in self._classified_logs().values(
-            "questionType", "source_name"
+            "questionType", "channel"
         ).annotate(value=Count("id")):
             name = self.question_type_label(row["questionType"])
-            source = row["source_name"] or "khác"
+            source = channel_label(row["channel"])
             sources.add(source)
 
             item = merged.setdefault(name, {"name": name, "value": 0})

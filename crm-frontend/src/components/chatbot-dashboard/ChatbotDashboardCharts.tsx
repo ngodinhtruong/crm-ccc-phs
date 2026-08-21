@@ -1978,10 +1978,19 @@ function ChannelPerformanceBarCard({
 /* ====================================================================
  * 📊 9. THỂ LOẠI CÂU HỎI CỦA KHÁCH (questionType)
  * ==================================================================== */
-/** Tên bảng Supabase -> tên nền tảng cho người đọc. */
+/**
+ * Màu từng nền tảng (cột `platform` bên Supabase, đã viết hoa).
+ *
+ * Không tách theo bảng nguồn: bảng xpro_chat_logs chứa lẫn cả xpro, website,
+ * mobile và một ít zalo. Nền tảng lạ rơi vào màu xám mặc định.
+ */
 const QUESTION_TYPE_SOURCES: Record<string, { label: string; color: string }> = {
-  xpro_chat_logs: { label: "XPro", color: "#0097cf" },
-  chat_questions: { label: "Zalo", color: "#10b981" },
+  XPRO: { label: "XPro", color: "#0097cf" },
+  WEBSITE: { label: "Website", color: "#10b981" },
+  MOBILE: { label: "Mobile", color: "#f59e0b" },
+  ZALO: { label: "Zalo", color: "#8b5cf6" },
+  APP: { label: "App", color: "#06b6d4" },
+  FACEBOOK: { label: "Facebook", color: "#ef4444" },
 };
 
 function questionTypeSource(source: string) {
@@ -2038,7 +2047,7 @@ function QuestionTypeBarCard({
       title="📊 9. TOP THỂ LOẠI CÂU HỎI KHÁCH HAY NHẮN TRÊN CÁC NỀN TẢNG"
       description={
         viewMode === "DEFAULT"
-          ? "Khách hỏi loại gì — tách theo nền tảng để thấy nguồn nào chưa gán loại"
+          ? "Khách hỏi loại gì — tách theo nền tảng (XPro / Website / Mobile / Zalo)"
           : "Biến động thể loại câu hỏi qua từng kỳ"
       }
       headerRight={
@@ -2158,7 +2167,9 @@ function QuestionTypeBarCard({
         <span>
           Tổng lượt hỏi: <strong className="text-slate-800">{formatNumber(total)}</strong>
         </span>
-        <span className="text-slate-400">Nguồn: cột questionType của 2 bảng chat</span>
+        <span className="text-slate-400">
+          Nguồn: questionType × platform của 2 bảng chat
+        </span>
       </div>
     </ChartCard>
   );
