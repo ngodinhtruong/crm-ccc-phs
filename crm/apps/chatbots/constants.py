@@ -27,12 +27,19 @@ SPAM_QUESTION_TYPES = [QUESTION_TYPE_GREETING, QUESTION_TYPE_UNRELATED]
 
 # sender_type trong bảng chat_questions. xpro_chat_logs không có cột này.
 SENDER_TYPE_CUSTOMER = "customer"
+SENDER_TYPE_ANONYMOUS = "anonymous"
 SENDER_TYPE_BOT = "bot"
 SENDER_TYPE_SA = "sa"
+
+# Khách nhắn, dù đã đăng nhập hay chưa. "anonymous" là khách chưa đăng nhập:
+# các dòng đó đều có `question` và không có `answer`, tức là khách đang hỏi.
+# Bỏ sót nó thì phiên toàn khách vãng lai bị đếm 0 lượt và rơi hết vào SPAM.
+CUSTOMER_SENDER_TYPES = {SENDER_TYPE_CUSTOMER, SENDER_TYPE_ANONYMOUS}
 
 # Nhãn người nói khi dựng lại hội thoại.
 SENDER_LABELS = {
     SENDER_TYPE_CUSTOMER: "KH",
+    SENDER_TYPE_ANONYMOUS: "KH",
     SENDER_TYPE_BOT: "Bot",
     SENDER_TYPE_SA: "NV",
 }
@@ -95,6 +102,11 @@ def normalize_sender_type(value):
     return str(value or "").strip().lower()
 
 
+def is_customer_sender(sender):
+    """sender_type (đã chuẩn hóa) có phải là khách không."""
+    return sender in CUSTOMER_SENDER_TYPES
+
+
 def is_customer_turn(log):
     """
     Dòng này có phải một lượt hỏi của khách không.
@@ -109,4 +121,4 @@ def is_customer_turn(log):
     """
     sender = normalize_sender_type(getattr(log, "sender_type", None))
 
-    return not sender or sender == SENDER_TYPE_CUSTOMER
+    return not sender or is_customer_sender(sender)

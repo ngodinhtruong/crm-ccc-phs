@@ -34,6 +34,11 @@ export function KpiCards({
       Luôn giữ 6 KPI trên cùng một hàng. Breakpoint cũ chỉ dùng 5 cột từ
       `2xl` (>= 1536px), nên laptop 1366px bị chia thành 3 + 2 card.
       Khi vùng nội dung hẹp hơn 1000px, hàng KPI cuộn ngang thay vì wrap.
+
+      Nhóm "Chưa xác định loại" cố ý KHÔNG có thẻ ở đây: nghiệp vụ chưa dùng
+      tới. Phân loại phía backend vẫn giữ nguyên để nhóm đó không bị dồn
+      nhầm vào "Câu hỏi rác"; muốn hiện lại thì thêm một KpiCard cho
+      summary.unclassified và đổi grid-cols-6 thành grid-cols-7.
     */
     <div className="-mx-1 overflow-x-auto px-1 pb-1">
       <div className="grid min-w-[1000px] grid-cols-6 gap-2 xl:gap-3">
@@ -101,6 +106,7 @@ export function KpiCards({
           iconClassName="bg-rose-100 text-rose-600"
           onClick={() => onOpenTickets({ title: "Câu hỏi rác", status: "SPAM" })}
         />
+
       </div>
     </div>
   );

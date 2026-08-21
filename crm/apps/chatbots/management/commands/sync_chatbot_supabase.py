@@ -2,6 +2,8 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
+
+from apps.chatbots.dashboard.periods import DASHBOARD_TIMEZONE
 from supabase import create_client
 
 from apps.chatbots.models import ChatbotChatLog, ChatbotSyncCursor
@@ -25,23 +27,36 @@ ORPHAN_SESSION_PREFIX = "no-session"
 
 
 def parse_dt(value):
+    """
+    Chuẩn hóa mốc thời gian từ Supabase về datetime có múi giờ Việt Nam.
+
+    Mọi mốc trên Supabase đều là GIỜ VIỆT NAM, kể cả các cột ``timestamptz``:
+    n8n ghi giờ địa phương rồi Postgres tự dán ``+00:00`` vào, biến nó thành
+    UTC giả. Đối chiếu phân bố giờ trong ngày của xpro_chat_logs với
+    chat_questions và cskh_* thì thấy rõ điều đó.
+
+    Vì vậy lấy nguyên con số giờ-phút-giây, bỏ offset (nếu có) rồi gán
+    Asia/Ho_Chi_Minh — không cộng trừ gì. Ghi thẳng DASHBOARD_TIMEZONE thay vì
+    ``timezone.get_current_timezone()`` để cách đọc dữ liệu không đổi theo
+    ``settings.TIME_ZONE``: đổi setting đó là mọi mốc lệch 7 tiếng mà không có
+    gì báo.
+
+    Không gắn múi giờ thì Django cảnh báo rồi hiểu ngầm là UTC, và phép so
+    ``dt > max_dt`` với mốc lấy từ DB sẽ ném
+    ``TypeError: can't compare offset-naive and offset-aware datetimes``.
+    """
     if not value:
         return None
 
-    if hasattr(value, "isoformat"):
-        dt = value
-    else:
-        dt = parse_datetime(str(value))
+    dt = value if hasattr(value, "isoformat") else parse_datetime(str(value))
 
     if not dt:
         return None
 
-    # Lấy con số giờ-phút-giây nguyên bản từ Supabase và gán múi giờ Asia/Ho_Chi_Minh
-    # Giữ nguyên 100% con số gốc trên Supabase, không bị cộng/trừ 7 tiếng.
     if not timezone.is_naive(dt):
         dt = dt.replace(tzinfo=None)
 
-    return timezone.make_aware(dt, timezone.get_current_timezone())
+    return dt.replace(tzinfo=DASHBOARD_TIMEZONE)
 
 
 def get_session_id(row, keys=DEFAULT_SESSION_KEYS):

@@ -127,7 +127,10 @@ class ChatbotSessionSummary(TimeStampedModel):
                   không nằm trong cskh_state lẫn cskh_requests)
       - RESEARCH: chatbot phân tích cổ phiếu / khuyến nghị thị trường
                   (có lượt hỏi RESEARCH nhưng không có lượt CUSTOMER_CARE)
-      - SPAM    : phần còn lại — phiên toàn GREETING/UNRELATED
+      - SPAM    : phiên có ít nhất một lượt GREETING/UNRELATED
+      - UNCLASSIFIED: phiên mà chatbot chưa gán questionType cho lượt nào.
+                  Tách riêng vì đây là LỖ HỔNG DỮ LIỆU chứ không phải kết quả
+                  xử lý — gộp vào SPAM là vu cho khách hỏi rác.
     """
 
     OUTCOME_BOT_DONE = "BOT_DONE"
@@ -135,6 +138,7 @@ class ChatbotSessionSummary(TimeStampedModel):
     OUTCOME_RESEARCH = "RESEARCH"
     OUTCOME_SPAM = "SPAM"
     OUTCOME_PENDING = "PENDING"
+    OUTCOME_UNCLASSIFIED = "UNCLASSIFIED"
 
     OUTCOME_CHOICES = [
         (OUTCOME_BOT_DONE, "Chatbot tự xử lý"),
@@ -142,6 +146,7 @@ class ChatbotSessionSummary(TimeStampedModel):
         (OUTCOME_RESEARCH, "Phân tích / khuyến nghị"),
         (OUTCOME_SPAM, "Câu hỏi rác"),
         (OUTCOME_PENDING, "Chờ thông tin khách hàng"),
+        (OUTCOME_UNCLASSIFIED, "Chưa xác định loại"),
     ]
 
     session_id = models.CharField(max_length=100, unique=True)
@@ -160,6 +165,7 @@ class ChatbotSessionSummary(TimeStampedModel):
     msg_count_spam = models.IntegerField(default=0)
     msg_count_pending = models.IntegerField(default=0)
     msg_count_research = models.IntegerField(default=0)
+    msg_count_unclassified = models.IntegerField(default=0)
 
     has_cskh_state = models.BooleanField(default=False)
     has_cskh_request = models.BooleanField(default=False)

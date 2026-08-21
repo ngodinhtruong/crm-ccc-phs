@@ -69,6 +69,11 @@ export const OUTCOME_STYLES: Record<
     pill: "bg-rose-100 text-rose-700",
     bar: "from-rose-500 to-rose-400",
   },
+  // Xám trung tính: đây là lỗ hổng dữ liệu, không phải một kết quả xử lý.
+  UNCLASSIFIED: {
+    pill: "bg-slate-200 text-slate-700",
+    bar: "from-slate-400 to-slate-300",
+  },
 };
 
 export const DEFAULT_OUTCOME_STYLE = {

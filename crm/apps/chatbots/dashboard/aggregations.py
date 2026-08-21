@@ -1,9 +1,11 @@
 """Các truy vấn aggregate nhỏ, độc lập theo section của dashboard chatbot."""
 
-from django.db.models import Count, Max, Q, Sum
+from django.db.models import Count, Max, Q, Subquery, Sum
 from django.db.models.functions import ExtractHour
 
 from apps.chatbots.constants import (
+    CUSTOMER_SENDER_TYPES,
+    QUESTION_TYPE_CUSTOMER_CARE,
     SPAM_QUESTION_TYPES,
     UNCATEGORIZED_LABEL,
     category_label,
@@ -29,6 +31,7 @@ OUTCOME_BOT_DONE = ChatbotSessionSummary.OUTCOME_BOT_DONE
 OUTCOME_CCC = ChatbotSessionSummary.OUTCOME_CCC
 OUTCOME_RESEARCH = ChatbotSessionSummary.OUTCOME_RESEARCH
 OUTCOME_SPAM = ChatbotSessionSummary.OUTCOME_SPAM
+OUTCOME_UNCLASSIFIED = ChatbotSessionSummary.OUTCOME_UNCLASSIFIED
 OUTCOME_PENDING = ChatbotSessionSummary.OUTCOME_PENDING
 
 # Nhóm có chủ đề để so bot với CCC. RESEARCH đứng ngoài vì chatbot không gán
@@ -50,6 +53,7 @@ OUTCOME_SERIES = (
     (OUTCOME_RESEARCH, "research", "Phân tích / khuyến nghị"),
     (OUTCOME_PENDING, "pending", "Chờ thông tin khách hàng"),
     (OUTCOME_SPAM, "spam", "Câu hỏi rác"),
+    (OUTCOME_UNCLASSIFIED, "unclassified", "Chưa xác định loại"),
 )
 
 
@@ -171,6 +175,8 @@ class ChatbotDashboardAggregator:
         fallback,
         value_field="total",
         limit=6,
+        date_field="started_at",
+        extra_annotations=None,
     ):
         """
         Khung chung cho nhóm biểu đồ "top N nhóm qua từng kỳ".
@@ -185,14 +191,18 @@ class ChatbotDashboardAggregator:
         """
         granularity = normalize_granularity(granularity)
 
+        # Bảng phiên đếm theo started_at và có outcome_type; bảng log đếm theo
+        # external_created_at và không có cột đó, nên cả hai đều truyền vào.
+        if extra_annotations is None:
+            extra_annotations = {
+                "ccc": Count("id", filter=Q(outcome_type=OUTCOME_CCC)),
+            }
+
         rows = (
-            queryset.filter(started_at__isnull=False)
-            .annotate(period=period_trunc(granularity))
+            queryset.filter(**{f"{date_field}__isnull": False})
+            .annotate(period=period_trunc(granularity, date_field))
             .values("period", dimension)
-            .annotate(
-                total=Count("id"),
-                ccc=Count("id", filter=Q(outcome_type=OUTCOME_CCC)),
-            )
+            .annotate(total=Count("id"), **extra_annotations)
             .order_by("period")
         )
 
@@ -306,27 +316,205 @@ class ChatbotDashboardAggregator:
         }
 
     # ------------------------------------------------------------------
-    # Section: topics
+    # Nhóm truy vấn chạy trên BẢNG LOG (mức từng lượt hỏi)
+    #
+    # Khác nhóm chạy trên bảng phiên: một phiên chỉ mang đúng một
+    # dashboard_category (chủ đề trội nhất), còn ở đây mỗi lượt hỏi được tính
+    # riêng nên phản ánh đúng "khách hỏi bao nhiêu lần về chủ đề này".
+    # Cả hai nguồn xpro_chat_logs và chat_questions đổ chung một bảng nên
+    # không phải tách truy vấn theo nền tảng.
     # ------------------------------------------------------------------
-    def build_multi_month_all_topics(self, granularity="month"):
-        return self._period_matrix(
-            granularity,
-            self.summaries,
-            "dashboard_category",
-            label_of=category_label,
-            fallback=(UNCATEGORIZED_LABEL,),
+    def _classified_logs(self):
+        """
+        Lượt của khách ĐÃ được chatbot gán questionType.
+
+        Bỏ dòng để trống: đó là dữ liệu nguồn còn thiếu, không phải một thể
+        loại câu hỏi. Muốn biết còn bao nhiêu dòng chưa gán thì tra thẳng
+        bảng log, đừng để nó chiếm một cột trong biểu đồ phân loại.
+        """
+        return (
+            self._customer_logs()
+            .exclude(questionType__isnull=True)
+            .exclude(questionType__exact="")
         )
 
-    def build_multi_month_ccc_topics(self, granularity="month"):
+    def _customer_logs(self):
+        """
+        Lượt hỏi do KHÁCH gửi.
+
+        Nguồn xpro ghi mỗi dòng là trọn một cặp hỏi - đáp và để trống
+        sender_type, nên dòng nào cũng tính. Nguồn chat_questions ghi mỗi tin
+        nhắn một dòng nên phải loại tin của bot và nhân viên — không loại thì
+        chúng dồn vào nhóm "Chưa gán loại" và thổi phồng nhóm đó.
+        """
+        return self.logs.filter(
+            Q(sender_type__isnull=True)
+            | Q(sender_type="")
+            | Q(sender_type__iregex=r"^(" + "|".join(CUSTOMER_SENDER_TYPES) + r")$")
+        )
+
+    def _logs_with_category(self, only_customer_care=False):
+        """Lượt hỏi đã được chatbot gán chủ đề."""
+        logs = self._customer_logs().exclude(category__isnull=True).exclude(
+            category__exact=""
+        )
+
+        if only_customer_care:
+            logs = logs.filter(questionType__iexact=QUESTION_TYPE_CUSTOMER_CARE)
+
+        return logs
+
+    def _ccc_session_ids(self):
+        """Phiên đã xin được thông tin khách (có dòng trong cskh_requests)."""
+        return Subquery(
+            self.summaries.filter(outcome_type=OUTCOME_CCC).values("session_id")
+        )
+
+    def build_topic_bar(self):
+        """Số LƯỢT hỏi theo chủ đề, gom từ cột category của cả hai bảng log."""
+        merged = {}
+
+        for row in self._logs_with_category().values("category").annotate(
+            value=Count("id")
+        ):
+            name = category_label(row["category"])
+            merged[name] = merged.get(name, 0) + (row["value"] or 0)
+
+        return [
+            {"name": name, "value": value}
+            for name, value in sorted(
+                merged.items(), key=lambda item: item[1], reverse=True
+            )
+            if value
+        ]
+
+    def build_topic_bar_by_period(self, granularity="month"):
         return self._period_matrix(
             granularity,
-            self.summaries,
-            "dashboard_category",
+            self._logs_with_category(),
+            "category",
+            label_of=category_label,
+            fallback=(UNCATEGORIZED_LABEL,),
+            date_field="external_created_at",
+            extra_annotations={},
+        )
+
+    def build_category_ccc_counts(self):
+        """
+        Số lượt chuyển CCC theo chủ đề.
+
+        Chỉ tính lượt CUSTOMER_CARE: đó là câu hỏi nghiệp vụ thật, cũng là loại
+        duy nhất được chatbot gán chủ đề một cách nhất quán. Một lượt được coi
+        là "chuyển CCC" khi phiên chứa nó đã xin được thông tin khách hàng.
+        """
+        ccc_sessions = self._ccc_session_ids()
+        merged = {}
+
+        for row in (
+            self._logs_with_category(only_customer_care=True)
+            .values("category")
+            .annotate(
+                total=Count("id"),
+                ccc=Count("id", filter=Q(session_id__in=ccc_sessions)),
+            )
+        ):
+            name = category_label(row["category"])
+            item = merged.setdefault(name, {"name": name, "total": 0, "ccc": 0})
+            item["total"] += row["total"] or 0
+            item["ccc"] += row["ccc"] or 0
+
+        return sorted(
+            (
+                {**item, "rate": self.rate(item["ccc"], item["total"], digits=1)}
+                for item in merged.values()
+                if item["total"]
+            ),
+            key=lambda item: (-item["ccc"], -item["rate"]),
+        )
+
+    def build_category_ccc_by_period(self, granularity="month"):
+        return self._period_matrix(
+            granularity,
+            self._logs_with_category(only_customer_care=True),
+            "category",
             label_of=category_label,
             fallback=(UNCATEGORIZED_LABEL,),
             value_field="ccc",
+            date_field="external_created_at",
+            extra_annotations={
+                "ccc": Count("id", filter=Q(session_id__in=self._ccc_session_ids())),
+            },
         )
 
+    # ------------------------------------------------------------------
+    # Thể loại câu hỏi (questionType)
+    # ------------------------------------------------------------------
+    # Nhãn tiếng Việt cho các giá trị questionType đã biết. Giá trị lạ (gõ sai
+    # từ n8n, ví dụ "GEETING") giữ nguyên để nhìn ra ngay mà đi sửa nguồn.
+    QUESTION_TYPE_LABELS = {
+        "CUSTOMER_CARE": "CUSTOMER_CARE",
+        "RESEARCH": "Phân tích / khuyến nghị",
+        "GREETING": "GREETING",
+        "UNRELATED": "UNRELATED",
+    }
+
+    UNKNOWN_QUESTION_TYPE_LABEL = "Chưa gán loại"
+
+    @classmethod
+    def question_type_label(cls, value):
+        code = str(value or "").strip().upper()
+
+        if not code:
+            return cls.UNKNOWN_QUESTION_TYPE_LABEL
+
+        return cls.QUESTION_TYPE_LABELS.get(code, code)
+
+    def build_question_type_bar(self):
+        """
+        Khách hỏi những loại gì, tách theo nguồn.
+
+        Tách nguồn vì hai nền tảng gán questionType không đều nhau: thiếu ở
+        nguồn nào thì nhìn cột "Chưa gán loại" là thấy ngay, thay vì tưởng
+        khách bên đó không hỏi.
+        """
+        merged = {}
+        sources = set()
+
+        for row in self._classified_logs().values(
+            "questionType", "source_name"
+        ).annotate(value=Count("id")):
+            name = self.question_type_label(row["questionType"])
+            source = row["source_name"] or "khác"
+            sources.add(source)
+
+            item = merged.setdefault(name, {"name": name, "value": 0})
+            item["value"] += row["value"] or 0
+            item[source] = item.get(source, 0) + (row["value"] or 0)
+
+        ordered = sorted(merged.values(), key=lambda item: item["value"], reverse=True)
+
+        return {
+            "sources": sorted(sources),
+            "items": [
+                {**item, **{src: item.get(src, 0) for src in sources}}
+                for item in ordered
+            ],
+        }
+
+    def build_question_type_by_period(self, granularity="month"):
+        return self._period_matrix(
+            granularity,
+            self._classified_logs(),
+            "questionType",
+            label_of=self.question_type_label,
+            fallback=(self.UNKNOWN_QUESTION_TYPE_LABEL,),
+            date_field="external_created_at",
+            extra_annotations={},
+        )
+
+    # ------------------------------------------------------------------
+    # Section: topics
+    # ------------------------------------------------------------------
     def _category_bot_vs_ccc(
         self,
         limit=TOPIC_COMPARISON_LIMIT,
@@ -475,31 +663,21 @@ class ChatbotDashboardAggregator:
         return {"period_labels": labels, "items": items}
 
     def build_topics_section(self, granularity="month"):
-        totals = {}
-
-        for row in self.summaries.values("dashboard_category").annotate(
-            topic_total=Count("id", filter=Q(outcome_type__in=TOPIC_OUTCOMES)),
-        ):
-            name = category_label(row["dashboard_category"])
-            totals[name] = totals.get(name, 0) + (row["topic_total"] or 0)
-
-        topic_bar = [
-            {"name": name, "value": value}
-            for name, value in sorted(
-                totals.items(), key=lambda item: item[1], reverse=True
-            )
-            if value
-        ]
-
         bot_vs_ccc = self._category_bot_vs_ccc()
 
         return {
             "charts": {
-                "topic_bar": topic_bar,
-                "ccc_multi_month_topics": self.build_multi_month_ccc_topics(
+                # BĐ3 và BĐ4 đếm theo LƯỢT HỎI trên cột category của hai bảng
+                # log, không phải theo phiên: một phiên hỏi cùng chủ đề năm lần
+                # thì đó là năm lượt quan tâm, gom về một là mất thông tin.
+                "topic_bar": self.build_topic_bar(),
+                "all_topic_multi_month": self.build_topic_bar_by_period(granularity),
+                "category_ccc_rate": self.build_category_ccc_counts(),
+                "ccc_multi_month_topics": self.build_category_ccc_by_period(
                     granularity
                 ),
-                "all_topic_multi_month": self.build_multi_month_all_topics(
+                "question_type_bar": self.build_question_type_bar(),
+                "question_type_multi_period": self.build_question_type_by_period(
                     granularity
                 ),
                 "category_bot_vs_ccc": bot_vs_ccc,
@@ -564,28 +742,6 @@ class ChatbotDashboardAggregator:
     # ------------------------------------------------------------------
     # Section: operations
     # ------------------------------------------------------------------
-    def _category_ccc_rate(self):
-        merged = {}
-
-        for row in self.summaries.values("dashboard_category").annotate(
-            total=Count("id"),
-            ccc=Count("id", filter=Q(outcome_type=OUTCOME_CCC)),
-        ):
-            name = category_label(row["dashboard_category"])
-            item = merged.setdefault(name, {"name": name, "total": 0, "ccc": 0})
-            item["total"] += row["total"] or 0
-            item["ccc"] += row["ccc"] or 0
-
-        return sorted(
-            (
-                {**item, "rate": self.rate(item["ccc"], item["total"], digits=1)}
-                for item in merged.values()
-                if item["total"]
-            ),
-            key=lambda item: item["rate"],
-            reverse=True,
-        )
-
     def _chat_funnel(self):
         agg = self.summaries.aggregate(
             s1=Count("id"),
@@ -771,7 +927,6 @@ class ChatbotDashboardAggregator:
         return {
             "charts": {
                 "ticket_status_distribution": status_distribution,
-                "category_ccc_rate": self._category_ccc_rate(),
                 "chat_funnel": self._chat_funnel(),
                 "hourly_peak": self._hourly_peak(),
                 "hourly_peak_multi_period": self.build_hourly_peak_by_period(

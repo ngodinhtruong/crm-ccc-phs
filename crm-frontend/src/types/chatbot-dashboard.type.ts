@@ -8,6 +8,7 @@ export type OutcomeCode =
   | "RESEARCH"
   | "SPAM"
   | "PENDING"
+  | "UNCLASSIFIED"
   | "TOPIC";
 
 export type TicketOpenOptions = {
@@ -48,6 +49,7 @@ export type PeriodComparisonItem = {
   research: number;
   pending: number;
   spam: number;
+  unclassified: number;
   ccc_rate: number;
   prev_label: string | null;
   prev_total: number | null;
@@ -156,6 +158,7 @@ export type TimeSeriesOutcomeItem = {
   research: number;
   pending: number;
   spam: number;
+  unclassified: number;
   bot_done_rate: number;
 };
 
@@ -209,6 +212,19 @@ export type CategoryBotVsCccByPeriodData = {
   items: Array<Record<string, any>>;
 };
 
+/**
+ * Thống kê thể loại câu hỏi (`questionType` của hai bảng log).
+ *
+ * Tách theo nguồn vì hai nền tảng gán questionType không đều nhau — nhìn cột
+ * "Chưa gán loại" là biết ngay nguồn nào đang thiếu, thay vì tưởng khách bên
+ * đó không hỏi. `sources` là tên bảng Supabase gốc; mỗi phần tử `items` mang
+ * một khóa động cho từng nguồn kèm `value` là tổng.
+ */
+export type QuestionTypeBarData = {
+  sources: string[];
+  items: Array<{ name: string; value: number } & Record<string, any>>;
+};
+
 export type FunnelStepItem = {
   step: number;
   name: string;
@@ -253,6 +269,7 @@ export type ChatbotOverviewResponse = {
     research: SummaryBucket;
     spam: SummaryBucket;
     pending: SummaryBucket;
+    unclassified: SummaryBucket;
   };
 
   charts: {
@@ -269,6 +286,8 @@ export type ChatbotOverviewResponse = {
     category_bot_vs_ccc?: CategoryBotVsCccData;
     category_bot_vs_ccc_multi_period?: CategoryBotVsCccByPeriodData;
     category_ccc_rate?: CategoryCccRateItem[];
+    question_type_bar?: QuestionTypeBarData;
+    question_type_multi_period?: CccMultiMonthTopicsData;
     chat_funnel?: FunnelStepItem[];
     hourly_peak?: HourlyPeakItem[];
     hourly_peak_multi_period?: HourlyPeakByPeriodData;

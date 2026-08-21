@@ -7,8 +7,8 @@ from django.utils import timezone
 
 from apps.chatbots.constants import (
     SENDER_LABELS,
-    SENDER_TYPE_CUSTOMER,
     category_label,
+    is_customer_sender,
     is_customer_turn,
     is_faq_question,
     is_research_question,
@@ -119,13 +119,13 @@ def build_full_conversation(logs):
             continue
 
         # Nguồn chat_questions: một dòng là một tin nhắn của một bên.
-        raw = log.question if sender == SENDER_TYPE_CUSTOMER else log.answer
+        raw = log.question if is_customer_sender(sender) else log.answer
         text = (raw or "").strip()
 
         if not text:
             continue
 
-        if sender == SENDER_TYPE_CUSTOMER:
+        if is_customer_sender(sender):
             index += 1
             lines.append(f"{index}. KH: {text}")
         else:
@@ -174,7 +174,13 @@ def detect_outcome(logs, has_state, has_request):
       2. Có cskh_state       -> PENDING (chatbot bí, KH chưa/không cho thông tin)
       3. Có câu FAQ          -> BOT_DONE (chatbot tự trả lời bằng kho tri thức)
       4. Có câu RESEARCH     -> RESEARCH (phân tích cổ phiếu, khuyến nghị)
-      5. Còn lại             -> SPAM
+      5. Có câu rác          -> SPAM (GREETING / UNRELATED)
+      6. Còn lại             -> UNCLASSIFIED
+
+    Bước 5 phải kiểm tra tường minh, không được để SPAM làm nhánh vét. Phiên
+    mà chatbot chưa gán questionType cho lượt nào không phải là hỏi rác — đó
+    là dữ liệu nguồn còn thiếu. Dồn vào SPAM thì tỷ lệ câu rác bị thổi phồng
+    và lỗ hổng dữ liệu bị giấu đi.
 
     Bước 3 đứng trước bước 4 có chủ đích: phiên vừa hỏi FAQ vừa hỏi phân tích
     được tính là BOT_DONE, vì trả được câu nghiệp vụ mới là tín hiệu chính.
@@ -201,7 +207,10 @@ def detect_outcome(logs, has_state, has_request):
     if any(is_research_question(log.questionType) for log in turns):
         return ChatbotSessionSummary.OUTCOME_RESEARCH
 
-    return ChatbotSessionSummary.OUTCOME_SPAM
+    if any(is_spam_question(log.questionType) for log in turns):
+        return ChatbotSessionSummary.OUTCOME_SPAM
+
+    return ChatbotSessionSummary.OUTCOME_UNCLASSIFIED
 
 
 def count_messages(logs, outcome):
@@ -210,6 +219,7 @@ def count_messages(logs, outcome):
 
     Bất biến cần giữ:
         msg_count_total = bot_done + ccc + spam + pending + research
+                        + unclassified
 
     Chỉ đếm lượt của KHÁCH. Nguồn chat_questions ghi mỗi tin nhắn một dòng
     (khách / bot / nhân viên), nên đếm hết mọi dòng sẽ thổi phồng số lượt của
@@ -235,6 +245,7 @@ def count_messages(logs, outcome):
         "msg_count_spam": spam,
         "msg_count_pending": 0,
         "msg_count_research": 0,
+        "msg_count_unclassified": 0,
     }
 
     if outcome == ChatbotSessionSummary.OUTCOME_CCC:
@@ -245,6 +256,8 @@ def count_messages(logs, outcome):
         counts["msg_count_bot_done"] = non_spam
     elif outcome == ChatbotSessionSummary.OUTCOME_RESEARCH:
         counts["msg_count_research"] = non_spam
+    elif outcome == ChatbotSessionSummary.OUTCOME_UNCLASSIFIED:
+        counts["msg_count_unclassified"] = non_spam
     else:
         counts["msg_count_spam"] = len(turns)
 
@@ -271,6 +284,17 @@ def rebuild_chatbot_session_summaries(affected_session_ids=None):
         )
 
     session_ids = {sid for sid in session_ids if sid}
+
+    # Rebuild toàn bộ thì dọn luôn phiên đã biến mất khỏi cả ba bảng nguồn.
+    # Không dọn thì summary cũ nằm lại vĩnh viễn và bị đếm vào mọi KPI: đổi
+    # cách sinh khóa phiên (hoặc xóa dữ liệu nguồn) là sinh ra một lô "phiên
+    # ma" mà không có gì báo.
+    if affected_session_ids is None:
+        stale = ChatbotSessionSummary.objects.exclude(session_id__in=session_ids)
+        stale_count = stale.count()
+
+        if stale_count:
+            stale.delete()
 
     if not session_ids:
         return 0

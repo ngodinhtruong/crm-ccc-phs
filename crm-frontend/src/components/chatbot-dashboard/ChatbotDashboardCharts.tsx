@@ -39,6 +39,7 @@ import type {
   HourlyPeakByPeriodData,
   HourlyPeakItem,
   OutcomeByPeriod,
+  QuestionTypeBarData,
   TimeSeriesOutcomeItem,
 } from "@/types/chatbot-dashboard.type";
 
@@ -124,6 +125,7 @@ function AutomationTrendChartCard({
         research: 0,
         pending: 0,
         spam: 0,
+        unclassified: 0,
         bot_done_rate: 0,
       });
     }
@@ -288,6 +290,7 @@ function SessionTrendLineChartCard({
         research: 0,
         pending: 0,
         spam: 0,
+        unclassified: 0,
         bot_done_rate: 0,
       });
     }
@@ -387,6 +390,7 @@ const OUTCOME_SERIES_COLORS: Record<string, string> = {
   "Phân tích / khuyến nghị": "#8b5cf6",
   "Chờ thông tin khách hàng": "#0284c7",
   "Câu hỏi rác": "#ef4444",
+  "Chưa xác định loại": "#94a3b8",
 };
 
 type ChartViewMode = "DEFAULT" | "TIME";
@@ -452,6 +456,7 @@ const OUTCOME_FIELDS = [
   { field: "research", name: "Phân tích / khuyến nghị" },
   { field: "pending", name: "Chờ thông tin khách hàng" },
   { field: "spam", name: "Câu hỏi rác" },
+  { field: "unclassified", name: "Chưa xác định loại" },
 ] as const;
 
 function outcomeSlicesFromRow(row: any): DrilldownSlice[] {
@@ -564,37 +569,161 @@ function OutcomeByPeriodChartCard({ data }: { data?: OutcomeByPeriod | null }) {
   );
 }
 
-function formatLabelByWords(text: string, maxWords: number = 4) {
-  if (!text) return "";
-  const words = text.trim().split(/\s+/);
-  if (words.length > maxWords) {
-    return `${words.slice(0, maxWords).join(" ")}...`;
+/*
+ * Nhãn chủ đề rất dài (vd "Phân tích & Nghiên cứu Chứng Khoán") nên cắt theo
+ * SỐ TỪ là sai: sáu từ tiếng Việt vẫn có thể dài 40 ký tự, vượt quá chỗ dành
+ * cho một nhãn và đè lên nhãn bên cạnh. Cắt theo số KÝ TỰ vừa với bề rộng
+ * thật của mỗi ô, và xuống dòng thay vì cắt cụt.
+ */
+
+/** Bề rộng trung bình một ký tự ở fontSize 11 (px). */
+const AXIS_CHAR_WIDTH = 6.2;
+
+/** Chiều cao một dòng nhãn (px). */
+const AXIS_LINE_HEIGHT = 11;
+
+/** Bề rộng tối thiểu cho một nhãn, tránh chia ra 2-3 ký tự mỗi dòng. */
+const MIN_TICK_SLOT = 54;
+
+/**
+ * Ngắt nhãn thành tối đa ``maxLines`` dòng, mỗi dòng tối đa ``maxChars`` ký tự.
+ * Phần không đủ chỗ được cắt và đánh dấu bằng dấu ba chấm; nhãn đầy đủ vẫn
+ * xem được bằng cách rê chuột (thẻ <title> của SVG).
+ */
+function wrapAxisLabel(text: string, maxChars: number, maxLines: number) {
+  const clean = String(text ?? "").trim();
+
+  if (!clean) return [];
+
+  const words = clean.split(/\s+/);
+  const lines: string[] = [];
+  let line = "";
+
+  for (const word of words) {
+    const next = line ? `${line} ${word}` : word;
+
+    if (next.length <= maxChars) {
+      line = next;
+      continue;
+    }
+
+    if (line) lines.push(line);
+
+    line = word;
+
+    if (lines.length >= maxLines) {
+      line = "";
+      break;
+    }
   }
-  return text;
+
+  if (line && lines.length < maxLines) lines.push(line);
+
+  // Còn chữ chưa hiện hết -> đánh dấu ở dòng cuối.
+  const shown = lines.join(" ").length;
+
+  if (shown < clean.length && lines.length) {
+    const last = lines.length - 1;
+    const room = Math.max(1, maxChars - 1);
+    lines[last] = `${lines[last].slice(0, room)}…`;
+  }
+
+  // Một từ đơn dài hơn cả dòng thì cắt cứng.
+  return lines.map((item) =>
+    item.length > maxChars ? `${item.slice(0, Math.max(1, maxChars - 1))}…` : item
+  );
 }
 
-function CustomCategoryAxisTick({ x, y, payload }: any) {
-  const text = payload?.value || "";
-  const formatted = formatLabelByWords(text, 4);
+/** Nhãn trục hoành: căn giữa, xuống tối đa 3 dòng. */
+function CustomCategoryAxisTick({
+  x,
+  y,
+  payload,
+  width,
+  visibleTicksCount,
+}: any) {
+  const text = String(payload?.value ?? "");
+
+  // Recharts truyền bề rộng trục và số nhãn đang vẽ, chia ra là chỗ thật sự
+  // dành cho một nhãn. Không có thì lùi về mức tối thiểu.
+  const slot = Math.max(
+    MIN_TICK_SLOT,
+    (Number(width) || 0) / Math.max(1, Number(visibleTicksCount) || 1)
+  );
+  const lines = wrapAxisLabel(text, Math.floor(slot / AXIS_CHAR_WIDTH), 3);
 
   return (
-    <g transform={`translate(${x},${y}) rotate(-25)`}>
-      <text
-        x={0}
-        y={0}
-        dx={-4}
-        dy={10}
-        textAnchor="end"
-        fill="#334155"
-        fontSize={10}
-        fontWeight={600}
-      >
-        {formatted}
-      </text>
+    <g transform={`translate(${x},${y})`}>
+      <title>{text}</title>
+
+      {lines.map((line, index) => (
+        <text
+          key={line + index}
+          x={0}
+          y={0}
+          dy={12 + index * AXIS_LINE_HEIGHT}
+          textAnchor="middle"
+          fill="#334155"
+          fontSize={11}
+          fontWeight={600}
+        >
+          {line}
+        </text>
+      ))}
     </g>
   );
 }
 
+/*
+ * Mã chủ đề CD1..CDn.
+ *
+ * Tên chủ đề nghiệp vụ dài tới 40-50 ký tự, in thẳng lên trục hoành thì dù có
+ * ngắt dòng vẫn vụn và khó đọc. Dùng lại cách của biểu đồ "Bot tự xử lý vs
+ * Chuyển CCC": trục chỉ mang mã ngắn, tên đầy đủ nằm ở bảng chú thích ngay
+ * dưới biểu đồ.
+ *
+ * Thứ tự mã bám theo thứ tự cột nên đọc từ trái sang phải là CD1, CD2, ...
+ */
+function useCategoryCodes(rows: Array<Record<string, any>> | undefined) {
+  return useMemo(() => {
+    const legend = (rows || []).map((row, index) => ({
+      code: `CD${index + 1}`,
+      label: String(row?.label ?? row?.category ?? ""),
+    }));
+
+    return {
+      legend,
+      codeByLabel: new Map(legend.map((item) => [item.label, item.code])),
+    };
+  }, [rows]);
+}
+
+/** Bảng chú thích mã chủ đề, đặt dưới biểu đồ. */
+function CategoryCodeLegend({
+  items,
+}: {
+  items: Array<{ code: string; label: string }>;
+}) {
+  if (items.length === 0) return null;
+
+  return (
+    // Một cột: thẻ chỉ rộng một phần ba màn hình, chia hai cột thì tên chủ đề
+    // bị cắt gần hết.
+    <dl className="mt-2 space-y-0.5 border-t border-slate-100 pt-2 text-[11px] leading-snug">
+      {items.map((item) => (
+        <div key={item.code} className="flex gap-2">
+          <dt className="w-9 shrink-0 font-bold text-slate-900">{item.code}</dt>
+          <dd
+            className="min-w-0 flex-1 truncate text-slate-600"
+            title={item.label}
+          >
+            {item.label}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
 
 /* ====================================================================
  * 📊 3. TOP CATEGORY ĐƯỢC HỎI NHIỀU NHẤT (HORIZONTAL BAR & TIME SERIES)
@@ -633,6 +762,8 @@ function TopCategoryHorizontalBarCard({
 
   const monthLabels = timeSeriesData.month_labels;
 
+  const topicCodes = useCategoryCodes(timeSeriesData.data_by_category);
+
   const { selectedPeriod, openPeriod, closePeriod } = usePeriodDrilldown();
 
   const changeViewMode = (mode: ChartViewMode) => {
@@ -667,7 +798,7 @@ function TopCategoryHorizontalBarCard({
         />
       }
     >
-      <div className="h-[360px]">
+      <div className={viewMode === "TIME" ? "h-[236px]" : "h-[360px]"}>
         {selectedPeriod ? (
           <PeriodDrilldownDonut
             data={drilldownSlices}
@@ -693,9 +824,9 @@ function TopCategoryHorizontalBarCard({
                 <YAxis
                   type="category"
                   dataKey="name"
-                  tickFormatter={(val: string) => formatLabelByWords(val, 6)}
-                  tick={{ fontSize: 11, fontWeight: 600, fill: "#1e293b" }}
-                  width={140}
+                  interval={0}
+                  tick={<CustomYAxisReasonTick />}
+                  width={160}
                 />
                 <Tooltip content={<ValueTooltip />} />
                 <Bar
@@ -721,13 +852,16 @@ function TopCategoryHorizontalBarCard({
                 onClick={openPeriod}
                 className="cursor-pointer"
                 data={timeSeriesData.data_by_category}
-                margin={{ top: 20, right: 25, left: -10, bottom: 70 }}
+                margin={{ top: 20, right: 25, left: -10, bottom: 5 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                 <XAxis
                   dataKey="label"
                   interval={0}
-                  tick={<CustomCategoryAxisTick />}
+                  tickFormatter={(value: string) =>
+                    topicCodes.codeByLabel.get(value) ?? value
+                  }
+                  tick={{ fontSize: 11, fontWeight: 700, fill: "#334155" }}
                 />
                 <YAxis
                   tick={{ fontSize: 11, fill: "#64748b" }}
@@ -759,6 +893,10 @@ function TopCategoryHorizontalBarCard({
           </ResponsiveContainer>
         )}
       </div>
+
+      {viewMode === "TIME" && !selectedPeriod && (
+        <CategoryCodeLegend items={topicCodes.legend} />
+      )}
     </ChartCard>
   );
 }
@@ -802,6 +940,8 @@ function CategoryCccRateHorizontalBarCard({
 
   const monthLabels = timeSeriesData.month_labels;
 
+  const topicCodes = useCategoryCodes(timeSeriesData.data_by_category);
+
   const { selectedPeriod, openPeriod, closePeriod } = usePeriodDrilldown();
 
   const changeViewMode = (mode: ChartViewMode) => {
@@ -836,7 +976,7 @@ function CategoryCccRateHorizontalBarCard({
         />
       }
     >
-      <div className="h-[360px]">
+      <div className={viewMode === "TIME" ? "h-[236px]" : "h-[360px]"}>
         {selectedPeriod ? (
           <PeriodDrilldownDonut
             data={drilldownSlices}
@@ -862,9 +1002,9 @@ function CategoryCccRateHorizontalBarCard({
                 <YAxis
                   type="category"
                   dataKey="name"
-                  tickFormatter={(val: string) => formatLabelByWords(val, 6)}
-                  tick={{ fontSize: 11, fontWeight: 600, fill: "#1e293b" }}
-                  width={140}
+                  interval={0}
+                  tick={<CustomYAxisReasonTick />}
+                  width={160}
                 />
                 <Tooltip content={<ValueTooltip />} />
                 <Bar
@@ -890,13 +1030,16 @@ function CategoryCccRateHorizontalBarCard({
                 onClick={openPeriod}
                 className="cursor-pointer"
                 data={timeSeriesData.data_by_category}
-                margin={{ top: 20, right: 25, left: -10, bottom: 70 }}
+                margin={{ top: 20, right: 25, left: -10, bottom: 5 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                 <XAxis
                   dataKey="label"
                   interval={0}
-                  tick={<CustomCategoryAxisTick />}
+                  tickFormatter={(value: string) =>
+                    topicCodes.codeByLabel.get(value) ?? value
+                  }
+                  tick={{ fontSize: 11, fontWeight: 700, fill: "#334155" }}
                 />
                 <YAxis
                   tick={{ fontSize: 11, fill: "#64748b" }}
@@ -928,6 +1071,10 @@ function CategoryCccRateHorizontalBarCard({
           </ResponsiveContainer>
         )}
       </div>
+
+      {viewMode === "TIME" && !selectedPeriod && (
+        <CategoryCodeLegend items={topicCodes.legend} />
+      )}
     </ChartCard>
   );
 }
@@ -1442,22 +1589,35 @@ function HourlyPeakChartCard({
   );
 }
 
-function CustomYAxisReasonTick({ x, y, payload }: any) {
-  const text = payload?.value || "";
-  const formatted = formatLabelByWords(text, 4);
+/** Nhãn trục tung (biểu đồ cột ngang): căn phải, xuống tối đa 2 dòng. */
+function CustomYAxisReasonTick({ x, y, payload, width }: any) {
+  const text = String(payload?.value ?? "");
+
+  // Chừa 8px cho khoảng cách giữa nhãn và trục.
+  const slot = Math.max(MIN_TICK_SLOT, (Number(width) || 140) - 8);
+  const lines = wrapAxisLabel(text, Math.floor(slot / AXIS_CHAR_WIDTH), 2);
+
+  // Căn giữa khối nhãn theo đúng vạch chia.
+  const offset = -((lines.length - 1) * AXIS_LINE_HEIGHT) / 2;
 
   return (
     <g transform={`translate(${x},${y})`}>
-      <text
-        x={-6}
-        y={4}
-        textAnchor="end"
-        fill="#1e293b"
-        fontSize={11}
-        fontWeight={600}
-      >
-        {formatted}
-      </text>
+      <title>{text}</title>
+
+      {lines.map((line, index) => (
+        <text
+          key={line + index}
+          x={-8}
+          y={0}
+          dy={offset + 4 + index * AXIS_LINE_HEIGHT}
+          textAnchor="end"
+          fill="#1e293b"
+          fontSize={11}
+          fontWeight={600}
+        >
+          {line}
+        </text>
+      ))}
     </g>
   );
 }
@@ -1500,6 +1660,8 @@ function TopReasonHorizontalBarCard({
 
   const monthLabels = timeSeriesData.month_labels;
 
+  const topicCodes = useCategoryCodes(timeSeriesData.data_by_category);
+
   const { selectedPeriod, openPeriod, closePeriod } = usePeriodDrilldown();
 
   const changeViewMode = (mode: ChartViewMode) => {
@@ -1534,7 +1696,7 @@ function TopReasonHorizontalBarCard({
         />
       }
     >
-      <div className="h-[360px]">
+      <div className={viewMode === "TIME" ? "h-[236px]" : "h-[360px]"}>
         {selectedPeriod ? (
           <PeriodDrilldownDonut
             data={drilldownSlices}
@@ -1562,7 +1724,7 @@ function TopReasonHorizontalBarCard({
                   dataKey="name"
                   interval={0}
                   tick={<CustomYAxisReasonTick />}
-                  width={140}
+                  width={160}
                 />
                 <Tooltip content={<ValueTooltip />} />
                 <Bar
@@ -1588,13 +1750,16 @@ function TopReasonHorizontalBarCard({
                 onClick={openPeriod}
                 className="cursor-pointer"
                 data={timeSeriesData.data_by_category}
-                margin={{ top: 25, right: 25, left: -10, bottom: 70 }}
+                margin={{ top: 25, right: 25, left: -10, bottom: 5 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                 <XAxis
                   dataKey="label"
                   interval={0}
-                  tick={<CustomCategoryAxisTick />}
+                  tickFormatter={(value: string) =>
+                    topicCodes.codeByLabel.get(value) ?? value
+                  }
+                  tick={{ fontSize: 11, fontWeight: 700, fill: "#334155" }}
                 />
                 <YAxis
                   tick={{ fontSize: 11, fill: "#64748b" }}
@@ -1627,6 +1792,10 @@ function TopReasonHorizontalBarCard({
         )}
       </div>
 
+
+      {viewMode === "TIME" && !selectedPeriod && (
+        <CategoryCodeLegend items={topicCodes.legend} />
+      )}
     </ChartCard>
   );
 }
@@ -1683,7 +1852,7 @@ function ChannelPerformanceBarCard({
 
   return (
     <ChartCard
-      title="📊 Hiệu quả theo Channel (Web / App / Zalo / Facebook)"
+      title="📊 SO SÁNH CÁC NỀN TẢNG KHÁCH HAY NHẮN)"
       description={
         viewMode === "DEFAULT"
           ? "Đánh giá kịch bản Chatbot hoạt động tốt nhất trên kênh giao tiếp nào"
@@ -1764,7 +1933,7 @@ function ChannelPerformanceBarCard({
                 onClick={openPeriod}
                 className="cursor-pointer"
                 data={timeSeriesData.data_by_category}
-                margin={{ top: 20, right: 25, left: -10, bottom: 70 }}
+                margin={{ top: 20, right: 25, left: -10, bottom: 28 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                 <XAxis
@@ -1801,6 +1970,195 @@ function ChannelPerformanceBarCard({
             )}
           </ResponsiveContainer>
         )}
+      </div>
+    </ChartCard>
+  );
+}
+
+/* ====================================================================
+ * 📊 9. THỂ LOẠI CÂU HỎI CỦA KHÁCH (questionType)
+ * ==================================================================== */
+/** Tên bảng Supabase -> tên nền tảng cho người đọc. */
+const QUESTION_TYPE_SOURCES: Record<string, { label: string; color: string }> = {
+  xpro_chat_logs: { label: "XPro", color: "#0097cf" },
+  chat_questions: { label: "Zalo", color: "#10b981" },
+};
+
+function questionTypeSource(source: string) {
+  return QUESTION_TYPE_SOURCES[source] || { label: source, color: "#64748b" };
+}
+
+function QuestionTypeBarCard({
+  data,
+  multiPeriodData,
+}: {
+  data?: QuestionTypeBarData | null;
+  multiPeriodData?: CccMultiMonthTopicsData | null;
+}) {
+  const [viewMode, setViewMode] = useState<ChartViewMode>("DEFAULT");
+
+  const items = useMemo(() => data?.items || [], [data]);
+  const sources = useMemo(() => data?.sources || [], [data]);
+
+  const timeSeriesData = useMemo(
+    () => ({
+      month_labels: multiPeriodData?.month_labels || [],
+      data_by_category: multiPeriodData?.data_by_category || [],
+    }),
+    [multiPeriodData]
+  );
+
+  const periodLabels = timeSeriesData.month_labels;
+
+  const { selectedPeriod, openPeriod, closePeriod } = usePeriodDrilldown();
+
+  const drilldownSlices = useMemo(
+    () =>
+      slicesFromRow(
+        timeSeriesData.data_by_category.find(
+          (row: any) => row.label === selectedPeriod
+        ),
+        periodLabels
+      ),
+    [timeSeriesData, selectedPeriod, periodLabels]
+  );
+
+  const total = useMemo(
+    () => items.reduce((sum, item) => sum + (item.value || 0), 0),
+    [items]
+  );
+
+  const changeViewMode = (mode: ChartViewMode) => {
+    closePeriod();
+    setViewMode(mode);
+  };
+
+  return (
+    <ChartCard
+      title="📊 9. TOP THỂ LOẠI CÂU HỎI KHÁCH HAY NHẮN TRÊN CÁC NỀN TẢNG"
+      description={
+        viewMode === "DEFAULT"
+          ? "Khách hỏi loại gì — tách theo nền tảng để thấy nguồn nào chưa gán loại"
+          : "Biến động thể loại câu hỏi qua từng kỳ"
+      }
+      headerRight={
+        <ChartModeHeader
+          viewMode={viewMode}
+          onChange={changeViewMode}
+          onBack={selectedPeriod ? closePeriod : undefined}
+        />
+      }
+    >
+      <div className="h-[330px]">
+        {items.length === 0 ? (
+          <EmptyState message="Chưa có lượt hỏi nào." />
+        ) : selectedPeriod ? (
+          <PeriodDrilldownDonut
+            data={drilldownSlices}
+            colorOf={periodColorOf(periodLabels)}
+            onExit={closePeriod}
+          />
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            {viewMode === "DEFAULT" ? (
+              <BarChart
+                layout="vertical"
+                data={items}
+                margin={{ top: 10, right: 45, left: 20, bottom: 5 }}
+              >
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="#f1f5f9"
+                  horizontal={false}
+                />
+                <XAxis
+                  type="number"
+                  tick={{ fontSize: 11, fill: "#64748b" }}
+                  allowDecimals={false}
+                />
+                <YAxis
+                  type="category"
+                  dataKey="name"
+                  interval={0}
+                  tick={<CustomYAxisReasonTick />}
+                  width={160}
+                />
+                <Tooltip content={<ValueTooltip />} cursor={{ fill: "#f8fafc" }} />
+                <Legend wrapperStyle={{ fontSize: 11, paddingTop: 6 }} />
+
+                {/* Chồng theo nguồn: tổng vẫn là chiều dài cả thanh, mà vẫn
+                    thấy phần nào đến từ nền tảng nào. */}
+                {sources.map((source, index) => (
+                  <Bar
+                    key={source}
+                    dataKey={source}
+                    name={questionTypeSource(source).label}
+                    stackId="source"
+                    fill={questionTypeSource(source).color}
+                    radius={
+                      index === sources.length - 1 ? [0, 4, 4, 0] : undefined
+                    }
+                    barSize={18}
+                    isAnimationActive={false}
+                  >
+                    {index === sources.length - 1 && (
+                      <LabelList
+                        dataKey="value"
+                        position="right"
+                        style={{ fontSize: 10, fontWeight: 700, fill: "#334155" }}
+                        formatter={hideZeroLabel}
+                      />
+                    )}
+                  </Bar>
+                ))}
+              </BarChart>
+            ) : (
+              <BarChart
+                onClick={openPeriod}
+                className="cursor-pointer"
+                data={timeSeriesData.data_by_category}
+                margin={{ top: 20, right: 25, left: -10, bottom: 28 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis
+                  dataKey="label"
+                  interval={0}
+                  tick={<CustomCategoryAxisTick />}
+                />
+                <YAxis
+                  tick={{ fontSize: 11, fill: "#64748b" }}
+                  allowDecimals={false}
+                />
+                <Tooltip content={<ValueTooltip />} />
+                <Legend wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
+                {periodLabels.map((label, index) => (
+                  <Bar
+                    key={label}
+                    dataKey={label}
+                    name={label}
+                    fill={COLORS[index % COLORS.length]}
+                    radius={[4, 4, 0, 0]}
+                    isAnimationActive={false}
+                  >
+                    <LabelList
+                      dataKey={label}
+                      position="top"
+                      style={{ fontSize: 9, fill: "#334155", fontWeight: 700 }}
+                      formatter={hideZeroLabel}
+                    />
+                  </Bar>
+                ))}
+              </BarChart>
+            )}
+          </ResponsiveContainer>
+        )}
+      </div>
+
+      <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-2 text-[11px] font-medium text-slate-500">
+        <span>
+          Tổng lượt hỏi: <strong className="text-slate-800">{formatNumber(total)}</strong>
+        </span>
+        <span className="text-slate-400">Nguồn: cột questionType của 2 bảng chat</span>
       </div>
     </ChartCard>
   );
@@ -1885,16 +2243,13 @@ function CustomerIssueDistributionChartCard({
       const filtered = topicData.filter((item) =>
         customerKeywords.some((kw) => item.name.toLowerCase().includes(kw))
       );
-      if (filtered.length > 0) return filtered;
+      return filtered;
     }
 
-    return [
-      { name: "Quên mật khẩu / Khóa đăng nhập", value: 142 },
-      { name: "Nhập sai mã OTP / Smart OTP", value: 98 },
-      { name: "Chưa xác thực CCCD / Thông tin", value: 64 },
-      { name: "Thao tác sai khi đặt lệnh / Hạn mức", value: 45 },
-      { name: "Nhầm lẫn số dư / Lịch sử giao dịch", value: 26 },
-    ];
+    // Không có chủ đề nào khớp thì trả rỗng. Trước đây chỗ này trả về một mảng
+    // số cứng (142/98/64/45/26) trông y như số thật — người đọc dashboard
+    // không có cách nào phân biệt.
+    return [];
   }, [topicData]);
 
   const totalCount = useMemo(() => chartData.reduce((sum, item) => sum + (item.value || 0), 0), [chartData]);
@@ -1905,11 +2260,14 @@ function CustomerIssueDistributionChartCard({
       description="Chi tiết các sự cố, thắc mắc phát sinh do thao tác, cài đặt hoặc nhầm lẫn từ phía Khách hàng"
     >
       <div className="h-[320px]">
+        {chartData.length === 0 ? (
+          <EmptyState message="Chưa có chủ đề nào khớp nhóm này trong khoảng đang lọc." />
+        ) : (
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={chartData}
             layout="vertical"
-            margin={{ top: 10, right: 35, left: 140, bottom: 10 }}
+            margin={{ top: 10, right: 40, left: 10, bottom: 10 }}
             barCategoryGap="15%"
             barGap={0}
           >
@@ -1918,8 +2276,9 @@ function CustomerIssueDistributionChartCard({
             <YAxis
               type="category"
               dataKey="name"
-              width={135}
-              tick={{ fontSize: 11, fontWeight: 600, fill: "#334155" }}
+              interval={0}
+              tick={<CustomYAxisReasonTick />}
+              width={170}
             />
             <Tooltip content={<ValueTooltip />} cursor={{ fill: "#f8fafc" }} />
             <Bar dataKey="value" name="Số lượt phát sinh" fill="#10b981" radius={[0, 4, 4, 0]} barSize={16} isAnimationActive={false}>
@@ -1932,10 +2291,11 @@ function CustomerIssueDistributionChartCard({
             </Bar>
           </BarChart>
         </ResponsiveContainer>
+        )}
       </div>
       <div className="mt-2.5 flex items-center justify-between border-t border-slate-100 pt-2 text-[11px] text-slate-500 font-medium">
         <span>Tổng lượt lỗi Khách hàng: <strong className="text-slate-800">{formatNumber(totalCount)}</strong> lượt</span>
-        <span className="text-[#059669] font-bold">Bot tự động giải đáp 82%</span>
+        <span className="text-slate-400">Nguồn: chủ đề khớp từ khóa phía khách hàng</span>
       </div>
     </ChartCard>
   );
@@ -1958,16 +2318,10 @@ function InternalIssueDistributionChartCard({
       const filtered = topicData.filter((item) =>
         internalKeywords.some((kw) => item.name.toLowerCase().includes(kw))
       );
-      if (filtered.length > 0) return filtered;
+      return filtered;
     }
 
-    return [
-      { name: "Gián đoạn kết nối Flex / Core chứng khoán", value: 88 },
-      { name: "Lỗi kết nối Nạp / Rút tiền Ngân hàng", value: 62 },
-      { name: "Chậm xử lý eKYC / Ký hợp đồng tự động", value: 46 },
-      { name: "Lỗi đồng bộ Phí & Tiền thưởng Sale Admin", value: 32 },
-      { name: "Máy chủ bảng giá & Đặt lệnh chập chờn", value: 23 },
-    ];
+    return [];
   }, [topicData]);
 
   const totalCount = useMemo(() => chartData.reduce((sum, item) => sum + (item.value || 0), 0), [chartData]);
@@ -1978,11 +2332,14 @@ function InternalIssueDistributionChartCard({
       description="Chi tiết các sự cố kỹ thuật, gián đoạn cổng thanh toán & lỗi vận hành hệ thống nội bộ"
     >
       <div className="h-[320px]">
+        {chartData.length === 0 ? (
+          <EmptyState message="Chưa có chủ đề nào khớp nhóm này trong khoảng đang lọc." />
+        ) : (
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={chartData}
             layout="vertical"
-            margin={{ top: 10, right: 35, left: 140, bottom: 10 }}
+            margin={{ top: 10, right: 40, left: 10, bottom: 10 }}
             barCategoryGap="15%"
             barGap={0}
           >
@@ -1991,8 +2348,9 @@ function InternalIssueDistributionChartCard({
             <YAxis
               type="category"
               dataKey="name"
-              width={135}
-              tick={{ fontSize: 11, fontWeight: 600, fill: "#334155" }}
+              interval={0}
+              tick={<CustomYAxisReasonTick />}
+              width={170}
             />
             <Tooltip content={<ValueTooltip />} cursor={{ fill: "#f8fafc" }} />
             <Bar dataKey="value" name="Số lượt phát sinh" fill="#f59e0b" radius={[0, 4, 4, 0]} barSize={16} isAnimationActive={false}>
@@ -2005,10 +2363,11 @@ function InternalIssueDistributionChartCard({
             </Bar>
           </BarChart>
         </ResponsiveContainer>
+        )}
       </div>
       <div className="mt-2.5 flex items-center justify-between border-t border-slate-100 pt-2 text-[11px] text-slate-500 font-medium">
         <span>Tổng lượt lỗi Nội bộ / Hệ thống: <strong className="text-slate-800">{formatNumber(totalCount)}</strong> lượt</span>
-        <span className="text-amber-600 font-bold">Tỷ lệ khắc phục 94%</span>
+        <span className="text-slate-400">Nguồn: chủ đề khớp từ khóa hệ thống</span>
       </div>
     </ChartCard>
   );
@@ -2039,20 +2398,10 @@ function IssueTrendOverTimeChartCard({
       });
     }
 
-    const now = new Date();
-    const fallback = [];
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const mStr = String(d.getMonth() + 1).padStart(2, "0");
-      fallback.push({
-        label: `T${mStr}/${d.getFullYear()}`,
-        customer_errors: Math.floor(120 + Math.random() * 50),
-        internal_errors: Math.floor(40 + Math.random() * 30),
-        total_errors: 180,
-        resolution_rate: 92,
-      });
-    }
-    return fallback;
+    // Không có dữ liệu thì trả rỗng. Trước đây chỗ này sinh 6 tháng số ngẫu
+    // nhiên bằng Math.random() — biểu đồ trông như có dữ liệu thật, và mỗi
+    // lần tải lại ra một bộ số khác.
+    return [];
   }, [timeSeriesData]);
 
   return (
@@ -2061,6 +2410,9 @@ function IssueTrendOverTimeChartCard({
       description="Diễn biến số lượng Lỗi Khách hàng vs Lỗi Nội bộ & Tỷ lệ khắc phục thành công qua các Kỳ"
     >
       <div className="h-[320px]">
+        {chartData.length === 0 ? (
+          <EmptyState message="Chưa có dữ liệu trong khoảng đang lọc." />
+        ) : (
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={chartData} margin={{ top: 15, right: 25, left: 0, bottom: 15 }} barGap={0}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
@@ -2089,6 +2441,7 @@ function IssueTrendOverTimeChartCard({
             />
           </ComposedChart>
         </ResponsiveContainer>
+        )}
       </div>
       <div className="mt-2.5 flex items-center justify-between border-t border-slate-100 pt-2 text-[11px] text-slate-500 font-medium">
         <span>Theo dõi xu hướng lỗi liên kỳ để chủ động phòng ngừa sự cố hệ thống</span>
@@ -2166,6 +2519,10 @@ export function ChatbotDashboardCharts({
           multiPeriodData={charts.channel_performance_multi_period}
         />
         <TopFaqTableCard faqs={faqs} />
+        <QuestionTypeBarCard
+          data={charts.question_type_bar}
+          multiPeriodData={charts.question_type_multi_period}
+        />
       </div>
     </div>
   );
