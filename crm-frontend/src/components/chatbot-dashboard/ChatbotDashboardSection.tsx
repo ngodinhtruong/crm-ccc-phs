@@ -99,49 +99,48 @@ export function ChatbotDashboardSection({
         </div>
       )}
 
-      {dashboard.loading && (
+      {dashboard.loading && !dashboard.overview && dashboard.tickets.length === 0 && dashboard.faqs.length === 0 && (
         <div className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-500 shadow-sm">
           Đang tải dữ liệu...
         </div>
       )}
 
-      {!dashboard.loading &&
-        !dashboard.error &&
-        dashboard.activeTab === "overview" &&
-        dashboard.overview && <OverviewTab overview={dashboard.overview} />}
+      <div className={`space-y-4 transition-opacity duration-200 ${dashboard.loading ? "opacity-70 pointer-events-none" : "opacity-100"}`}>
+        {!dashboard.error &&
+          dashboard.activeTab === "overview" &&
+          dashboard.overview && <OverviewTab overview={dashboard.overview} />}
 
-      {!dashboard.loading &&
-        !dashboard.error &&
-        dashboard.activeTab === "tickets" && (
-          <TicketsTab
-            tickets={dashboard.tickets}
-            count={dashboard.ticketCount}
-            title={dashboard.ticketPanelTitle}
-            status={dashboard.ticketStatus}
-            keyword={dashboard.ticketKeyword}
-            category={dashboard.ticketCategory}
-            onStatusChange={dashboard.changeTicketStatus}
-            onKeywordChange={dashboard.setTicketKeyword}
-            onSearch={dashboard.searchTickets}
-            onClearPreset={dashboard.clearTicketFilters}
-            onOpenSession={dashboard.setSelectedSession}
-            columnFilters={dashboard.columnFilters}
-            onColumnFilterChange={dashboard.updateColumnFilter}
-            hasColumnFilter={dashboard.hasColumnFilter}
-          />
-        )}
+        {!dashboard.error &&
+          dashboard.activeTab === "tickets" && (
+            <TicketsTab
+              tickets={dashboard.tickets}
+              count={dashboard.ticketCount}
+              title={dashboard.ticketPanelTitle}
+              status={dashboard.ticketStatus}
+              keyword={dashboard.ticketKeyword}
+              category={dashboard.ticketCategory}
+              onStatusChange={dashboard.changeTicketStatus}
+              onKeywordChange={dashboard.setTicketKeyword}
+              onSearch={dashboard.searchTickets}
+              onClearPreset={dashboard.clearTicketFilters}
+              onOpenSession={dashboard.setSelectedSession}
+              columnFilters={dashboard.columnFilters}
+              onColumnFilterChange={dashboard.updateColumnFilter}
+              hasColumnFilter={dashboard.hasColumnFilter}
+            />
+          )}
 
-      {!dashboard.loading &&
-        !dashboard.error &&
-        dashboard.activeTab === "faqs" && (
-          <FaqTab
-            faqs={dashboard.faqs}
-            count={dashboard.faqCount}
-            keyword={dashboard.faqKeyword}
-            onKeywordChange={dashboard.setFaqKeyword}
-            onSearch={dashboard.searchFaqs}
-          />
-        )}
+        {!dashboard.error &&
+          dashboard.activeTab === "faqs" && (
+            <FaqTab
+              faqs={dashboard.faqs}
+              count={dashboard.faqCount}
+              keyword={dashboard.faqKeyword}
+              onKeywordChange={dashboard.setFaqKeyword}
+              onSearch={dashboard.searchFaqs}
+            />
+          )}
+      </div>
 
       {dashboard.selectedSession && (
         <ConversationModal

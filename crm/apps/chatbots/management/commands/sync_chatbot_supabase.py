@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.core.management.base import BaseCommand
+from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from supabase import create_client
 
@@ -28,9 +29,19 @@ def parse_dt(value):
         return None
 
     if hasattr(value, "isoformat"):
-        return value
+        dt = value
+    else:
+        dt = parse_datetime(str(value))
 
-    return parse_datetime(str(value))
+    if not dt:
+        return None
+
+    # Lấy con số giờ-phút-giây nguyên bản từ Supabase và gán múi giờ Asia/Ho_Chi_Minh
+    # Giữ nguyên 100% con số gốc trên Supabase, không bị cộng/trừ 7 tiếng.
+    if not timezone.is_naive(dt):
+        dt = dt.replace(tzinfo=None)
+
+    return timezone.make_aware(dt, timezone.get_current_timezone())
 
 
 def get_session_id(row, keys=DEFAULT_SESSION_KEYS):
@@ -92,22 +103,22 @@ class Command(BaseCommand):
 
         if affected_sessions:
             self.stdout.write(
-                f"Tính lại tổng hợp cho {len(affected_sessions)} phiên..."
+                f"Tinh lai tong hop cho {len(affected_sessions)} phien..."
             )
             rebuild_chatbot_session_summaries(affected_session_ids=affected_sessions)
         else:
-            self.stdout.write("Không có phiên nào thay đổi.")
+            self.stdout.write("Khong co phien nao thay doi.")
 
         if options["create_tickets"]:
             default_branch = resolve_default_branch(options["branch_code"])
 
             if not default_branch:
-                raise RuntimeError("Chưa có chi nhánh nào. Hãy tạo Branch trước.")
+                raise RuntimeError("Chua co chi nhanh nao. Hay tao Branch truo-c.")
 
             created = create_crm_tickets_from_chatbot(default_branch=default_branch)
-            self.stdout.write(f"Đã tạo {created} ticket CRM từ chatbot.")
+            self.stdout.write(f"Da tao {created} ticket CRM tu chatbot.")
 
-        self.stdout.write(self.style.SUCCESS("Sync chatbot hoàn tất."))
+        self.stdout.write(self.style.SUCCESS("Sync chatbot hoan tat."))
 
     def fetch_incremental(self, client, table_name, time_column, since=None):
         rows = []
@@ -197,8 +208,14 @@ class Command(BaseCommand):
 
             sessions.add(session_id)
 
-            if dt and (not max_dt or dt > max_dt):
-                max_dt = dt
+            if dt:
+                if timezone.is_naive(dt):
+                    dt = timezone.make_aware(dt, timezone.get_current_timezone())
+                if max_dt and timezone.is_naive(max_dt):
+                    max_dt = timezone.make_aware(max_dt, timezone.get_current_timezone())
+
+                if not max_dt or dt > max_dt:
+                    max_dt = dt
 
         self.save_cursor(cursor, max_dt, len(rows))
         self.stdout.write(f"{source.label}: {len(rows)}")

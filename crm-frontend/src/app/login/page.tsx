@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 
@@ -16,6 +16,23 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+
+  useEffect(() => {
+    if (authService.isAuthenticated()) {
+      accountService
+        .getMe()
+        .then((currentUser) => {
+          router.replace(getDefaultHomePath(currentUser));
+        })
+        .catch(() => {
+          authService.logout();
+          setCheckingAuth(false);
+        });
+    } else {
+      setCheckingAuth(false);
+    }
+  }, [router]);
 
   const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -47,6 +64,17 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
+
+  if (checkingAuth) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-50">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#00713d] border-t-transparent" />
+          <p className="text-xs font-medium text-slate-500">Đang kiểm tra trạng thái đăng nhập...</p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-white">

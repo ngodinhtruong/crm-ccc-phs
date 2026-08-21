@@ -73,12 +73,12 @@ export function FunnelChartComponent({ data }: { data?: FunnelStepItem[] | null 
     <div className="w-full max-w-[540px] flex flex-col items-center py-2">
       <svg viewBox="0 0 500 295" className="w-full h-auto overflow-visible">
         {funnelShapes.map((shape, idx) => (
-          <g key={shape.step} className="group cursor-pointer transition-all duration-300">
+          <g key={shape.step} className="group cursor-pointer">
             {/* Trapezoid Polygon Body */}
             <polygon
               points={shape.points}
               fill={shape.color}
-              className="transition-opacity duration-200 group-hover:opacity-90 shadow-md"
+              className="group-hover:opacity-90 shadow-md"
             />
 
             {/* Left Label: Step Name */}

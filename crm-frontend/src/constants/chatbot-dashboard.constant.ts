@@ -37,6 +37,13 @@ export const CHATBOT_TICKET_STATUS_OPTIONS: {
   { value: "TOPIC", label: "Có chủ đề (Chatbot + CCC)" },
 ];
 
+export const CHANNEL_OPTIONS = [
+  { value: "xpro", label: "XPro" },
+  { value: "zalo", label: "Zalo" },
+  { value: "website", label: "Website" },
+  { value: "mobile", label: "Mobile" },
+];
+
 /** Màu của từng nhóm xử lý, dùng chung cho pill và biểu đồ cột. */
 export const OUTCOME_STYLES: Record<
   string,

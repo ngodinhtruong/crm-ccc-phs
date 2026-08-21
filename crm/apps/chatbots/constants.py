@@ -4,9 +4,19 @@
 QUESTION_TYPE_GREETING = "GREETING"
 QUESTION_TYPE_UNRELATED = "UNRELATED"
 
-# Câu hỏi nghiệp vụ (FAQ). Đây là loại questionType duy nhất được chatbot gán
-# category, nên cũng là loại duy nhất so sánh được bot với CCC theo chủ đề.
 QUESTION_TYPE_CUSTOMER_CARE = "CUSTOMER_CARE"
+
+# Các dạng câu hỏi nghiệp vụ / FAQ tự động mà chatbot trả lời bằng kho tri thức.
+# Hấp thụ cả các biến thể từ Supabase (CUSTOMER_CARE, CUSTOMER CARE CENTER, RAG, DIRECT, FAQ).
+FAQ_QUESTION_KEYWORDS = (
+    "CUSTOMER_CARE",
+    "CUSTOMER CARE",
+    "CUSTOMER_CARE_CENTER",
+    "CUSTOMER CARE CENTER",
+    "RAG",
+    "DIRECT",
+    "FAQ",
+)
 
 # Câu phân tích cổ phiếu / khuyến nghị thị trường. Chỉ nguồn xpro_chat_logs có;
 # chat_questions (Zalo) chỉ dùng CUSTOMER_CARE / GREETING / UNRELATED.
@@ -72,7 +82,8 @@ def is_spam_question(question_type):
 
 def is_faq_question(question_type):
     """Câu hỏi nghiệp vụ mà chatbot trả lời bằng kho tri thức."""
-    return normalize_question_type(question_type) == QUESTION_TYPE_CUSTOMER_CARE
+    normalized = normalize_question_type(question_type)
+    return any(keyword in normalized for keyword in FAQ_QUESTION_KEYWORDS)
 
 
 def is_research_question(question_type):

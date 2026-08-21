@@ -193,7 +193,7 @@ function AutomationTrendChartCard({
                 allowDecimals={false}
               />
               <Tooltip content={<ValueTooltip />} cursor={{ fill: "#f8fafc" }} />
-              <Legend wrapperStyle={{ fontSize: 11, paddingTop: 6 }} />
+              <Legend verticalAlign="top" align="right" wrapperStyle={{ fontSize: 11, paddingBottom: 8 }} />
               <Bar
                 dataKey="bot_done"
                 name="Bot tự xử lý (BOT_DONE)"
@@ -346,7 +346,7 @@ function SessionTrendLineChartCard({
                 allowDecimals={false}
               />
               <Tooltip content={<ValueTooltip />} />
-              <Legend wrapperStyle={{ fontSize: 11, paddingTop: 6 }} />
+              <Legend verticalAlign="top" align="right" wrapperStyle={{ fontSize: 11, paddingBottom: 8 }} />
               <Line
                 type="monotone"
                 dataKey="total"
@@ -540,7 +540,7 @@ function OutcomeByPeriodChartCard({ data }: { data?: OutcomeByPeriod | null }) {
                   content={<ValueTooltip />}
                   cursor={{ fill: "#f8fafc" }}
                 />
-                <Legend wrapperStyle={{ fontSize: 11, paddingTop: 6 }} />
+                <Legend verticalAlign="top" align="right" wrapperStyle={{ fontSize: 11, paddingBottom: 8 }} />
 
                 {series.map((name, index) => (
                   <Bar
@@ -564,7 +564,7 @@ function OutcomeByPeriodChartCard({ data }: { data?: OutcomeByPeriod | null }) {
   );
 }
 
-function formatLabelByWords(text: string, maxWords: number = 6) {
+function formatLabelByWords(text: string, maxWords: number = 4) {
   if (!text) return "";
   const words = text.trim().split(/\s+/);
   if (words.length > maxWords) {
@@ -575,17 +575,18 @@ function formatLabelByWords(text: string, maxWords: number = 6) {
 
 function CustomCategoryAxisTick({ x, y, payload }: any) {
   const text = payload?.value || "";
-  const formatted = formatLabelByWords(text, 6);
+  const formatted = formatLabelByWords(text, 4);
 
   return (
-    <g transform={`translate(${x},${y})`}>
+    <g transform={`translate(${x},${y}) rotate(-25)`}>
       <text
         x={0}
         y={0}
-        dy={12}
-        textAnchor="middle"
+        dx={-4}
+        dy={10}
+        textAnchor="end"
         fill="#334155"
-        fontSize={11}
+        fontSize={10}
         fontWeight={600}
       >
         {formatted}
@@ -593,6 +594,7 @@ function CustomCategoryAxisTick({ x, y, payload }: any) {
     </g>
   );
 }
+
 
 /* ====================================================================
  * 📊 3. TOP CATEGORY ĐƯỢC HỎI NHIỀU NHẤT (HORIZONTAL BAR & TIME SERIES)
@@ -665,7 +667,7 @@ function TopCategoryHorizontalBarCard({
         />
       }
     >
-      <div className="h-[330px]">
+      <div className="h-[360px]">
         {selectedPeriod ? (
           <PeriodDrilldownDonut
             data={drilldownSlices}
@@ -719,7 +721,7 @@ function TopCategoryHorizontalBarCard({
                 onClick={openPeriod}
                 className="cursor-pointer"
                 data={timeSeriesData.data_by_category}
-                margin={{ top: 20, right: 25, left: -10, bottom: 35 }}
+                margin={{ top: 20, right: 25, left: -10, bottom: 70 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                 <XAxis
@@ -732,7 +734,7 @@ function TopCategoryHorizontalBarCard({
                   allowDecimals={false}
                 />
                 <Tooltip content={<ValueTooltip />} />
-                <Legend wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
+                <Legend verticalAlign="top" align="right" wrapperStyle={{ fontSize: 11, paddingBottom: 8 }} />
                 {monthLabels.map((mLabel, idx) => (
                   <Bar
                     key={mLabel}
@@ -834,7 +836,7 @@ function CategoryCccRateHorizontalBarCard({
         />
       }
     >
-      <div className="h-[330px]">
+      <div className="h-[360px]">
         {selectedPeriod ? (
           <PeriodDrilldownDonut
             data={drilldownSlices}
@@ -888,7 +890,7 @@ function CategoryCccRateHorizontalBarCard({
                 onClick={openPeriod}
                 className="cursor-pointer"
                 data={timeSeriesData.data_by_category}
-                margin={{ top: 20, right: 25, left: -10, bottom: 35 }}
+                margin={{ top: 20, right: 25, left: -10, bottom: 70 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                 <XAxis
@@ -901,7 +903,7 @@ function CategoryCccRateHorizontalBarCard({
                   allowDecimals={false}
                 />
                 <Tooltip content={<ValueTooltip />} />
-                <Legend wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
+                <Legend verticalAlign="top" align="right" wrapperStyle={{ fontSize: 11, paddingBottom: 8 }} />
                 {monthLabels.map((mLabel, idx) => (
                   <Bar
                     key={mLabel}
@@ -1136,7 +1138,7 @@ function CategoryBotVsCccBarCard({
                   content={<BotVsCccPeriodTooltip />}
                   cursor={{ fill: "#f8fafc" }}
                 />
-                <Legend wrapperStyle={{ fontSize: 11, paddingTop: 6 }} />
+                <Legend verticalAlign="top" align="right" wrapperStyle={{ fontSize: 11, paddingBottom: 8 }} />
                 <Bar
                   dataKey="bot_done"
                   name="Bot tự xử lý (phiên)"
@@ -1191,7 +1193,7 @@ function CategoryBotVsCccBarCard({
                   allowDecimals={false}
                 />
                 <Tooltip content={<ValueTooltip />} />
-                <Legend wrapperStyle={{ fontSize: 11, paddingTop: 6 }} />
+                <Legend verticalAlign="top" align="right" wrapperStyle={{ fontSize: 11, paddingBottom: 8 }} />
                 <Bar
                   dataKey="bot_done"
                   name="Bot tự xử lý (phiên)"
@@ -1415,7 +1417,7 @@ function HourlyPeakChartCard({
                   allowDecimals={false}
                 />
                 <Tooltip content={<ValueTooltip />} />
-                <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
+                <Legend verticalAlign="top" align="right" wrapperStyle={{ fontSize: 11, paddingBottom: 8 }} />
                 {periodLabels.map((pLabel, idx) => (
                   <Line
                     key={pLabel}
@@ -1442,7 +1444,7 @@ function HourlyPeakChartCard({
 
 function CustomYAxisReasonTick({ x, y, payload }: any) {
   const text = payload?.value || "";
-  const formatted = formatLabelByWords(text, 6);
+  const formatted = formatLabelByWords(text, 4);
 
   return (
     <g transform={`translate(${x},${y})`}>
@@ -1459,6 +1461,7 @@ function CustomYAxisReasonTick({ x, y, payload }: any) {
     </g>
   );
 }
+
 
 /* ====================================================================
  * 📊 7. TOP CHỦ ĐỀ CHUYỂN CCC (HORIZONTAL BAR & TIME SERIES)
@@ -1531,7 +1534,7 @@ function TopReasonHorizontalBarCard({
         />
       }
     >
-      <div className="h-[330px]">
+      <div className="h-[360px]">
         {selectedPeriod ? (
           <PeriodDrilldownDonut
             data={drilldownSlices}
@@ -1585,7 +1588,7 @@ function TopReasonHorizontalBarCard({
                 onClick={openPeriod}
                 className="cursor-pointer"
                 data={timeSeriesData.data_by_category}
-                margin={{ top: 25, right: 25, left: -10, bottom: 0 }}
+                margin={{ top: 25, right: 25, left: -10, bottom: 70 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                 <XAxis
@@ -1598,7 +1601,7 @@ function TopReasonHorizontalBarCard({
                   allowDecimals={false}
                 />
                 <Tooltip content={<ValueTooltip />} />
-                <Legend wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
+                <Legend verticalAlign="top" align="right" wrapperStyle={{ fontSize: 11, paddingBottom: 8 }} />
                 {monthLabels.map((mLabel, idx) => (
                   <Bar
                     key={mLabel}
@@ -1694,7 +1697,7 @@ function ChannelPerformanceBarCard({
         />
       }
     >
-      <div className="h-[330px]">
+      <div className="h-[360px]">
         {selectedPeriod ? (
           <PeriodDrilldownDonut
             data={drilldownSlices}
@@ -1720,7 +1723,7 @@ function ChannelPerformanceBarCard({
                   allowDecimals={false}
                 />
                 <Tooltip content={<ValueTooltip />} />
-                <Legend wrapperStyle={{ fontSize: 11, paddingTop: 6 }} />
+                <Legend verticalAlign="top" align="right" wrapperStyle={{ fontSize: 11, paddingBottom: 8 }} />
                 <Bar
                   dataKey="bot_done"
                   name="Bot xử lý (phiên)"
@@ -1761,7 +1764,7 @@ function ChannelPerformanceBarCard({
                 onClick={openPeriod}
                 className="cursor-pointer"
                 data={timeSeriesData.data_by_category}
-                margin={{ top: 20, right: 25, left: -10, bottom: 35 }}
+                margin={{ top: 20, right: 25, left: -10, bottom: 70 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                 <XAxis
@@ -1774,7 +1777,7 @@ function ChannelPerformanceBarCard({
                   allowDecimals={false}
                 />
                 <Tooltip content={<ValueTooltip />} />
-                <Legend wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
+                <Legend verticalAlign="top" align="right" wrapperStyle={{ fontSize: 11, paddingBottom: 8 }} />
                 {monthLabels.map((mLabel, idx) => (
                   <Bar
                     key={mLabel}
@@ -1919,7 +1922,7 @@ function CustomerIssueDistributionChartCard({
               tick={{ fontSize: 11, fontWeight: 600, fill: "#334155" }}
             />
             <Tooltip content={<ValueTooltip />} cursor={{ fill: "#f8fafc" }} />
-            <Bar dataKey="value" name="Số lượt phát sinh" fill="#10b981" radius={[0, 4, 4, 0]} barSize={16}>
+            <Bar dataKey="value" name="Số lượt phát sinh" fill="#10b981" radius={[0, 4, 4, 0]} barSize={16} isAnimationActive={false}>
               <LabelList
                 dataKey="value"
                 position="right"
@@ -1992,7 +1995,7 @@ function InternalIssueDistributionChartCard({
               tick={{ fontSize: 11, fontWeight: 600, fill: "#334155" }}
             />
             <Tooltip content={<ValueTooltip />} cursor={{ fill: "#f8fafc" }} />
-            <Bar dataKey="value" name="Số lượt phát sinh" fill="#f59e0b" radius={[0, 4, 4, 0]} barSize={16}>
+            <Bar dataKey="value" name="Số lượt phát sinh" fill="#f59e0b" radius={[0, 4, 4, 0]} barSize={16} isAnimationActive={false}>
               <LabelList
                 dataKey="value"
                 position="right"
@@ -2071,9 +2074,9 @@ function IssueTrendOverTimeChartCard({
               unit="%"
             />
             <Tooltip content={<ValueTooltip />} cursor={{ fill: "#f8fafc" }} />
-            <Legend wrapperStyle={{ fontSize: 11, paddingTop: 6 }} />
-            <Bar yAxisId="left" dataKey="customer_errors" name="Lỗi Khách hàng" fill="#10b981" stackId="errors" barSize={20} />
-            <Bar yAxisId="left" dataKey="internal_errors" name="Lỗi Nội bộ / Hệ thống" fill="#f59e0b" stackId="errors" barSize={20} />
+            <Legend verticalAlign="top" align="right" wrapperStyle={{ fontSize: 11, paddingBottom: 8 }} />
+            <Bar yAxisId="left" dataKey="customer_errors" name="Lỗi Khách hàng" fill="#10b981" stackId="errors" barSize={20} isAnimationActive={false} />
+            <Bar yAxisId="left" dataKey="internal_errors" name="Lỗi Nội bộ / Hệ thống" fill="#f59e0b" stackId="errors" barSize={20} isAnimationActive={false} />
             <Line
               yAxisId="right"
               type="monotone"
@@ -2082,6 +2085,7 @@ function IssueTrendOverTimeChartCard({
               stroke="#8b5cf6"
               strokeWidth={2.5}
               dot={{ r: 4, fill: "#8b5cf6" }}
+              isAnimationActive={false}
             />
           </ComposedChart>
         </ResponsiveContainer>

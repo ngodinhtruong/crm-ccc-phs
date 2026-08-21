@@ -4,11 +4,11 @@ import { useRouter } from "next/navigation";
 import { StatusPill } from "@/components/chatbot-dashboard/StatusPill";
 import {
   ColumnDateRangeFilter,
-  ColumnNumberRangeFilter,
   ColumnSelectFilter,
   ColumnTextFilter,
 } from "@/components/common/table-filters";
 import {
+  CHANNEL_OPTIONS,
   CHATBOT_TICKET_STATUS_OPTIONS,
   ticketStatusPillClass,
 } from "@/constants/chatbot-dashboard.constant";
@@ -143,7 +143,7 @@ export function TicketsTab({
                 onSearch();
               }
             }}
-            placeholder="Mã ticket, session_id, câu hỏi, thông tin KH..."
+            placeholder="Mã ticket, session_id, câu hỏi..."
             className="h-8 w-full rounded-lg border border-slate-300 bg-white px-2.5 text-xs outline-none focus:border-sky-400"
           />
         </div>
@@ -161,18 +161,16 @@ export function TicketsTab({
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1430px] border-collapse text-left text-xs">
+        <table className="w-full min-w-[1200px] border-collapse text-left text-xs">
           <thead>
             <tr className="h-7 border-b bg-slate-50 text-slate-700 text-[11px]">
               <th className="w-[150px] px-3 py-1 font-semibold">Mã ticket</th>
               <th className="w-[130px] px-3 py-1 font-semibold">Trạng thái</th>
               <th className="w-[190px] px-3 py-1 font-semibold">Session ID</th>
               <th className="w-[150px] px-3 py-1 font-semibold">Thời gian</th>
-              <th className="w-[90px] px-3 py-1 font-semibold">Kênh</th>
+              <th className="w-[110px] px-3 py-1 font-semibold">Kênh</th>
               <th className="w-[170px] px-3 py-1 font-semibold">Chủ đề</th>
-              <th className="w-[90px] px-3 py-1 font-semibold">Số lần chat</th>
               <th className="w-[180px] px-3 py-1 font-semibold">Nhóm xử lý</th>
-              <th className="w-[160px] px-3 py-1 font-semibold">Thông tin KH</th>
               <th className="w-[250px] px-3 py-1 font-semibold">Câu hỏi cuối</th>
               <th className="w-[250px] px-3 py-1 font-semibold">Lý do chuyển CCC</th>
             </tr>
@@ -213,10 +211,11 @@ export function TicketsTab({
               </th>
 
               <th className="px-2 py-1.5">
-                <ColumnTextFilter
+                <ColumnSelectFilter
                   value={columnFilters.channel}
                   onChange={set("channel")}
-                  placeholder="Kênh"
+                  options={CHANNEL_OPTIONS}
+                  placeholder="Tất cả"
                 />
               </th>
 
@@ -229,35 +228,16 @@ export function TicketsTab({
               </th>
 
               <th className="px-2 py-1.5">
-                <ColumnNumberRangeFilter
-                  minValue={columnFilters.msg_count_min}
-                  maxValue={columnFilters.msg_count_max}
-                  onMinChange={set("msg_count_min")}
-                  onMaxChange={set("msg_count_max")}
-                />
-              </th>
-
-              <th className="px-2 py-1.5">
                 <ColumnSelectFilter
-                  value={status === "CCC" ? "" : status}
+                  value={status}
                   onChange={(value) =>
-                    onStatusChange((value || "CCC") as OutcomeCode)
+                    onStatusChange((value || "ALL") as OutcomeCode)
                   }
-                  options={CHATBOT_TICKET_STATUS_OPTIONS.filter(
-                    (option) => option.value !== "ALL"
-                  ).map((option) => ({
+                  options={CHATBOT_TICKET_STATUS_OPTIONS.map((option) => ({
                     value: option.value,
                     label: option.label,
                   }))}
-                  placeholder="Chuyển CCC xử lý"
-                />
-              </th>
-
-              <th className="px-2 py-1.5">
-                <ColumnTextFilter
-                  value={columnFilters.contact_info}
-                  onChange={set("contact_info")}
-                  placeholder="SĐT / email / STK"
+                  placeholder="Tất cả nhóm"
                 />
               </th>
 
@@ -282,7 +262,7 @@ export function TicketsTab({
           <tbody>
             {tickets.length === 0 && (
               <tr>
-                <td colSpan={11} className="h-20 text-center text-slate-500">
+                <td colSpan={9} className="h-20 text-center text-slate-500">
                   Không có dữ liệu.
                 </td>
               </tr>
@@ -348,7 +328,6 @@ export function TicketsTab({
 
                 <td className="px-3 py-1 text-slate-700">{item.channel || "-"}</td>
                 <td className="px-3 py-1 text-slate-700">{item.category_label || "-"}</td>
-                <td className="px-3 py-1 text-slate-700">{item.msg_count_total ?? 0}</td>
 
                 <td className="px-3 py-1 text-slate-700">
                   <StatusPill
@@ -357,7 +336,6 @@ export function TicketsTab({
                   />
                 </td>
 
-                <td className="px-3 py-1 text-slate-700">{item.contact_info || "-"}</td>
                 <td className="px-3 py-1 text-slate-700">{shortText(item.last_question, 110)}</td>
                 <td className="px-3 py-1 text-slate-700">{shortText(item.reason, 110)}</td>
               </tr>
@@ -368,3 +346,4 @@ export function TicketsTab({
     </div>
   );
 }
+

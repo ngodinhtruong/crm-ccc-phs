@@ -37,14 +37,22 @@ def get_value(row, *keys):
     """
     Giá trị đầu tiên khác None trong payload.
 
-    Lớp hấp thụ việc Supabase đổi tên cột: đổi ``channel`` thành ``platform``
-    thì chỉ cần thêm tên mới vào danh sách, không phải migration bên CRM.
+    Lớp hấp thụ việc Supabase đổi tên cột hoặc khác biệt viết hoa/viết thường:
+    thử lần lượt các tên chính xác, sau đó thử tìm kiếm không phân biệt hoa thường.
     """
     for key in keys:
         value = row.get(key)
-
         if value is not None:
             return value
+
+    # Case-insensitive fallback (nếu Supabase dùng questiontype, QuestionType, Category, etc.)
+    row_keys_lower = {str(k).lower(): k for k in row.keys()}
+    for key in keys:
+        k_lower = key.lower()
+        if k_lower in row_keys_lower:
+            value = row.get(row_keys_lower[k_lower])
+            if value is not None:
+                return value
 
     return None
 
@@ -84,10 +92,10 @@ XPRO_CHAT_LOGS = ChatbotSyncSource(
     allow_orphan_session=True,
     track_source=True,
     extra_fields=lambda row: {
-        "question": get_value(row, "question"),
-        "answer": get_value(row, "answer"),
-        "questionType": get_value(row, "questionType", "question_type"),
-        "category": get_value(row, "category", "categories"),
+        "question": get_value(row, "question", "Question", "QUESTION"),
+        "answer": get_value(row, "answer", "Answer", "ANSWER"),
+        "questionType": get_value(row, "questionType", "question_type", "questiontype", "QuestionType", "QUESTION_TYPE", "type"),
+        "category": get_value(row, "category", "categories", "Category", "CATEGORIES", "topic", "subject", "category_name"),
     },
 )
 
@@ -105,12 +113,12 @@ CHAT_QUESTIONS = ChatbotSyncSource(
     allow_orphan_session=True,
     track_source=True,
     extra_fields=lambda row: {
-        "question": get_value(row, "question"),
-        "answer": get_value(row, "answer"),
+        "question": get_value(row, "question", "Question", "QUESTION"),
+        "answer": get_value(row, "answer", "Answer", "ANSWER"),
         # Zalo dùng cùng bộ giá trị với XPro, trừ RESEARCH:
         # CUSTOMER_CARE / GREETING / UNRELATED.
-        "questionType": get_value(row, "questionType", "question_type"),
-        "category": get_value(row, "category", "categories"),
+        "questionType": get_value(row, "questionType", "question_type", "questiontype", "QuestionType", "QUESTION_TYPE", "type"),
+        "category": get_value(row, "category", "categories", "Category", "CATEGORIES", "topic", "subject", "category_name"),
         # Một dòng của bảng này là một tin nhắn của MỘT bên.
         "sender_type": get_value(row, "sender_type"),
         # Phiên chốt ở chế độ nào sau 30 phút: bot / mod / sa. Lưu sẵn cho

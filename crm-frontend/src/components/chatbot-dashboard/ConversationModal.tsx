@@ -110,7 +110,7 @@ export function ConversationModal({
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 border-b border-slate-100 bg-slate-50 px-5 py-3 text-xs md:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 border-b border-slate-100 bg-slate-50 px-5 py-3 text-xs md:grid-cols-4">
           <InfoItem
             label="Nhóm xử lý"
             value={
@@ -126,14 +126,11 @@ export function ConversationModal({
             value={formatDateTime(displaySession.started_at)}
           />
           <InfoItem
-            label="Thông tin KH"
-            value={displaySession.contact_info || "Chưa có"}
-          />
-          <InfoItem
             label="Mã ticket"
             value={displaySession.ticket_code || "Không tạo ticket"}
           />
         </div>
+
 
         {displaySession.reason && (
           <div className="border-b border-slate-100 bg-amber-50 px-5 py-3">

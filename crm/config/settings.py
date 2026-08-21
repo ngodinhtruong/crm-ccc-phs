@@ -18,8 +18,6 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
@@ -54,9 +52,7 @@ DEBUG = os.getenv("DJANGO_DEBUG", "False").lower() in {
     "on",
 }
 
-
 # Application definition
-
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -118,20 +114,12 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
-
-# Database
-# https://docs.djangoproject.com/en/6.0/ref/settings/#databases
-
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
-
-
-# Password validation
-# https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -148,29 +136,14 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
-# Internationalization
-# https://docs.djangoproject.com/en/6.0/topics/i18n/
-
 LANGUAGE_CODE = 'en-us'
-
-TIME_ZONE = 'UTC'
-
+TIME_ZONE = 'Asia/Ho_Chi_Minh'
 USE_I18N = True
-
 USE_TZ = True
-
-
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
 
-
-
-
 AUTH_USER_MODEL = "accounts.User"
-
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
@@ -181,21 +154,16 @@ REST_FRAMEWORK = {
     "PAGE_SIZE": 20,
 }
 
-
-#supabase
+# Supabase
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
 SUPABASE_XPRO_CHAT_TABLE = os.getenv("SUPABASE_XPRO_CHAT_TABLE", "xpro_chat")
-SUPABASE_CHAT_QUESTIONS_TABLE = os.getenv(
-    "SUPABASE_CHAT_QUESTIONS_TABLE",
-    "chat_questions",
-)
+SUPABASE_CHAT_QUESTIONS_TABLE = os.getenv("SUPABASE_CHAT_QUESTIONS_TABLE", "chat_questions")
 SUPABASE_CSKH_STATE_TABLE = os.getenv("SUPABASE_CSKH_STATE_TABLE", "cskh_state")
 SUPABASE_CSKH_REQUESTS_TABLE = os.getenv("SUPABASE_CSKH_REQUESTS_TABLE", "cskh_requests")
 
-
-#selery
+# Celery
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://127.0.0.1:6379/0")
 CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://127.0.0.1:6379/1")
 CELERY_TIMEZONE = "Asia/Ho_Chi_Minh"
@@ -212,7 +180,6 @@ CACHES = {
 }
 CHATBOT_SYNC_INTERVAL_SECONDS = int(os.getenv("CHATBOT_SYNC_INTERVAL_SECONDS", 60))
 CHATBOT_SYNC_LOOKBACK_MINUTES = int(os.getenv("CHATBOT_SYNC_LOOKBACK_MINUTES", 30))
-
 
 ALLOWED_HOSTS = [
     host.strip()
@@ -231,4 +198,3 @@ CSRF_TRUSTED_ORIGINS = [
     for origin in os.getenv("CSRF_TRUSTED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",")
     if origin.strip()
 ]
-
