@@ -2071,31 +2071,23 @@ function QuestionTypeBarCard({
           <ResponsiveContainer width="100%" height="100%">
             {viewMode === "DEFAULT" ? (
               <BarChart
-                layout="vertical"
                 data={items}
-                margin={{ top: 10, right: 45, left: 20, bottom: 5 }}
+                margin={{ top: 20, right: 20, left: -10, bottom: 46 }}
               >
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="#f1f5f9"
-                  horizontal={false}
-                />
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                 <XAxis
-                  type="number"
-                  tick={{ fontSize: 11, fill: "#64748b" }}
-                  allowDecimals={false}
-                />
-                <YAxis
-                  type="category"
                   dataKey="name"
                   interval={0}
-                  tick={<CustomYAxisReasonTick />}
-                  width={160}
+                  tick={<CustomCategoryAxisTick />}
+                />
+                <YAxis
+                  tick={{ fontSize: 11, fill: "#64748b" }}
+                  allowDecimals={false}
                 />
                 <Tooltip content={<ValueTooltip />} cursor={{ fill: "#f8fafc" }} />
                 <Legend wrapperStyle={{ fontSize: 11, paddingTop: 6 }} />
 
-                {/* Chồng theo nguồn: tổng vẫn là chiều dài cả thanh, mà vẫn
+                {/* Chồng theo nền tảng: chiều cao cả cột là tổng lượt, mà vẫn
                     thấy phần nào đến từ nền tảng nào. */}
                 {sources.map((source, index) => (
                   <Bar
@@ -2105,15 +2097,15 @@ function QuestionTypeBarCard({
                     stackId="source"
                     fill={questionTypeSource(source).color}
                     radius={
-                      index === sources.length - 1 ? [0, 4, 4, 0] : undefined
+                      index === sources.length - 1 ? [4, 4, 0, 0] : undefined
                     }
-                    barSize={18}
+                    maxBarSize={54}
                     isAnimationActive={false}
                   >
                     {index === sources.length - 1 && (
                       <LabelList
                         dataKey="value"
-                        position="right"
+                        position="top"
                         style={{ fontSize: 10, fontWeight: 700, fill: "#334155" }}
                         formatter={hideZeroLabel}
                       />
