@@ -225,6 +225,28 @@ export type QuestionTypeBarData = {
   items: Array<{ name: string; value: number } & Record<string, any>>;
 };
 
+/**
+ * Thời lượng phiên theo nền tảng.
+ *
+ * Có cả trung bình lẫn trung vị vì dữ liệu lệch rất nặng: một phiên kéo dài
+ * nhiều ngày đủ đẩy trung bình lên gấp vài chục lần trung vị. Đọc mỗi trung
+ * bình sẽ tưởng khách trò chuyện hàng giờ.
+ */
+export type SessionDurationItem = {
+  name: string;
+  session_count: number;
+  avg_minutes: number;
+  median_minutes: number;
+  max_minutes: number;
+  /** Phiên chỉ có một lượt hỏi — thời lượng bằng 0. */
+  single_turn_count: number;
+};
+
+export type SessionDurationByPeriodData = {
+  period_labels: string[];
+  items: Array<{ name: string } & Record<string, any>>;
+};
+
 export type FunnelStepItem = {
   step: number;
   name: string;
@@ -287,6 +309,8 @@ export type ChatbotOverviewResponse = {
     category_bot_vs_ccc_multi_period?: CategoryBotVsCccByPeriodData;
     category_ccc_rate?: CategoryCccRateItem[];
     question_type_bar?: QuestionTypeBarData;
+    session_duration_by_channel?: SessionDurationItem[];
+    session_duration_multi_period?: SessionDurationByPeriodData;
     question_type_multi_period?: CccMultiMonthTopicsData;
     chat_funnel?: FunnelStepItem[];
     hourly_peak?: HourlyPeakItem[];

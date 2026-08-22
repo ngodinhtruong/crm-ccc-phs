@@ -9,7 +9,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.chatbots.constants import SPAM_QUESTION_TYPES, UNCATEGORIZED_LABEL
+from apps.chatbots.constants import NON_FAQ_QUESTION_TYPES, UNCATEGORIZED_LABEL
 from apps.chatbots.dashboard.aggregations import (
     ChatbotDashboardAggregator,
     TOPIC_OUTCOMES,
@@ -316,7 +316,9 @@ class ChatbotDashboardFAQAPIView(ChatbotDashboardFilterMixin, generics.ListAPIVi
     pagination_class = StandardResultsSetPagination
 
     def get_queryset(self):
-        logs = self.get_filtered_logs().exclude(questionType__in=SPAM_QUESTION_TYPES)
+        logs = self.get_filtered_logs().exclude(
+            questionType__in=NON_FAQ_QUESTION_TYPES
+        )
         keyword = (self.request.query_params.get("q") or "").strip()
 
         if keyword:

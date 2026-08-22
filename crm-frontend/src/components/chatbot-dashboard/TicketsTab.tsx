@@ -60,6 +60,16 @@ export function TicketsTab({
     (key: ChatbotTicketColumnFilterKey) => (value: string) =>
       onColumnFilterChange(key, value);
 
+  /*
+   * Hai nhóm này chatbot không gán chủ đề: RESEARCH (câu phân tích cổ phiếu)
+   * và SPAM (câu không liên quan) đều để trống `category`, nên cột Chủ đề chỉ
+   * toàn "Chưa phân loại" — chiếm chỗ mà không nói được gì.
+   */
+  const showCategory = status !== "RESEARCH" && status !== "SPAM";
+
+  // Số cột thật, dùng cho dòng "Không có dữ liệu".
+  const columnCount = showCategory ? 9 : 8;
+
   // Nhãn trạng thái ticket dùng chung với màn chi tiết, giá trị gửi lên là
   // status_code để backend khỏi phải dịch ngược từ nhãn tiếng Việt.
   const ticketStatusOptions = Object.entries(CHATBOT_TICKET_STATUS_LABELS).map(
@@ -169,7 +179,9 @@ export function TicketsTab({
               <th className="w-[190px] px-3 py-1 font-semibold">Session ID</th>
               <th className="w-[150px] px-3 py-1 font-semibold">Thời gian</th>
               <th className="w-[110px] px-3 py-1 font-semibold">Kênh</th>
-              <th className="w-[170px] px-3 py-1 font-semibold">Chủ đề</th>
+              {showCategory && (
+                <th className="w-[170px] px-3 py-1 font-semibold">Chủ đề</th>
+              )}
               <th className="w-[180px] px-3 py-1 font-semibold">Nhóm xử lý</th>
               <th className="w-[250px] px-3 py-1 font-semibold">Câu hỏi cuối</th>
               <th className="w-[250px] px-3 py-1 font-semibold">Lý do chuyển CCC</th>
@@ -219,13 +231,15 @@ export function TicketsTab({
                 />
               </th>
 
-              <th className="px-2 py-1.5">
-                <ColumnTextFilter
-                  value={columnFilters.category}
-                  onChange={set("category")}
-                  placeholder="Chủ đề"
-                />
-              </th>
+              {showCategory && (
+                <th className="px-2 py-1.5">
+                  <ColumnTextFilter
+                    value={columnFilters.category}
+                    onChange={set("category")}
+                    placeholder="Chủ đề"
+                  />
+                </th>
+              )}
 
               <th className="px-2 py-1.5">
                 <ColumnSelectFilter
@@ -262,7 +276,7 @@ export function TicketsTab({
           <tbody>
             {tickets.length === 0 && (
               <tr>
-                <td colSpan={9} className="h-20 text-center text-slate-500">
+                <td colSpan={columnCount} className="h-20 text-center text-slate-500">
                   Không có dữ liệu.
                 </td>
               </tr>
@@ -327,7 +341,11 @@ export function TicketsTab({
                 </td>
 
                 <td className="px-3 py-1 text-slate-700">{item.channel || "-"}</td>
-                <td className="px-3 py-1 text-slate-700">{item.category_label || "-"}</td>
+                {showCategory && (
+                  <td className="px-3 py-1 text-slate-700">
+                    {item.category_label || "-"}
+                  </td>
+                )}
 
                 <td className="px-3 py-1 text-slate-700">
                   <StatusPill

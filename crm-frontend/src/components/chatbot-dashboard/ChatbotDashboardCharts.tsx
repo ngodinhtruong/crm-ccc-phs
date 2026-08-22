@@ -40,6 +40,8 @@ import type {
   HourlyPeakItem,
   OutcomeByPeriod,
   QuestionTypeBarData,
+  SessionDurationByPeriodData,
+  SessionDurationItem,
   TimeSeriesOutcomeItem,
 } from "@/types/chatbot-dashboard.type";
 
@@ -1682,10 +1684,10 @@ function TopReasonHorizontalBarCard({
 
   return (
     <ChartCard
-      title="📊 7. Top Chủ đề Chuyển CCC"
+      title="📊 7. Top Chủ đề Chatbot phải xin thông tin KH"
       description={
         viewMode === "DEFAULT"
-          ? "Chủ đề của các phiên phát sinh yêu cầu hỗ trợ, tìm điểm nghẽn để cải tiến kịch bản Chatbot"
+          ? "Chủ đề mà chatbot bí và phải hỏi xin liên hệ — điểm nghẽn cần cải tiến kịch bản. Gồm cả phiên KH chưa cung cấp thông tin, nên số này LỚN HƠN ô KPI 'Chuyển CCC xử lý'"
           : "Trục hoành: Các chủ đề nghiệp vụ | Biến động theo thời gian (phụ thuộc bộ lọc)"
       }
       headerRight={
@@ -2168,6 +2170,177 @@ function QuestionTypeBarCard({
 }
 
 /* ====================================================================
+ * ⏱️ 10. THỜI LƯỢNG PHIÊN THEO NỀN TẢNG
+ * ==================================================================== */
+/** Phút -> chuỗi đọc được: 0,8 phút · 42,9 phút · 25,7 giờ. */
+function formatMinutes(value: number) {
+  if (!value) return "0 phút";
+  if (value < 60) return `${value.toFixed(1).replace(".", ",")} phút`;
+
+  const hours = value / 60;
+
+  if (hours < 24) return `${hours.toFixed(1).replace(".", ",")} giờ`;
+
+  return `${(hours / 24).toFixed(1).replace(".", ",")} ngày`;
+}
+
+/** Tooltip riêng: cột chỉ mang số phút, cần chú thích thêm cho dễ đọc. */
+function DurationTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null;
+
+  const row = payload[0]?.payload || {};
+
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white/95 px-3.5 py-2.5 text-xs shadow-xl backdrop-blur-sm">
+      <div className="mb-1.5 font-bold text-slate-800">{label}</div>
+
+      {payload.map((item: any) => (
+        <div key={item.dataKey} className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-1.5">
+            <span
+              className="h-2 w-2 rounded-full"
+              style={{ backgroundColor: item.color || item.fill }}
+            />
+            <span className="text-slate-600">{item.name}</span>
+          </div>
+          <span className="font-bold text-slate-900">
+            {formatMinutes(Number(item.value) || 0)}
+          </span>
+        </div>
+      ))}
+
+      {row.session_count !== undefined && (
+        <div className="mt-1.5 border-t border-slate-100 pt-1.5 text-[11px] text-slate-500">
+          {row.session_count} phiên · dài nhất {formatMinutes(row.max_minutes || 0)}
+          <br />
+          {row.single_turn_count} phiên chỉ có 1 lượt hỏi
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SessionDurationCard({
+  data,
+  multiPeriodData,
+}: {
+  data?: SessionDurationItem[] | null;
+  multiPeriodData?: SessionDurationByPeriodData | null;
+}) {
+  const [viewMode, setViewMode] = useState<ChartViewMode>("DEFAULT");
+
+  const items = useMemo(() => data || [], [data]);
+  const periodLabels = useMemo(
+    () => multiPeriodData?.period_labels || [],
+    [multiPeriodData]
+  );
+  const periodItems = useMemo(
+    () => multiPeriodData?.items || [],
+    [multiPeriodData]
+  );
+
+  const totalSessions = useMemo(
+    () => items.reduce((sum, item) => sum + (item.session_count || 0), 0),
+    [items]
+  );
+
+  return (
+    <ChartCard
+      title="⏱️ 10. Thời lượng Phiên theo Nền tảng"
+      description={
+        viewMode === "DEFAULT"
+          ? "Một phiên kéo dài bao lâu — trung vị là con số điển hình, trung bình bị vài phiên cá biệt kéo lệch"
+          : "Trung vị thời lượng phiên qua từng kỳ, mỗi nền tảng một cột"
+      }
+      headerRight={
+        <ChartModeHeader viewMode={viewMode} onChange={setViewMode} />
+      }
+    >
+      <div className="h-[330px]">
+        {items.length === 0 ? (
+          <EmptyState message="Chưa có phiên nào đo được thời lượng." />
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            {viewMode === "DEFAULT" ? (
+              <BarChart
+                data={items}
+                margin={{ top: 20, right: 20, left: -5, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis
+                  dataKey="name"
+                  tick={{ fontSize: 11, fontWeight: 700, fill: "#334155" }}
+                />
+                <YAxis
+                  tick={{ fontSize: 11, fill: "#64748b" }}
+                  unit="p"
+                  width={52}
+                />
+                <Tooltip content={<DurationTooltip />} cursor={{ fill: "#f8fafc" }} />
+                <Legend wrapperStyle={{ fontSize: 11, paddingTop: 6 }} />
+
+                <Bar
+                  dataKey="median_minutes"
+                  name="Trung vị"
+                  fill="#0097cf"
+                  radius={[4, 4, 0, 0]}
+                  maxBarSize={44}
+                  isAnimationActive={false}
+                />
+                <Bar
+                  dataKey="avg_minutes"
+                  name="Trung bình"
+                  fill="#cbd5e1"
+                  radius={[4, 4, 0, 0]}
+                  maxBarSize={44}
+                  isAnimationActive={false}
+                />
+              </BarChart>
+            ) : (
+              <BarChart
+                data={periodItems}
+                margin={{ top: 20, right: 20, left: -5, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis
+                  dataKey="name"
+                  tick={{ fontSize: 11, fontWeight: 700, fill: "#334155" }}
+                />
+                <YAxis
+                  tick={{ fontSize: 11, fill: "#64748b" }}
+                  unit="p"
+                  width={52}
+                />
+                <Tooltip content={<DurationTooltip />} />
+                <Legend wrapperStyle={{ fontSize: 11, paddingTop: 6 }} />
+                {periodLabels.map((label, index) => (
+                  <Bar
+                    key={label}
+                    dataKey={label}
+                    name={label}
+                    fill={COLORS[index % COLORS.length]}
+                    radius={[4, 4, 0, 0]}
+                    maxBarSize={40}
+                    isAnimationActive={false}
+                  />
+                ))}
+              </BarChart>
+            )}
+          </ResponsiveContainer>
+        )}
+      </div>
+
+      <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-2 text-[11px] font-medium text-slate-500">
+        <span>
+          Đo được <strong className="text-slate-800">{formatNumber(totalSessions)}</strong> phiên
+        </span>
+        <span className="text-slate-400">Phiên thiếu mốc bắt đầu/kết thúc bị loại</span>
+      </div>
+    </ChartCard>
+  );
+}
+
+/* ====================================================================
  * 📋 8. TOP CÂU HỎI PHỔ BIẾN (TABLE)
  * ==================================================================== */
 function TopFaqTableCard({ faqs }: { faqs?: ChatbotFaqItem[] | null }) {
@@ -2526,6 +2699,13 @@ export function ChatbotDashboardCharts({
           data={charts.question_type_bar}
           multiPeriodData={charts.question_type_multi_period}
         />
+        {/* Thẻ "Thời lượng Phiên theo Nền tảng" tạm ẩn — nghiệp vụ chưa dùng
+            tới. Component SessionDurationCard và API vẫn còn nguyên, bật lại
+            chỉ cần bỏ chú thích khối dưới đây.
+        <SessionDurationCard
+          data={charts.session_duration_by_channel}
+          multiPeriodData={charts.session_duration_multi_period}
+        /> */}
       </div>
     </div>
   );

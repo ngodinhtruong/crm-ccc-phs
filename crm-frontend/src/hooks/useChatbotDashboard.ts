@@ -438,6 +438,12 @@ export function useChatbotDashboard(initialFilters?: Partial<ChatbotDashboardFil
   const changeTicketStatus = async (status: OutcomeCode) => {
     setTicketStatus(status);
     setTicketCategory("");
+
+    // Cột Chủ đề bị ẩn ở nhóm RESEARCH/SPAM, nên phải xoá luôn ô lọc của nó:
+    // để lại thì bộ lọc vẫn chạy ngầm trên một cột người dùng không nhìn thấy
+    // và bảng ra rỗng không rõ lý do.
+    setColumnFilters((prev) => ({ ...prev, category: "" }));
+    columnFiltersRef.current = { ...columnFiltersRef.current, category: "" };
     setTicketPanelTitle(
       CHATBOT_TICKET_STATUS_OPTIONS.find((item) => item.value === status)
         ?.label || DEFAULT_PANEL_TITLE

@@ -6,7 +6,7 @@ from django.db.models.functions import ExtractHour
 from apps.chatbots.constants import (
     CUSTOMER_SENDER_TYPES,
     QUESTION_TYPE_CUSTOMER_CARE,
-    SPAM_QUESTION_TYPES,
+    NON_FAQ_QUESTION_TYPES,
     UNCATEGORIZED_LABEL,
     category_label,
     channel_label,
@@ -515,6 +515,129 @@ class ChatbotDashboardAggregator:
         )
 
     # ------------------------------------------------------------------
+    # Thời lượng phiên
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _median(values):
+        if not values:
+            return 0.0
+
+        ordered = sorted(values)
+        middle = len(ordered) // 2
+
+        if len(ordered) % 2:
+            return ordered[middle]
+
+        return (ordered[middle - 1] + ordered[middle]) / 2
+
+    def _session_durations_by_channel(self):
+        """
+        Thời lượng từng phiên (phút), gom theo nền tảng.
+
+        Phiên thiếu started_at hoặc ended_at bị loại — không đo được thì đừng
+        đoán. Phiên chỉ có một lượt có thời lượng bằng 0 và VẪN được tính:
+        đó là dữ liệu thật (khách hỏi một câu rồi thôi), bỏ đi sẽ làm mọi con
+        số đẹp lên một cách giả tạo.
+        """
+        buckets = {}
+
+        rows = self.summaries.filter(
+            started_at__isnull=False,
+            ended_at__isnull=False,
+        ).values_list("channel", "started_at", "ended_at")
+
+        for channel, started_at, ended_at in rows:
+            minutes = (ended_at - started_at).total_seconds() / 60
+
+            if minutes < 0:
+                continue
+
+            buckets.setdefault(channel_label(channel), []).append(minutes)
+
+        return buckets
+
+    def build_session_duration_by_channel(self):
+        """
+        Thời lượng phiên theo nền tảng: trung bình VÀ trung vị.
+
+        Phải có cả hai. Dữ liệu thực tế lệch rất nặng — một phiên kéo dài
+        nhiều ngày đủ để đẩy trung bình lên gấp vài chục lần trung vị, và ai
+        đọc mỗi trung bình sẽ tưởng khách trò chuyện hàng giờ.
+        """
+        items = []
+
+        for name, values in self._session_durations_by_channel().items():
+            items.append(
+                {
+                    "name": name,
+                    "session_count": len(values),
+                    "avg_minutes": round(sum(values) / len(values), 1),
+                    "median_minutes": round(self._median(values), 1),
+                    "max_minutes": round(max(values), 1),
+                    # Phiên một lượt: hỏi xong là hết, không có "thời lượng".
+                    "single_turn_count": sum(1 for value in values if value == 0),
+                }
+            )
+
+        return sorted(items, key=lambda item: item["session_count"], reverse=True)
+
+    def build_session_duration_by_period(self, granularity="month"):
+        """Trung vị thời lượng theo từng kỳ, mỗi nền tảng một đường."""
+        granularity = normalize_granularity(granularity)
+
+        period_labels = {}
+        buckets = {}
+        channel_totals = {}
+
+        rows = self.summaries.filter(
+            started_at__isnull=False,
+            ended_at__isnull=False,
+        ).annotate(period=period_trunc(granularity)).values_list(
+            "period", "channel", "started_at", "ended_at"
+        )
+
+        for period, channel, started_at, ended_at in rows:
+            if not period:
+                continue
+
+            minutes = (ended_at - started_at).total_seconds() / 60
+
+            if minutes < 0:
+                continue
+
+            key = period_key(granularity, period)
+            period_labels[key] = period_label(granularity, period)
+
+            name = channel_label(channel)
+            buckets.setdefault((key, name), []).append(minutes)
+            channel_totals[name] = channel_totals.get(name, 0) + 1
+
+        keys = sorted(period_labels)
+        labels = [period_labels[key] for key in keys]
+        names = sorted(channel_totals, key=lambda n: -channel_totals[n])
+
+        return {
+            "period_labels": labels,
+            "items": [
+                {
+                    "name": name,
+                    **{
+                        label: (
+                            round(self._median(buckets[(key, name)]), 1)
+                            # Kỳ không có phiên nào của nền tảng đó trả None
+                            # chứ không phải 0 — "không có dữ liệu" khác hẳn
+                            # "phiên dài 0 phút".
+                            if (key, name) in buckets
+                            else None
+                        )
+                        for key, label in zip(keys, labels)
+                    },
+                }
+                for name in names
+            ],
+        }
+
+    # ------------------------------------------------------------------
     # Section: topics
     # ------------------------------------------------------------------
     def _category_bot_vs_ccc(
@@ -679,6 +802,12 @@ class ChatbotDashboardAggregator:
                     granularity
                 ),
                 "question_type_bar": self.build_question_type_bar(),
+                "session_duration_by_channel": (
+                    self.build_session_duration_by_channel()
+                ),
+                "session_duration_multi_period": (
+                    self.build_session_duration_by_period(granularity)
+                ),
                 "question_type_multi_period": self.build_question_type_by_period(
                     granularity
                 ),
@@ -846,7 +975,13 @@ class ChatbotDashboardAggregator:
 
     def _top_reasons(self, limit=6):
         """
-        Chủ đề của các phiên đã phát sinh yêu cầu hỗ trợ.
+        Chủ đề của các phiên mà chatbot phải hỏi xin thông tin liên hệ.
+
+        KHÔNG phải "phiên đã chuyển CCC". Điều kiện là có `reason`, mà reason
+        được điền từ cskh_requests HOẶC cskh_state (dự phòng) — nên phiên
+        PENDING (chatbot đã hỏi, khách chưa cho thông tin) cũng nằm trong đây.
+        Vì vậy con số này luôn >= ô KPI "Chuyển CCC xử lý"; muốn đúng nghĩa
+        chuyển CCC thì lọc thêm outcome_type=CCC.
 
         Gom theo `dashboard_category` chứ không phải `reason`: cùng một hệ nhãn
         với biểu đồ so sánh bot vs CCC đứng cạnh thì hai biểu đồ đọc ngang được,
@@ -865,7 +1000,13 @@ class ChatbotDashboardAggregator:
         return [{"name": name, "value": value} for name, value in ranked[:limit]]
 
     def _with_reason(self):
-        """Phiên có ghi lý do chuyển CCC."""
+        """
+        Phiên có ghi lý do cần người hỗ trợ.
+
+        Gồm cả CCC (đã xin được liên hệ) lẫn PENDING (đã hỏi, khách chưa cho)
+        — vì reason của summary lấy từ cskh_requests, thiếu thì lấy của
+        cskh_state.
+        """
         return self.summaries.exclude(reason__isnull=True).exclude(reason__exact="")
 
     def build_multi_period_reasons(self, granularity="month"):
@@ -999,7 +1140,7 @@ class ChatbotDashboardAggregator:
     # ------------------------------------------------------------------
     def _top_faqs(self, limit=5):
         return list(
-            self.logs.exclude(questionType__in=SPAM_QUESTION_TYPES)
+            self.logs.exclude(questionType__in=NON_FAQ_QUESTION_TYPES)
             .exclude(category__isnull=True)
             .exclude(category__exact="")
             .values("category")

@@ -22,8 +22,16 @@ FAQ_QUESTION_KEYWORDS = (
 # chat_questions (Zalo) chỉ dùng CUSTOMER_CARE / GREETING / UNRELATED.
 QUESTION_TYPE_RESEARCH = "RESEARCH"
 
-# Câu hỏi rác: chào hỏi + không liên quan
-SPAM_QUESTION_TYPES = [QUESTION_TYPE_GREETING, QUESTION_TYPE_UNRELATED]
+# Câu hỏi rác: CHỈ loại không liên quan.
+#
+# Chào hỏi không phải rác — "xin chào" là cách mở đầu bình thường của một
+# cuộc trò chuyện, gộp vào rác thì tỷ lệ câu rác bị thổi phồng và người đọc
+# tưởng khách đang phá.
+SPAM_QUESTION_TYPES = [QUESTION_TYPE_UNRELATED]
+
+# Câu không mang nghiệp vụ, không đưa vào bảng xếp hạng FAQ. Rộng hơn nhóm
+# rác: chào hỏi tuy không phải rác nhưng cũng chẳng phải chủ đề để xếp hạng.
+NON_FAQ_QUESTION_TYPES = [QUESTION_TYPE_GREETING, QUESTION_TYPE_UNRELATED]
 
 # sender_type trong bảng chat_questions. xpro_chat_logs không có cột này.
 SENDER_TYPE_CUSTOMER = "customer"
