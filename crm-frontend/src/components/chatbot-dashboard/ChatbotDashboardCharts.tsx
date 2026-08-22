@@ -964,7 +964,7 @@ function CategoryCccRateHorizontalBarCard({
 
   return (
     <ChartCard
-      title="📊 4. Số lượt Chuyển CCC theo Category"
+      title="📊 4. Số lượt đã chuyển cho CCC theo category"
       description={
         viewMode === "DEFAULT"
           ? "Biết số lượt phiên chuyển CCC hỗ trợ cho từng chủ đề nghiệp vụ"
@@ -2652,12 +2652,28 @@ export function ChatbotDashboardCharts({
         <PeriodComparisonChart data={charts.period_comparison} />
       </div>
 
-      {/* ROW 2: 3 CHARTS (KHU VỰC PHÂN TÍCH LỖI: LỖI KHÁCH HÀNG - LỖI NỘI BỘ - XU HƯỚNG THEO THỜI GIAN) */}
+      {/*
+        ROW 2 — ba thẻ "phân bố lỗi" tạm ẩn.
+
+        Lý do: CRM không có dữ liệu phân loại lỗi khách hàng / lỗi hệ thống.
+        Hai thẻ đầu chỉ lọc `topic_bar` bằng một danh sách từ khoá đoán
+        ("tài khoản", "otp", "ngân hàng"...), nên chủ đề như "Mở Tài Khoản
+        Phái Sinh" bị xếp thành lỗi khách hàng chỉ vì tên có chữ "tài khoản".
+        Thẻ thứ ba thì chia đôi số liệu theo tỷ lệ cố định 0,62 — con số bịa,
+        và về bản chất nó trùng với thẻ 1 (Xu hướng tự động hóa) vốn đã vẽ
+        đúng dữ liệu thật.
+
+        Muốn phân loại lỗi thật thì nối vào app `external_errors`, nơi đã có
+        sẵn ExternalErrorGroup / ExternalErrorCauseGroup.
+
+        Component vẫn còn nguyên, bật lại chỉ cần bỏ chú thích khối dưới.
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <CustomerIssueDistributionChartCard topicData={charts.topic_bar} />
         <InternalIssueDistributionChartCard topicData={charts.topic_bar} />
         <IssueTrendOverTimeChartCard timeSeriesData={charts.time_series_outcomes} />
       </div>
+      */}
 
       {/* ROW 3: 3 CHARTS */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

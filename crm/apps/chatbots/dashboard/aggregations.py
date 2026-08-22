@@ -718,7 +718,7 @@ class ChatbotDashboardAggregator:
         Bản gộp chỉ trả lời "chủ đề nào bot đang đuối"; lọc 5 tháng mà xem số
         cộng dồn thì không biết bot đang khá lên hay tệ đi trên từng chủ đề.
         Giá trị vẽ ra là tỷ lệ % chứ không phải số phiên: số phiên theo kỳ đã
-        có ở biểu đồ "Số lượt Chuyển CCC theo Category", và số tuyệt đối lên
+        có ở biểu đồ "", và số tuyệt đối lên
         xuống theo lưu lượng nên không so được chất lượng bot giữa các kỳ.
 
         Danh sách chủ đề và thứ tự lấy nguyên từ bản gộp để mã CD1..CDn ở chú
