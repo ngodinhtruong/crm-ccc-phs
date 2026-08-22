@@ -14,7 +14,10 @@ from apps.chatbots.dashboard.aggregations import (
     ChatbotDashboardAggregator,
     TOPIC_OUTCOMES,
 )
-from apps.chatbots.dashboard.cache import get_or_build_dashboard_section
+from apps.chatbots.dashboard.cache import (
+    bump_chatbot_dashboard_cache_version,
+    get_or_build_dashboard_section,
+)
 from apps.chatbots.dashboard.constants import (
     SECTION_COMPARISON,
     SECTION_OPERATIONS,
@@ -57,6 +60,9 @@ class ChatbotDashboardOverviewAPIView(ChatbotDashboardFilterMixin, APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        if request.query_params.get("refresh") in ("true", "1", "True") or request.query_params.get("force") in ("true", "1", "True"):
+            bump_chatbot_dashboard_cache_version()
+
         # Không truyền granularity thì tự suy từ độ dài khoảng lọc:
         # lọc trong tháng -> ngày, lọc trọn năm -> tháng, nhiều năm -> năm.
         granularity = self.resolve_granularity(

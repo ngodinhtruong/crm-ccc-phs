@@ -35,6 +35,7 @@ export type ChatbotDashboardFilters = {
   start_hour?: string;
   end_hour?: string;
   granularity?: GranularityChoice;
+  refresh?: string | boolean;
 };
 
 /** Một cột trong biểu đồ so sánh kỳ (kỳ này với kỳ liền trước). */

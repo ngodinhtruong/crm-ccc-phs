@@ -225,9 +225,13 @@ export function useChatbotDashboard(initialFilters?: Partial<ChatbotDashboardFil
 
   const loadOverview = async (
     activeFilters: ChatbotDashboardFilters,
-    requestId: number
+    requestId: number,
+    forceRefresh = false
   ) => {
-    const data = await chatbotDashboardService.getOverview(activeFilters);
+    const filtersToUse = forceRefresh
+      ? { ...activeFilters, refresh: "true" }
+      : activeFilters;
+    const data = await chatbotDashboardService.getOverview(filtersToUse);
 
     if (isLatest(requestId)) setOverview(data);
   };
@@ -271,7 +275,8 @@ export function useChatbotDashboard(initialFilters?: Partial<ChatbotDashboardFil
 
   const loadData = async (
     overrideFilters?: ChatbotDashboardFilters,
-    tabOverride?: ActiveTab
+    tabOverride?: ActiveTab,
+    forceRefresh = false
   ) => {
     const tab = tabOverride || activeTab;
 
@@ -288,7 +293,7 @@ export function useChatbotDashboard(initialFilters?: Partial<ChatbotDashboardFil
       // KPI và hàng chờ chỉ nằm ở tab Tổng quan nên các tab khác không
       // cần gọi overview — tránh một request thừa mỗi lần đổi tab.
       if (tab === "overview") {
-        await loadOverview(activeFilters, requestId);
+        await loadOverview(activeFilters, requestId, forceRefresh);
       } else if (tab === "tickets") {
         await loadTickets(activeFilters, {}, requestId);
       } else if (tab === "faqs") {
@@ -589,7 +594,7 @@ export function useChatbotDashboard(initialFilters?: Partial<ChatbotDashboardFil
     loading,
     error,
 
-    refresh: () => void loadData(),
+    refresh: () => void loadData(undefined, undefined, true),
     searchTickets: () => void loadData(undefined, "tickets"),
     searchFaqs: () => void loadData(undefined, "faqs"),
   };

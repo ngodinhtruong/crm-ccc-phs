@@ -101,12 +101,14 @@ export function PeriodComparisonChart({
   const items = data?.items || [];
   const unit = data?.granularity_label || "kỳ";
 
+  const isAllZero = items.length === 0 || items.every((item) => (item.total || 0) === 0);
+
   return (
     <ChartCard
       title={`So sánh theo ${unit.toLowerCase()}`}
       description={`Mỗi ${unit.toLowerCase()} đặt cạnh ${unit.toLowerCase()} liền trước để thấy mức tăng/giảm.`}
     >
-      {items.length === 0 ? (
+      {isAllZero ? (
         <EmptyState message="Chưa đủ dữ liệu để so sánh kỳ." />
       ) : (
         <div className="h-[300px]">

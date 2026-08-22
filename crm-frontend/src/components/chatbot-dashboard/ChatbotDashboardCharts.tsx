@@ -150,6 +150,16 @@ function AutomationTrendChartCard({
     [chartData, selectedPeriod],
   );
 
+  const isAllZero = useMemo(() => {
+    if (!data || data.length === 0) return true;
+    return data.every(
+      (row) =>
+        (row.total || 0) === 0 &&
+        (row.bot_done || 0) === 0 &&
+        (row.ccc || 0) === 0
+    );
+  }, [data]);
+
   return (
     <ChartCard
       title={
@@ -176,6 +186,8 @@ function AutomationTrendChartCard({
             colorOf={outcomeColorOf}
             onExit={closePeriod}
           />
+        ) : isAllZero ? (
+          <EmptyState message="Chưa có dữ liệu trong khoảng đang lọc." />
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart
@@ -299,6 +311,11 @@ function SessionTrendLineChartCard({
     return fallback;
   }, [data]);
 
+  const isAllZero = useMemo(() => {
+    if (!data || data.length === 0) return true;
+    return data.every((row) => (row.total || 0) === 0);
+  }, [data]);
+
   const { selectedPeriod, openPeriod, closePeriod } = usePeriodDrilldown();
 
   const drilldownSlices = useMemo(
@@ -333,6 +350,8 @@ function SessionTrendLineChartCard({
             colorOf={outcomeColorOf}
             onExit={closePeriod}
           />
+        ) : isAllZero ? (
+          <EmptyState message="Chưa có dữ liệu trong khoảng đang lọc." />
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <LineChart
@@ -488,6 +507,13 @@ function OutcomeByPeriodChartCard({ data }: { data?: OutcomeByPeriod | null }) {
   const rows = useMemo(() => data?.data || [], [data]);
   const series = useMemo(() => data?.series || [], [data]);
 
+  const isAllZero = useMemo(() => {
+    if (!rows || rows.length === 0) return true;
+    return rows.every((row) =>
+      series.every((name) => (Number(row[name]) || 0) === 0)
+    );
+  }, [rows, series]);
+
   const { selectedPeriod, openPeriod, closePeriod } = usePeriodDrilldown();
 
   const drilldownSlices = useMemo(
@@ -516,7 +542,7 @@ function OutcomeByPeriodChartCard({ data }: { data?: OutcomeByPeriod | null }) {
         ) : undefined
       }
     >
-      {rows.length === 0 ? (
+      {isAllZero ? (
         <EmptyState message="Chưa có dữ liệu kết quả xử lý." />
       ) : (
         <div className="h-[320px]">
