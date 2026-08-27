@@ -1,5 +1,6 @@
 from django.db.models import Case, IntegerField, Q, Value, When
 from rest_framework import status, viewsets
+from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -11,6 +12,7 @@ from apps.sale_admin.models import (
     SaInterestLevel,
     SaIcpGroup,
     SaIcpRule,
+    SaProduct,
     SaRecord,
     SaRecordAuditLog,
 )
@@ -19,6 +21,7 @@ from apps.sale_admin.serializers import (
     SaInterestLevelSerializer,
     SaIcpGroupSerializer,
     SaIcpRuleSerializer,
+    SaProductSerializer,
     SaRecordAuditLogSerializer,
     SaRecordReadSerializer,
     SaRecordWriteSerializer,
@@ -194,6 +197,56 @@ class SaVipClassificationOptionAPIView(APIView):
             results.append(option)
 
         return Response({"count": len(results), "results": results})
+
+
+class SaProductViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = SaProductSerializer
+
+    def get_queryset(self):
+        qs = SaProduct.objects.filter(is_active=True)
+        search = (
+            self.request.query_params.get("search")
+            or self.request.query_params.get("q")
+            or ""
+        ).strip()
+        if search:
+            qs = qs.filter(name__icontains=search)
+        return qs.order_by("-usage_count", "name", "id")
+
+    def create(self, request, *args, **kwargs):
+        name = str(request.data.get("name") or "").strip()
+        if not name:
+            return Response({"name": ["Tên sản phẩm không được để trống."]}, status=status.HTTP_400_BAD_REQUEST)
+        
+        product, created = SaProduct.objects.get_or_create(
+            name__iexact=name,
+            defaults={
+                "name": name,
+                "code": request.data.get("code") or "",
+                "description": request.data.get("description") or "",
+                "is_active": True,
+            }
+        )
+        if not created and not product.is_active:
+            product.is_active = True
+            product.save(update_fields=["is_active", "updated_at"])
+
+        serializer = self.get_serializer(product)
+        return Response(serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+    @action(detail=False, methods=["get"], url_path="similar")
+    def similar(self, request):
+        name = str(request.query_params.get("name") or "").strip()
+        if not name:
+            return Response([])
+
+        qs = SaProduct.objects.filter(is_active=True).filter(
+            Q(name__icontains=name) | Q(name__istartswith=name[:3])
+        ).order_by("-usage_count", "name")[:10]
+
+        serializer = self.get_serializer(qs, many=True)
+        return Response(serializer.data)
 
 
 class SaCallResultViewSet(viewsets.ReadOnlyModelViewSet):

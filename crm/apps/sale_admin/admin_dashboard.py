@@ -908,6 +908,77 @@ def _build_criteria():
     }
 
 
+def _build_product_introduction_stats(current_records: list[SaRecord]) -> dict[str, Any]:
+    prod_records = [
+        r for r in current_records
+        if r.introduced_product or r.introduced_product_obj_id or r.introduced_product_name
+    ]
+
+    total_records = len(prod_records)
+    unique_accounts = len({r.account_no for r in prod_records if r.account_no})
+
+    product_stats = defaultdict(lambda: {
+        "product_name": "",
+        "product_id": None,
+        "count": 0,
+        "accounts": set(),
+        "branches": defaultdict(int),
+        "sas": defaultdict(int),
+    })
+
+    for r in prod_records:
+        p_name = r.introduced_product_name or (
+            r.introduced_product_obj.name if r.introduced_product_obj else "Khác / Chưa phân loại"
+        )
+        p_id = r.introduced_product_obj_id
+
+        stat = product_stats[p_name]
+        stat["product_name"] = p_name
+        if p_id:
+            stat["product_id"] = p_id
+        stat["count"] += 1
+        if r.account_no:
+            stat["accounts"].add(r.account_no)
+
+        branch_label = r.branch_name_snapshot or (r.branch.branch_name if r.branch else "Khác")
+        stat["branches"][branch_label] += 1
+
+        sa_label = r.pic_name_snapshot or (
+            r.pic_employee.full_name if r.pic_employee else (
+                r.pic_user.get_full_name() or r.pic_user.username if r.pic_user else "N/A"
+            )
+        )
+        stat["sas"][sa_label] += 1
+
+    top_products = []
+    for p_name, stat in sorted(product_stats.items(), key=lambda x: x[1]["count"], reverse=True):
+        top_branch = max(stat["branches"].items(), key=lambda x: x[1])[0] if stat["branches"] else "N/A"
+        top_sa = max(stat["sas"].items(), key=lambda x: x[1])[0] if stat["sas"] else "N/A"
+
+        top_products.append({
+            "product_name": p_name,
+            "product_id": stat["product_id"],
+            "count": stat["count"],
+            "unique_customers": len(stat["accounts"]),
+            "top_branch": top_branch,
+            "top_sa": top_sa,
+            "branch_breakdown": [
+                {"branch_name": b, "count": c}
+                for b, c in sorted(stat["branches"].items(), key=lambda x: x[1], reverse=True)[:5]
+            ],
+            "sa_breakdown": [
+                {"sa_name": s, "count": c}
+                for s, c in sorted(stat["sas"].items(), key=lambda x: x[1], reverse=True)[:5]
+            ],
+        })
+
+    return {
+        "total_introduced_records": total_records,
+        "total_unique_customers": unique_accounts,
+        "top_products": top_products,
+    }
+
+
 def get_sale_admin_report_payload(request) -> dict[str, Any]:
     period = _get_request_period(request)
     previous = _previous_period(period)
@@ -929,6 +1000,7 @@ def get_sale_admin_report_payload(request) -> dict[str, Any]:
             "call_result",
             "interest_level",
             "icp_group",
+            "introduced_product_obj",
         ),
         request.user,
     )
@@ -1015,6 +1087,7 @@ def get_sale_admin_report_payload(request) -> dict[str, Any]:
         "top_employees": top_employees,
         "top_accounts": top_accounts,
         "product_fee": [],
+        "product_introduction_stats": _build_product_introduction_stats(current_records),
         "icp_distribution": _build_icp_distribution(current_records),
         "customer_group_distribution": _build_customer_group_distribution(current_records, current_account_map),
         "criteria": _build_criteria(),

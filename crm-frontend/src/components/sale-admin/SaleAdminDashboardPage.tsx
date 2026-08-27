@@ -23,6 +23,7 @@ import { BranchRankingTable } from "@/components/sale-admin/dashboard/BranchRank
 import { CustomerGroupDistributionPanel } from "@/components/sale-admin/dashboard/CustomerGroupDistributionPanel";
 import { FeeByBranchChart } from "@/components/sale-admin/dashboard/FeeByBranchChart";
 import { IcpDistributionChart } from "@/components/sale-admin/dashboard/IcpDistributionChart";
+import { ProductIntroductionStatsPanel } from "@/components/sale-admin/dashboard/ProductIntroductionStatsPanel";
 import { TopAccountsTable } from "@/components/sale-admin/dashboard/TopAccountsTable";
 import { TopEmployeeChart } from "@/components/sale-admin/dashboard/TopEmployeeChart";
 import { TopEmployeesTable } from "@/components/sale-admin/dashboard/TopEmployeesTable";
@@ -258,6 +259,12 @@ export function SaleAdminDashboardPage() {
                   month={dashboard.month}
                   year={dashboard.year}
                   periodLabel={periodLabel}
+                />
+              </div>
+
+              <div className="2xl:col-span-12">
+                <ProductIntroductionStatsPanel
+                  data={dashboard.data.product_introduction_stats}
                 />
               </div>
 

@@ -1,3 +1,5 @@
+import { ProductIntroductionStatsData } from "@/components/sale-admin/dashboard/ProductIntroductionStatsPanel";
+
 export type SaAdminDashboardParams = {
   year?: string;
   month?: string;
@@ -165,6 +167,7 @@ export type SaAdminDashboardResponse = {
   top_employees: SaAdminTopEmployeeRow[];
   top_accounts: SaAdminTopAccountRow[];
   product_fee: SaAdminProductFeeRow[];
+  product_introduction_stats?: ProductIntroductionStatsData | null;
   icp_distribution: SaAdminIcpDistributionRow[];
   customer_group_distribution: SaAdminCustomerGroupRow[];
   criteria?: SaAdminCriteriaDefinition | null;

@@ -8,9 +8,16 @@ from apps.sale_admin.models import (
     SaInterestLevel,
     SaIcpGroup,
     SaIcpRule,
+    SaProduct,
     SaRecord,
     SaRecordAuditLog,
 )
+
+
+class SaProductSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SaProduct
+        fields = "__all__"
 
 
 class SaCallResultSerializer(serializers.ModelSerializer):
@@ -99,6 +106,11 @@ class SaRecordReadSerializer(serializers.ModelSerializer):
     )
     icp_group_type = serializers.CharField(
         source="icp_group.icp_type",
+        read_only=True,
+    )
+
+    introduced_product_obj_detail = SaProductSerializer(
+        source="introduced_product_obj",
         read_only=True,
     )
 
@@ -309,6 +321,8 @@ class SaRecordWriteSerializer(serializers.ModelSerializer):
             "reactivation_confirmed_at",
 
             "introduced_product",
+            "introduced_product_obj",
+            "introduced_product_name",
             "support_info",
             "referred_rm",
 
@@ -487,4 +501,46 @@ class SaRecordWriteSerializer(serializers.ModelSerializer):
                     }
                 )
 
+        # Xử lý thông tin sản phẩm giới thiệu
+        introduced_product_obj = attrs.get("introduced_product_obj")
+        introduced_product_name = attrs.get("introduced_product_name")
+
+        if introduced_product_obj:
+            attrs["introduced_product"] = True
+            attrs["introduced_product_name"] = introduced_product_obj.name
+        elif introduced_product_name and str(introduced_product_name).strip():
+            attrs["introduced_product"] = True
+            p_name = str(introduced_product_name).strip()
+            attrs["introduced_product_name"] = p_name
+            product_obj, _ = SaProduct.objects.get_or_create(
+                name__iexact=p_name,
+                defaults={"name": p_name}
+            )
+            attrs["introduced_product_obj"] = product_obj
+        else:
+            introduced_flag = attrs.get("introduced_product")
+            if introduced_flag is None and self.instance:
+                introduced_flag = self.instance.introduced_product
+            attrs["introduced_product"] = bool(introduced_flag)
+            if not attrs["introduced_product"]:
+                attrs["introduced_product_obj"] = None
+                attrs["introduced_product_name"] = None
+
         return attrs
+
+    def create(self, validated_data):
+        instance = super().create(validated_data)
+        if instance.introduced_product_obj_id:
+            cnt = SaRecord.objects.filter(introduced_product_obj_id=instance.introduced_product_obj_id).count()
+            SaProduct.objects.filter(id=instance.introduced_product_obj_id).update(usage_count=cnt)
+        return instance
+
+    def update(self, instance, validated_data):
+        old_prod_id = instance.introduced_product_obj_id
+        instance = super().update(instance, validated_data)
+        new_prod_id = instance.introduced_product_obj_id
+        for p_id in {old_prod_id, new_prod_id}:
+            if p_id:
+                cnt = SaRecord.objects.filter(introduced_product_obj_id=p_id).count()
+                SaProduct.objects.filter(id=p_id).update(usage_count=cnt)
+        return instance

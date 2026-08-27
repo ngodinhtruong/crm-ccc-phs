@@ -44,6 +44,8 @@ const initialForm: SaRecordCreateFormState = {
   icpGroup: "",
 
   introducedProduct: false,
+  introducedProductId: null,
+  introducedProductName: "",
   reactivation: false,
   supportInfo: false,
   referredRm: false,
@@ -381,6 +383,8 @@ export function useSaRecordCreate() {
 
         reactivation: form.reactivation,
         introduced_product: form.introducedProduct,
+        introduced_product_obj: form.introducedProduct && form.introducedProductId ? Number(form.introducedProductId) : null,
+        introduced_product_name: form.introducedProduct ? (form.introducedProductName || null) : null,
         support_info: form.supportInfo,
         referred_rm: form.referredRm,
 

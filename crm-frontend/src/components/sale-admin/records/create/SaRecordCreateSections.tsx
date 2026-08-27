@@ -22,6 +22,7 @@ import {
   TextInput,
   ToggleChip,
 } from "./SaRecordCreateFormControls";
+import { SaProductSelectCombobox } from "./SaProductSelectCombobox";
 
 type SaRecordCreateController = SaRecordFormController;
 
@@ -347,12 +348,31 @@ export function SaRecordCallSection({
           />
         </div>
 
-        <div className="col-span-12 md:col-span-3">
+        <div className="col-span-12 md:col-span-6 space-y-2">
           <ToggleChip
             checked={create.form.introducedProduct}
-            onChange={(value) => create.setField("introducedProduct", value)}
+            onChange={(value) => {
+              create.setField("introducedProduct", value);
+              if (!value) {
+                create.setField("introducedProductId", null);
+                create.setField("introducedProductName", "");
+              }
+            }}
             label="Giới thiệu sản phẩm dịch vụ"
           />
+          {create.form.introducedProduct && (
+            <div className="mt-2">
+              <FieldLabel required>Chọn hoặc nhập sản phẩm giới thiệu</FieldLabel>
+              <SaProductSelectCombobox
+                selectedProductId={create.form.introducedProductId}
+                selectedProductName={create.form.introducedProductName}
+                onSelectProduct={(productId, productName) => {
+                  create.setField("introducedProductId", productId);
+                  create.setField("introducedProductName", productName);
+                }}
+              />
+            </div>
+          )}
         </div>
 
         <div className="col-span-12 md:col-span-3">

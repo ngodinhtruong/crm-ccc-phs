@@ -5,6 +5,22 @@ from django.db.models import Q
 from apps.common.models import TimeStampedModel
 
 
+class SaProduct(TimeStampedModel):
+    name = models.CharField(max_length=255, unique=True, db_index=True)
+    code = models.CharField(max_length=100, null=True, blank=True)
+    description = models.TextField(null=True, blank=True)
+    usage_count = models.PositiveIntegerField(default=0, db_index=True)
+    is_active = models.BooleanField(default=True)
+    sort_order = models.IntegerField(null=True, blank=True)
+
+    class Meta:
+        db_table = "sa_products"
+        ordering = ["-usage_count", "name", "id"]
+
+    def __str__(self):
+        return self.name
+
+
 class SaCallResult(TimeStampedModel):
     result_code = models.CharField(max_length=50, unique=True)
     result_name = models.CharField(max_length=255)
@@ -193,6 +209,14 @@ class SaRecord(TimeStampedModel):
 
     # KPI Part A
     introduced_product = models.BooleanField(default=False)
+    introduced_product_obj = models.ForeignKey(
+        SaProduct,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sa_records",
+    )
+    introduced_product_name = models.CharField(max_length=255, null=True, blank=True)
     support_info = models.BooleanField(default=False)
     referred_rm = models.BooleanField(default=False)
 
@@ -291,6 +315,7 @@ class SaRecord(TimeStampedModel):
             models.Index(fields=["call_result"]),
             models.Index(fields=["icp_group"]),
             models.Index(fields=["reactivation"]),
+            models.Index(fields=["introduced_product_obj"]),
             models.Index(fields=["source_system"]),
             models.Index(fields=["data_status"]),
             models.Index(fields=["branch", "call_date"], name="sa_rec_branch_call_idx"),

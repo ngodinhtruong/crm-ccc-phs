@@ -5,6 +5,17 @@ export type PaginatedResponse<T> = {
     results: T[];
 };
 
+export type SaProduct = {
+    id: number;
+    name: string;
+    code?: string | null;
+    description?: string | null;
+    usage_count: number;
+    is_active: boolean;
+    created_at?: string;
+    updated_at?: string;
+};
+
 export type SaCallResult = {
     id: number;
     result_code: string;
@@ -115,6 +126,9 @@ export type SaRecordItem = {
     icp_group_type?: string | null;
 
     introduced_product: boolean;
+    introduced_product_obj?: number | null;
+    introduced_product_name?: string | null;
+    introduced_product_obj_detail?: SaProduct | null;
     reactivation: boolean;
     support_info: boolean;
     referred_rm: boolean;
@@ -231,6 +245,8 @@ export type SaRecordCreatePayload = {
 
     reactivation?: boolean;
     introduced_product?: boolean;
+    introduced_product_obj?: number | null;
+    introduced_product_name?: string | null;
     support_info?: boolean;
     referred_rm?: boolean;
 
@@ -270,6 +286,8 @@ export type SaRecordCreateFormState = {
     icpGroup: string;
 
     introducedProduct: boolean;
+    introducedProductId?: number | string | null;
+    introducedProductName?: string | null;
     reactivation: boolean;
     supportInfo: boolean;
     referredRm: boolean;

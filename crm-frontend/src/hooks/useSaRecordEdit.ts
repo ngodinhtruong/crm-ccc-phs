@@ -92,6 +92,8 @@ function mapRecordToForm(item: SaRecordItem): SaRecordCreateFormState {
     icpGroup: item.icp_group ? String(item.icp_group) : "",
 
     introducedProduct: Boolean(item.introduced_product),
+    introducedProductId: item.introduced_product_obj || (item.introduced_product_obj_detail ? item.introduced_product_obj_detail.id : null),
+    introducedProductName: item.introduced_product_name || (item.introduced_product_obj_detail ? item.introduced_product_obj_detail.name : ""),
     reactivation: Boolean(item.reactivation),
     supportInfo: Boolean(item.support_info),
     referredRm: Boolean(item.referred_rm),
@@ -272,6 +274,8 @@ export function useSaRecordEdit(recordId: string) {
       icp_group: form.icpGroup ? Number(form.icpGroup) : null,
 
       introduced_product: form.introducedProduct,
+      introduced_product_obj: form.introducedProduct && form.introducedProductId ? Number(form.introducedProductId) : null,
+      introduced_product_name: form.introducedProduct ? (form.introducedProductName || null) : null,
       reactivation: form.reactivation,
       support_info: form.supportInfo,
       referred_rm: form.referredRm,

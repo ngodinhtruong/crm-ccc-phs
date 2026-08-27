@@ -13,9 +13,11 @@ import {
   SaRecordAuditLogItem,
   SaRecordUpdatePayload,
   SaCustomerAccountSuggestion,
+  SaProduct,
   SaSelectOption,
 } from "@/types/sale-admin.type";
 
+const SA_PRODUCT_ENDPOINT = "/api/sale-admin/products/";
 const SA_RECORD_ENDPOINT = "/api/sale-admin/records/";
 const SA_RECORD_AUDIT_LOG_ENDPOINT = "/api/sale-admin/record-audit-logs/";
 const SA_CALL_RESULT_ENDPOINT = "/api/sale-admin/call-results/";
@@ -42,6 +44,28 @@ function normalizePaginated<T>(
 }
 
 export const saleAdminApi = {
+  getSaProducts: async (search?: string): Promise<SaProduct[]> => {
+    const response = await api.get<SaProduct[] | PaginatedResponse<SaProduct>>(
+      SA_PRODUCT_ENDPOINT,
+      search ? { params: { search } } : undefined
+    );
+    return getListData<SaProduct>(response.data);
+  },
+
+  getSimilarSaProducts: async (name: string): Promise<SaProduct[]> => {
+    if (!name.trim()) return [];
+    const response = await api.get<SaProduct[] | PaginatedResponse<SaProduct>>(
+      `${SA_PRODUCT_ENDPOINT}similar/`,
+      { params: { name } }
+    );
+    return getListData<SaProduct>(response.data);
+  },
+
+  createSaProduct: async (payload: { name: string; description?: string }): Promise<SaProduct> => {
+    const response = await api.post<SaProduct>(SA_PRODUCT_ENDPOINT, payload);
+    return response.data;
+  },
+
   getSaRecords: async (
     params: SaRecordListParams = {}
   ): Promise<PaginatedResponse<SaRecordItem>> => {
