@@ -395,7 +395,6 @@ export function SaRecordCallSection({
             label="Giới thiệu Referral"
           />
           <p className="mt-0.5 text-right text-[11px] font-medium italic text-slate-600 leading-snug">
-            * Chỉ áp dụng cho KH nhóm Tiềm năng & Rất tiềm năng (A/B)
           </p>
         </div>
       </div>
