@@ -1,14 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import {
   Package,
-  Users,
   Building2,
-  Sparkles,
   BarChart3,
-  Layers,
-  Columns,
 } from "lucide-react";
 import {
   BarChart,
@@ -98,8 +94,6 @@ export function ProductIntroductionStatsPanel({
 }: {
   data?: ProductIntroductionStatsData | null;
 }) {
-  const [isStacked, setIsStacked] = useState<boolean>(true);
-
   const branchChartData = data?.by_branch_chart || [];
   const productNames =
     data?.all_product_names || (data?.top_products ? data.top_products.map((p) => p.product_name) : []);
@@ -128,61 +122,18 @@ export function ProductIntroductionStatsPanel({
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+      <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
         <div className="flex items-center gap-2.5">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-100 text-[#059669]">
             <BarChart3 size={20} />
           </div>
           <div>
-            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800">
               Biểu đồ Số lượng Dịch vụ Sản phẩm theo Chi nhánh
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-[#059669]">
-                <Sparkles size={12} /> Real-time
-              </span>
             </h3>
             <p className="text-xs text-slate-500">
               Thống kê phân bổ chi tiết các sản phẩm dịch vụ được khách hàng sử dụng theo từng Chi nhánh
             </p>
-          </div>
-        </div>
-
-        {/* Quick Summary Pills & Chart Toggle */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-1.5 border border-slate-100">
-            <Package size={15} className="text-[#059669]" />
-            <div>
-              <p className="text-[10px] text-slate-500 font-medium">Tổng lượt giới thiệu</p>
-              <p className="text-xs font-bold text-slate-800">{data.total_introduced_records}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-1.5 border border-emerald-100">
-            <Users size={15} className="text-[#059669]" />
-            <div>
-              <p className="text-[10px] text-emerald-700 font-medium">KH tiếp cận SP</p>
-              <p className="text-xs font-bold text-[#059669]">{data.total_unique_customers}</p>
-            </div>
-          </div>
-
-          {/* Toggle Switch: Stacked vs Grouped Bar */}
-          <div className="flex items-center rounded-lg border border-slate-200 bg-white p-0.5 text-xs font-semibold">
-            <button
-              type="button"
-              onClick={() => setIsStacked(true)}
-              className={`flex items-center gap-1 rounded-md px-2.5 py-1 transition-all ${
-                isStacked ? "bg-[#10b981] text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <Layers size={13} /> Cột xếp chồng
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsStacked(false)}
-              className={`flex items-center gap-1 rounded-md px-2.5 py-1 transition-all ${
-                !isStacked ? "bg-[#10b981] text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <Columns size={13} /> Cột đơn
-            </button>
           </div>
         </div>
       </div>
@@ -190,14 +141,17 @@ export function ProductIntroductionStatsPanel({
       {/* Biểu đồ Cột Recharts */}
       <div className="h-80 w-full pt-2">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={branchChartData} margin={{ top: 10, right: 10, left: -15, bottom: 25 }}>
+          <BarChart data={branchChartData} margin={{ top: 10, right: 15, left: -10, bottom: 45 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
             <XAxis
               dataKey="branch_name"
+              height={60}
               tick={{ fontSize: 11, fill: "#475569" }}
+              tickFormatter={(val) => String(val || "").replace(/^Chi nhánh\s*/i, "CN ")}
               interval={0}
-              angle={-15}
+              angle={-20}
               textAnchor="end"
+              dy={5}
             />
             <YAxis
               allowDecimals={false}
@@ -205,7 +159,7 @@ export function ProductIntroductionStatsPanel({
             />
             <Tooltip content={<CustomBarTooltip />} isAnimationActive={false} />
             <Legend
-              wrapperStyle={{ paddingTop: "10px", fontSize: "11px" }}
+              wrapperStyle={{ paddingTop: "15px", fontSize: "11px" }}
               iconSize={10}
             />
             {productNames.map((pName, index) => (
@@ -213,9 +167,8 @@ export function ProductIntroductionStatsPanel({
                 key={pName}
                 dataKey={pName}
                 name={pName}
-                stackId={isStacked ? "a" : undefined}
                 fill={PRODUCT_BAR_COLORS[index % PRODUCT_BAR_COLORS.length]}
-                radius={isStacked ? [0, 0, 0, 0] : [4, 4, 0, 0]}
+                radius={[4, 4, 0, 0]}
                 isAnimationActive={false}
               />
             ))}
