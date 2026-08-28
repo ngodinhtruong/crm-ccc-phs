@@ -972,10 +972,137 @@ def _build_product_introduction_stats(current_records: list[SaRecord]) -> dict[s
             ],
         })
 
+    # Build branch-centric products breakdown for Bar Chart
+    branch_product_counts = defaultdict(lambda: defaultdict(int))
+    all_products_set = set()
+
+    for r in prod_records:
+        b_name = r.branch_name_snapshot or (r.branch.branch_name if r.branch else "Khác")
+        p_name = r.introduced_product_name or (
+            r.introduced_product_obj.name if r.introduced_product_obj else "Khác / Chưa phân loại"
+        )
+        branch_product_counts[b_name][p_name] += 1
+        all_products_set.add(p_name)
+
+    by_branch_chart = []
+    for b_name, p_counts in sorted(branch_product_counts.items(), key=lambda x: sum(x[1].values()), reverse=True):
+        row = {
+            "branch_name": b_name,
+            "total_count": sum(p_counts.values()),
+            "products": [
+                {"product_name": p, "count": c}
+                for p, c in sorted(p_counts.items(), key=lambda x: x[1], reverse=True)
+            ]
+        }
+        for p, c in p_counts.items():
+            row[p] = c
+        by_branch_chart.append(row)
+
     return {
         "total_introduced_records": total_records,
         "total_unique_customers": unique_accounts,
         "top_products": top_products,
+        "by_branch_chart": by_branch_chart,
+        "all_product_names": sorted(list(all_products_set)),
+    }
+
+
+def _build_support_info_stats(current_records: list[SaRecord]) -> dict[str, Any]:
+    support_records = [
+        r for r in current_records
+        if r.support_info or r.support_info_category_obj_id or r.support_info_category_name
+    ]
+
+    total_records = len(support_records)
+    unique_accounts = len({r.account_no for r in support_records if r.account_no})
+
+    category_stats = defaultdict(lambda: {
+        "category_name": "",
+        "category_id": None,
+        "count": 0,
+        "accounts": set(),
+        "branches": defaultdict(int),
+        "sas": defaultdict(int),
+    })
+
+    for r in support_records:
+        c_name = r.support_info_category_name or (
+            r.support_info_category_obj.name if r.support_info_category_obj else "Hỗ trợ chung"
+        )
+        c_id = r.support_info_category_obj_id
+
+        stat = category_stats[c_name]
+        stat["category_name"] = c_name
+        if c_id:
+            stat["category_id"] = c_id
+        stat["count"] += 1
+        if r.account_no:
+            stat["accounts"].add(r.account_no)
+
+        branch_label = r.branch_name_snapshot or (r.branch.branch_name if r.branch else "Khác")
+        stat["branches"][branch_label] += 1
+
+        sa_label = r.pic_name_snapshot or (
+            r.pic_employee.full_name if r.pic_employee else (
+                r.pic_user.get_full_name() or r.pic_user.username if r.pic_user else "N/A"
+            )
+        )
+        stat["sas"][sa_label] += 1
+
+    top_categories = []
+    for c_name, stat in sorted(category_stats.items(), key=lambda x: x[1]["count"], reverse=True):
+        top_branch = max(stat["branches"].items(), key=lambda x: x[1])[0] if stat["branches"] else "N/A"
+        top_sa = max(stat["sas"].items(), key=lambda x: x[1])[0] if stat["sas"] else "N/A"
+
+        top_categories.append({
+            "category_name": c_name,
+            "category_id": stat["category_id"],
+            "count": stat["count"],
+            "unique_customers": len(stat["accounts"]),
+            "top_branch": top_branch,
+            "top_sa": top_sa,
+            "branch_breakdown": [
+                {"branch_name": b, "count": c}
+                for b, c in sorted(stat["branches"].items(), key=lambda x: x[1], reverse=True)[:5]
+            ],
+            "sa_breakdown": [
+                {"sa_name": s, "count": c}
+                for s, c in sorted(stat["sas"].items(), key=lambda x: x[1], reverse=True)[:5]
+            ],
+        })
+
+    # Build branch-centric support categories breakdown for Bar Chart
+    branch_category_counts = defaultdict(lambda: defaultdict(int))
+    all_categories_set = set()
+
+    for r in support_records:
+        b_name = r.branch_name_snapshot or (r.branch.branch_name if r.branch else "Khác")
+        c_name = r.support_info_category_name or (
+            r.support_info_category_obj.name if r.support_info_category_obj else "Hỗ trợ chung"
+        )
+        branch_category_counts[b_name][c_name] += 1
+        all_categories_set.add(c_name)
+
+    by_branch_chart = []
+    for b_name, c_counts in sorted(branch_category_counts.items(), key=lambda x: sum(x[1].values()), reverse=True):
+        row = {
+            "branch_name": b_name,
+            "total_count": sum(c_counts.values()),
+            "categories": [
+                {"category_name": c, "count": cnt}
+                for c, cnt in sorted(c_counts.items(), key=lambda x: x[1], reverse=True)
+            ]
+        }
+        for c, cnt in c_counts.items():
+            row[c] = cnt
+        by_branch_chart.append(row)
+
+    return {
+        "total_support_records": total_records,
+        "total_unique_customers": unique_accounts,
+        "top_categories": top_categories,
+        "by_branch_chart": by_branch_chart,
+        "all_category_names": sorted(list(all_categories_set)),
     }
 
 
@@ -1001,6 +1128,7 @@ def get_sale_admin_report_payload(request) -> dict[str, Any]:
             "interest_level",
             "icp_group",
             "introduced_product_obj",
+            "support_info_category_obj",
         ),
         request.user,
     )
@@ -1088,6 +1216,7 @@ def get_sale_admin_report_payload(request) -> dict[str, Any]:
         "top_accounts": top_accounts,
         "product_fee": [],
         "product_introduction_stats": _build_product_introduction_stats(current_records),
+        "support_info_stats": _build_support_info_stats(current_records),
         "icp_distribution": _build_icp_distribution(current_records),
         "customer_group_distribution": _build_customer_group_distribution(current_records, current_account_map),
         "criteria": _build_criteria(),

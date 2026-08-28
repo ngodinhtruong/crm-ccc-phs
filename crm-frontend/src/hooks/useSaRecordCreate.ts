@@ -48,6 +48,8 @@ const initialForm: SaRecordCreateFormState = {
   introducedProductName: "",
   reactivation: false,
   supportInfo: false,
+  supportInfoCategoryId: null,
+  supportInfoCategoryName: "",
   referredRm: false,
 
   handoverToBroker: false,
@@ -386,6 +388,8 @@ export function useSaRecordCreate() {
         introduced_product_obj: form.introducedProduct && form.introducedProductId ? Number(form.introducedProductId) : null,
         introduced_product_name: form.introducedProduct ? (form.introducedProductName || null) : null,
         support_info: form.supportInfo,
+        support_info_category_obj: form.supportInfo && form.supportInfoCategoryId ? Number(form.supportInfoCategoryId) : null,
+        support_info_category_name: form.supportInfo ? (form.supportInfoCategoryName || null) : null,
         referred_rm: form.referredRm,
 
         handover_to_broker: form.handoverToBroker,

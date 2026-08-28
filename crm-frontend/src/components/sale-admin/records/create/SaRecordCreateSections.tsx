@@ -23,6 +23,7 @@ import {
   ToggleChip,
 } from "./SaRecordCreateFormControls";
 import { SaProductSelectCombobox } from "./SaProductSelectCombobox";
+import { SaSupportCategorySelectCombobox } from "./SaSupportCategorySelectCombobox";
 
 type SaRecordCreateController = SaRecordFormController;
 
@@ -241,19 +242,6 @@ export function SaRecordCallSection({
 }: {
   create: SaRecordCreateController;
 }) {
-  const selectedIcpGroup = create.icpGroups.find(
-    (g) => String(g.id) === String(create.form.icpGroup)
-  );
-  const icpCode = (selectedIcpGroup?.icp_code || "").trim().toUpperCase();
-  const isTpOrRtp = Boolean(
-    selectedIcpGroup &&
-    (icpCode === "A" ||
-      icpCode === "B" ||
-      icpCode.startsWith("A") ||
-      icpCode.startsWith("B") ||
-      selectedIcpGroup.is_potential)
-  );
-
   return (
     <section className="rounded-lg border border-slate-200 border-l-4 border-l-[#10b981] bg-white p-3.5 shadow-sm">
       <div className="mb-2.5 flex items-center gap-2 border-b border-slate-100 pb-2">
@@ -348,7 +336,7 @@ export function SaRecordCallSection({
           />
         </div>
 
-        <div className="col-span-12 md:col-span-6 space-y-2">
+        <div className="col-span-12 md:col-span-3">
           <ToggleChip
             checked={create.form.introducedProduct}
             onChange={(value) => {
@@ -360,25 +348,18 @@ export function SaRecordCallSection({
             }}
             label="Giới thiệu sản phẩm dịch vụ"
           />
-          {create.form.introducedProduct && (
-            <div className="mt-2">
-              <FieldLabel required>Chọn hoặc nhập sản phẩm giới thiệu</FieldLabel>
-              <SaProductSelectCombobox
-                selectedProductId={create.form.introducedProductId}
-                selectedProductName={create.form.introducedProductName}
-                onSelectProduct={(productId, productName) => {
-                  create.setField("introducedProductId", productId);
-                  create.setField("introducedProductName", productName);
-                }}
-              />
-            </div>
-          )}
         </div>
 
         <div className="col-span-12 md:col-span-3">
           <ToggleChip
             checked={create.form.supportInfo}
-            onChange={(value) => create.setField("supportInfo", value)}
+            onChange={(value) => {
+              create.setField("supportInfo", value);
+              if (!value) {
+                create.setField("supportInfoCategoryId", null);
+                create.setField("supportInfoCategoryName", "");
+              }
+            }}
             label="Hỗ trợ thông tin tài khoản"
           />
         </div>
@@ -386,17 +367,50 @@ export function SaRecordCallSection({
         <div className="col-span-12 md:col-span-3">
           <ToggleChip
             checked={Boolean(create.form.referredRm)}
-            disabled={!isTpOrRtp}
-            onChange={(value) => {
-              if (isTpOrRtp) {
-                create.setField("referredRm", value);
-              }
-            }}
+            onChange={(value) => create.setField("referredRm", value)}
             label="Giới thiệu Referral"
           />
-          <p className="mt-0.5 text-right text-[11px] font-medium italic text-slate-600 leading-snug">
-          </p>
         </div>
+
+        {/* Dynamic Product Selection Card */}
+        {create.form.introducedProduct && (
+          <div className="col-span-12 rounded-lg border border-emerald-200 bg-emerald-50/40 p-3.5 shadow-xs transition-all space-y-2">
+            <div className="flex items-center justify-between">
+              <FieldLabel required>Sản phẩm dịch vụ giới thiệu cho KH</FieldLabel>
+              <span className="text-[11px] font-medium text-[#059669]">
+                * Bắt buộc chọn sản phẩm khi tích giới thiệu
+              </span>
+            </div>
+            <SaProductSelectCombobox
+              selectedProductId={create.form.introducedProductId}
+              selectedProductName={create.form.introducedProductName}
+              onSelectProduct={(productId, productName) => {
+                create.setField("introducedProductId", productId);
+                create.setField("introducedProductName", productName);
+              }}
+            />
+          </div>
+        )}
+
+        {/* Dynamic Support Category Selection Card */}
+        {create.form.supportInfo && (
+          <div className="col-span-12 rounded-lg border border-sky-200 bg-sky-50/40 p-3.5 shadow-xs transition-all space-y-2">
+            <div className="flex items-center justify-between">
+              <FieldLabel required>Danh mục thông tin hỗ trợ KH</FieldLabel>
+              <span className="text-[11px] font-medium text-[#0284c7]">
+                * Bắt buộc chọn hoặc nhập nội dung hỗ trợ khi tích cờ
+              </span>
+            </div>
+            <SaSupportCategorySelectCombobox
+              selectedCategoryId={create.form.supportInfoCategoryId}
+              selectedCategoryName={create.form.supportInfoCategoryName}
+              onSelectCategory={(categoryId, categoryName) => {
+                create.setField("supportInfoCategoryId", categoryId);
+                create.setField("supportInfoCategoryName", categoryName);
+              }}
+            />
+          </div>
+        )}
       </div>
     </section>
   );

@@ -13,6 +13,7 @@ from apps.sale_admin.models import (
     SaIcpGroup,
     SaIcpRule,
     SaProduct,
+    SaSupportCategory,
     SaRecord,
     SaRecordAuditLog,
 )
@@ -22,6 +23,7 @@ from apps.sale_admin.serializers import (
     SaIcpGroupSerializer,
     SaIcpRuleSerializer,
     SaProductSerializer,
+    SaSupportCategorySerializer,
     SaRecordAuditLogSerializer,
     SaRecordReadSerializer,
     SaRecordWriteSerializer,
@@ -242,6 +244,56 @@ class SaProductViewSet(viewsets.ModelViewSet):
             return Response([])
 
         qs = SaProduct.objects.filter(is_active=True).filter(
+            Q(name__icontains=name) | Q(name__istartswith=name[:3])
+        ).order_by("-usage_count", "name")[:10]
+
+        serializer = self.get_serializer(qs, many=True)
+        return Response(serializer.data)
+
+
+class SaSupportCategoryViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = SaSupportCategorySerializer
+
+    def get_queryset(self):
+        qs = SaSupportCategory.objects.filter(is_active=True)
+        search = (
+            self.request.query_params.get("search")
+            or self.request.query_params.get("q")
+            or ""
+        ).strip()
+        if search:
+            qs = qs.filter(name__icontains=search)
+        return qs.order_by("-usage_count", "name", "id")
+
+    def create(self, request, *args, **kwargs):
+        name = str(request.data.get("name") or "").strip()
+        if not name:
+            return Response({"name": ["Tên danh mục hỗ trợ không được để trống."]}, status=status.HTTP_400_BAD_REQUEST)
+        
+        category, created = SaSupportCategory.objects.get_or_create(
+            name__iexact=name,
+            defaults={
+                "name": name,
+                "code": request.data.get("code") or "",
+                "description": request.data.get("description") or "",
+                "is_active": True,
+            }
+        )
+        if not created and not category.is_active:
+            category.is_active = True
+            category.save(update_fields=["is_active", "updated_at"])
+
+        serializer = self.get_serializer(category)
+        return Response(serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+    @action(detail=False, methods=["get"], url_path="similar")
+    def similar(self, request):
+        name = str(request.query_params.get("name") or "").strip()
+        if not name:
+            return Response([])
+
+        qs = SaSupportCategory.objects.filter(is_active=True).filter(
             Q(name__icontains=name) | Q(name__istartswith=name[:3])
         ).order_by("-usage_count", "name")[:10]
 

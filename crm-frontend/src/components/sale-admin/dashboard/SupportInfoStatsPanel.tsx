@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import {
-  Package,
+  HelpCircle,
   Users,
   Building2,
   Sparkles,
@@ -20,43 +20,18 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import { SupportInfoStatsData } from "@/types/sale-admin-dashboard.type";
 
-export type ProductStatItem = {
-  product_name: string;
-  product_id: number | null;
-  count: number;
-  unique_customers: number;
-  top_branch: string;
-  top_sa: string;
-  branch_breakdown?: Array<{ branch_name: string; count: number }>;
-  sa_breakdown?: Array<{ sa_name: string; count: number }>;
-};
-
-export type BranchProductChartRow = {
-  branch_name: string;
-  total_count: number;
-  products: Array<{ product_name: string; count: number }>;
-  [key: string]: any;
-};
-
-export type ProductIntroductionStatsData = {
-  total_introduced_records: number;
-  total_unique_customers: number;
-  top_products: ProductStatItem[];
-  by_branch_chart?: BranchProductChartRow[];
-  all_product_names?: string[];
-};
-
-const PRODUCT_BAR_COLORS = [
-  "#10b981", // emerald
+const SUPPORT_BAR_COLORS = [
+  "#0284c7", // sky
   "#3b82f6", // blue
-  "#f59e0b", // amber
+  "#6366f1", // indigo
   "#8b5cf6", // purple
   "#ec4899", // pink
-  "#06b6d4", // cyan
+  "#14b8a6", // teal
+  "#f59e0b", // amber
+  "#10b981", // emerald
   "#f97316", // orange
-  "#6366f1", // indigo
-  "#84cc16", // lime
   "#64748b", // slate
 ];
 
@@ -69,9 +44,9 @@ function CustomBarTooltip({ active, payload, label }: any) {
     <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-xl text-xs space-y-1.5 min-w-[200px]">
       <div className="flex items-center justify-between border-b border-slate-100 pb-1 font-bold text-slate-800">
         <span className="flex items-center gap-1">
-          <Building2 size={13} className="text-[#059669]" /> Chi nhánh: {label}
+          <Building2 size={13} className="text-[#0284c7]" /> Chi nhánh: {label}
         </span>
-        <span className="text-[#059669]">{total} lượt</span>
+        <span className="text-[#0284c7]">{total} lượt hỗ trợ</span>
       </div>
       <div className="space-y-1">
         {payload
@@ -93,33 +68,33 @@ function CustomBarTooltip({ active, payload, label }: any) {
   );
 }
 
-export function ProductIntroductionStatsPanel({
+export function SupportInfoStatsPanel({
   data,
 }: {
-  data?: ProductIntroductionStatsData | null;
+  data?: SupportInfoStatsData | null;
 }) {
   const [isStacked, setIsStacked] = useState<boolean>(true);
 
   const branchChartData = data?.by_branch_chart || [];
-  const productNames =
-    data?.all_product_names || (data?.top_products ? data.top_products.map((p) => p.product_name) : []);
+  const categoryNames =
+    data?.all_category_names || (data?.top_categories ? data.top_categories.map((c) => c.category_name) : []);
 
   if (!data || branchChartData.length === 0) {
     return (
       <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-[#059669]">
-            <Package size={18} />
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-50 text-[#0284c7]">
+            <HelpCircle size={18} />
           </div>
           <div>
             <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800">
-              Biểu đồ Cột Số lượng Dịch vụ Sản phẩm theo Chi nhánh
+              Biểu đồ Cột Số lượng Hỗ trợ Thông tin KH theo Chi nhánh
             </h3>
-            <p className="text-xs text-slate-500">Thống kê phân bổ dịch vụ sản phẩm giới thiệu theo từng Chi nhánh</p>
+            <p className="text-xs text-slate-500">Thống kê phân bổ danh mục hỗ trợ tài khoản/khách hàng theo từng Chi nhánh</p>
           </div>
         </div>
         <div className="py-8 text-center text-xs text-slate-500">
-          Chưa có dữ liệu giới thiệu sản phẩm trong kỳ này.
+          Chưa có dữ liệu hỗ trợ thông tin khách hàng trong kỳ này.
         </div>
       </div>
     );
@@ -130,18 +105,18 @@ export function ProductIntroductionStatsPanel({
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-100 text-[#059669]">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sky-100 text-[#0284c7]">
             <BarChart3 size={20} />
           </div>
           <div>
             <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
-              Biểu đồ Số lượng Dịch vụ Sản phẩm theo Chi nhánh
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-[#059669]">
+              Biểu đồ Số lượng Hỗ trợ Thông tin KH theo Chi nhánh
+              <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-[#0284c7]">
                 <Sparkles size={12} /> Real-time
               </span>
             </h3>
             <p className="text-xs text-slate-500">
-              Thống kê phân bổ chi tiết các sản phẩm dịch vụ được khách hàng sử dụng theo từng Chi nhánh
+              Thống kê phân bổ chi tiết danh mục hỗ trợ thông tin được xử lý theo từng Chi nhánh
             </p>
           </div>
         </div>
@@ -149,17 +124,17 @@ export function ProductIntroductionStatsPanel({
         {/* Quick Summary Pills & Chart Toggle */}
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-1.5 border border-slate-100">
-            <Package size={15} className="text-[#059669]" />
+            <HelpCircle size={15} className="text-[#0284c7]" />
             <div>
-              <p className="text-[10px] text-slate-500 font-medium">Tổng lượt giới thiệu</p>
-              <p className="text-xs font-bold text-slate-800">{data.total_introduced_records}</p>
+              <p className="text-[10px] text-slate-500 font-medium">Tổng lượt hỗ trợ</p>
+              <p className="text-xs font-bold text-slate-800">{data.total_support_records}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-1.5 border border-emerald-100">
-            <Users size={15} className="text-[#059669]" />
+          <div className="flex items-center gap-2 rounded-lg bg-sky-50 px-3 py-1.5 border border-sky-100">
+            <Users size={15} className="text-[#0284c7]" />
             <div>
-              <p className="text-[10px] text-emerald-700 font-medium">KH tiếp cận SP</p>
-              <p className="text-xs font-bold text-[#059669]">{data.total_unique_customers}</p>
+              <p className="text-[10px] text-sky-700 font-medium">KH được hỗ trợ</p>
+              <p className="text-xs font-bold text-[#0284c7]">{data.total_unique_customers}</p>
             </div>
           </div>
 
@@ -169,7 +144,7 @@ export function ProductIntroductionStatsPanel({
               type="button"
               onClick={() => setIsStacked(true)}
               className={`flex items-center gap-1 rounded-md px-2.5 py-1 transition-all ${
-                isStacked ? "bg-[#10b981] text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
+                isStacked ? "bg-[#0284c7] text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
               }`}
             >
               <Layers size={13} /> Cột xếp chồng
@@ -178,7 +153,7 @@ export function ProductIntroductionStatsPanel({
               type="button"
               onClick={() => setIsStacked(false)}
               className={`flex items-center gap-1 rounded-md px-2.5 py-1 transition-all ${
-                !isStacked ? "bg-[#10b981] text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
+                !isStacked ? "bg-[#0284c7] text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
               }`}
             >
               <Columns size={13} /> Cột đơn
@@ -208,13 +183,13 @@ export function ProductIntroductionStatsPanel({
               wrapperStyle={{ paddingTop: "10px", fontSize: "11px" }}
               iconSize={10}
             />
-            {productNames.map((pName, index) => (
+            {categoryNames.map((cName, index) => (
               <Bar
-                key={pName}
-                dataKey={pName}
-                name={pName}
+                key={cName}
+                dataKey={cName}
+                name={cName}
                 stackId={isStacked ? "a" : undefined}
-                fill={PRODUCT_BAR_COLORS[index % PRODUCT_BAR_COLORS.length]}
+                fill={SUPPORT_BAR_COLORS[index % SUPPORT_BAR_COLORS.length]}
                 radius={isStacked ? [0, 0, 0, 0] : [4, 4, 0, 0]}
                 isAnimationActive={false}
               />

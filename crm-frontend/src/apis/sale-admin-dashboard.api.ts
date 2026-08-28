@@ -74,6 +74,8 @@ function normalizeDashboardResponse(
     top_employees: data.top_employees || [],
     top_accounts: data.top_accounts || [],
     product_fee: data.product_fee || [],
+    product_introduction_stats: data.product_introduction_stats || null,
+    support_info_stats: data.support_info_stats || null,
     icp_distribution: data.icp_distribution || [],
     customer_group_distribution: (data.customer_group_distribution || []).map(
       (row, index) => normalizeCustomerGroupRow(row, index)

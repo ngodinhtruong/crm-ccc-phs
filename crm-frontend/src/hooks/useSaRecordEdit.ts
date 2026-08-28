@@ -96,6 +96,8 @@ function mapRecordToForm(item: SaRecordItem): SaRecordCreateFormState {
     introducedProductName: item.introduced_product_name || (item.introduced_product_obj_detail ? item.introduced_product_obj_detail.name : ""),
     reactivation: Boolean(item.reactivation),
     supportInfo: Boolean(item.support_info),
+    supportInfoCategoryId: item.support_info_category_obj || (item.support_info_category_obj_detail ? item.support_info_category_obj_detail.id : null),
+    supportInfoCategoryName: item.support_info_category_name || (item.support_info_category_obj_detail ? item.support_info_category_obj_detail.name : ""),
     referredRm: Boolean(item.referred_rm),
 
     handoverToBroker: Boolean(item.handover_to_broker),
@@ -278,6 +280,8 @@ export function useSaRecordEdit(recordId: string) {
       introduced_product_name: form.introducedProduct ? (form.introducedProductName || null) : null,
       reactivation: form.reactivation,
       support_info: form.supportInfo,
+      support_info_category_obj: form.supportInfo && form.supportInfoCategoryId ? Number(form.supportInfoCategoryId) : null,
+      support_info_category_name: form.supportInfo ? (form.supportInfoCategoryName || null) : null,
       referred_rm: form.referredRm,
 
       handover_to_broker: form.handoverToBroker,

@@ -14,10 +14,12 @@ import {
   SaRecordUpdatePayload,
   SaCustomerAccountSuggestion,
   SaProduct,
+  SaSupportCategory,
   SaSelectOption,
 } from "@/types/sale-admin.type";
 
 const SA_PRODUCT_ENDPOINT = "/api/sale-admin/products/";
+const SA_SUPPORT_CATEGORY_ENDPOINT = "/api/sale-admin/support-categories/";
 const SA_RECORD_ENDPOINT = "/api/sale-admin/records/";
 const SA_RECORD_AUDIT_LOG_ENDPOINT = "/api/sale-admin/record-audit-logs/";
 const SA_CALL_RESULT_ENDPOINT = "/api/sale-admin/call-results/";
@@ -63,6 +65,28 @@ export const saleAdminApi = {
 
   createSaProduct: async (payload: { name: string; description?: string }): Promise<SaProduct> => {
     const response = await api.post<SaProduct>(SA_PRODUCT_ENDPOINT, payload);
+    return response.data;
+  },
+
+  getSaSupportCategories: async (search?: string): Promise<SaSupportCategory[]> => {
+    const response = await api.get<SaSupportCategory[] | PaginatedResponse<SaSupportCategory>>(
+      SA_SUPPORT_CATEGORY_ENDPOINT,
+      search ? { params: { search } } : undefined
+    );
+    return getListData<SaSupportCategory>(response.data);
+  },
+
+  getSimilarSaSupportCategories: async (name: string): Promise<SaSupportCategory[]> => {
+    if (!name.trim()) return [];
+    const response = await api.get<SaSupportCategory[] | PaginatedResponse<SaSupportCategory>>(
+      `${SA_SUPPORT_CATEGORY_ENDPOINT}similar/`,
+      { params: { name } }
+    );
+    return getListData<SaSupportCategory>(response.data);
+  },
+
+  createSaSupportCategory: async (payload: { name: string; description?: string }): Promise<SaSupportCategory> => {
+    const response = await api.post<SaSupportCategory>(SA_SUPPORT_CATEGORY_ENDPOINT, payload);
     return response.data;
   },
 

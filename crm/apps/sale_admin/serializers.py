@@ -9,6 +9,7 @@ from apps.sale_admin.models import (
     SaIcpGroup,
     SaIcpRule,
     SaProduct,
+    SaSupportCategory,
     SaRecord,
     SaRecordAuditLog,
 )
@@ -17,6 +18,12 @@ from apps.sale_admin.models import (
 class SaProductSerializer(serializers.ModelSerializer):
     class Meta:
         model = SaProduct
+        fields = "__all__"
+
+
+class SaSupportCategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SaSupportCategory
         fields = "__all__"
 
 
@@ -111,6 +118,11 @@ class SaRecordReadSerializer(serializers.ModelSerializer):
 
     introduced_product_obj_detail = SaProductSerializer(
         source="introduced_product_obj",
+        read_only=True,
+    )
+
+    support_info_category_obj_detail = SaSupportCategorySerializer(
+        source="support_info_category_obj",
         read_only=True,
     )
 
@@ -324,6 +336,8 @@ class SaRecordWriteSerializer(serializers.ModelSerializer):
             "introduced_product_obj",
             "introduced_product_name",
             "support_info",
+            "support_info_category_obj",
+            "support_info_category_name",
             "referred_rm",
 
             "handover_to_broker",
@@ -422,33 +436,6 @@ class SaRecordWriteSerializer(serializers.ModelSerializer):
         referred_rm = bool(referred_rm)
         attrs["referred_rm"] = referred_rm
 
-        if referred_rm:
-            icp_group = attrs.get("icp_group")
-            if icp_group is None and self.instance:
-                icp_group = self.instance.icp_group
-
-            is_tp_rtp = False
-            if icp_group:
-                icp_code = str(getattr(icp_group, "icp_code", "") or "").strip().upper()
-                is_tp_rtp = (
-                    icp_code in ["A", "B"]
-                    or icp_code.startswith("A")
-                    or icp_code.startswith("B")
-                    or bool(getattr(icp_group, "is_potential", False))
-                )
-
-            if not is_tp_rtp:
-                import logging
-                logger = logging.getLogger(__name__)
-                acc_num = attrs.get("account_no") or (customer_account.account_number if customer_account else "N/A")
-                grp_code = getattr(icp_group, "icp_code", "Chưa chọn") if icp_group else "Chưa chọn"
-                logger.warning(
-                    f"Từ chối cờ Referral cho SA Record (TK {acc_num}): Nhóm ICP '{grp_code}' không thuộc nhóm Tiềm năng (A) hoặc Rất tiềm năng (B)."
-                )
-                raise serializers.ValidationError(
-                    {"referred_rm": "Chỉ được ghi nhận Referral cho khách hàng thuộc nhóm Tiềm năng (nhóm A) hoặc Rất tiềm năng (nhóm B)."}
-                )
-
         if handover_to_broker:
             broker_user = attrs.get("broker_user")
             broker_employee = attrs.get("broker_employee")
@@ -526,6 +513,31 @@ class SaRecordWriteSerializer(serializers.ModelSerializer):
                 attrs["introduced_product_obj"] = None
                 attrs["introduced_product_name"] = None
 
+        # Xử lý thông tin danh mục hỗ trợ
+        support_category_obj = attrs.get("support_info_category_obj")
+        support_category_name = attrs.get("support_info_category_name")
+
+        if support_category_obj:
+            attrs["support_info"] = True
+            attrs["support_info_category_name"] = support_category_obj.name
+        elif support_category_name and str(support_category_name).strip():
+            attrs["support_info"] = True
+            c_name = str(support_category_name).strip()
+            attrs["support_info_category_name"] = c_name
+            category_obj, _ = SaSupportCategory.objects.get_or_create(
+                name__iexact=c_name,
+                defaults={"name": c_name}
+            )
+            attrs["support_info_category_obj"] = category_obj
+        else:
+            support_flag = attrs.get("support_info")
+            if support_flag is None and self.instance:
+                support_flag = self.instance.support_info
+            attrs["support_info"] = bool(support_flag)
+            if not attrs["support_info"]:
+                attrs["support_info_category_obj"] = None
+                attrs["support_info_category_name"] = None
+
         return attrs
 
     def create(self, validated_data):
@@ -533,14 +545,26 @@ class SaRecordWriteSerializer(serializers.ModelSerializer):
         if instance.introduced_product_obj_id:
             cnt = SaRecord.objects.filter(introduced_product_obj_id=instance.introduced_product_obj_id).count()
             SaProduct.objects.filter(id=instance.introduced_product_obj_id).update(usage_count=cnt)
+        if instance.support_info_category_obj_id:
+            cnt = SaRecord.objects.filter(support_info_category_obj_id=instance.support_info_category_obj_id).count()
+            SaSupportCategory.objects.filter(id=instance.support_info_category_obj_id).update(usage_count=cnt)
         return instance
 
     def update(self, instance, validated_data):
         old_prod_id = instance.introduced_product_obj_id
+        old_cat_id = instance.support_info_category_obj_id
         instance = super().update(instance, validated_data)
         new_prod_id = instance.introduced_product_obj_id
+        new_cat_id = instance.support_info_category_obj_id
+
         for p_id in {old_prod_id, new_prod_id}:
             if p_id:
                 cnt = SaRecord.objects.filter(introduced_product_obj_id=p_id).count()
                 SaProduct.objects.filter(id=p_id).update(usage_count=cnt)
+
+        for c_id in {old_cat_id, new_cat_id}:
+            if c_id:
+                cnt = SaRecord.objects.filter(support_info_category_obj_id=c_id).count()
+                SaSupportCategory.objects.filter(id=c_id).update(usage_count=cnt)
+
         return instance

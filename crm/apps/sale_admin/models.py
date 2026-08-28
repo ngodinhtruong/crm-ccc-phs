@@ -21,6 +21,22 @@ class SaProduct(TimeStampedModel):
         return self.name
 
 
+class SaSupportCategory(TimeStampedModel):
+    name = models.CharField(max_length=255, unique=True, db_index=True)
+    code = models.CharField(max_length=100, null=True, blank=True)
+    description = models.TextField(null=True, blank=True)
+    usage_count = models.PositiveIntegerField(default=0, db_index=True)
+    is_active = models.BooleanField(default=True)
+    sort_order = models.IntegerField(null=True, blank=True)
+
+    class Meta:
+        db_table = "sa_support_categories"
+        ordering = ["-usage_count", "name", "id"]
+
+    def __str__(self):
+        return self.name
+
+
 class SaCallResult(TimeStampedModel):
     result_code = models.CharField(max_length=50, unique=True)
     result_name = models.CharField(max_length=255)
@@ -218,6 +234,14 @@ class SaRecord(TimeStampedModel):
     )
     introduced_product_name = models.CharField(max_length=255, null=True, blank=True)
     support_info = models.BooleanField(default=False)
+    support_info_category_obj = models.ForeignKey(
+        SaSupportCategory,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sa_records",
+    )
+    support_info_category_name = models.CharField(max_length=255, null=True, blank=True)
     referred_rm = models.BooleanField(default=False)
 
     # Bàn giao MG chăm sóc

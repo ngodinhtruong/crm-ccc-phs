@@ -16,6 +16,17 @@ export type SaProduct = {
     updated_at?: string;
 };
 
+export type SaSupportCategory = {
+    id: number;
+    name: string;
+    code?: string | null;
+    description?: string | null;
+    usage_count: number;
+    is_active: boolean;
+    created_at?: string;
+    updated_at?: string;
+};
+
 export type SaCallResult = {
     id: number;
     result_code: string;
@@ -131,6 +142,9 @@ export type SaRecordItem = {
     introduced_product_obj_detail?: SaProduct | null;
     reactivation: boolean;
     support_info: boolean;
+    support_info_category_obj?: number | null;
+    support_info_category_name?: string | null;
+    support_info_category_obj_detail?: SaSupportCategory | null;
     referred_rm: boolean;
 
     transaction_value_snapshot: string;
@@ -248,6 +262,8 @@ export type SaRecordCreatePayload = {
     introduced_product_obj?: number | null;
     introduced_product_name?: string | null;
     support_info?: boolean;
+    support_info_category_obj?: number | null;
+    support_info_category_name?: string | null;
     referred_rm?: boolean;
 
     handover_to_broker?: boolean;
@@ -290,6 +306,8 @@ export type SaRecordCreateFormState = {
     introducedProductName?: string | null;
     reactivation: boolean;
     supportInfo: boolean;
+    supportInfoCategoryId?: number | string | null;
+    supportInfoCategoryName?: string | null;
     referredRm: boolean;
 
     handoverToBroker: boolean;

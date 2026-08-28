@@ -155,6 +155,32 @@ export type SaAdminDashboardFilters = {
   branch_options: SaAdminBranchOption[];
 };
 
+export type SupportCategoryStatItem = {
+  category_name: string;
+  category_id?: number | null;
+  count: number;
+  unique_customers: number;
+  top_branch?: string;
+  top_sa?: string;
+  branch_breakdown?: Array<{ branch_name: string; count: number }>;
+  sa_breakdown?: Array<{ sa_name: string; count: number }>;
+};
+
+export type BranchSupportCategoryChartRow = {
+  branch_name: string;
+  total_count: number;
+  categories: Array<{ category_name: string; count: number }>;
+  [category_name: string]: string | number | Array<{ category_name: string; count: number }>;
+};
+
+export type SupportInfoStatsData = {
+  total_support_records: number;
+  total_unique_customers: number;
+  top_categories: SupportCategoryStatItem[];
+  by_branch_chart: BranchSupportCategoryChartRow[];
+  all_category_names: string[];
+};
+
 export type SaAdminDashboardResponse = {
   generated_at?: string | null;
   period?: SaAdminDashboardPeriod | null;
@@ -168,6 +194,7 @@ export type SaAdminDashboardResponse = {
   top_accounts: SaAdminTopAccountRow[];
   product_fee: SaAdminProductFeeRow[];
   product_introduction_stats?: ProductIntroductionStatsData | null;
+  support_info_stats?: SupportInfoStatsData | null;
   icp_distribution: SaAdminIcpDistributionRow[];
   customer_group_distribution: SaAdminCustomerGroupRow[];
   criteria?: SaAdminCriteriaDefinition | null;

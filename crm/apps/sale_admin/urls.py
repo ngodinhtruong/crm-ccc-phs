@@ -10,6 +10,7 @@ from apps.sale_admin.views import (
     SaIcpGroupViewSet,
     SaIcpRuleViewSet,
     SaProductViewSet,
+    SaSupportCategoryViewSet,
     SaRecordAuditLogViewSet,
     SaRecordViewSet,
     SaVipClassificationOptionAPIView,
@@ -17,6 +18,7 @@ from apps.sale_admin.views import (
 
 router = DefaultRouter()
 router.register("products", SaProductViewSet, basename="sa-product")
+router.register("support-categories", SaSupportCategoryViewSet, basename="sa-support-category")
 router.register("records", SaRecordViewSet, basename="sa-record")
 router.register("record-audit-logs", SaRecordAuditLogViewSet, basename="sa-record-audit-log")
 router.register("call-results", SaCallResultViewSet, basename="sa-call-result")

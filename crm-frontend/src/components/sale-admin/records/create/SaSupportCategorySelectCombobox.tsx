@@ -1,30 +1,30 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
-import { Plus, Search, Check, PackagePlus, AlertCircle, ChevronDown, X, Sparkles, TrendingUp } from "lucide-react";
-import { SaProduct } from "@/types/sale-admin.type";
+import { Plus, Search, Check, HelpCircle, AlertCircle, ChevronDown, X, Sparkles, TrendingUp } from "lucide-react";
+import { SaSupportCategory } from "@/types/sale-admin.type";
 import { saleAdminApi } from "@/apis/sale-admin.api";
 
-interface SaProductSelectComboboxProps {
-  selectedProductId?: number | string | null;
-  selectedProductName?: string | null;
-  onSelectProduct: (productId: number | null, productName: string) => void;
+interface SaSupportCategorySelectComboboxProps {
+  selectedCategoryId?: number | string | null;
+  selectedCategoryName?: string | null;
+  onSelectCategory: (categoryId: number | null, categoryName: string) => void;
 }
 
-export function SaProductSelectCombobox({
-  selectedProductId,
-  selectedProductName,
-  onSelectProduct,
-}: SaProductSelectComboboxProps) {
-  const [products, setProducts] = useState<SaProduct[]>([]);
+export function SaSupportCategorySelectCombobox({
+  selectedCategoryId,
+  selectedCategoryName,
+  onSelectCategory,
+}: SaSupportCategorySelectComboboxProps) {
+  const [categories, setCategories] = useState<SaSupportCategory[]>([]);
   const [loading, setLoading] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Mode tạo sản phẩm mới
+  // Mode tạo danh mục mới
   const [isAddingNew, setIsAddingNew] = useState(false);
-  const [newProductName, setNewProductName] = useState("");
-  const [similarProducts, setSimilarProducts] = useState<SaProduct[]>([]);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [similarCategories, setSimilarCategories] = useState<SaSupportCategory[]>([]);
   const [loadingSimilar, setLoadingSimilar] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
@@ -32,21 +32,21 @@ export function SaProductSelectCombobox({
   const containerRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Fetch danh sách sản phẩm ban đầu
-  const fetchProducts = async (search?: string) => {
+  // Fetch danh sách danh mục hỗ trợ ban đầu
+  const fetchCategories = async (search?: string) => {
     try {
       setLoading(true);
-      const res = await saleAdminApi.getSaProducts(search);
-      setProducts(res || []);
+      const res = await saleAdminApi.getSaSupportCategories(search);
+      setCategories(res || []);
     } catch (err) {
-      console.error("Lỗi tải sản phẩm:", err);
+      console.error("Lỗi tải danh mục hỗ trợ:", err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchProducts();
+    fetchCategories();
   }, []);
 
   // Close dropdown on outside click
@@ -61,50 +61,50 @@ export function SaProductSelectCombobox({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Tim kiem san pham tuong tu khi gõ ten moi
+  // Tim kiem danh muc tuong tu khi gõ ten moi
   useEffect(() => {
-    if (!isAddingNew || !newProductName.trim()) {
-      setSimilarProducts([]);
+    if (!isAddingNew || !newCategoryName.trim()) {
+      setSimilarCategories([]);
       return;
     }
 
     const timer = setTimeout(async () => {
       try {
         setLoadingSimilar(true);
-        const res = await saleAdminApi.getSimilarSaProducts(newProductName);
-        setSimilarProducts(res || []);
+        const res = await saleAdminApi.getSimilarSaSupportCategories(newCategoryName);
+        setSimilarCategories(res || []);
       } catch (err) {
-        console.error("Lỗi tìm SP tương tự:", err);
+        console.error("Lỗi tìm danh mục tương tự:", err);
       } finally {
         setLoadingSimilar(false);
       }
     }, 200);
 
     return () => clearTimeout(timer);
-  }, [newProductName, isAddingNew]);
+  }, [newCategoryName, isAddingNew]);
 
-  const filteredProducts = products.filter((p) =>
-    p.name.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredCategories = categories.filter((c) =>
+    c.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleCreateProduct = async (overrideName?: string) => {
-    const targetName = (overrideName || newProductName).trim();
+  const handleCreateCategory = async (overrideName?: string) => {
+    const targetName = (overrideName || newCategoryName).trim();
     if (!targetName) {
-      setCreateError("Vui lòng nhập tên sản phẩm mới.");
+      setCreateError("Vui lòng nhập tên danh mục hỗ trợ mới.");
       return;
     }
 
     try {
       setCreating(true);
       setCreateError("");
-      const createdProduct = await saleAdminApi.createSaProduct({ name: targetName });
-      await fetchProducts();
-      onSelectProduct(createdProduct.id, createdProduct.name);
+      const createdCategory = await saleAdminApi.createSaSupportCategory({ name: targetName });
+      await fetchCategories();
+      onSelectCategory(createdCategory.id, createdCategory.name);
       setIsAddingNew(false);
-      setNewProductName("");
+      setNewCategoryName("");
       setDropdownOpen(false);
     } catch (err: any) {
-      const msg = err?.response?.data?.name?.[0] || err?.message || "Không thể tạo sản phẩm mới";
+      const msg = err?.response?.data?.name?.[0] || err?.message || "Không thể tạo danh mục mới";
       setCreateError(msg);
     } finally {
       setCreating(false);
@@ -112,33 +112,33 @@ export function SaProductSelectCombobox({
   };
 
   const selectedDisplayLabel =
-    selectedProductName ||
-    products.find((p) => String(p.id) === String(selectedProductId))?.name ||
+    selectedCategoryName ||
+    categories.find((c) => String(c.id) === String(selectedCategoryId))?.name ||
     "";
 
   return (
     <div className="relative w-full" ref={containerRef}>
-      {/* Container chọn hoặc hiển thị sản phẩm đã chọn */}
+      {/* Container chọn hoặc hiển thị danh mục hỗ trợ đã chọn */}
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
           {selectedDisplayLabel && !dropdownOpen ? (
-            /* Badge hiển thị khi đã chọn sản phẩm */
-            <div className="flex items-center justify-between rounded-lg border border-emerald-300 bg-emerald-50/80 px-3 py-2 text-xs font-bold text-[#059669] shadow-sm transition-all hover:bg-emerald-100/80">
+            /* Badge hiển thị khi đã chọn danh mục */
+            <div className="flex items-center justify-between rounded-lg border border-sky-300 bg-sky-50/80 px-3 py-2 text-xs font-bold text-[#0284c7] shadow-sm transition-all hover:bg-sky-100/80">
               <span className="flex items-center gap-2 truncate">
-                <Sparkles size={14} className="shrink-0 text-emerald-600" />
+                <Sparkles size={14} className="shrink-0 text-sky-600" />
                 <span className="truncate">{selectedDisplayLabel}</span>
               </span>
               <div className="flex items-center gap-1">
                 <button
                   type="button"
                   onClick={() => setDropdownOpen(true)}
-                  className="rounded px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-200/60"
+                  className="rounded px-1.5 py-0.5 text-[11px] font-semibold text-sky-700 hover:bg-sky-200/60"
                 >
-                  Đổi SP
+                  Đổi nội dung
                 </button>
                 <button
                   type="button"
-                  onClick={() => onSelectProduct(null, "")}
+                  onClick={() => onSelectCategory(null, "")}
                   title="Xóa lựa chọn"
                   className="rounded p-1 text-slate-400 hover:bg-red-100 hover:text-red-600"
                 >
@@ -154,10 +154,10 @@ export function SaProductSelectCombobox({
                 setDropdownOpen((prev) => !prev);
                 setIsAddingNew(false);
               }}
-              className="flex w-full items-center justify-between rounded-md border border-slate-300 bg-white px-3 py-2 text-xs text-slate-800 shadow-sm transition-all hover:border-[#10b981] focus:border-[#10b981] focus:ring-2 focus:ring-[#10b981]/20"
+              className="flex w-full items-center justify-between rounded-md border border-slate-300 bg-white px-3 py-2 text-xs text-slate-800 shadow-sm transition-all hover:border-[#0284c7] focus:border-[#0284c7] focus:ring-2 focus:ring-[#0284c7]/20"
             >
-              <span className={selectedDisplayLabel ? "font-semibold text-[#059669]" : "text-slate-400"}>
-                {selectedDisplayLabel || "-- Bấm để chọn sản phẩm dịch vụ --"}
+              <span className={selectedDisplayLabel ? "font-semibold text-[#0284c7]" : "text-slate-400"}>
+                {selectedDisplayLabel || "-- Bấm để chọn danh mục thông tin hỗ trợ --"}
               </span>
               <ChevronDown size={14} className="text-slate-400 transition-transform duration-200" />
             </button>
@@ -176,8 +176,8 @@ export function SaProductSelectCombobox({
                         type="text"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Tìm theo tên sản phẩm..."
-                        className="w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-8 pr-3 text-xs outline-none transition-colors focus:border-[#10b981] focus:ring-2 focus:ring-[#10b981]/20"
+                        placeholder="Tìm theo nội dung / danh mục hỗ trợ..."
+                        className="w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-8 pr-3 text-xs outline-none transition-colors focus:border-[#0284c7] focus:ring-2 focus:ring-[#0284c7]/20"
                         autoFocus
                       />
                       <Search size={14} className="absolute left-2.5 top-2.5 text-slate-400" />
@@ -193,60 +193,60 @@ export function SaProductSelectCombobox({
                     </div>
                     <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium px-1">
                       <span className="flex items-center gap-1">
-                        <TrendingUp size={12} className="text-[#059669]" /> Ưu tiên xếp theo chọn nhiều
+                        <TrendingUp size={12} className="text-[#0284c7]" /> Ưu tiên xếp theo chọn nhiều
                       </span>
-                      <span>{products.length} SP hiện có</span>
+                      <span>{categories.length} Danh mục hiện có</span>
                     </div>
                   </div>
 
-                  {/* Products list */}
+                  {/* Categories list */}
                   <div className="max-h-60 overflow-y-auto divide-y divide-slate-100">
                     {loading ? (
                       <div className="flex items-center gap-2 px-3 py-3 text-xs text-slate-500">
-                        <span className="h-2 w-2 animate-ping rounded-full bg-[#10b981]" />
-                        Đang tải sản phẩm...
+                        <span className="h-2 w-2 animate-ping rounded-full bg-[#0284c7]" />
+                        Đang tải danh mục hỗ trợ...
                       </div>
-                    ) : filteredProducts.length === 0 ? (
+                    ) : filteredCategories.length === 0 ? (
                       <div className="p-4 text-center text-xs text-slate-500 space-y-2">
-                        <p>Không tìm thấy sản phẩm khớp với &quot;{searchQuery}&quot;</p>
+                        <p>Không tìm thấy danh mục khớp với &quot;{searchQuery}&quot;</p>
                         <button
                           type="button"
                           onClick={() => {
                             setIsAddingNew(true);
-                            setNewProductName(searchQuery);
+                            setNewCategoryName(searchQuery);
                           }}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-bold text-[#059669] hover:bg-emerald-100"
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-sky-50 px-3 py-1.5 text-xs font-bold text-[#0284c7] hover:bg-sky-100"
                         >
-                          <Plus size={14} /> Nhập & Tạo sản phẩm mới này
+                          <Plus size={14} /> Nhập & Tạo danh mục mới này
                         </button>
                       </div>
                     ) : (
-                      filteredProducts.map((prod) => {
+                      filteredCategories.map((cat) => {
                         const isSelected =
-                          String(prod.id) === String(selectedProductId) || prod.name === selectedProductName;
+                          String(cat.id) === String(selectedCategoryId) || cat.name === selectedCategoryName;
                         return (
                           <button
-                            key={prod.id}
+                            key={cat.id}
                             type="button"
                             onClick={() => {
-                              onSelectProduct(prod.id, prod.name);
+                              onSelectCategory(cat.id, cat.name);
                               setDropdownOpen(false);
                             }}
-                            className={`flex w-full items-center justify-between px-3 py-2.5 text-left text-xs transition-colors hover:bg-emerald-50/70 ${
-                              isSelected ? "bg-emerald-50 font-bold text-[#059669]" : "text-slate-700"
+                            className={`flex w-full items-center justify-between px-3 py-2.5 text-left text-xs transition-colors hover:bg-sky-50/70 ${
+                              isSelected ? "bg-sky-50 font-bold text-[#0284c7]" : "text-slate-700"
                             }`}
                           >
                             <div className="flex items-center gap-2 min-w-0 pr-2">
                               {isSelected ? (
-                                <Check size={14} className="shrink-0 text-[#059669]" />
+                                <Check size={14} className="shrink-0 text-[#0284c7]" />
                               ) : (
                                 <span className="h-1.5 w-1.5 rounded-full bg-slate-300 shrink-0" />
                               )}
-                              <span className="truncate">{prod.name}</span>
+                              <span className="truncate">{cat.name}</span>
                             </div>
-                            {prod.usage_count > 0 && (
+                            {cat.usage_count > 0 && (
                               <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
-                                {prod.usage_count} lượt chọn
+                                {cat.usage_count} lượt hỗ trợ
                               </span>
                             )}
                           </button>
@@ -261,26 +261,26 @@ export function SaProductSelectCombobox({
                       type="button"
                       onClick={() => {
                         setIsAddingNew(true);
-                        setNewProductName(searchQuery);
+                        setNewCategoryName(searchQuery);
                       }}
-                      className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-emerald-400 bg-emerald-50/70 px-3 py-1.5 text-xs font-bold text-[#059669] transition-colors hover:bg-emerald-100"
+                      className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-sky-400 bg-sky-50/70 px-3 py-1.5 text-xs font-bold text-[#0284c7] transition-colors hover:bg-sky-100"
                     >
-                      <Plus size={14} /> Thêm tên sản phẩm mới vào hệ thống
+                      <Plus size={14} /> Thêm danh mục hỗ trợ mới vào hệ thống
                     </button>
                   </div>
                 </div>
               ) : (
-                /* Mode Nhập sản phẩm mới trong dropdown */
+                /* Mode Nhập danh mục mới trong dropdown */
                 <div className="p-3 space-y-3 bg-white">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                    <span className="flex items-center gap-1.5 text-xs font-bold text-[#059669]">
-                      <PackagePlus size={16} /> Thêm mới sản phẩm
+                    <span className="flex items-center gap-1.5 text-xs font-bold text-[#0284c7]">
+                      <HelpCircle size={16} /> Thêm mới danh mục hỗ trợ
                     </span>
                     <button
                       type="button"
                       onClick={() => {
                         setIsAddingNew(false);
-                        setNewProductName("");
+                        setNewCategoryName("");
                         setCreateError("");
                       }}
                       className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
@@ -293,17 +293,17 @@ export function SaProductSelectCombobox({
                     <div className="relative flex items-center gap-1.5">
                       <input
                         type="text"
-                        value={newProductName}
-                        onChange={(e) => setNewProductName(e.target.value)}
-                        placeholder="Nhập tên sản phẩm mới (VD: Margin T+3, Bond Flex...)"
-                        className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-[#10b981] focus:ring-2 focus:ring-[#10b981]/20"
+                        value={newCategoryName}
+                        onChange={(e) => setNewCategoryName(e.target.value)}
+                        placeholder="Nhập tên danh mục (VD: Hướng dẫn eKYC, Mở rộng hạn mức...)"
+                        className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-[#0284c7] focus:ring-2 focus:ring-[#0284c7]/20"
                         autoFocus
                       />
                       <button
                         type="button"
-                        disabled={creating || !newProductName.trim()}
-                        onClick={() => handleCreateProduct()}
-                        className="shrink-0 rounded-md bg-[#10b981] px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-[#059669] disabled:opacity-50"
+                        disabled={creating || !newCategoryName.trim()}
+                        onClick={() => handleCreateCategory()}
+                        className="shrink-0 rounded-md bg-[#0284c7] px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-[#0369a1] disabled:opacity-50"
                       >
                         {creating ? "Đang tạo..." : "Tạo & Chọn"}
                       </button>
@@ -315,31 +315,31 @@ export function SaProductSelectCombobox({
                       </div>
                     )}
 
-                    {/* Check sản phẩm tương tự đã có */}
-                    {newProductName.trim().length >= 1 && (
+                    {/* Check danh mục tương tự đã có */}
+                    {newCategoryName.trim().length >= 1 && (
                       <div className="rounded-lg bg-slate-50 p-2.5 border border-slate-200">
                         <p className="text-[11px] font-semibold text-slate-600 mb-1 flex items-center gap-1">
-                          <Search size={12} className="text-emerald-600" /> Sản phẩm có tên tương tự đã tồn tại:
+                          <Search size={12} className="text-sky-600" /> Danh mục hỗ trợ tương tự đã tồn tại:
                         </p>
                         {loadingSimilar ? (
                           <p className="text-[11px] text-slate-400">Đang kiểm tra trùng lặp...</p>
-                        ) : similarProducts.length === 0 ? (
-                          <p className="text-[11px] text-emerald-700 italic">
-                            Chưa có sản phẩm nào tương tự. Bạn có thể tự tin tạo mới!
+                        ) : similarCategories.length === 0 ? (
+                          <p className="text-[11px] text-sky-700 italic">
+                            Chưa có danh mục nào tương tự. Bạn có thể tự tin tạo mới!
                           </p>
                         ) : (
                           <div className="flex flex-wrap gap-1.5 mt-1 max-h-32 overflow-y-auto">
-                            {similarProducts.map((sim) => (
+                            {similarCategories.map((sim) => (
                               <button
                                 key={sim.id}
                                 type="button"
                                 onClick={() => {
-                                  onSelectProduct(sim.id, sim.name);
+                                  onSelectCategory(sim.id, sim.name);
                                   setIsAddingNew(false);
                                   setDropdownOpen(false);
-                                  setNewProductName("");
+                                  setNewCategoryName("");
                                 }}
-                                className="inline-flex items-center gap-1 rounded-md border border-emerald-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-[#059669] shadow-sm hover:bg-emerald-50 transition-colors"
+                                className="inline-flex items-center gap-1 rounded-md border border-sky-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-[#0284c7] shadow-sm hover:bg-sky-50 transition-colors"
                               >
                                 <Check size={12} /> {sim.name} ({sim.usage_count} lần)
                               </button>
@@ -355,16 +355,16 @@ export function SaProductSelectCombobox({
           )}
         </div>
 
-        {/* Nút cộng Nhanh mở ô tạo SP mới */}
+        {/* Nút cộng Nhanh mở ô tạo danh mục mới */}
         {!selectedDisplayLabel && !isAddingNew && (
           <button
             type="button"
-            title="Thêm sản phẩm mới"
+            title="Thêm danh mục hỗ trợ mới"
             onClick={() => {
               setDropdownOpen(true);
               setIsAddingNew(true);
             }}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-emerald-300 bg-emerald-50 text-[#059669] transition-all hover:bg-[#10b981] hover:text-white shadow-sm"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-sky-300 bg-sky-50 text-[#0284c7] transition-all hover:bg-[#0284c7] hover:text-white shadow-sm"
           >
             <Plus size={16} />
           </button>
