@@ -29,9 +29,32 @@ QUESTION_TYPE_RESEARCH = "RESEARCH"
 # tưởng khách đang phá.
 SPAM_QUESTION_TYPES = [QUESTION_TYPE_UNRELATED]
 
-# Câu không mang nghiệp vụ, không đưa vào bảng xếp hạng FAQ. Rộng hơn nhóm
-# rác: chào hỏi tuy không phải rác nhưng cũng chẳng phải chủ đề để xếp hạng.
-NON_FAQ_QUESTION_TYPES = [QUESTION_TYPE_GREETING, QUESTION_TYPE_UNRELATED]
+# Các loại KHÔNG có chủ đề. Rộng hơn nhóm rác: chào hỏi tuy không phải rác
+# nhưng cũng chẳng phải chủ đề để xếp hạng.
+#
+# Nguồn chỉ gán chủ đề nghiệp vụ cho CUSTOMER_CARE. Với ba loại này, cột
+# `category` được ghi bằng chính tên loại viết thường ("research", "greeting",
+# "unrelated") — đó là nhãn loại, không phải chủ đề. Đọc nguyên si thì
+# "research" leo lên hạng 1 biểu đồ chủ đề và bảng FAQ, át hết chủ đề thật.
+NON_TOPIC_QUESTION_TYPES = [
+    QUESTION_TYPE_GREETING,
+    QUESTION_TYPE_UNRELATED,
+    QUESTION_TYPE_RESEARCH,
+]
+
+# Tên cũ, giữ lại cho code đang import. Cùng một danh sách.
+NON_FAQ_QUESTION_TYPES = NON_TOPIC_QUESTION_TYPES
+
+# Giá trị `category` là echo của chính questionType chứ không phải chủ đề.
+# Lọc theo questionType là chốt chặn chính; đây là chốt thứ hai cho dòng lệch
+# (đã gặp dòng CUSTOMER_CARE mà category="research").
+ECHO_CATEGORY_VALUES = {
+    "research",
+    "greeting",
+    "unrelated",
+    "customer_care",
+    "customer care",
+}
 
 # sender_type trong bảng chat_questions. xpro_chat_logs không có cột này.
 SENDER_TYPE_CUSTOMER = "customer"
@@ -73,8 +96,15 @@ def normalize_step(value):
 
 
 def normalize_category(value):
-    """Trả về category đã trim, hoặc chuỗi rỗng nếu chatbot chưa phân loại."""
-    return str(value or "").strip()
+    """
+    Trả về category đã trim, hoặc chuỗi rỗng nếu chatbot chưa phân loại.
+
+    Giá trị chỉ là echo của questionType ("research", "greeting"...) cũng trả
+    về rỗng: đó là nhãn loại câu hỏi, không phải chủ đề nghiệp vụ.
+    """
+    text = str(value or "").strip()
+
+    return "" if text.lower() in ECHO_CATEGORY_VALUES else text
 
 
 def category_label(value):
@@ -104,6 +134,18 @@ def is_faq_question(question_type):
 def is_research_question(question_type):
     """Câu phân tích cổ phiếu / khuyến nghị thị trường."""
     return normalize_question_type(question_type) == QUESTION_TYPE_RESEARCH
+
+
+def has_topic(question_type):
+    """
+    Lượt hỏi này có mang chủ đề nghiệp vụ không.
+
+    Chỉ CUSTOMER_CARE mới được nguồn gán chủ đề. Viết theo hướng loại trừ chứ
+    không phải "chỉ nhận CUSTOMER_CARE": thêm một loại nghiệp vụ mới thì không
+    phải sửa lại, và dòng chưa gán questionType nhưng đã có chủ đề thật (đang
+    có ở nguồn Zalo) vẫn được giữ.
+    """
+    return normalize_question_type(question_type) not in NON_TOPIC_QUESTION_TYPES
 
 
 def normalize_sender_type(value):

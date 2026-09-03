@@ -9,10 +9,11 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.chatbots.constants import NON_FAQ_QUESTION_TYPES, UNCATEGORIZED_LABEL
+from apps.chatbots.constants import UNCATEGORIZED_LABEL
 from apps.chatbots.dashboard.aggregations import (
     ChatbotDashboardAggregator,
     TOPIC_OUTCOMES,
+    only_topic_logs,
 )
 from apps.chatbots.dashboard.cache import (
     bump_chatbot_dashboard_cache_version,
@@ -322,9 +323,10 @@ class ChatbotDashboardFAQAPIView(ChatbotDashboardFilterMixin, generics.ListAPIVi
     pagination_class = StandardResultsSetPagination
 
     def get_queryset(self):
-        logs = self.get_filtered_logs().exclude(
-            questionType__in=NON_FAQ_QUESTION_TYPES
-        )
+        # Cùng bộ lọc với biểu đồ chủ đề: chỉ lượt thật sự mang chủ đề nghiệp
+        # vụ. Không dùng chung thì bảng FAQ và biểu đồ nói hai con số khác nhau
+        # cho cùng một chủ đề.
+        logs = only_topic_logs(self.get_filtered_logs())
         keyword = (self.request.query_params.get("q") or "").strip()
 
         if keyword:
@@ -335,9 +337,7 @@ class ChatbotDashboardFAQAPIView(ChatbotDashboardFilterMixin, generics.ListAPIVi
             )
 
         return (
-            logs.exclude(category__isnull=True)
-            .exclude(category__exact="")
-            .values("category")
+            logs.values("category")
             .annotate(
                 hit_count=Count("id"),
                 session_count=Count("session_id", distinct=True),
