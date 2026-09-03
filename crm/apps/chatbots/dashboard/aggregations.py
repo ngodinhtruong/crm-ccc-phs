@@ -42,6 +42,10 @@ TOPIC_OUTCOMES = (OUTCOME_BOT_DONE, OUTCOME_CCC)
 # Ngưỡng cho biểu đồ so sánh bot vs CCC theo chủ đề. Chủ đề chỉ 1-2 phiên mà
 # 100% chuyển CCC không nói lên bot yếu, chỉ nói lên mẫu quá nhỏ; giới hạn số
 # chủ đề vẽ ra để các cột không bị bóp lại đến mức không đọc được.
+# Nhãn nhóm gộp phần đuôi của các biểu đồ "top N nhóm theo kỳ", để tổng của
+# biểu đồ luôn cộng đủ bằng số liệu gốc.
+OTHER_GROUP_LABEL = "Khác"
+
 TOPIC_COMPARISON_MIN_VOLUME = 5
 TOPIC_COMPARISON_LIMIT = 8
 
@@ -117,6 +121,11 @@ class ChatbotDashboardAggregator:
         self.summaries = summaries
         self.logs = logs
 
+        # Phần đuôi bị cắt của hai bảng "top N", điền khi hàm tương ứng chạy.
+        # Khởi tạo sẵn để section không tham chiếu thuộc tính chưa tồn tại.
+        self._top_reasons_skipped = []
+        self._top_faqs_skipped = []
+
         # Hai phạm vi, cố ý khác nhau:
         #   summaries        - đúng bộ lọc (phễu, khung giờ, bảng FAQ)
         #   series_summaries - nới ra kỳ cha KHI bộ lọc chỉ gói đúng một kỳ,
@@ -147,37 +156,55 @@ class ChatbotDashboardAggregator:
         đang nằm trong bộ lọc không; ``row`` rỗng ở kỳ không có phiên nào — kỳ
         trống vẫn phải hiện thành cột 0, nếu không người đọc tưởng trục thiếu
         kỳ (bấm "Năm" mà năm chưa có dữ liệu thì biến mất khỏi biểu đồ).
+
+        Kỳ ĐANG LỌC đếm trên ``summaries`` (đúng bộ lọc), kỳ xung quanh đếm
+        trên ``series_summaries`` (cửa sổ đã nới). Đếm tất cả trên cửa sổ nới
+        thì cột của kỳ đang xem không còn khớp thẻ KPI: lọc 16-31/08 với mốc
+        "Tháng" sẽ cho cột T08 bằng TRỌN tháng 8, tức cộng thêm cả nửa đầu
+        tháng mà người dùng đã lọc bỏ.
         """
         granularity = normalize_granularity(granularity)
 
         if granularity in self._outcome_rows_cache:
             return self._outcome_rows_cache[granularity]
 
-        by_key = {
-            period_key(granularity, row["period"]): row
-            for row in (
-                self.series_summaries.filter(started_at__isnull=False)
-                .annotate(period=period_trunc(granularity))
-                .values("period")
-                .annotate(total=Count("id"), **outcome_counts())
-            )
-            if row["period"]
-        }
+        def count_by_period(queryset):
+            return {
+                period_key(granularity, row["period"]): row
+                for row in (
+                    queryset.filter(started_at__isnull=False)
+                    .annotate(period=period_trunc(granularity))
+                    .values("period")
+                    .annotate(total=Count("id"), **outcome_counts())
+                )
+                if row["period"]
+            }
+
+        by_key = count_by_period(self.series_summaries)
+
+        # Không nới cửa sổ thì hai queryset là một, khỏi chạy truy vấn thứ hai.
+        focus_by_key = (
+            by_key
+            if self.series_summaries is self.summaries
+            else count_by_period(self.summaries)
+        )
 
         window_lo, window_hi = series_bounds(granularity, *self.focus_bounds)
         rows = []
 
         for period in iter_periods(granularity, window_lo, window_hi):
             key = period_key(granularity, period)
+            # Kỳ nằm trong bộ lọc; kỳ còn lại chỉ là nền so sánh.
+            in_focus = self._is_in_focus(granularity, period)
+            source = focus_by_key if in_focus else by_key
             rows.append(
                 (
                     {
                         "key": key,
                         "label": period_label(granularity, period),
-                        # Kỳ nằm trong bộ lọc; kỳ còn lại chỉ là nền so sánh.
-                        "is_current": self._is_in_focus(granularity, period),
+                        "is_current": in_focus,
                     },
-                    by_key.get(key) or {},
+                    source.get(key) or {},
                 )
             )
 
@@ -257,29 +284,57 @@ class ChatbotDashboardAggregator:
             group_totals[name] = group_totals.get(name, 0) + (row["total"] or 0)
             matrix[(key, name)] = matrix.get((key, name), 0) + (row[value_field] or 0)
 
-        top_groups = [
+        ranked = [
             name
             for name, _total in sorted(
                 group_totals.items(), key=lambda item: item[1], reverse=True
             )
-        ][:limit] or list(fallback)
+        ]
+        top_groups = ranked[:limit] or list(fallback)
+
+        # Phần đuôi gom vào một nhóm "Khác" thay vì biến mất không dấu vết.
+        # Bản cũ cắt thẳng ở top N: bảng chủ đề có 62 nhóm thì biểu đồ chỉ vẽ
+        # 6 nhóm và im lặng bỏ 45% số lượt, người đọc cộng lại thấy hụt mà
+        # không có gì giải thích.
+        rest_groups = ranked[limit:]
 
         keys = sorted(period_labels)
+
+        series = [
+            {
+                "label": name,
+                "category": name,
+                **{
+                    period_labels[key]: matrix.get((key, name), 0)
+                    for key in keys
+                },
+            }
+            for name in top_groups
+        ]
+
+        if rest_groups:
+            top_groups = top_groups + [OTHER_GROUP_LABEL]
+            series.append(
+                {
+                    "label": OTHER_GROUP_LABEL,
+                    "category": OTHER_GROUP_LABEL,
+                    "is_aggregate": True,
+                    "group_count": len(rest_groups),
+                    **{
+                        period_labels[key]: sum(
+                            matrix.get((key, name), 0) for name in rest_groups
+                        )
+                        for key in keys
+                    },
+                }
+            )
 
         return {
             "month_labels": [period_labels[key] for key in keys],
             "top_categories": top_groups,
-            "data_by_category": [
-                {
-                    "label": name,
-                    "category": name,
-                    **{
-                        period_labels[key]: matrix.get((key, name), 0)
-                        for key in keys
-                    },
-                }
-                for name in top_groups
-            ],
+            "other_group_count": len(rest_groups),
+            "other_group_label": OTHER_GROUP_LABEL if rest_groups else "",
+            "data_by_category": series,
         }
 
     # ------------------------------------------------------------------
@@ -715,13 +770,13 @@ class ChatbotDashboardAggregator:
             item["ccc"] += ccc
 
         ranked = []
-        skipped_low_volume = 0
+        low_volume_items = []
 
         for item in merged.values():
             total = item["bot_done"] + item["ccc"]
 
             if total < min_volume:
-                skipped_low_volume += total
+                low_volume_items.append({**item, "total": total})
                 continue
 
             ranked.append(
@@ -737,12 +792,26 @@ class ChatbotDashboardAggregator:
         # tải cho CCC nhiều hơn.
         ranked.sort(key=lambda item: (-item["ccc_rate"], -item["total"], item["name"]))
 
+        # Chủ đề bị cắt trả kèm tên và số phiên, không chỉ tổng: ghi chú dưới
+        # biểu đồ liệt kê đích danh từng chủ đề, để người đọc biết cái gì không
+        # được vẽ mà không phải tra database.
+        beyond_limit_items = ranked[limit:]
+        low_volume_items.sort(key=lambda item: (-item["total"], item["name"]))
+
         return {
             "items": ranked[:limit],
             "min_volume": min_volume,
             "skipped_uncategorized": skipped_uncategorized,
-            "skipped_low_volume": skipped_low_volume,
-            "skipped_beyond_limit": sum(item["total"] for item in ranked[limit:]),
+            "skipped_low_volume": sum(item["total"] for item in low_volume_items),
+            "skipped_beyond_limit": sum(item["total"] for item in beyond_limit_items),
+            "skipped_low_volume_items": [
+                {"name": item["name"], "total": item["total"]}
+                for item in low_volume_items
+            ],
+            "skipped_beyond_limit_items": [
+                {"name": item["name"], "total": item["total"]}
+                for item in beyond_limit_items
+            ],
         }
 
     def _category_bot_vs_ccc_by_period(self, granularity, names):
@@ -1031,6 +1100,12 @@ class ChatbotDashboardAggregator:
 
         ranked = sorted(merged.items(), key=lambda item: (-item[1], item[0]))
 
+        # Phần đuôi trả kèm tên: cắt im lặng ở top N thì người đọc cộng lại
+        # thấy hụt mà không có gì giải thích (đúng lỗi đã sửa ở _period_matrix).
+        self._top_reasons_skipped = [
+            {"name": name, "value": value} for name, value in ranked[limit:]
+        ]
+
         return [{"name": name, "value": value} for name, value in ranked[:limit]]
 
     def _with_reason(self):
@@ -1101,6 +1176,8 @@ class ChatbotDashboardAggregator:
             .annotate(value=Count("id"))
         ]
 
+        top_reasons = self._top_reasons()
+
         return {
             "charts": {
                 "ticket_status_distribution": status_distribution,
@@ -1109,7 +1186,8 @@ class ChatbotDashboardAggregator:
                 "hourly_peak_multi_period": self.build_hourly_peak_by_period(
                     granularity
                 ),
-                "top_reasons": self._top_reasons(),
+                "top_reasons": top_reasons,
+                "top_reasons_skipped": self._top_reasons_skipped,
                 "top_reasons_multi_period": self.build_multi_period_reasons(granularity),
                 "channel_performance": self._channel_performance(),
                 "channel_performance_multi_period": self.build_multi_period_channels(
@@ -1173,7 +1251,9 @@ class ChatbotDashboardAggregator:
     # Section: quick_lists
     # ------------------------------------------------------------------
     def _top_faqs(self, limit=5):
-        return list(
+        # Cắt trong Python thay vì LIMIT trong SQL: cần biết phần bị bỏ gồm
+        # những câu nào để ghi chú dưới bảng, chứ không chỉ 5 dòng đầu.
+        ranked = list(
             self._logs_with_category()
             .values("category")
             .annotate(
@@ -1181,8 +1261,18 @@ class ChatbotDashboardAggregator:
                 session_count=Count("session_id", distinct=True),
                 latest_at=Max("external_created_at"),
             )
-            .order_by("-hit_count", "-latest_at")[:limit]
+            .order_by("-hit_count", "-latest_at")
         )
+
+        self._top_faqs_skipped = [
+            {
+                "name": category_label(row["category"]),
+                "value": row["hit_count"],
+            }
+            for row in ranked[limit:]
+        ]
+
+        return ranked[:limit]
 
     # Bảng "Vấn đề cần CCC xử lý" cuộn và phân trang ngay tại chỗ nên cần sẵn
     # một lô, không phải đúng 5 dòng. Vẫn có trần để payload overview không
@@ -1212,12 +1302,15 @@ class ChatbotDashboardAggregator:
             .order_by("-started_at", "-id")[: self.PENDING_TICKET_LIMIT]
         )
 
+        top_faqs = self._top_faqs()
+
         return {
             "quick_lists": {
                 "latest_ccc_tickets": ChatbotSessionQuickSerializer(
                     latest, many=True
                 ).data,
                 "pending_ticket_total": pending_queryset.count(),
-                "top_faqs": self._top_faqs(),
+                "top_faqs": top_faqs,
+                "top_faqs_skipped": self._top_faqs_skipped,
             }
         }

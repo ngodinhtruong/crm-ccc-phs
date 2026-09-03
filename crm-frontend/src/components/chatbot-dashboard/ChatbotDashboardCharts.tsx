@@ -1159,6 +1159,62 @@ function BotVsCccPeriodTooltip({ active, payload, label }: any) {
   );
 }
 
+/**
+ * Ghi chú phần dữ liệu KHÔNG lên biểu đồ, kèm nút bung danh sách chi tiết.
+ *
+ * Mọi biểu đồ "top N" đều cắt bớt; cắt im lặng thì người đọc cộng lại thấy hụt
+ * mà không có gì giải thích. Danh sách có thể vài chục dòng nên mặc định đóng,
+ * mở ra thì xếp lưới nhiều cột để không đẩy biểu đồ đi mất.
+ */
+function SkippedItemsNote({
+  summary,
+  items,
+}: {
+  summary: string;
+  items: Array<{ name: string; value: number }>;
+}) {
+  const [open, setOpen] = useState(false);
+
+  if (!summary) return null;
+
+  return (
+    <div className="mt-3 border-t border-slate-100 pt-2 text-[11px] leading-snug text-slate-500">
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+        <p className="italic">{summary}</p>
+
+        {items.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setOpen((value) => !value)}
+            aria-expanded={open}
+            className="shrink-0 font-semibold text-[#00713d] underline underline-offset-2 transition hover:opacity-70"
+          >
+            {open ? "Thu gọn" : `Xem chi tiết (${items.length})`}
+          </button>
+        )}
+      </div>
+
+      {open && items.length > 0 && (
+        <ul className="mt-2 grid max-h-52 grid-cols-1 gap-x-6 gap-y-1 overflow-y-auto rounded-lg bg-slate-50 p-3 sm:grid-cols-2 xl:grid-cols-3">
+          {items.map((item) => (
+            <li
+              key={item.name}
+              className="flex items-baseline justify-between gap-2 border-b border-dashed border-slate-200 pb-1"
+            >
+              <span className="truncate text-slate-600" title={item.name}>
+                {item.name}
+              </span>
+              <span className="shrink-0 font-semibold text-slate-900">
+                {formatNumber(item.value)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function CategoryBotVsCccBarCard({
   data,
   multiPeriodData,
@@ -1253,8 +1309,10 @@ function CategoryBotVsCccBarCard({
     }
 
     if (data.skipped_low_volume > 0) {
+      const topicCount = (data.skipped_low_volume_items ?? []).length;
+
       notes.push(
-        `${formatNumber(data.skipped_low_volume)} phiên thuộc chủ đề dưới ${data.min_volume} phiên`,
+        `${formatNumber(data.skipped_low_volume)} phiên thuộc ${topicCount} chủ đề dưới ${data.min_volume} phiên`,
       );
     }
 
@@ -1266,6 +1324,17 @@ function CategoryBotVsCccBarCard({
 
     return notes;
   }, [data, items.length]);
+
+  // Danh sách đích danh các chủ đề bị cắt. Chỉ nói "41 phiên bị loại" thì
+  // người đọc không tra được là chủ đề nào; liệt kê tên kèm số phiên để thấy
+  // ngay chủ đề nào đang bị chẻ nhỏ dưới ngưỡng.
+  const skippedTopics = useMemo(
+    () => [
+      ...(data?.skipped_low_volume_items ?? []),
+      ...(data?.skipped_beyond_limit_items ?? []),
+    ],
+    [data],
+  );
 
   return (
     <ChartCard
@@ -1454,11 +1523,17 @@ function CategoryBotVsCccBarCard({
         </dl>
       )}
 
-      {/* {skippedNotes.length > 0 && (
-        <p className="mt-2 text-[11px] italic leading-snug text-slate-500">
-          Đã loại khỏi biểu đồ: {skippedNotes.join(" · ")}.
-        </p>
-      )} */}
+      <SkippedItemsNote
+        summary={
+          skippedNotes.length > 0
+            ? `Biểu đồ chỉ vẽ ${items.length} chủ đề có từ ${data?.min_volume} phiên trở lên. Đã loại: ${skippedNotes.join(" · ")}.`
+            : ""
+        }
+        items={skippedTopics.map((topic) => ({
+          name: topic.name,
+          value: topic.total,
+        }))}
+      />
     </ChartCard>
   );
 }
@@ -1657,9 +1732,11 @@ function CustomYAxisReasonTick({ x, y, payload, width }: any) {
 function TopReasonHorizontalBarCard({
   data,
   multiPeriodData,
+  skipped,
 }: {
   data?: any[] | null;
   multiPeriodData?: CccMultiMonthTopicsData | null;
+  skipped?: Array<{ name: string; value: number }> | null;
 }) {
   // Mặc định xem theo kỳ để khớp mốc đang chọn trên thanh công cụ; muốn xem
   // xếp hạng gộp cả kỳ thì bấm nút chuyển.
@@ -1824,6 +1901,15 @@ function TopReasonHorizontalBarCard({
       {viewMode === "TIME" && !selectedPeriod && (
         <CategoryCodeLegend items={topicCodes.legend} />
       )}
+
+      <SkippedItemsNote
+        summary={
+          (skipped?.length ?? 0) > 0
+            ? `Biểu đồ chỉ vẽ ${defaultChartData.length} chủ đề nhiều nhất. Đã loại ${skipped!.reduce((sum, item) => sum + item.value, 0)} lượt thuộc ${skipped!.length} chủ đề còn lại.`
+            : ""
+        }
+        items={skipped ?? []}
+      />
     </ChartCard>
   );
 }
@@ -1883,7 +1969,7 @@ function ChannelPerformanceBarCard({
       title="📊 SO SÁNH CÁC NỀN TẢNG KHÁCH HAY NHẮN)"
       description={
         viewMode === "DEFAULT"
-          ? "Đánh giá kịch bản Chatbot hoạt động tốt nhất trên kênh giao tiếp nào"
+          ? "Đánh giá kịch bản Chatbot hoạt động tốt nhất trên kênh giao tiếp nào — cột xám là TỔNG phiên của kênh, hai cột màu chỉ là 2 trong 6 nhóm xử lý"
           : "Trục hoành: Các kênh giao tiếp | Số phiên theo thời gian (phụ thuộc bộ lọc)"
       }
       headerRight={
@@ -1921,6 +2007,26 @@ function ChannelPerformanceBarCard({
                 />
                 <Tooltip content={<ValueTooltip />} />
                 <Legend verticalAlign="top" align="right" wrapperStyle={{ fontSize: 11, paddingBottom: 8 }} />
+                {/* Cột tổng phải có mặt: hai cột bot/ccc chỉ là 2 trong 6 nhóm
+                    xử lý, cộng lại không bao giờ ra bằng thẻ KPI "Tổng tiếp
+                    nhận" — thiếu nó thì người đọc tưởng số liệu sai. */}
+                <Bar
+                  dataKey="total"
+                  name="Tổng phiên"
+                  fill="#cbd5e1"
+                  radius={[4, 4, 0, 0]}
+                  barSize={22}
+                  isAnimationActive={false}
+                >
+                  <LabelList
+                    dataKey="total"
+                    position="top"
+                    style={{ fontSize: 9, fill: "#64748b", fontWeight: 700 }}
+                    formatter={(val: any) =>
+                      val && Number(val) > 0 ? val : ""
+                    }
+                  />
+                </Bar>
                 <Bar
                   dataKey="bot_done"
                   name="Bot xử lý (phiên)"
@@ -2369,7 +2475,13 @@ function SessionDurationCard({
 /* ====================================================================
  * 📋 8. TOP CÂU HỎI PHỔ BIẾN (TABLE)
  * ==================================================================== */
-function TopFaqTableCard({ faqs }: { faqs?: ChatbotFaqItem[] | null }) {
+function TopFaqTableCard({
+  faqs,
+  skipped,
+}: {
+  faqs?: ChatbotFaqItem[] | null;
+  skipped?: Array<{ name: string; value: number }> | null;
+}) {
   const list = useMemo(() => {
     if (Array.isArray(faqs) && faqs.length > 0) return faqs;
     return [];
@@ -2424,6 +2536,15 @@ function TopFaqTableCard({ faqs }: { faqs?: ChatbotFaqItem[] | null }) {
           </tbody>
         </table>
       </div>
+
+      <SkippedItemsNote
+        summary={
+          (skipped?.length ?? 0) > 0
+            ? `Bảng chỉ liệt kê ${list.length} câu hỏi nhiều lượt nhất. Còn ${skipped!.length} câu hỏi khác với ${skipped!.reduce((sum, item) => sum + item.value, 0)} lượt.`
+            : ""
+        }
+        items={skipped ?? []}
+      />
     </ChartCard>
   );
 }
@@ -2659,10 +2780,12 @@ function IssueTrendOverTimeChartCard({
 export function ChatbotDashboardCharts({
   charts,
   faqs,
+  topFaqsSkipped,
   onlyTrendChart = false,
 }: {
   charts: ChatbotOverviewCharts;
   faqs?: ChatbotFaqItem[];
+  topFaqsSkipped?: Array<{ name: string; value: number }>;
   onlyTrendChart?: boolean;
 }) {
   if (onlyTrendChart) {
@@ -2723,6 +2846,7 @@ export function ChatbotDashboardCharts({
         <TopReasonHorizontalBarCard
           data={charts.top_reasons}
           multiPeriodData={charts.top_reasons_multi_period}
+          skipped={charts.top_reasons_skipped}
         />
         <CategoryBotVsCccBarCard
           data={charts.category_bot_vs_ccc}
@@ -2736,7 +2860,7 @@ export function ChatbotDashboardCharts({
           data={charts.channel_performance}
           multiPeriodData={charts.channel_performance_multi_period}
         />
-        <TopFaqTableCard faqs={faqs} />
+        <TopFaqTableCard faqs={faqs} skipped={topFaqsSkipped} />
         <QuestionTypeBarCard
           data={charts.question_type_bar}
           multiPeriodData={charts.question_type_multi_period}
