@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.core.management.base import BaseCommand
+from django.db import transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
@@ -178,59 +179,60 @@ class Command(BaseCommand):
         sessions = set()
         max_dt = cursor.last_synced_at
 
-        for row in rows:
-            external_id = get_value(row, "id", "external_id")
+        with transaction.atomic():
+            for row in rows:
+                external_id = get_value(row, "id", "external_id")
 
-            if external_id is None:
-                continue
-
-            # Dòng chat không có cả câu hỏi lẫn câu trả lời thì không phải một
-            # lượt trò chuyện — bỏ để không sinh phiên rỗng trên dashboard.
-            if source.model is ChatbotChatLog and not (
-                get_value(row, "question") or get_value(row, "answer")
-            ):
-                continue
-
-            external_id = str(external_id)
-            session_id = get_session_id(row, source.session_keys)
-
-            if not session_id:
-                if not source.allow_orphan_session:
+                if external_id is None:
                     continue
 
-                session_id = f"{ORPHAN_SESSION_PREFIX}-{source.name}-{external_id}"
+                # Dòng chat không có cả câu hỏi lẫn câu trả lời thì không phải một
+                # lượt trò chuyện — bỏ để không sinh phiên rỗng trên dashboard.
+                if source.model is ChatbotChatLog and not (
+                    get_value(row, "question") or get_value(row, "answer")
+                ):
+                    continue
 
-            dt = parse_dt(get_value(row, *source.time_keys))
+                external_id = str(external_id)
+                session_id = get_session_id(row, source.session_keys)
 
-            # Nguồn nào đổ chung bảng thì source_name phải nằm trong khóa tra:
-            # id của xpro_chat_logs và chat_questions trùng dải nhau.
-            lookup = {"external_id": external_id}
+                if not session_id:
+                    if not source.allow_orphan_session:
+                        continue
 
-            if source.track_source:
-                lookup["source_name"] = source.name
+                    session_id = f"{ORPHAN_SESSION_PREFIX}-{source.name}-{external_id}"
 
-            source.model.objects.update_or_create(
-                **lookup,
-                defaults={
-                    "session_id": session_id,
-                    "user_id": get_value(row, *source.user_keys),
-                    "channel": get_value(row, "platform", "channel"),
-                    "external_created_at": dt,
-                    "raw_payload": row,
-                    **source.extra_fields(row),
-                },
-            )
+                dt = parse_dt(get_value(row, *source.time_keys))
 
-            sessions.add(session_id)
+                # Nguồn nào đổ chung bảng thì source_name phải nằm trong khóa tra:
+                # id của xpro_chat_logs và chat_questions trùng dải nhau.
+                lookup = {"external_id": external_id}
 
-            if dt:
-                if timezone.is_naive(dt):
-                    dt = timezone.make_aware(dt, timezone.get_current_timezone())
-                if max_dt and timezone.is_naive(max_dt):
-                    max_dt = timezone.make_aware(max_dt, timezone.get_current_timezone())
+                if source.track_source:
+                    lookup["source_name"] = source.name
 
-                if not max_dt or dt > max_dt:
-                    max_dt = dt
+                source.model.objects.update_or_create(
+                    **lookup,
+                    defaults={
+                        "session_id": session_id,
+                        "user_id": get_value(row, *source.user_keys),
+                        "channel": get_value(row, "platform", "channel"),
+                        "external_created_at": dt,
+                        "raw_payload": row,
+                        **source.extra_fields(row),
+                    },
+                )
+
+                sessions.add(session_id)
+
+                if dt:
+                    if timezone.is_naive(dt):
+                        dt = timezone.make_aware(dt, timezone.get_current_timezone())
+                    if max_dt and timezone.is_naive(max_dt):
+                        max_dt = timezone.make_aware(max_dt, timezone.get_current_timezone())
+
+                    if not max_dt or dt > max_dt:
+                        max_dt = dt
 
         self.save_cursor(cursor, max_dt, len(rows))
         self.stdout.write(f"{source.label}: {len(rows)}")
