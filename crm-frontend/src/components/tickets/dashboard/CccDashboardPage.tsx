@@ -26,7 +26,11 @@ import {
   CccPeriodControls,
 } from "@/components/common";
 import { ChartViewMode, GranularityMode, CompareMode } from "./CccDashboardUtils";
-import { useCccDashboard } from "@/hooks/useCccDashboard";
+import {
+  useCccDashboard,
+  getCurrentYearStart,
+  getCurrentDate,
+} from "@/hooks/useCccDashboard";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
 import { CccDashboardChartSkeleton } from "./CccDashboardChartSkeleton";
 import {
@@ -39,7 +43,12 @@ import { ekycApi } from "@/apis/ekyc.api";
 import { chatbotDashboardService } from "@/services/chatbot-dashboard.service";
 import { externalErrorService } from "@/services/external-error.service";
 import { surveyApi } from "@/apis/survey.api";
-import { defaultSurveyFilters } from "@/utils/survey-period.util";
+import {
+  currentPeriodCode,
+  defaultSurveyFilters,
+  type SurveyFilters,
+} from "@/utils/survey-period.util";
+import type { SurveyGranularity } from "@/types/survey.type";
 import { useExternalErrorDashboard } from "@/hooks/useExternalErrorDashboard";
 import { ExecutiveOverviewGrid } from "@/components/external-errors/ExternalErrorDashboardPage";
 
@@ -218,6 +227,9 @@ const SurveyDashboardSection = dynamic(
 );
 
 function SurveyDashboardWrapper({
+  dateFrom,
+  dateTo,
+  granularity,
   onlyTrendChart = false,
 }: {
   dateFrom?: string;
@@ -225,7 +237,24 @@ function SurveyDashboardWrapper({
   granularity: GranularityMode;
   onlyTrendChart?: boolean;
 }) {
-  const filters = defaultSurveyFilters("month");
+  const surveyGranularity: SurveyGranularity =
+    granularity === "QUARTER"
+      ? "quarter"
+      : granularity === "YEAR"
+      ? "year"
+      : "month";
+
+  const isDefaultRange =
+    !dateFrom ||
+    !dateTo ||
+    (dateFrom === getCurrentYearStart() && dateTo === getCurrentDate());
+
+  const filters: SurveyFilters = {
+    granularity: surveyGranularity,
+    period: isDefaultRange ? currentPeriodCode(surveyGranularity) : "",
+    startDate: isDefaultRange ? "" : dateFrom || "",
+    endDate: isDefaultRange ? "" : dateTo || "",
+  };
 
   return <SurveyDashboardSection filters={filters} onlyTrendChart={onlyTrendChart} />;
 }
@@ -1223,7 +1252,25 @@ export function CccDashboardPage() {
 
   const fetchMetrics = useCallback(async () => {
     try {
-      const surveyParams = { granularity: "month" as const, period: "" };
+      const surveyGranularity: SurveyGranularity =
+        granularity === "QUARTER"
+          ? "quarter"
+          : granularity === "YEAR"
+          ? "year"
+          : "month";
+
+      const isDefaultRange =
+        !dashboard.dateFrom ||
+        !dashboard.dateTo ||
+        (dashboard.dateFrom === getCurrentYearStart() &&
+          dashboard.dateTo === getCurrentDate());
+
+      const surveyParams = {
+        granularity: surveyGranularity,
+        period: isDefaultRange ? currentPeriodCode(surveyGranularity) : "",
+        start_date: isDefaultRange ? undefined : dashboard.dateFrom,
+        end_date: isDefaultRange ? undefined : dashboard.dateTo,
+      };
 
       const [ekycRes, chatbotRes, errorRes, surveyRes] = await Promise.allSettled([
         ekycApi.getDashboard({

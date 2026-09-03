@@ -45,7 +45,7 @@ const dashboardRequests = new Map<string, Promise<CccDashboardResponse>>();
 let masterDataCache: MasterDataCacheEntry | null = null;
 let masterDataRequest: Promise<MasterData> | null = null;
 
-function getCurrentYearStart() {
+export function getCurrentYearStart() {
   const now = new Date();
   const start = new Date(now.getFullYear(), now.getMonth() - 4, 1);
   const year = start.getFullYear();
@@ -53,7 +53,7 @@ function getCurrentYearStart() {
   return `${year}-${month}-01`;
 }
 
-function getCurrentDate() {
+export function getCurrentDate() {
   const now = new Date();
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, "0");

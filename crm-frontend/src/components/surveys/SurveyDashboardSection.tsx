@@ -191,7 +191,9 @@ export function SurveyDashboardSection({
       try {
         const result = await surveyApi.dashboard(JSON.parse(paramsKey));
 
-        if (!cancelled) setData(result);
+        if (!cancelled) {
+          setData(result);
+        }
       } catch (err) {
         if (!cancelled) {
           setError(getErrorMessage(err, "Không tải được số liệu khảo sát"));
