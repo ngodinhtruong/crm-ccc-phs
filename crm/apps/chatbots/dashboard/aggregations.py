@@ -5,8 +5,9 @@ from django.db.models.functions import ExtractHour
 
 from apps.chatbots.constants import (
     CUSTOMER_SENDER_TYPES,
+    ECHO_CATEGORY_VALUES,
+    NON_TOPIC_QUESTION_TYPES,
     QUESTION_TYPE_CUSTOMER_CARE,
-    NON_FAQ_QUESTION_TYPES,
     UNCATEGORIZED_LABEL,
     category_label,
     channel_label,
@@ -55,6 +56,41 @@ OUTCOME_SERIES = (
     (OUTCOME_SPAM, "spam", "Câu hỏi rác"),
     (OUTCOME_UNCLASSIFIED, "unclassified", "Chưa xác định loại"),
 )
+
+
+def only_topic_logs(queryset):
+    """
+    Giữ lại các lượt hỏi thật sự MANG chủ đề nghiệp vụ.
+
+    Nguồn chỉ gán chủ đề cho CUSTOMER_CARE. Với RESEARCH / GREETING /
+    UNRELATED, cột `category` được ghi bằng chính tên loại viết thường, nên
+    đọc nguyên si thì "research" thành một chủ đề và leo lên hạng 1 mọi bảng
+    xếp hạng, át hết chủ đề thật.
+
+    Lọc hai tầng vì hai tầng bắt hai loại lỗi khác nhau:
+      - theo questionType : chốt chặn chính, đúng với quy ước của nguồn.
+      - theo giá trị      : bắt dòng lệch quy ước (đã gặp dòng CUSTOMER_CARE
+                            mà category = "research").
+
+    Dùng ``iexact`` chứ không phải ``__in``: ``__in`` phân biệt hoa thường nên
+    một dòng ghi "research" viết thường sẽ lọt lưới.
+    """
+    non_topic_type = Q()
+
+    for code in NON_TOPIC_QUESTION_TYPES:
+        non_topic_type |= Q(questionType__iexact=code)
+
+    echo_category = Q()
+
+    for value in ECHO_CATEGORY_VALUES:
+        echo_category |= Q(category__iexact=value)
+
+    return (
+        queryset.exclude(category__isnull=True)
+        .exclude(category__exact="")
+        .exclude(non_topic_type)
+        .exclude(echo_category)
+    )
 
 
 def outcome_counts():
@@ -354,10 +390,8 @@ class ChatbotDashboardAggregator:
         )
 
     def _logs_with_category(self, only_customer_care=False):
-        """Lượt hỏi đã được chatbot gán chủ đề."""
-        logs = self._customer_logs().exclude(category__isnull=True).exclude(
-            category__exact=""
-        )
+        """Lượt hỏi đã được chatbot gán chủ đề nghiệp vụ."""
+        logs = only_topic_logs(self._customer_logs())
 
         if only_customer_care:
             logs = logs.filter(questionType__iexact=QUESTION_TYPE_CUSTOMER_CARE)
@@ -1140,9 +1174,7 @@ class ChatbotDashboardAggregator:
     # ------------------------------------------------------------------
     def _top_faqs(self, limit=5):
         return list(
-            self.logs.exclude(questionType__in=NON_FAQ_QUESTION_TYPES)
-            .exclude(category__isnull=True)
-            .exclude(category__exact="")
+            self._logs_with_category()
             .values("category")
             .annotate(
                 hit_count=Count("id"),

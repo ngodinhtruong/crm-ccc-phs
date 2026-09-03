@@ -10,6 +10,7 @@ from apps.chatbots.constants import (
     category_label,
     is_customer_sender,
     is_customer_turn,
+    has_topic,
     is_faq_question,
     is_research_question,
     is_spam_question,
@@ -137,7 +138,12 @@ def build_full_conversation(logs):
 def pick_session_category(logs):
     """
     Chủ đề của phiên = category được hỏi nhiều nhất trong phiên.
-    Bỏ qua câu hỏi rác và các dòng chatbot chưa gán category.
+
+    Chỉ tính lượt CÓ chủ đề: nguồn chỉ gán chủ đề nghiệp vụ cho CUSTOMER_CARE,
+    còn RESEARCH / GREETING / UNRELATED thì ghi chính tên loại vào cột
+    category. Không lọc thì phiên phân tích cổ phiếu mang "chủ đề" là
+    "research" và leo lên biểu đồ so sánh bot vs CCC như một chủ đề thật.
+
     Hòa phiếu thì lấy category xuất hiện gần nhất.
     """
     counter = defaultdict(int)
@@ -148,7 +154,7 @@ def pick_session_category(logs):
         if not is_customer_turn(log):
             continue
 
-        if is_spam_question(log.questionType):
+        if not has_topic(log.questionType):
             continue
 
         category = normalize_category(log.category)
