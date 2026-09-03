@@ -1,6 +1,6 @@
 """Các truy vấn aggregate nhỏ, độc lập theo section của dashboard chatbot."""
 
-from django.db.models import Count, Max, Q, Subquery, Sum
+from django.db.models import Count, Max, Min, Q, Subquery, Sum
 from django.db.models.functions import ExtractHour
 
 from apps.chatbots.constants import (
@@ -190,6 +190,21 @@ class ChatbotDashboardAggregator:
         )
 
         window_lo, window_hi = series_bounds(granularity, *self.focus_bounds)
+
+        # Không lọc ngày thì focus_bounds rỗng, mà iter_periods bỏ qua khoảng
+        # mở — hai biểu đồ chuỗi thời gian sẽ trắng trơn thay vì vẽ đủ dữ liệu.
+        # Suy khoảng từ chính dữ liệu để "không lọc" nghĩa là "xem tất cả".
+        if window_lo is None or window_hi is None:
+            span = self.series_summaries.filter(started_at__isnull=False).aggregate(
+                data_lo=Min("started_at"), data_hi=Max("started_at")
+            )
+
+            if span["data_lo"] and span["data_hi"]:
+                if window_lo is None:
+                    window_lo = span["data_lo"]
+                if window_hi is None:
+                    window_hi = period_bounds(granularity, span["data_hi"])[1]
+
         rows = []
 
         for period in iter_periods(granularity, window_lo, window_hi):
@@ -954,6 +969,79 @@ class ChatbotDashboardAggregator:
 
         return rows
 
+    # Mốc chia nhóm độ dài phiên. Tách riêng 1 và 2 lượt vì đó là phần lớn
+    # lưu lượng: gộp chung vào "1-5" sẽ giấu mất việc quá nửa số phiên chỉ có
+    # đúng một câu hỏi rồi thôi.
+    SESSION_LENGTH_BUCKETS = (
+        (1, "1 lượt"),
+        (2, "2 lượt"),
+        (5, "3-5 lượt"),
+        (10, "6-10 lượt"),
+        (None, "trên 10 lượt"),
+    )
+
+    def _session_length(self):
+        """
+        Độ dài một phiên tính bằng số lượt tin nhắn.
+
+        Trả kèm cả trung bình lẫn TRUNG VỊ vì hai con số này lệch nhau rất xa:
+        vài phiên dài hàng chục lượt kéo trung bình lên trong khi quá nửa số
+        phiên chỉ có một lượt. Đọc mỗi trung bình sẽ tưởng khách trao đổi qua
+        lại nhiều, nên biểu đồ phải bày cả phân bố.
+        """
+        counts = list(self.summaries.values_list("msg_count_total", flat=True))
+        total_sessions = len(counts)
+        total_messages = sum(counts)
+
+        buckets = {label: 0 for _bound, label in self.SESSION_LENGTH_BUCKETS}
+
+        for value in counts:
+            for bound, label in self.SESSION_LENGTH_BUCKETS:
+                if bound is None or value <= bound:
+                    buckets[label] += 1
+                    break
+
+        by_channel = {}
+
+        for channel, value in self.summaries.values_list("channel", "msg_count_total"):
+            item = by_channel.setdefault(
+                channel_label(channel), {"sessions": 0, "messages": 0}
+            )
+            item["sessions"] += 1
+            item["messages"] += value or 0
+
+        return {
+            "avg_messages": round(total_messages / total_sessions, 2)
+            if total_sessions
+            else 0.0,
+            "median_messages": self._median(counts),
+            "total_sessions": total_sessions,
+            "total_messages": total_messages,
+            # Giữ đúng thứ tự mốc, không sắp theo số lượng: đây là phân bố,
+            # đọc từ phiên ngắn sang phiên dài mới thấy được hình dạng.
+            "distribution": [
+                {
+                    "name": label,
+                    "value": buckets[label],
+                    "rate": self.rate(buckets[label], total_sessions, digits=1),
+                }
+                for _bound, label in self.SESSION_LENGTH_BUCKETS
+            ],
+            "by_channel": sorted(
+                (
+                    {
+                        "name": name,
+                        "value": round(item["messages"] / item["sessions"], 2),
+                        "session_count": item["sessions"],
+                        "message_count": item["messages"],
+                    }
+                    for name, item in by_channel.items()
+                    if item["sessions"]
+                ),
+                key=lambda item: -item["value"],
+            ),
+        }
+
     def build_traffic_section(self, granularity="day"):
         channels = {}
 
@@ -970,6 +1058,7 @@ class ChatbotDashboardAggregator:
                     )
                 ],
                 "time_series_outcomes": self._time_series_rows(granularity),
+                "session_length": self._session_length(),
             }
         }
 

@@ -30,6 +30,7 @@ import {
 import type {
   CategoryBotVsCccByPeriodData,
   CategoryBotVsCccData,
+  SessionLengthData,
   CategoryCccRateItem,
   CccMultiMonthTopicsData,
   ChannelPerformanceItem,
@@ -1159,6 +1160,157 @@ function BotVsCccPeriodTooltip({ active, payload, label }: any) {
   );
 }
 
+/* ====================================================================
+ * 📏 ĐỘ DÀI TRUNG BÌNH MỘT PHIÊN
+ * ==================================================================== */
+/**
+ * Trung bình + trung vị số lượt mỗi phiên, kèm phân bố.
+ *
+ * Chỉ hiện trung bình sẽ gây hiểu sai: vài phiên dài hàng chục lượt kéo nó lên
+ * trong khi quá nửa số phiên chỉ có một câu hỏi rồi thôi. Vì vậy đặt trung vị
+ * ngay cạnh trung bình, và mặc định mở ở tab phân bố chứ không phải tab so
+ * sánh nền tảng.
+ */
+function SessionLengthChartCard({ data }: { data?: SessionLengthData | null }) {
+  const [viewMode, setViewMode] = useState<"DISTRIBUTION" | "CHANNEL">(
+    "DISTRIBUTION",
+  );
+
+  const isDistribution = viewMode === "DISTRIBUTION";
+
+  // Hai nguồn có shape khác nhau (rate vs session_count) nên đưa về cùng một
+  // kiểu trước khi giao cho recharts, tránh union type ở dataKey.
+  const rows = useMemo<Array<{ name: string; value: number }>>(() => {
+    if (!data) return [];
+
+    return isDistribution
+      ? data.distribution.map((item) => ({ name: item.name, value: item.value }))
+      : data.by_channel.map((item) => ({ name: item.name, value: item.value }));
+  }, [data, isDistribution]);
+
+  const stats = [
+    {
+      label: "Trung bình",
+      value: `${formatNumber(data?.avg_messages ?? 0)} lượt`,
+      tone: "text-slate-900",
+    },
+    {
+      label: "Trung vị",
+      value: `${formatNumber(data?.median_messages ?? 0)} lượt`,
+      tone: "text-[#00713d]",
+    },
+    {
+      label: "Tổng phiên",
+      value: formatNumber(data?.total_sessions ?? 0),
+      tone: "text-slate-900",
+    },
+    {
+      label: "Tổng lượt",
+      value: formatNumber(data?.total_messages ?? 0),
+      tone: "text-slate-900",
+    },
+  ];
+
+  return (
+    <ChartCard
+      title="📏 Độ dài trung bình một phiên"
+      description={
+        isDistribution
+          ? "Mỗi cột là số phiên có độ dài tương ứng — xem khách hỏi bao nhiêu câu rồi dừng"
+          : "Trung bình số lượt mỗi phiên trên từng nền tảng"
+      }
+      headerRight={
+        <div className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-100 p-0.5 shadow-2xs">
+          {(["DISTRIBUTION", "CHANNEL"] as const).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => setViewMode(mode)}
+              className={`cursor-pointer rounded-md px-2.5 py-1 text-xs font-bold transition-all ${
+                viewMode === mode
+                  ? "bg-[#10b981] text-white shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              {mode === "DISTRIBUTION" ? "Phân bố" : "Theo nền tảng"}
+            </button>
+          ))}
+        </div>
+      }
+    >
+      <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {stats.map((item) => (
+          <div
+            key={item.label}
+            className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2"
+          >
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+              {item.label}
+            </p>
+            <p className={`text-lg font-bold ${item.tone}`}>{item.value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="h-[280px]">
+        {rows.length === 0 ? (
+          <EmptyState message="Chưa có phiên nào trong khoảng đang lọc." />
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              data={rows}
+              margin={{ top: 25, right: 20, left: -10, bottom: 5 }}
+              barCategoryGap="20%"
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis
+                dataKey="name"
+                interval={0}
+                tick={{ fontSize: 11, fontWeight: 700, fill: "#334155" }}
+              />
+              <YAxis
+                tick={{ fontSize: 11, fill: "#64748b" }}
+                allowDecimals={!isDistribution}
+              />
+              <Tooltip content={<ValueTooltip />} cursor={{ fill: "#f8fafc" }} />
+              <Bar
+                dataKey="value"
+                name={isDistribution ? "Số phiên" : "TB lượt/phiên"}
+                fill="#00713d"
+                radius={[4, 4, 0, 0]}
+                isAnimationActive={false}
+              >
+                <LabelList
+                  dataKey="value"
+                  position="top"
+                  style={{ fontSize: 11, fontWeight: 700, fill: "#059669" }}
+                  formatter={hideZeroLabel}
+                />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+
+      <p className="mt-2.5 border-t border-slate-100 pt-2 text-[11px] leading-snug text-slate-500">
+        {isDistribution ? (
+          <>
+            Trung bình <strong className="text-slate-800">{formatNumber(data?.avg_messages ?? 0)}</strong>{" "}
+            lượt nhưng trung vị chỉ{" "}
+            <strong className="text-slate-800">{formatNumber(data?.median_messages ?? 0)}</strong>{" "}
+            — phần lớn phiên rất ngắn, số trung bình bị một nhóm nhỏ phiên dài kéo lên.
+          </>
+        ) : (
+          <>
+            Nền tảng ít phiên có thể cho trung bình rất cao mà không đại diện cho
+            xu hướng chung — luôn đọc kèm số phiên trong chú giải.
+          </>
+        )}
+      </p>
+    </ChartCard>
+  );
+}
+
 /**
  * Ghi chú phần dữ liệu KHÔNG lên biểu đồ, kèm nút bung danh sách chi tiết.
  *
@@ -1341,7 +1493,7 @@ function CategoryBotVsCccBarCard({
       title={
         activeTopic
           ? `📊 Bot Tự xử lý vs Chuyển CCC — ${topicCodeByLabel.get(activeTopic) ?? ""}. ${activeTopic}`
-          : "📊 Bot Tự xử lý vs Chuyển CCC theo Chủ đề"
+          : "📊 TOP Bot Tự xử lý vs Chuyển CCC theo Chủ đề"
       }
       description={
         activeTopic
@@ -2865,6 +3017,7 @@ export function ChatbotDashboardCharts({
           data={charts.question_type_bar}
           multiPeriodData={charts.question_type_multi_period}
         />
+        <SessionLengthChartCard data={charts.session_length} />
         {/* Thẻ "Thời lượng Phiên theo Nền tảng" tạm ẩn — nghiệp vụ chưa dùng
             tới. Component SessionDurationCard và API vẫn còn nguyên, bật lại
             chỉ cần bỏ chú thích khối dưới đây.

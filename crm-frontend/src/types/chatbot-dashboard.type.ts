@@ -190,6 +190,28 @@ export type CategoryBotVsCccItem = {
   ccc_rate: number;
 };
 
+/**
+ * Độ dài một phiên tính bằng số lượt tin nhắn.
+ *
+ * Có cả `avg_messages` lẫn `median_messages` vì hai con số lệch nhau rất xa —
+ * vài phiên dài kéo trung bình lên trong khi quá nửa số phiên chỉ có 1 lượt.
+ */
+export type SessionLengthData = {
+  avg_messages: number;
+  median_messages: number;
+  total_sessions: number;
+  total_messages: number;
+  /** Phân bố theo mốc độ dài, giữ đúng thứ tự ngắn → dài. */
+  distribution: Array<{ name: string; value: number; rate: number }>;
+  /** Trung bình lượt/phiên của từng nền tảng, sắp giảm dần. */
+  by_channel: Array<{
+    name: string;
+    value: number;
+    session_count: number;
+    message_count: number;
+  }>;
+};
+
 /** Một chủ đề bị cắt khỏi biểu đồ, kèm số phiên của nó. */
 export type CategorySkippedTopic = {
   name: string;
@@ -333,6 +355,7 @@ export type ChatbotOverviewResponse = {
     chat_funnel?: FunnelStepItem[];
     hourly_peak?: HourlyPeakItem[];
     hourly_peak_multi_period?: HourlyPeakByPeriodData;
+    session_length?: SessionLengthData;
     top_reasons?: ChartItem[];
     /** Chủ đề rơi ngoài top của `top_reasons`, để ghi chú dưới biểu đồ. */
     top_reasons_skipped?: ChartItem[];
