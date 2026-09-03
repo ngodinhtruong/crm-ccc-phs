@@ -409,6 +409,7 @@ def rebuild_chatbot_session_summaries(affected_session_ids=None):
                     request.channel if request else "",
                     state.channel if state else "",
                     first_log.channel if first_log else "",
+                    "ZALO" if first_log and first_log.source_name == "chat_questions" else "XPRO" if first_log else "",
                 ),
                 "dashboard_category": pick_session_category(logs),
                 "outcome_type": outcome,
