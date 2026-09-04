@@ -1161,7 +1161,7 @@ function BotVsCccPeriodTooltip({ active, payload, label }: any) {
 }
 
 /* ====================================================================
- * 📏 ĐỘ DÀI TRUNG BÌNH MỘT PHIÊN
+ * 📏 trung bình số lượt câu hỏi trong 1 phiên
  * ==================================================================== */
 /**
  * Trung bình + trung vị số lượt mỗi phiên, kèm phân bố.
@@ -1213,7 +1213,7 @@ function SessionLengthChartCard({ data }: { data?: SessionLengthData | null }) {
 
   return (
     <ChartCard
-      title="📏 Độ dài trung bình một phiên"
+      title="📏 Trung bình số lượt câu hỏi trong 1 phiên"
       description={
         isDistribution
           ? "Mỗi cột là số phiên có độ dài tương ứng — xem khách hỏi bao nhiêu câu rồi dừng"
