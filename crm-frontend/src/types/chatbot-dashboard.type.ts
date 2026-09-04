@@ -167,6 +167,12 @@ export type CccMultiMonthTopicsData = {
   month_labels: string[];
   top_categories: string[];
   data_by_category: Array<Record<string, any>>;
+  /**
+   * Số nhóm bị gom vào cột "Khác". Biểu đồ chỉ vẽ top N nhóm; phần đuôi được
+   * cộng dồn chứ không bị bỏ, nên tổng của biểu đồ luôn khớp số liệu gốc.
+   */
+  other_group_count?: number;
+  other_group_label?: string;
 };
 
 export type CategoryCccRateItem = {
@@ -185,11 +191,42 @@ export type CategoryBotVsCccItem = {
 };
 
 /**
+ * Độ dài một phiên tính bằng số lượt tin nhắn.
+ *
+ * Có cả `avg_messages` lẫn `median_messages` vì hai con số lệch nhau rất xa —
+ * vài phiên dài kéo trung bình lên trong khi quá nửa số phiên chỉ có 1 lượt.
+ */
+export type SessionLengthData = {
+  avg_messages: number;
+  median_messages: number;
+  total_sessions: number;
+  total_messages: number;
+  /** Phân bố theo mốc độ dài, giữ đúng thứ tự ngắn → dài. */
+  distribution: Array<{ name: string; value: number; rate: number }>;
+  /** Trung bình lượt/phiên của từng nền tảng, sắp giảm dần. */
+  by_channel: Array<{
+    name: string;
+    value: number;
+    session_count: number;
+    message_count: number;
+  }>;
+};
+
+/** Một chủ đề bị cắt khỏi biểu đồ, kèm số phiên của nó. */
+export type CategorySkippedTopic = {
+  name: string;
+  total: number;
+};
+
+/**
  * So sánh bot tự xử lý với chuyển CCC trên cùng một chủ đề.
  *
  * Các trường `skipped_*` là số phiên KHÔNG nằm trong `items` — phiên chưa gán
  * chủ đề, chủ đề dưới ngưỡng `min_volume`, và chủ đề rơi ngoài top. Frontend
  * ghi chú các con số này dưới biểu đồ để người xem biết phần bị cắt.
+ *
+ * Hai mảng `skipped_*_items` liệt kê đích danh tên chủ đề và số phiên, để ghi
+ * chú nói rõ "chủ đề nào" thay vì chỉ một con số tổng không tra được.
  */
 export type CategoryBotVsCccData = {
   items: CategoryBotVsCccItem[];
@@ -197,6 +234,8 @@ export type CategoryBotVsCccData = {
   skipped_uncategorized: number;
   skipped_low_volume: number;
   skipped_beyond_limit: number;
+  skipped_low_volume_items?: CategorySkippedTopic[];
+  skipped_beyond_limit_items?: CategorySkippedTopic[];
 };
 
 /**
@@ -316,7 +355,10 @@ export type ChatbotOverviewResponse = {
     chat_funnel?: FunnelStepItem[];
     hourly_peak?: HourlyPeakItem[];
     hourly_peak_multi_period?: HourlyPeakByPeriodData;
+    session_length?: SessionLengthData;
     top_reasons?: ChartItem[];
+    /** Chủ đề rơi ngoài top của `top_reasons`, để ghi chú dưới biểu đồ. */
+    top_reasons_skipped?: ChartItem[];
     top_reasons_multi_period?: CccMultiMonthTopicsData;
     channel_performance?: ChannelPerformanceItem[];
     channel_performance_multi_period?: CccMultiMonthTopicsData;
@@ -328,6 +370,8 @@ export type ChatbotOverviewResponse = {
     /** Tổng số ticket chưa tiếp nhận trên toàn hàng chờ. */
     pending_ticket_total?: number;
     top_faqs: ChatbotFaqItem[];
+    /** Câu hỏi rơi ngoài top của `top_faqs`, để ghi chú dưới bảng. */
+    top_faqs_skipped?: ChartItem[];
   };
 };
 

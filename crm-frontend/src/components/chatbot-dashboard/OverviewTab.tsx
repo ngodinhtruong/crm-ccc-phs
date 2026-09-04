@@ -19,6 +19,7 @@ export function OverviewTab({
       <ChatbotDashboardCharts
         charts={overview.charts}
         faqs={overview.quick_lists?.top_faqs}
+        topFaqsSkipped={overview.quick_lists?.top_faqs_skipped}
         onlyTrendChart={onlyTrendChart}
       />
     </div>
