@@ -321,6 +321,7 @@ def rebuild_chatbot_session_summaries(affected_session_ids=None):
         # is_customer_turn() đọc cột này; thiếu ở đây là mỗi dòng log sinh
         # thêm một query phụ khi rebuild.
         "sender_type",
+        "source_name",
         "external_created_at",
     ).order_by("external_created_at", "id")
 
