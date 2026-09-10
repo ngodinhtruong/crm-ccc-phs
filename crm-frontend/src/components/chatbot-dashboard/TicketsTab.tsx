@@ -1,5 +1,7 @@
-import { Search, Eye } from "lucide-react";
+import { useState } from "react";
+import { Search, Eye, Download } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { ExportChatbotModal } from "@/components/chatbot-dashboard/ExportChatbotModal";
 
 import { StatusPill } from "@/components/chatbot-dashboard/StatusPill";
 import {
@@ -56,6 +58,7 @@ export function TicketsTab({
   ) => void;
   hasColumnFilter: boolean;
 }) {
+  const [exportModalOpen, setExportModalOpen] = useState(false);
   const set =
     (key: ChatbotTicketColumnFilterKey) => (value: string) =>
       onColumnFilterChange(key, value);
@@ -107,6 +110,16 @@ export function TicketsTab({
             Tổng: <span className="font-bold text-slate-800">{count}</span> phiên
           </div>
 
+          <button
+            type="button"
+            onClick={() => setExportModalOpen(true)}
+            className="flex h-7 items-center gap-1.5 rounded-md border border-teal-600/30 bg-teal-50 px-2.5 text-xs font-semibold text-teal-700 hover:bg-teal-100 transition"
+            title="Xuất dữ liệu Excel / CSV"
+          >
+            <Download size={13} />
+            Xuất Excel/CSV
+          </button>
+
           {hasFilter && (
             <button
               type="button"
@@ -116,6 +129,17 @@ export function TicketsTab({
               Xóa lọc
             </button>
           )}
+
+          <ExportChatbotModal
+            isOpen={exportModalOpen}
+            onClose={() => setExportModalOpen(false)}
+            currentFilters={{
+              status: status !== "CCC" ? status : undefined,
+              dashboard_category: category,
+              q: keyword,
+              ...columnFilters,
+            }}
+          />
         </div>
       </div>
 

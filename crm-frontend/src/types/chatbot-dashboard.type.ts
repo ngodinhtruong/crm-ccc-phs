@@ -437,3 +437,18 @@ export type FaqListParams = ChatbotDashboardFilters & {
   page?: number;
   page_size?: number;
 };
+
+export type ChatbotExportParams = TicketListParams & {
+  export_format?: "excel" | "csv";
+  export_source?: "db" | "filtered";
+  export_mode?: "formatted" | "raw_db" | string;
+  raw_db?: boolean | string;
+  group_by?: "none" | "category" | "outcome" | "channel" | "date" | string;
+  selected_group_values?: string;
+  channels?: string;
+  outcomes?: string;
+  categories?: string;
+  ticket_statuses?: string;
+  columns?: string;
+};
+

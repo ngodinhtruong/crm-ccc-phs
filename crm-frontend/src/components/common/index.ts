@@ -1,3 +1,4 @@
+export { DatePickerInput } from "./DatePickerInput";
 export { DateRangeFilter } from "./DateRangeFilter";
 export { FilterSelect } from "./FilterSelect";
 export { FilterTextInput } from "./FilterTextInput";

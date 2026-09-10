@@ -1,6 +1,7 @@
 from django.urls import path
 
 from apps.chatbots.views import (
+    ChatbotDashboardExportAPIView,
     ChatbotDashboardFAQAPIView,
     ChatbotDashboardOverviewAPIView,
     ChatbotDashboardTicketsAPIView,
@@ -24,6 +25,11 @@ urlpatterns = [
         "dashboard/faqs/",
         ChatbotDashboardFAQAPIView.as_view(),
         name="chatbot-dashboard-faqs",
+    ),
+    path(
+        "dashboard/export/",
+        ChatbotDashboardExportAPIView.as_view(),
+        name="chatbot-dashboard-export",
     ),
     path(
         "dashboard/sessions/<str:session_id>/",

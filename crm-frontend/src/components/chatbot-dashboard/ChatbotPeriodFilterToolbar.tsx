@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Bot, RefreshCw, SlidersHorizontal, X } from "lucide-react";
+import { Bot, Download, RefreshCw, SlidersHorizontal, X } from "lucide-react";
 import { CccPeriodControls, DateRangeFilter } from "@/components/common";
+import { ExportChatbotModal } from "@/components/chatbot-dashboard/ExportChatbotModal";
 import { GranularityMode } from "@/components/tickets/dashboard/CccDashboardUtils";
 import type { ChatbotDashboardFilters, GranularityChoice } from "@/types/chatbot-dashboard.type";
 
@@ -24,6 +25,7 @@ export function ChatbotPeriodFilterToolbar({
   onReload: () => void;
 }) {
   const [filterOpen, setFilterOpen] = useState(false);
+  const [exportModalOpen, setExportModalOpen] = useState(false);
 
   // Map effective / filter granularity to CCC GranularityMode ("MONTH" | "QUARTER" | "YEAR")
   const currentGranularityMode: GranularityMode =
@@ -138,6 +140,17 @@ export function ChatbotPeriodFilterToolbar({
           </div>
         )}
 
+        {/* Export Excel / CSV Button */}
+        <button
+          type="button"
+          onClick={() => setExportModalOpen(true)}
+          className="flex h-8 items-center gap-1.5 rounded-lg border border-teal-600/30 bg-teal-50 px-3 text-xs font-semibold text-teal-700 hover:bg-teal-100 transition-all"
+          title="Xuất dữ liệu Excel / CSV"
+        >
+          <Download size={14} />
+          Xuất Excel / CSV
+        </button>
+
         {/* Reload Button */}
         <button
           type="button"
@@ -148,7 +161,15 @@ export function ChatbotPeriodFilterToolbar({
           <RefreshCw size={14} />
           Làm mới
         </button>
+
+        {/* Modal Export */}
+        <ExportChatbotModal
+          isOpen={exportModalOpen}
+          onClose={() => setExportModalOpen(false)}
+          currentFilters={filters}
+        />
       </div>
     </div>
   );
 }
+

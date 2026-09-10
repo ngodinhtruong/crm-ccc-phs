@@ -2,6 +2,7 @@ import api from "@/apis/axios-client";
 import { cleanParams } from "@/utils/api-param.util";
 import {
   ChatbotDashboardFilters,
+  ChatbotExportParams,
   ChatbotFaqItem,
   ChatbotOverviewResponse,
   ChatbotSessionDetail,
@@ -58,6 +59,28 @@ export const chatbotDashboardApi = {
 
     return response.data;
   },
+
+  exportData: async (params: ChatbotExportParams = {}): Promise<void> => {
+    const format = params.export_format || "excel";
+    const response = await api.get("/api/chatbots/dashboard/export/", {
+      params: cleanParams(params),
+      responseType: "blob",
+    });
+
+    const extension = format === "csv" ? "csv" : "xlsx";
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
+    const filename = `Chatbot_Export_${dateStr}.${extension}`;
+
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  },
 };
 
-export const chatbotDashboardService = chatbotDashboardApi;
+export const chatbotDashboardService = chatbotDashboardApi;
