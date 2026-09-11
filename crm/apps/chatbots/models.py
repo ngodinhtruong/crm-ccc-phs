@@ -28,6 +28,21 @@ class ChatbotChatLog(TimeStampedModel):
     answer = models.TextField(null=True, blank=True)
     questionType = models.CharField(max_length=100, null=True, blank=True)
     category = models.CharField(max_length=100, null=True, blank=True)
+    # Mã chủ đề của chatbot. Nguồn ghi cột `category` lúc thì là chuỗi thuần,
+    # lúc thì là JSON có kèm id; tách sẵn ra đây để phía sau không phải parse
+    # lại, và để ánh xạ sang danh mục CRM theo mã thay vì theo tên có dấu.
+    category_id = models.IntegerField(null=True, blank=True, db_index=True)
+
+    # ── Cột nguồn mới (xpro_chat_UAT); nguồn cũ để trống ──
+    language = models.CharField(max_length=10, null=True, blank=True)
+    # Vấn đề của khách, do chatbot tóm tắt lại. Đây là thứ CCC cần đọc đầu
+    # tiên, và là tiêu đề ticket khi phiên chuyển CCC.
+    issue = models.TextField(null=True, blank=True)
+    # Lượt này có phát sinh vấn đề cần người xử lý không.
+    is_issue_occurrence = models.BooleanField(null=True, blank=True)
+    # Quan hệ với vấn đề của lượt trước: NEW_TOPIC / SAME_ISSUE /
+    # FOLLOW_UP_NEW_ISSUE / CONTEXTUAL_REPLY / CUSTOMER_INFO_COLLECTED.
+    relation_issue = models.CharField(max_length=50, null=True, blank=True)
 
     # ── Chỉ nguồn chat_questions (Zalo) điền; xpro_chat_logs để trống ──
     # Ai gửi tin này: customer / bot / sa. Trống nghĩa là dòng xpro, tức là
@@ -71,6 +86,14 @@ class ChatbotState(TimeStampedModel):
     step = models.CharField(max_length=100, null=True, blank=True)
     reason = models.TextField(null=True, blank=True)
 
+    # ── Cột nguồn mới (cskh_state_UAT); nguồn cũ để trống ──
+    category = models.CharField(max_length=255, null=True, blank=True)
+    category_id = models.IntegerField(null=True, blank=True)
+    language = models.CharField(max_length=10, null=True, blank=True)
+    # Câu chatbot đã trả lời khách khi xin thông tin. Nguồn viết sai chính tả
+    # tên cột ("reponse"); đọc theo cả hai cách, lưu về đúng tên.
+    response = models.TextField(null=True, blank=True)
+
     # external_created_at dùng để lưu cột updated_at từ Supabase
     external_created_at = models.DateTimeField(null=True, blank=True)
     raw_payload = models.JSONField(null=True, blank=True)
@@ -94,10 +117,26 @@ class ChatbotCskhRequest(TimeStampedModel):
     user_id = models.CharField(max_length=100, null=True, blank=True)
     channel = models.CharField(max_length=50, null=True, blank=True)
 
+    # Chuỗi hiển thị, đã dàn phẳng từ contact_payload. Giữ kiểu chuỗi vì admin
+    # và bộ lọc của dashboard tìm kiếm bằng icontains trên cột này.
     contact_info = models.CharField(max_length=255, null=True, blank=True)
+    # Bản đầy đủ khách đã cung cấp: full_name / phone / email / account_number
+    # / customer_type. Nguồn mới trả JSON nhiều trường chứ không còn một giá
+    # trị duy nhất — dàn phẳng rồi vứt đi thì mất đúng thứ dùng để tra ra
+    # khách hàng (số tài khoản), và CCC mất tên người cần gọi.
+    contact_payload = models.JSONField(null=True, blank=True)
+    # PHONE / EMAIL / ACCOUNT / MULTIPLE
     contact_type = models.CharField(max_length=50, null=True, blank=True)
+    # Lý do khách cần CSKH. Nguồn cũ đặt tên cột là `reason`, nguồn mới là
+    # `issue`; cả hai cùng đổ vào đây để mọi chỗ đang đọc `reason` (serializer,
+    # bộ lọc, dashboard, tiêu đề ticket) không phải sửa theo.
     reason = models.TextField(null=True, blank=True)
     status = models.CharField(max_length=50, null=True, blank=True)
+
+    # Chủ đề chatbot chốt tại thời điểm chuyển CCC — chính xác hơn chủ đề suy
+    # ra từ các lượt chat, vì nó là nhãn của chính yêu cầu được bàn giao.
+    category = models.CharField(max_length=255, null=True, blank=True)
+    category_id = models.IntegerField(null=True, blank=True)
 
     # external_created_at dùng để lưu cột created_at từ Supabase
     external_created_at = models.DateTimeField(null=True, blank=True)
@@ -155,6 +194,7 @@ class ChatbotSessionSummary(TimeStampedModel):
 
     # Chủ đề của phiên, lấy từ cột category của xpro_chat_logs
     dashboard_category = models.CharField(max_length=255, null=True, blank=True)
+    dashboard_category_id = models.IntegerField(null=True, blank=True)
 
     outcome_type = models.CharField(max_length=50, choices=OUTCOME_CHOICES)
 
@@ -173,6 +213,10 @@ class ChatbotSessionSummary(TimeStampedModel):
     state_step = models.CharField(max_length=50, null=True, blank=True)
 
     contact_info = models.CharField(max_length=255, null=True, blank=True)
+    # Nguyên văn khối thông tin khách đã cung cấp, chép từ cskh_request của
+    # phiên. Ticket và màn CCC đọc từ đây thay vì cắt chuỗi contact_info.
+    contact_payload = models.JSONField(null=True, blank=True)
+    contact_name = models.CharField(max_length=255, null=True, blank=True)
     contact_type = models.CharField(max_length=50, null=True, blank=True)
     reason = models.TextField(null=True, blank=True)
 

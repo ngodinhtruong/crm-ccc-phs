@@ -166,7 +166,13 @@ REST_FRAMEWORK = {
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
-SUPABASE_XPRO_CHAT_TABLE = os.getenv("SUPABASE_XPRO_CHAT_TABLE", "xpro_chat")
+# Mặc định là bộ bảng chạy thật; bộ *_UAT dùng để thử thì đổi ở .env.
+#
+# Tính đến 2026-09-11 CẢ HAI bộ đã cùng một schema: contact_info dạng jsonb
+# nhiều trường, `issue` thay cho `reason`, `category` kèm category_id dạng
+# JSON, thêm language / is_issue_occurrence / relation_issue. Lớp nhập vẫn đọc
+# được cả schema cũ lẫn mới, nên đổi qua lại chỉ là đổi bốn dòng dưới đây.
+SUPABASE_XPRO_CHAT_TABLE = os.getenv("SUPABASE_XPRO_CHAT_TABLE", "xpro_chat_logs")
 SUPABASE_CHAT_QUESTIONS_TABLE = os.getenv("SUPABASE_CHAT_QUESTIONS_TABLE", "chat_questions")
 SUPABASE_CSKH_STATE_TABLE = os.getenv("SUPABASE_CSKH_STATE_TABLE", "cskh_state")
 SUPABASE_CSKH_REQUESTS_TABLE = os.getenv("SUPABASE_CSKH_REQUESTS_TABLE", "cskh_requests")

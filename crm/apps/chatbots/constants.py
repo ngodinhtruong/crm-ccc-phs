@@ -1,5 +1,7 @@
 """Giá trị nghiệp vụ dùng chung cho module chatbot."""
 
+import json
+
 # questionType trong bảng xpro_chat_logs
 QUESTION_TYPE_GREETING = "GREETING"
 QUESTION_TYPE_UNRELATED = "UNRELATED"
@@ -54,6 +56,10 @@ ECHO_CATEGORY_VALUES = {
     "unrelated",
     "customer_care",
     "customer care",
+    # Nguồn UAT ghi questionType là "customer care center" (thường), nên dạng
+    # echo cũng đổi theo.
+    "customer care center",
+    "customer_care_center",
 }
 
 # sender_type trong bảng chat_questions. xpro_chat_logs không có cột này.
@@ -80,6 +86,19 @@ STATE_STEP_WAITING_INFO = "waiting_info"
 STATE_STEP_COLLECTED = "collected"
 STATE_STEP_CLOSED = "closed"
 
+# Thứ tự hiển thị và nhãn tiếng Việt của từng mảnh thông tin liên hệ.
+# Số tài khoản đứng đầu vì đó là thứ CCC tra cứu trước tiên.
+CONTACT_FIELD_LABELS = (
+    ("account_number", "Số TK"),
+    ("full_name", "Họ tên"),
+    ("phone", "SĐT"),
+    ("email", "Email"),
+    ("customer_type", "Loại KH"),
+)
+
+CONTACT_FIELD_KEYS = tuple(key for key, _ in CONTACT_FIELD_LABELS)
+
+
 # Nhãn hiển thị khi câu hỏi chưa được chatbot gán category
 UNCATEGORIZED_LABEL = "Chưa phân loại"
 
@@ -95,6 +114,60 @@ def normalize_step(value):
     return str(value or "").strip().lower()
 
 
+def parse_category(value):
+    """
+    Tách cột ``category`` thô thành ``(category_id, tên chủ đề)``.
+
+    Nguồn ghi cột này theo hai dạng NẰM LẪN NHAU, kể cả trong cùng một phiên:
+
+      - chuỗi thuần    : ``Mở & Quản lý tài khoản``
+      - chuỗi JSON     : ``{"category_id":2,"category":"Mở & Quản lý tài khoản"}``
+
+    Đọc nguyên si thì cùng một chủ đề tách thành hai cột riêng trên biểu đồ, và
+    ticket sinh ra mang tiêu đề là một cục JSON. Nên mọi nơi chạm vào category
+    phải đi qua đây, không được ``str(value).strip()`` tại chỗ.
+
+    ``category_id`` là mã chủ đề của chatbot, giữ lại để sau này ánh xạ sang
+    danh mục hỗ trợ của CRM mà không phải dò theo tên (tên có dấu, dễ lệch).
+    """
+    if value is None:
+        return None, ""
+
+    data = value
+
+    if isinstance(data, str):
+        text = data.strip()
+
+        if not text:
+            return None, ""
+
+        # Chỉ thử parse khi trông như JSON object; chủ đề thật không mở bằng "{".
+        if not text.startswith("{"):
+            return None, text
+
+        try:
+            data = json.loads(text)
+        except (TypeError, ValueError):
+            return None, text
+
+    if not isinstance(data, dict):
+        return None, str(data).strip()
+
+    name = str(data.get("category") or data.get("category_name") or "").strip()
+
+    try:
+        category_id = int(data.get("category_id"))
+    except (TypeError, ValueError):
+        category_id = None
+
+    return category_id, name
+
+
+def category_id_of(value):
+    """Mã chủ đề, None nếu nguồn ghi dạng chuỗi thuần."""
+    return parse_category(value)[0]
+
+
 def normalize_category(value):
     """
     Trả về category đã trim, hoặc chuỗi rỗng nếu chatbot chưa phân loại.
@@ -102,7 +175,7 @@ def normalize_category(value):
     Giá trị chỉ là echo của questionType ("research", "greeting"...) cũng trả
     về rỗng: đó là nhãn loại câu hỏi, không phải chủ đề nghiệp vụ.
     """
-    text = str(value or "").strip()
+    text = parse_category(value)[1]
 
     return "" if text.lower() in ECHO_CATEGORY_VALUES else text
 

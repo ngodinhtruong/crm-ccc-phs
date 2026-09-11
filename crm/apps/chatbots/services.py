@@ -6,6 +6,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.chatbots.constants import (
+    CONTACT_FIELD_LABELS,
     SENDER_LABELS,
     category_label,
     is_customer_sender,
@@ -42,7 +43,9 @@ CHANNEL_TO_SOURCE_CODE = {
     "facebook": "FACEBOOK",
     "fb": "FACEBOOK",
     "web": "WEB",
+    "website": "WEB",
     "app": "APP",
+    "mobile": "APP",
 }
 
 FALLBACK_SOURCE_CODE = "CHATBOT"
@@ -50,9 +53,24 @@ FALLBACK_SOURCE_CODE = "CHATBOT"
 CONTACT_TYPE_PHONE = "PHONE"
 CONTACT_TYPE_EMAIL = "EMAIL"
 CONTACT_TYPE_ACCOUNT = "ACCOUNT"
+# Khách để lại từ hai mảnh thông tin trở lên (tên + SĐT + email...). Nguồn mới
+# ghi thẳng contact_type = "MULTIPLE" cho trường hợp này, và khi đó không có
+# MỘT loại liên hệ duy nhất để suy ra — phải đọc contact_payload.
+CONTACT_TYPE_MULTIPLE = "MULTIPLE"
 
 EMAIL_CONTACT_HINTS = ("email", "mail")
 PHONE_CONTACT_HINTS = ("phone", "sdt", "điện thoại", "dien thoai", "mobile")
+
+# Thứ tự tra khách hàng khi khách đưa nhiều mảnh thông tin cùng lúc.
+#
+# Số tài khoản trước: cột account_number là unique và do chính hệ thống PHS
+# cấp, khớp được là chắc chắn đúng người. Điện thoại sau, email cuối — email
+# hay là email dùng chung của gia đình/công ty nên dễ khớp nhầm nhất.
+CONTACT_LOOKUP_ORDER = (
+    ("account_number", CONTACT_TYPE_ACCOUNT),
+    ("phone", CONTACT_TYPE_PHONE),
+    ("email", CONTACT_TYPE_EMAIL),
+)
 
 
 def resolve_ticket_source(channel):
@@ -66,14 +84,32 @@ def resolve_ticket_source(channel):
     ).first()
 
 
-def normalize_contact_type(raw_type, value=None):
+def normalize_contact_type(raw_type, value=None, payload=None):
     """
-    contact_type thô của chatbot -> mã chuẩn PHONE / EMAIL / ACCOUNT.
+    contact_type thô của chatbot -> mã chuẩn PHONE / EMAIL / ACCOUNT / MULTIPLE.
 
     Giá trị từ Supabase là chữ tự do nên phải dò từ khoá; không đoán được thì
     suy từ chính chuỗi khách đưa (có '@' thì là email).
+
+    ``payload`` là khối thông tin có cấu trúc của nguồn mới. Khi khách để lại
+    nhiều mảnh cùng lúc, nguồn ghi contact_type = "MULTIPLE" và ``value`` là
+    chuỗi hiển thị ghép sẵn — suy loại từ chuỗi đó là ra kết quả vô nghĩa
+    (chuỗi có '@' nên mọi thứ thành EMAIL). Nên khi có payload, loại liên hệ
+    lấy theo mảnh tin cậy nhất khách đã đưa.
     """
     text = str(raw_type or "").strip().lower()
+
+    if payload:
+        keys = [key for key, _ in CONTACT_LOOKUP_ORDER if payload.get(key)]
+
+        if len(keys) > 1:
+            return CONTACT_TYPE_MULTIPLE
+
+        if keys:
+            return dict(CONTACT_LOOKUP_ORDER)[keys[0]]
+
+    if text == CONTACT_TYPE_MULTIPLE.lower():
+        return CONTACT_TYPE_MULTIPLE
 
     if is_account_contact(text):
         return CONTACT_TYPE_ACCOUNT
@@ -340,6 +376,8 @@ def rebuild_chatbot_session_summaries(affected_session_ids=None):
         "channel",
         "step",
         "reason",
+        "category",
+        "category_id",
         "external_created_at",
     ).order_by("external_created_at", "id")
 
@@ -356,8 +394,11 @@ def rebuild_chatbot_session_summaries(affected_session_ids=None):
         "user_id",
         "channel",
         "contact_info",
+        "contact_payload",
         "contact_type",
         "reason",
+        "category",
+        "category_id",
         "external_created_at",
     ).order_by("external_created_at", "id")
 
@@ -398,6 +439,25 @@ def rebuild_chatbot_session_summaries(affected_session_ids=None):
             state.reason if state else "",
         )
 
+        # Chủ đề của phiên: ưu tiên nhãn chatbot chốt lúc bàn giao (trên
+        # cskh_request, rồi cskh_state) trước khi suy ra từ các lượt chat.
+        #
+        # Cùng một hệ nhãn nên không lệch chuẩn, nhưng nhãn lúc bàn giao là
+        # nhãn của chính yêu cầu được chuyển cho CCC, còn nhãn suy từ lượt chat
+        # là chủ đề được hỏi NHIỀU nhất — phiên hỏi lan man rồi mới chốt một
+        # việc khác sẽ bị xếp nhầm chủ đề, và ticket nhận sai phân loại.
+        category = first_non_empty(
+            normalize_category(request.category) if request else "",
+            normalize_category(state.category) if state else "",
+            pick_session_category(logs),
+        )
+        category_id = first_non_empty(
+            request.category_id if request else None,
+            state.category_id if state else None,
+        ) or None
+
+        contact_payload = (request.contact_payload if request else None) or None
+
         ChatbotSessionSummary.objects.update_or_create(
             session_id=session_id,
             defaults={
@@ -412,13 +472,20 @@ def rebuild_chatbot_session_summaries(affected_session_ids=None):
                     first_log.channel if first_log else "",
                     "ZALO" if first_log and first_log.source_name == "chat_questions" else "XPRO" if first_log else "",
                 ),
-                "dashboard_category": pick_session_category(logs),
+                "dashboard_category": category,
+                "dashboard_category_id": category_id,
                 "outcome_type": outcome,
                 "has_cskh_state": bool(state),
                 "has_cskh_request": bool(request),
                 "state_step": normalize_step(state.step) if state else "",
                 "contact_info": request.contact_info if request else "",
-                "contact_type": request.contact_type if request else "",
+                "contact_payload": contact_payload,
+                "contact_name": (contact_payload or {}).get("full_name") or "",
+                "contact_type": normalize_contact_type(
+                    request.contact_type if request else None,
+                    request.contact_info if request else None,
+                    payload=contact_payload,
+                ) or "",
                 "reason": reason,
                 "first_question": first_customer.question if first_customer else "",
                 "last_question": last_customer.question if last_customer else "",
@@ -450,26 +517,17 @@ def is_account_contact(contact_type):
     )
 
 
-def find_customer_by_contact(contact_type, contact_info):
-    """
-    Tra khách hàng theo ĐÚNG loại thông tin khách đưa.
+def lookup_one_contact(kind, value):
+    """Tra khách hàng bằng đúng MỘT mảnh thông tin."""
+    value = str(value or "").strip()
 
-    Trước đây hàm này luôn chạy `phone=x OR email=x` cho mọi trường hợp, nên
-    một số điện thoại trùng email của người khác sẽ khớp nhầm. Giờ tách theo
-    contact_type: ACCOUNT tra số tài khoản, PHONE tra số điện thoại, EMAIL tra
-    email. Cả ba cột đều unique nên kết quả là duy nhất.
-    """
-    contact_info = str(contact_info or "").strip()
-
-    if not contact_info:
+    if not value:
         return None, None
 
-    normalized = normalize_contact_type(contact_type, contact_info)
-
-    if normalized == CONTACT_TYPE_ACCOUNT:
+    if kind == CONTACT_TYPE_ACCOUNT:
         account = (
             CustomerAccount.objects.select_related("customer")
-            .filter(account_number=contact_info)
+            .filter(account_number=value)
             .first()
         )
 
@@ -478,13 +536,50 @@ def find_customer_by_contact(contact_type, contact_info):
 
         return None, None
 
-    if normalized == CONTACT_TYPE_EMAIL:
-        return Customer.objects.filter(email__iexact=contact_info).first(), None
+    if kind == CONTACT_TYPE_EMAIL:
+        return Customer.objects.filter(email__iexact=value).first(), None
 
-    if normalized == CONTACT_TYPE_PHONE:
-        return Customer.objects.filter(phone=contact_info).first(), None
+    if kind == CONTACT_TYPE_PHONE:
+        return Customer.objects.filter(phone=value).first(), None
 
     return None, None
+
+
+def find_customer_by_contact(contact_type, contact_info, payload=None):
+    """
+    Tra khách hàng theo ĐÚNG loại thông tin khách đưa.
+
+    Trước đây hàm này luôn chạy `phone=x OR email=x` cho mọi trường hợp, nên
+    một số điện thoại trùng email của người khác sẽ khớp nhầm. Giờ tách theo
+    contact_type: ACCOUNT tra số tài khoản, PHONE tra số điện thoại, EMAIL tra
+    email. Cả ba cột đều unique nên kết quả là duy nhất.
+
+    ``payload`` là khối thông tin có cấu trúc của nguồn mới (số TK / SĐT /
+    email / họ tên trong cùng một jsonb). Có payload thì tra lần lượt theo
+    ``CONTACT_LOOKUP_ORDER`` và lấy kết quả đầu tiên khớp — khách đưa cả SĐT
+    lẫn email mà chỉ tra một cái thì bỏ lỡ những ca nối được.
+
+    Không có payload là dữ liệu nguồn cũ (một giá trị đơn) — giữ nguyên đường
+    cũ để bản ghi đã đồng bộ trước đây không đổi cách hiểu.
+    """
+    if payload:
+        for key, kind in CONTACT_LOOKUP_ORDER:
+            customer, account = lookup_one_contact(kind, payload.get(key))
+
+            if customer or account:
+                return customer, account
+
+        return None, None
+
+    contact_info = str(contact_info or "").strip()
+
+    if not contact_info:
+        return None, None
+
+    return lookup_one_contact(
+        normalize_contact_type(contact_type, contact_info),
+        contact_info,
+    )
 
 
 def resolve_default_branch(branch_code=None):
@@ -569,6 +664,60 @@ def relink_ticket_customer(ticket):
     return True
 
 
+def primary_contact_value(summary):
+    """
+    Một giá trị liên hệ duy nhất để lưu lên ticket.
+
+    Lấy mảnh tin cậy nhất khách đã đưa (số TK -> SĐT -> email) chứ không lấy
+    chuỗi hiển thị đã ghép nhãn: cột này để tra cứu và đối chiếu, nhét cả
+    "Họ tên: vivi | SĐT: 0377929765" vào là biến nó thành cột không tra được.
+    """
+    payload = summary.contact_payload or {}
+
+    for key, _ in CONTACT_LOOKUP_ORDER:
+        if payload.get(key):
+            return str(payload[key])
+
+    return summary.contact_info or ""
+
+
+def build_contact_lines(summary):
+    """
+    Khối thông tin liên hệ in trong nội dung ticket.
+
+    Tách từng mảnh ra từng dòng có nhãn thay vì in nguyên chuỗi gộp: CCC gọi
+    khách theo tên, tra cứu theo số tài khoản, gọi theo số điện thoại — nhìn
+    một dãy ghép chung thì phải tự đoán đâu là gì.
+    """
+    payload = summary.contact_payload or {}
+
+    if not payload:
+        return [
+            f"Thông tin liên hệ: {summary.contact_info or ''} "
+            f"({summary.contact_type or ''})"
+        ]
+
+    lines = [f"Loại liên hệ: {summary.contact_type or ''}"]
+
+    lines.extend(
+        f"{label}: {payload[key]}"
+        for key, label in CONTACT_FIELD_LABELS
+        if payload.get(key)
+    )
+
+    # Nguồn thêm key mới mà CRM chưa biết tên tiếng Việt: vẫn in ra, để thông
+    # tin khách đã cung cấp không bị nuốt mất trong im lặng.
+    known = {key for key, _ in CONTACT_FIELD_LABELS}
+
+    lines.extend(
+        f"{key}: {value}"
+        for key, value in payload.items()
+        if key not in known
+    )
+
+    return lines
+
+
 def build_chatbot_ticket_kwargs(*, summary, default_branch, created_status, policy):
     """Tạo kwargs tương thích với phiên bản TicketService hiện tại.
 
@@ -578,15 +727,22 @@ def build_chatbot_ticket_kwargs(*, summary, default_branch, created_status, poli
     """
     from apps.tickets.services import TicketService
 
+    payload = summary.contact_payload or {}
+
     customer, customer_account = find_customer_by_contact(
         summary.contact_type,
         summary.contact_info,
+        payload=payload,
     )
     normalized_contact_type = normalize_contact_type(
         summary.contact_type,
         summary.contact_info,
+        payload=payload,
     )
 
+    # Tiêu đề ticket: vấn đề chatbot đã tóm tắt (cột `issue` của nguồn, đổ vào
+    # `reason`) mô tả đúng việc cần xử lý. Câu hỏi cuối chỉ là phương án dự
+    # phòng — nó thường là câu khách đọc số điện thoại, không nói lên việc gì.
     title = first_non_empty(
         summary.reason,
         summary.last_question,
@@ -598,7 +754,7 @@ def build_chatbot_ticket_kwargs(*, summary, default_branch, created_status, poli
             f"Session ID: {summary.session_id}",
             f"Kênh: {summary.channel or ''}",
             f"Chủ đề: {category_label(summary.dashboard_category)}",
-            f"Thông tin liên hệ: {summary.contact_info or ''} ({summary.contact_type or ''})",
+            *build_contact_lines(summary),
             f"Lý do chuyển CCC: {summary.reason or ''}",
             "",
             "Nội dung hội thoại:",
@@ -627,16 +783,26 @@ def build_chatbot_ticket_kwargs(*, summary, default_branch, created_status, poli
         kwargs["contact_type"] = normalized_contact_type
 
     if "contact_value" in parameters:
-        kwargs["contact_value"] = summary.contact_info or ""
+        kwargs["contact_value"] = primary_contact_value(summary)
 
     # Nhánh Ticket cũ chưa có contact_type/contact_value vẫn lưu được số tài
     # khoản thô để CCC tra cứu sau.
+    #
+    # Với nguồn mới, số tài khoản nằm trong contact_payload chứ không còn là
+    # cả giá trị contact_info — lấy nguyên contact_info là nhét cả chuỗi "Họ
+    # tên: ... | SĐT: ..." vào cột số tài khoản.
+    raw_account_number = payload.get("account_number") or (
+        summary.contact_info
+        if normalized_contact_type == CONTACT_TYPE_ACCOUNT and not payload
+        else ""
+    )
+
     if (
         "raw_account_number" in parameters
-        and normalized_contact_type == CONTACT_TYPE_ACCOUNT
+        and raw_account_number
         and customer_account is None
     ):
-        kwargs["raw_account_number"] = summary.contact_info or ""
+        kwargs["raw_account_number"] = raw_account_number[:50]
 
     return kwargs
 
